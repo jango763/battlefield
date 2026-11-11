@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Серый наёмник — тест немецкого солдата</title>
+<style>
+html,body{margin:0;min-height:100%;background:#161b16;color:#f4efd9;font:16px/1.5 Arial,sans-serif}
+#status{position:fixed;inset:0;display:grid;place-content:center;text-align:center;padding:24px}
+small{display:block;color:#bcbba7;margin-top:12px;font-size:13px}
+</style>
+</head>
+<body>
+<div id="status" role="status"><b>Загрузка тестовой игры…</b><small>Немецкий солдат Panzergrenadier</small></div>
+<script>
+(async function(){
+  const count=27,parts=new Array(count);
+  const status=document.getElementById('status');
+  let done=0;
+  const root=new URL('./german-data/',location.href);
+  try{
+    await Promise.all(Array.from({length:count},async(_,i)=>{
+      const url=new URL('part-'+String(i).padStart(2,'0')+'.txt',root);
+      const response=await fetch(url);
+      if(!response.ok)throw new Error('Файл '+i+': HTTP '+response.status);
+      parts[i]=await response.text();
+      done++;
+      status.querySelector('b').textContent='Загрузка игры: '+Math.round(done*100/count)+'%';
+    }));
+    const html=parts.join('');
+    if(!/^<!doctype html>/i.test(html.slice(0,40)) || !html.trimEnd().endsWith('</html>')) throw new Error('Сборка неполная');
+    document.open();
+    document.write(html);
+    document.close();
+  }catch(e){
+    console.error('German preview loading failed:',e);
+    status.querySelector('b').textContent='Не удалось загрузить игру';
+    status.querySelector('small').textContent=e.message+' — проверьте интернет и обновите страницу';
+  }
+})();
+</script>
+</body>
+</html>
