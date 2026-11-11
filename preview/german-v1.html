@@ -1,0 +1,11 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Серый наёмник — немецкий солдат (тест)</title></head><body style="margin:0;background:#25291c;color:#eee;font:16px Arial;padding:22px"><p id="wait">Загрузка исходной игры и немецкой модели…</p><script>
+(async function(){try{
+  const response=await fetch('../index.html',{cache:'no-store'});
+  if(!response.ok)throw Error('Исходная игра недоступна: '+response.status);
+  let html=await response.text();
+  if(!html.includes('function mk(t,cmd,eng)')||!html.includes('function animSoldier(o,moving,dt)'))throw Error('Версия исходной игры изменилась — тестовая сборка не применена');
+  const inserts="<script src=\"./german-data-01.js\"><\/script><script src=\"./german-data-02.js\"><\/script><script src=\"./german-data-03.js\"><\/script><script src=\"./german-data-04.js\"><\/script><script src=\"./german-data-05.js\"><\/script><script src=\"./german-data-06.js\"><\/script><script src=\"./german-data-07.js\"><\/script><script src=\"./german-integration.js\"><\/script>";
+  html=html.replace('</body>',inserts+'</body>');
+  document.open();document.write(html);document.close();
+}catch(error){document.getElementById('wait').textContent='Ошибка загрузки тестовой сборки: '+error.message;console.error(error)}})();
+</script></body></html>
