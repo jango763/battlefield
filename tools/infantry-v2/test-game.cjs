@@ -16,7 +16,8 @@ async function run(file){
   for(let i=0;i<900;i++){time+=1000/30;if(i===90)vm.runInContext('keys.d=0',ctx);vm.runInContext('update(1/30);scene.updateMatrixWorld(true);',ctx);}
   const snapshot=vm.runInContext('JSON.stringify({gold:G,hp:P.hp,x:P.x,z:P.z,units:U.map(u=>[u.t,u.hp,u.x,u.z,u.gold,u.type]),bases:[CA.blue.hp,CA.red.hp],models:U.filter(u=>u.germanPreview).length})',ctx);
   const stats=JSON.parse(snapshot);assert(stats.models>0,'No German models installed');
-  if(file.includes('v2'))vm.runInContext("for(const u of U){if(!u.germanPreview)continue;if(u.germanPreview.legacy.visible)throw Error('Visible legacy');}toggleGermanSoldierPreview();update(.016);toggleGermanSoldierPreview();update(.016);",ctx);
+  if(file.includes('v2')){assert.equal(stats.models,stats.units.length);vm.runInContext("for(const u of [P,...U]){if(!u.germanPreview)throw Error('Missing new model');if(u.germanPreview.legacy.visible)throw Error('Visible legacy');}",ctx);}
+  delete stats.models;
   return stats;
 }
-(async()=>{const before=await run('preview-original.html'),after=await run('preview-v2-built.html');assert.deepEqual(after,before,'Rendering change altered battle simulation');console.log(JSON.stringify({passed:true,simulatedSeconds:30,units:after.units.length,models:after.models,baselineCombatIdentical:true,fullSourceExecuted:true}));})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{const before=await run('preview-original.html'),after=await run('preview-v2-built.html');assert.deepEqual(after,before,'Rendering change altered battle simulation');console.log(JSON.stringify({passed:true,simulatedSeconds:30,units:after.units.length,allInfantryAndHeroUpdated:true,baselineCombatIdentical:true,fullSourceExecuted:true}));})().catch(e=>{console.error(e);process.exitCode=1});

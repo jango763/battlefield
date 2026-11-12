@@ -10,3 +10,6 @@ poses.json
 render-states.json
 rig-check.png
 tex-*
+role-states.json
+roles-check.png
+*-render.log

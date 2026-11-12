@@ -15,14 +15,17 @@
   try{
     const chunks=new Array(17);let next=0,done=0;
     const worker=async()=>{while(next<17){const i=next++;chunks[i]=await get('parts/german-'+String(i).padStart(3,'0')+'.txt');progress.textContent='Загрузка игры: '+Math.round(++done/18*100)+'%';}};
-    const work=await Promise.all([get('german-v2.js?v=20261112-1'),...Array.from({length:4},worker)]);
+    const work=await Promise.all([get('german-v2.js?v=20261112-2'),...Array.from({length:4},worker)]);
     let html=chunks.join('');const start='// === Preview integration: German WW2 Panzergrenadier (red faction) ===',end='// === End of preview integration ===';
     const a=html.indexOf(start),b=html.indexOf(end,a);if(a<0||b<a)throw new Error('Не найдена основа тестовой версии');
     html=html.slice(0,a)+work[0]+html.slice(b+end.length);
-    html=once(html,'if(moving)dust(o,dt);if(m.spr)','if(moving)dust(o,dt);if(o.germanPreview&&germanPreview.showNew){animateGermanSoldier(o,dt);return}if(m.spr)');
+    html=once(html,'if(moving)dust(o,dt);if(m.spr)','if(moving)dust(o,dt);if(o.germanPreview){animateGermanSoldier(o,dt);return}if(m.spr)');
     html=once(html,'U=U.filter(u=>{if(u.hp>0)return true;','U=U.filter(u=>{if(u.hp>0)return true;disposeGermanSoldier(u);');
     html=once(html,'dustUpdate(dt);pointsUpdate(dt);fogUpdate(dt);','refreshGermanPreviewLabel();dustUpdate(dt);pointsUpdate(dt);fogUpdate(dt);');
-    html=once(html,'🇩🇪 Сравнить немца','🇩🇪 Показать старую');
+    html=once(html,'<button type="button" id="german-compare">🇩🇪 Сравнить немца</button>','');
+    html=once(html,"U.push(u);if(t==='red'&&!cmd&&!eng)attachGermanSoldier(u);return u;","U.push(u);attachGermanSoldier(u);return u;");
+    if(html.split('pm.mf.getWorldPosition(mzV);').length!==3)throw new Error('Изменилось крепление прицела');
+    html=html.split('pm.mf.getWorldPosition(mzV);').join('(P.germanPreview?P.germanPreview.weapon.flash:pm.mf).getWorldPosition(mzV);');
     html=once(html,'<title>Серый наёмник: линия фронта</title>','<title>Серый наёмник — пехота v2</title>');
     progress.textContent='Запуск…';document.open();document.write(html);document.close();
   }catch(e){error.textContent='Не удалось загрузить игру: '+(e.name==='AbortError'?'превышено время ожидания':e.message);progress.textContent='Загрузка прервана';retry.hidden=false;}

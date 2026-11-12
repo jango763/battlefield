@@ -1,8 +1,89 @@
-// German infantry integration v2. Gameplay, damage and input stay in the original game.
+// Unified soldier visuals: faction palettes and distinct hero/captain/engineer roles.
+// Gameplay, damage and input stay in the original game.
 // Model: britdawgmasterfunk, CC BY 4.0; see assets/soldiers/CREDITS.md.
 const creditsLink=document.createElement('a');creditsLink.textContent='Авторы моделей';creditsLink.href='../assets/soldiers/CREDITS.md';creditsLink.target='_blank';creditsLink.rel='noopener';creditsLink.style.cssText='position:fixed;z-index:23;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 113px);font:10px Arial;color:#e7dec8;background:#20251dcc;padding:3px 5px';document.body.appendChild(creditsLink);
-const germanPreview={template:null,pending:[],bounds:null,limit:8,showNew:true,error:null};
-function germanPreviewLabel(message){const e=document.getElementById('german-preview-status');if(e&&e.textContent!==message)e.textContent=message;}
+const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null};
+function germanPreviewLabel(message){const e=document.getElementById('german-preview-status');if(e){e.hidden=!message;if(e.textContent!==message)e.textContent=message;}}
+function soldierRole(unit){return unit.kind==='p'?'hero':unit.cmd?'captain':unit.eng?'engineer':'infantry';}
+function soldierPalette(unit){return unit.kind==='p'?'hero':unit.t==='red'?'grey':'khaki';}
+// A shared cloth mask excludes skin, hands and boots. Texture detail remains,
+// while the uniform's hue is controlled separately from leather and equipment.
+function prepareSoldierGeometry(figure){
+  figure.traverse(n=>{
+    if(!n.isSkinnedMesh||n.material.name!=='Material.003')return;
+    const g=n.geometry,indices=g.attributes.skinIndex,weights=g.attributes.skinWeight;
+    const mask=new Float32Array(indices.count);
+    for(let i=0;i<mask.length;i++){
+      let cloth=0;
+      for(let k=0;k<4;k++){
+        const name=n.skeleton.bones[indices.array[i*4+k]].name;
+        if(!/Head|Neck|Hand|Foot|Toe/i.test(name))cloth+=weights.array[i*4+k];
+      }
+      mask[i]=THREE.MathUtils.smoothstep(cloth,.25,.8);
+    }
+    g.setAttribute('uniformMask',new THREE.BufferAttribute(mask,1));
+  });
+}
+function soldierMaterial(source,palette){
+  const key=source.uuid+':'+palette;if(germanPreview.materials.has(key))return germanPreview.materials.get(key);
+  const m=source.clone(),cloth=m.name==='Material.003',helmet=/helmet/.test(m.name);
+  m.metalness=helmet?.08:0;m.metalnessMap=null;m.roughness=.88;m.aoMapIntensity=.62;
+  m.emissive.setHex(0x292b2c);m.emissiveIntensity=.16;
+  if(cloth||helmet){
+    const tint=new THREE.Color(palette==='hero'?0x555960:palette==='grey'?0x93979b:0xb4ad85);
+    m.userData.uniformTint=tint.toArray();m.userData.clothMask=cloth;
+    m.onBeforeCompile=shader=>{
+      shader.uniforms.uniformTint={value:tint};
+      if(cloth){
+        shader.vertexShader='attribute float uniformMask; varying float vUniformMask;\n'+shader.vertexShader;
+        shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvUniformMask=uniformMask;');
+      }
+      shader.fragmentShader='uniform vec3 uniformTint;\n'+(cloth?'varying float vUniformMask;\n':'')+shader.fragmentShader;
+      shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
+        float fabricLight=dot(diffuseColor.rgb,vec3(.2126,.7152,.0722));
+        vec3 fabric=uniformTint*clamp(.28+sqrt(max(fabricLight,0.0))*.95,.28,1.0);
+        diffuseColor.rgb=mix(diffuseColor.rgb,fabric,${cloth?'vUniformMask':'1.0'});`);
+    };
+    m.customProgramCacheKey=()=>cloth?'soldier-cloth-v3':'soldier-helmet-v3';
+  }
+  germanPreview.materials.set(key,m);return m;
+}
+function makeSoldierIdentity(role,palette){
+  const root=new THREE.Group(),head=new THREE.Group(),body=new THREE.Group();root.add(head,body);root.name='Identity-'+role;
+  const cloth=new THREE.MeshLambertMaterial({color:palette==='hero'?0x4e5259:palette==='grey'?0x858b8e:0x928968});
+  const leather=new THREE.MeshLambertMaterial({color:0x4d3c30}),metal=new THREE.MeshLambertMaterial({color:0x62676b}),brass=new THREE.MeshLambertMaterial({color:0xc1a66b}),dark=new THREE.MeshLambertMaterial({color:0x252b2c});
+  const add=(group,geo,mat,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);group.add(m);return m;};
+  const box=(group,mat,w,h,d,x,y,z)=>add(group,new THREE.BoxGeometry(w,h,d),mat,x,y,z);
+  const oval=(group,mat,x,y,z,sx,sy,sz)=>{const m=add(group,new THREE.SphereGeometry(1,16,10),mat,x,y,z);m.scale.set(sx,sy,sz);return m;};
+  if(role==='hero'){
+    oval(head,new THREE.MeshLambertMaterial({color:0x80283e}),.03,.245,0,.235,.075,.22).rotation.z=-.16;
+    oval(head,brass,-.09,.25,.20,.028,.032,.012);
+    box(body,leather,.06,.43,.025,.16,-.14,.18).rotation.z=-.3;
+    box(body,dark,.12,.27,.12,.31,-.61,.06);
+    box(body,cloth,.35,.40,.20,0,-.13,-.27);
+  }else if(role==='captain'){
+    add(head,new THREE.CylinderGeometry(.205,.18,.09,20),cloth,0,.295,0);
+    add(head,new THREE.CylinderGeometry(.19,.19,.075,20),dark,0,.22,0);
+    oval(head,dark,0,.205,.16,.18,.02,.14);oval(head,brass,0,.285,.195,.025,.03,.012);
+    for(const side of [-1,1])box(body,brass,.14,.035,.12,side*.27,.05,0);
+    box(body,leather,.30,.32,.09,.29,-.47,.20).rotation.z=-.12;
+    for(const side of [-1,1])add(body,new THREE.CylinderGeometry(.045,.05,.16,10),dark,side*.055,-.18,.26).rotation.x=Math.PI/2;
+  }else if(role==='engineer'){
+    box(body,leather,.44,.53,.24,0,-.15,-.28);
+    for(const side of [-1,1])box(body,cloth,.055,.48,.035,side*.14,-.15,-.415);
+    box(body,leather,.32,.15,.13,.29,-.52,.12);
+    const handle=box(body,leather,.045,.66,.045,.30,-.27,-.39);handle.rotation.z=-.18;
+    box(body,metal,.17,.22,.035,.35,-.62,-.39).rotation.z=-.18;
+    box(body,metal,.18,.07,.045,-.23,-.48,.19);
+  }
+  if(palette==='khaki'&&role!=='hero'&&role!=='captain'){
+    oval(head,cloth,0,.23,0,.255,.13,.255);
+    add(head,new THREE.CylinderGeometry(.32,.32,.025,20),cloth,0,.18,0);
+  }
+  const band=box(body,new THREE.MeshLambertMaterial({color:0x777777}),.028,.10,.16,.31,-.10,0);
+  root.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
+  return{root,head,body,band};
+}
 function germanSkeletonClone(source){
   const originals=[],copies=[];source.traverse(n=>originals.push(n));
   const clone=source.clone(true);clone.traverse(n=>copies.push(n));
@@ -52,7 +133,7 @@ const GermanRig=(()=>{
 })();
 function makeGermanWeapon(){
   const root=new THREE.Group(),wood=new THREE.MeshLambertMaterial({color:0x705039}),metal=new THREE.MeshLambertMaterial({color:0x343c3c}),strap=new THREE.MeshLambertMaterial({color:0x3f3727});
-  const rifle=new THREE.Group(),machineGun=new THREE.Group(),launcher=new THREE.Group();root.add(rifle,machineGun,launcher);
+  const rifle=new THREE.Group(),machineGun=new THREE.Group(),launcher=new THREE.Group(),scope=new THREE.Group(),magazine=new THREE.Group();root.add(rifle,machineGun,launcher,scope,magazine);
   const box=(mat,x,y,z,px,py,pz,group=rifle)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(x,y,z),mat);m.position.set(px,py,pz);group.add(m);return m;};
   // +Z is the muzzle direction; geometry is in the same units as the soldier.
   box(wood,.095,.12,.46,0,-.015,-.22);box(wood,.085,.075,.45,0,0,.20);
@@ -65,17 +146,26 @@ function makeGermanWeapon(){
   const tube=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,1.02,10),strap);tube.rotation.x=Math.PI/2;tube.position.z=.22;launcher.add(tube);
   const rocket=new THREE.Mesh(new THREE.ConeGeometry(.13,.30,10),metal);rocket.rotation.x=Math.PI/2;rocket.position.z=.86;launcher.add(rocket);
   box(metal,.04,.13,.035,0,.12,.32,launcher);
+  const optic=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.24,10),metal);optic.rotation.x=Math.PI/2;optic.position.set(0,.15,.12);scope.add(optic);
+  box(metal,.055,.23,.08,0,-.16,.16,magazine);
   const flash=new THREE.Mesh(new THREE.SphereGeometry(.08,6,4),new THREE.MeshBasicMaterial({color:0xffd487}));flash.position.set(0,.05,.87);flash.scale.set(.7,.7,2.2);flash.visible=false;root.add(flash);
   const rear=new THREE.Object3D(),front=new THREE.Object3D();rear.position.set(-.025,-.07,-.035);front.position.set(.03,-.065,.20);root.add(rear,front);
-  root.name='GermanWeapon';return{root,flash,rear,front,rifle,machineGun,launcher};
+  root.name='GermanWeapon';return{root,flash,rear,front,rifle,machineGun,launcher,scope,magazine,barrel};
 }
 function attachGermanSoldier(unit){
-  if(unit.t!=='red'||unit.cmd||unit.eng||unit.germanPreview)return;
+  if(unit.germanPreview||unit.hp<=0)return;
   if(!germanPreview.template){if(!germanPreview.pending.includes(unit))germanPreview.pending.push(unit);return;}
-  if(U.filter(u=>u.germanPreview&&u.hp>0).length>=germanPreview.limit)return;
   let figure;
   try{figure=germanSkeletonClone(germanPreview.template);}catch(e){console.warn(e);return;}
   const anchor=new THREE.Group();anchor.name='GermanVisual';anchor.add(figure);
+  const role=soldierRole(unit),palette=soldierPalette(unit);
+  // Normalize only the visual anchor: collision radii and gameplay scales stay intact.
+  anchor.scale.setScalar(1.1/unit.m.g.scale.y);
+  figure.traverse(n=>{if(!n.isMesh)return;
+    const name=n.material.name;
+    n.visible=!/scrim/.test(name)&&!(/helmet/.test(name)&&(role==='hero'||role==='captain'||palette==='khaki'));
+    n.material=soldierMaterial(n.material,palette);
+  });
   const bounds=germanPreview.bounds,height=bounds.max.y-bounds.min.y,factor=2.55/height;
   figure.scale.setScalar(factor);figure.position.set(-(bounds.min.x+bounds.max.x)*factor/2,-bounds.min.y*factor,0);
   const names={hips:'Hips',spine:'Spine',chest:'Spine2',head:'Head',lUp:'LeftUpLeg',rUp:'RightUpLeg',lKnee:'LeftLeg',rKnee:'RightLeg',lFoot:'LeftFoot',rFoot:'RightFoot',lArm:'LeftArm',rArm:'RightArm',lFore:'LeftForeArm',rFore:'RightForeArm',lHand:'LeftHand',rHand:'RightHand'};
@@ -89,35 +179,34 @@ function attachGermanSoldier(unit){
   const legacy=new THREE.Group();legacy.name='LegacySoldierVisual';
   for(const child of [...unit.m.g.children]){
     const type=child.geometry&&child.geometry.type;
-    if(type==='RingGeometry'||type==='CircleGeometry')continue;
+    if(type==='RingGeometry'||type==='CircleGeometry'){child.scale.multiplyScalar(1.1/unit.m.g.scale.y);continue;}
     legacy.add(child);
   }
-  const weapon=makeGermanWeapon();anchor.add(weapon.root);unit.m.g.add(legacy,anchor);
+  const weapon=makeGermanWeapon(),identity=makeSoldierIdentity(role,palette);anchor.add(weapon.root,identity.root);unit.m.g.add(legacy,anchor);
   const local=(bone)=>{anchor.updateWorldMatrix(true,true);return anchor.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));};
   const feet={left:local(bones.lFoot),right:local(bones.rFoot)};
   const anchorQ=anchor.getWorldQuaternion(new THREE.Quaternion()).invert();
   const footQ={left:anchorQ.clone().multiply(bones.lFoot.getWorldQuaternion(new THREE.Quaternion())),right:anchorQ.clone().multiply(bones.rFoot.getWorldQuaternion(new THREE.Quaternion()))};
-  unit.germanPreview={anchor,figure,legacy,bones,rest,feet,footQ,weapon,phase:0,walk:0,aim:0,yaw:0,
+  const headQ=anchorQ.clone().multiply(bones.head.getWorldQuaternion(new THREE.Quaternion())).invert(),chestQ=anchorQ.clone().multiply(bones.chest.getWorldQuaternion(new THREE.Quaternion())).invert();
+  unit.germanPreview={anchor,figure,legacy,bones,rest,feet,footQ,weapon,identity,role,palette,headQ,chestQ,phase:0,walk:0,aim:0,yaw:0,
     targets:{left:new THREE.Vector3(),right:new THREE.Vector3(),rear:new THREE.Vector3(),front:new THREE.Vector3()},
     poles:{left:new THREE.Vector3(.72,1.35,-.12),right:new THREE.Vector3(-.72,1.35,-.12),lKnee:new THREE.Vector3(.24,.6,.9),rKnee:new THREE.Vector3(-.24,.6,.9)}};
-  legacy.visible=!germanPreview.showNew;anchor.visible=germanPreview.showNew;
+  legacy.visible=false;anchor.visible=true;
   animateGermanSoldier(unit,0);
   refreshGermanPreviewLabel();
 }
 function refreshGermanPreviewLabel(){
-  const count=U.filter(u=>u.hp>0&&u.germanPreview).length;
-  germanPreviewLabel('🇩🇪 Новая пехота: '+count+' / '+germanPreview.limit);
+  if(germanPreview.template)germanPreviewLabel('');
 }
 function disposeGermanSoldier(unit){
   const v=unit.germanPreview;if(!v)return;
-  const materials=new Set();v.weapon.root.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material)materials.add(n.material);});
+  const materials=new Set();for(const group of [v.weapon.root,v.identity.root])group.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material)materials.add(n.material);});
   for(const m of materials)m.dispose();
   v.figure.traverse(n=>{if(n.skeleton&&n.skeleton.boneTexture)n.skeleton.boneTexture.dispose();});
 }
 function animateGermanSoldier(unit,dt=.016){
   const v=unit.germanPreview;if(!v)return;
-  v.legacy.visible=!germanPreview.showNew;v.anchor.visible=germanPreview.showNew;
-  if(!germanPreview.showNew)return;
+  v.legacy.visible=false;v.anchor.visible=true;
   const blend=1-Math.exp(-Math.max(0,dt)*12),speed=unit.sv||0;
   v.walk+=(Math.min(1,speed/4.5)-v.walk)*blend;v.aim+=((unit.aim>0?1:0)-v.aim)*blend;
   // One full gait cycle per 1.7 game units, with a continuous phase at stops.
@@ -153,16 +242,19 @@ function animateGermanSoldier(unit,dt=.016){
   GermanRig.orient(v.anchor,v.bones.rHand,handQ);GermanRig.orient(v.anchor,v.bones.lHand,handQ);
   for(const r of v.rest){if(/Hand(Index|Middle|Ring|Pinky)[123]_/.test(r.bone.name))GermanRig.rotate(r.bone,[-.7,0,0]);}
   v.weapon.flash.visible=unit.kick>0;
-  const heavy=!!(unit.hv&&unit.ammo>0);
-  v.weapon.rifle.visible=!heavy;v.weapon.machineGun.visible=!heavy&&unit.type==='mg';v.weapon.launcher.visible=heavy;
+  const hero=unit.kind==='p',heavy=hero?unit.wpn>=4:!!(unit.hv&&unit.ammo>0),smg=hero?unit.wpn===1:unit.type==='smg';
+  v.weapon.rifle.visible=!heavy;v.weapon.machineGun.visible=!heavy&&(hero?unit.wpn===2:unit.type==='mg');v.weapon.launcher.visible=heavy;
+  v.weapon.scope.visible=hero&&unit.wpn===3;v.weapon.magazine.visible=smg;
+  v.weapon.barrel.scale.y=smg?.45:1;v.weapon.barrel.position.z=smg?.47:.60;
+  v.weapon.flash.position.z=heavy?1.04:smg?.60:.87;
+  const inv= v.anchor.getWorldQuaternion(new THREE.Quaternion()).invert();
+  for(const [part,bone,restQ] of [[v.identity.head,v.bones.head,v.headQ],[v.identity.body,v.bones.chest,v.chestQ]]){
+    part.position.copy(v.anchor.worldToLocal(bone.getWorldPosition(new THREE.Vector3())));
+    part.quaternion.copy(inv).multiply(bone.getWorldQuaternion(new THREE.Quaternion())).multiply(restQ);
+  }
+  v.identity.band.material.color.setHex((hero?unit.side:unit.t)==='red'?0x9e4a44:0x4d7391);
   v.anchor.updateWorldMatrix(true,true);
 }
-function toggleGermanSoldierPreview(){
-  germanPreview.showNew=!germanPreview.showNew;
-  for(const u of U){const v=u.germanPreview;if(v){v.legacy.visible=!germanPreview.showNew;v.anchor.visible=germanPreview.showNew;}}
-  const b=document.getElementById('german-compare');if(b)b.textContent=germanPreview.showNew?'🇩🇪 Показать старую':'🇩🇪 Показать новую';
-}
-document.getElementById('german-compare').addEventListener('click',toggleGermanSoldierPreview);
 function loadGermanSoldierPreview(){
   if(typeof THREE.GLTFLoader!=='function'){germanPreviewLabel('Модель недоступна — исходные бойцы');return;}
   try{
@@ -171,13 +263,10 @@ function loadGermanSoldierPreview(){
       try{
         const figure=gltf.scene;figure.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(figure);
         if(!Number.isFinite(bounds.min.y)||bounds.max.y<=bounds.min.y)throw new Error('Размеры модели');
-        figure.traverse(n=>{if(!n.isMesh)return;n.castShadow=true;n.receiveShadow=true;
-          const prep=m=>{m=m.clone();m.metalness=/helmet/i.test(m.name)?.15:0;m.roughness=.86;
-            m.emissive.setHex(0x171b13);m.emissiveIntensity=.24;return m;};
-          n.material=Array.isArray(n.material)?n.material.map(prep):prep(n.material);
-        });
+        figure.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
+        prepareSoldierGeometry(figure);
         germanPreview.template=figure;germanPreview.bounds=bounds;
-        const queue=[...germanPreview.pending];germanPreview.pending.length=0;
+        const queue=[P,...U,...germanPreview.pending];germanPreview.pending.length=0;
         for(const u of queue)if(u.hp>0)attachGermanSoldier(u);
         refreshGermanPreviewLabel();
       }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');}

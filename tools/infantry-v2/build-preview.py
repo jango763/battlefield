@@ -10,10 +10,13 @@ begin='// === Preview integration: German WW2 Panzergrenadier (red faction) ==='
 end='// === End of preview integration ==='
 a=original.index(begin);b=original.index(end,a)+len(end)
 html=original[:a]+integration+original[b:]
-html=once('if(moving)dust(o,dt);if(m.spr)', 'if(moving)dust(o,dt);if(o.germanPreview&&germanPreview.showNew){animateGermanSoldier(o,dt);return}if(m.spr)',html)
+html=once('if(moving)dust(o,dt);if(m.spr)', 'if(moving)dust(o,dt);if(o.germanPreview){animateGermanSoldier(o,dt);return}if(m.spr)',html)
 html=once('U=U.filter(u=>{if(u.hp>0)return true;', 'U=U.filter(u=>{if(u.hp>0)return true;disposeGermanSoldier(u);',html)
 html=once('dustUpdate(dt);pointsUpdate(dt);fogUpdate(dt);','refreshGermanPreviewLabel();dustUpdate(dt);pointsUpdate(dt);fogUpdate(dt);',html)
-html=once('🇩🇪 Сравнить немца','🇩🇪 Показать старую',html)
+html=once('<button type="button" id="german-compare">🇩🇪 Сравнить немца</button>','',html)
+html=once("U.push(u);if(t==='red'&&!cmd&&!eng)attachGermanSoldier(u);return u;","U.push(u);attachGermanSoldier(u);return u;",html)
+assert html.count('pm.mf.getWorldPosition(mzV);')==2
+html=html.replace('pm.mf.getWorldPosition(mzV);','(P.germanPreview?P.germanPreview.weapon.flash:pm.mf).getWorldPosition(mzV);')
 html=once('<title>Серый наёмник: линия фронта</title>','<title>Серый наёмник — пехота v2</title>',html)
 for i,m in enumerate(re.finditer(r'<script([^>]*)>(.*?)</script>',html,re.S)):
     if 'src=' not in m[1] and 'application/octet-stream' not in m[1]:
