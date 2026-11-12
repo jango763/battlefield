@@ -191,6 +191,7 @@ function attachGermanSoldier(unit){
   unit.germanPreview={anchor,figure,legacy,bones,rest,feet,footQ,weapon,identity,role,palette,headQ,chestQ,phase:0,walk:0,aim:0,yaw:0,gaitSpeed:0,idleClock:0,
      footContact:{left:new THREE.Vector3(),right:new THREE.Vector3()},
      footSwingStart:{left:new THREE.Vector3(),right:new THREE.Vector3()},
+     footSwingEnd:{left:new THREE.Vector3(),right:new THREE.Vector3()},
      footState:{left:'idle',right:'idle'},
     targets:{left:new THREE.Vector3(),right:new THREE.Vector3(),rear:new THREE.Vector3(),front:new THREE.Vector3()},
     poles:{left:new THREE.Vector3(.72,1.35,-.12),right:new THREE.Vector3(-.72,1.35,-.12),lKnee:new THREE.Vector3(.24,.6,.9),rKnee:new THREE.Vector3(-.24,.6,.9)}};
@@ -276,7 +277,8 @@ function animateGermanSoldier(unit,dt=.016){
       }
       const q=(phase-stance)/(1-stance);
       const smooth=q*q*(3-2*q);
-      t.copy(from).lerp(new THREE.Vector3(f.x,f.y,f.z+stride),smooth);
+      const to=v.footSwingEnd[side];to.set(f.x,f.y,f.z+stride);
+      t.copy(from).lerp(to,smooth);
       t.y+=lift*Math.sin(Math.PI*q);
     }
     GermanRig.solve(v.anchor,side==='left'?v.bones.lUp:v.bones.rUp,side==='left'?v.bones.lKnee:v.bones.rKnee,side==='left'?v.bones.lFoot:v.bones.rFoot,t,side==='left'?v.poles.lKnee:v.poles.rKnee);
