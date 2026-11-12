@@ -1,0 +1,12 @@
+node_modules/
+vendor/
+preview-original.html
+preview-v2-built.html
+german-v2.js
+german-v2.html
+german.glb
+check-*.js
+poses.json
+render-states.json
+rig-check.png
+tex-*

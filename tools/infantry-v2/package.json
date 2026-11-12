@@ -1,0 +1,6 @@
+{
+  "name":"gray-mercenary-infantry-validation",
+  "private":true,
+  "scripts":{"test":"node prepare.cjs && python3 build-preview.py && node test-loader.cjs && node test-rig.cjs && node test-game.cjs"},
+  "dependencies":{"three":"0.128.0"}
+}

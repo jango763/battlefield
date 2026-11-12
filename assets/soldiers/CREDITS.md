@@ -1,11 +1,18 @@
-# Attribution for German infantry preview
+# Авторы моделей
 
-**Asset:** [WW2 Panzergrenadier 2k (CC0)](https://sketchfab.com/3d-models/ww2-panzergrenadier-2k-cc0-6a104431bcb8400080b79446ec019696)
+## Немецкий пехотинец
 
-**Creator:** [britdawgmasterfunk](https://sketchfab.com/britdawgmasterfunk)
+- Модель: [WW2 Panzergrenadier 2k (CC0)](https://sketchfab.com/3d-models/ww2-panzergrenadier-2k-cc0-6a104431bcb8400080b79446ec019696).
+- Автор: [britdawgmasterfunk](https://sketchfab.com/britdawgmasterfunk).
+- Лицензия в метаданных исходного GLB: [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
+- Несмотря на CC0 в названии, сохраняется атрибуция CC BY по метаданным файла.
+- Изменения: уменьшение/перекодирование текстур в исходном тесте; в v2 — масштаб, параметры материалов, процедурная поза и анимация, добавленная винтовка.
 
-**License displayed on Sketchfab:** [Creative Commons Attribution (CC BY)](https://creativecommons.org/licenses/by/4.0/). The asset title and description mention CC0, but Sketchfab's model page lists **CC Attribution**, so this project conservatively follows CC BY attribution requirements.
+## Бронетехника
 
-**Adaptations:** GLB optimized for mobile preview by downscaling/re-encoding texture maps; rig and mesh hierarchy retained. Used to visually replace selected German/red infantry in the separate preview at `preview/german-v1.html`.
+- Модель: [Cartoon Dieselpunk armored cars Polygonal Style](https://sketchfab.com/3d-models/cartoon-dieselpunk-armored-cars-polygonal-style-cd1e044d046841aa846cce9edee0fa3e).
+- Автор: [Tykryk](https://sketchfab.com/Tykryk).
+- Лицензия в метаданных исходного GLB: [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
+- Изменения в игре: масштабирование, поворот, затемнение материалов и использование в качестве подбитой техники.
 
-The original game version remains in `index.html`.
+Авторы исходных моделей не связаны с проектом и не заявляют его поддержку.
