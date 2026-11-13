@@ -762,8 +762,13 @@ function dressNativeHeroFieldUniform(rig){
     };
     if(Object.values(donorHands).some(h=>!h.upper||!h.elbow||!h.hand))
       throw new Error('WW2 uniform sleeve/hand joints missing');
+    const donorFingers=[];
+    for(const [name,bone] of garmentBones){
+      const match=name.match(/^(Left|Right)Hand(Thumb|Index|Middle|Ring|Pinky)([123])$/);
+      if(match)donorFingers.push({bone,name,digit:match[2],segment:Number(match[3])});
+    }
     ww2={donor,bindings,donorMeshes,originalMeshes,side:null,modelType:'existing-panzergrenadier',
-      headwear:'none',headBone:garmentBones.get('Head'),donorHands,matchedBones:bindings.length};
+      headwear:'none',headBone:garmentBones.get('Head'),donorHands,donorFingers,matchedBones:bindings.length};
     rig.ww2Uniform=ww2;
     rig.ww2OutfitTemporary=null;
     for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
@@ -831,8 +836,20 @@ function updateNativeHeroFieldUniform(rig){
       GermanRig.solve(vis,arm.upper,arm.elbow,arm.hand,goal,pole);
       errors[side]=arm.hand.getWorldPosition(new THREE.Vector3()).distanceTo(grip.getWorldPosition(new THREE.Vector3()));
     }
+    // Hand bones reach the rifle but open fingers still look like "offering"
+    // the gun on flat palms. Curl digits over the grips after pose retarget:
+    // every mixer frame resets to native animation, so there is no drift.
+    const grasp=new THREE.Quaternion(),axis=new THREE.Vector3(1,0,0);
+    for(const entry of uniform.donorFingers){
+      const angle=entry.digit==='Thumb'?
+        (entry.segment===1?-.32:entry.segment===2?-.38:-.23):
+        (entry.segment===1?-.57:entry.segment===2?-.74:-.56);
+      entry.bone.quaternion.multiply(grasp.setFromAxisAngle(axis,angle));
+      entry.bone.updateWorldMatrix(false,true);
+    }
     uniform.visualGripErrors=errors;
     if(rig.weaponDiagnostics){
+      rig.weaponDiagnostics.visualFingerBones=uniform.donorFingers.length;
       rig.weaponDiagnostics.visibleRightError=errors.right;
       rig.weaponDiagnostics.visibleLeftError=errors.left;
     }
