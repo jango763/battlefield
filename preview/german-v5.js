@@ -229,27 +229,39 @@ function animateGermanSoldier(unit,dt=.016){
   GermanRig.rotate(v.bones.spine,[.03*v.walk+breathing,v.yaw*.4,-sway*.022]);
   GermanRig.rotate(v.bones.chest,[breathing*.35,v.yaw*.6,sway*.014]);
   GermanRig.rotate(v.bones.head,[0,-v.yaw*.12,0]);
-  // Keep the pelvis stable: excessive vertical oscillation makes figures bounce.
+  // Keep the silhouette upright while gently transferring weight toward
+  // the planted leg. Use the rig's actual left/right axes, not an assumed axis.
   const bob=(1-Math.cos(v.phase*2))*.0055*v.walk;
+  const leftAxis=Math.sign(v.feet.left.x-v.feet.right.x)||-1;
+  v.anchor.position.x=leftAxis*Math.sin(v.phase)*.024*v.walk;
   v.anchor.position.y=-.012*v.walk+bob;
-  // SAFE GAIT v5: targets stay in local body coordinates; v4 world-pinned
-  // contacts stretched and twisted the legs on turns and changes of speed.
-  // Smooth easing and conservative displacement keep both knees within reach.
+  // Feet follow continuous stance/swing arcs in the character's local space.
+  // Keep IK targets conservative to avoid snapping the knees on turns.
   const stride=.26*v.walk,lift=.105*v.walk,stance=.60;
   for(const [side,offset] of [['left',0],['right',.5]]){
     const phase=((v.phase/(Math.PI*2)+offset)%1+1)%1;
     const t=v.targets[side],f=v.feet[side];
+    const footBone=side==='left'?v.bones.lFoot:v.bones.rFoot;
     t.copy(f);
+    let footRoll=0;
     if(phase<stance){
       const q=phase/stance,smooth=q*q*(3-2*q);
       t.z+=stride*(1-2*smooth);
+      // Slight toe-off near the end of stance, not the whole planted phase.
+      const toe=THREE.MathUtils.clamp((q-.72)/.28,0,1);
+      footRoll=.065*toe*toe*v.walk;
     }else{
       const q=(phase-stance)/(1-stance),smooth=q*q*(3-2*q);
       t.z+=stride*(-1+2*smooth);
-      t.y+=lift*Math.sin(Math.PI*q);
+      // Squared sine eases the foot off and back onto the ground with
+      // zero vertical velocity at contact, avoiding a robotic kick.
+      const arc=Math.sin(Math.PI*q);
+      t.y+=lift*arc*arc;
+      footRoll=-.045*arc*v.walk;
     }
-    GermanRig.solve(v.anchor,side==='left'?v.bones.lUp:v.bones.rUp,side==='left'?v.bones.lKnee:v.bones.rKnee,side==='left'?v.bones.lFoot:v.bones.rFoot,t,side==='left'?v.poles.lKnee:v.poles.rKnee);
-    GermanRig.orient(v.anchor,side==='left'?v.bones.lFoot:v.bones.rFoot,v.footQ[side]);
+    GermanRig.solve(v.anchor,side==='left'?v.bones.lUp:v.bones.rUp,side==='left'?v.bones.lKnee:v.bones.rKnee,footBone,t,side==='left'?v.poles.lKnee:v.poles.rKnee);
+    GermanRig.orient(v.anchor,footBone,v.footQ[side]);
+    GermanRig.rotate(footBone,[footRoll,0,0]);
   }
   const recoil=unit.kick>0?Math.min(1,unit.kick/.1)*.035:0;
   const w=v.weapon.root;w.position.set(-.11,1.78+v.aim*.12+Math.sin(v.phase*2)*.006*v.walk+breathing*.6,.19-recoil);
