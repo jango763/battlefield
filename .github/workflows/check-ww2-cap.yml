@@ -99,7 +99,11 @@ jobs:
                 if(data.model!=='existing-panzergrenadier')report.failures.push('donor source');
                 if(!data.capReady||!data.headwear?.includes('M43')||data.capMeshCount<4)
                   report.failures.push('M43 GLB failed to load: '+data.headwearError);
-                if(!data.capParent?.includes('Head'))report.failures.push('M43 not attached to head bone');
+                if(data.capParent!=='QuaterniusHeroRigDiagnostic')report.failures.push('M43 not in correctly scaled visual rig');
+                if(data.capWorld&&data.headWorld){
+                  const clearance=data.capWorld.min[1]-data.headWorld[1];
+                  if(clearance<-.04||clearance>.17)report.failures.push('M43 cap floating or clipping: '+clearance.toFixed(3));
+                }else report.failures.push('M43 world bounds unavailable');
                 if(data.sides.red?.m43Visible!==true||data.sides.blue?.m43Visible!==false)
                   report.failures.push('Faction-specific M43 visibility');
                 if(!data.nativeHidden)report.failures.push('old Quaternius avatar not hidden');

@@ -729,7 +729,7 @@ function updateNativeHeroFieldUniform(rig){
     space.updateWorldMatrix(true,true);
     // Cap pivot is the wearer's forehead band, ~0.27m above Mixamo Head joint.
     cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
-    cap.position.y+=.27;
+    cap.position.y+=.11;
     const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
     cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
   }
