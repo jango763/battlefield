@@ -2,7 +2,9 @@ name: Hero two-handed weapon browser acceptance
 on:
   push:
     branches: [feature/hero-native-rifle-ready-20261113]
-    paths: [.github/workflows/check-hero-rifle.yml]
+    paths:
+      - .github/workflows/check-hero-rifle.yml
+      - preview/german-v5.js
 permissions:
   contents: write
 jobs:
