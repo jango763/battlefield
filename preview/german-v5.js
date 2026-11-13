@@ -447,6 +447,135 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
     gaitState:rig.state,aimed,visible:w.root.visible
   };
 }
+// Native-hero outfit: geometry follows the existing Quaternius bones without
+// modifying its skin, skeleton, clips, walk cycle or weapon hand targets.
+// Simplified late-war German field-grey wool uniform for top-down rendering.
+function makeNativeHeroFieldUniform(v,rig){
+  const model=rig.model,bones={};
+  model.traverse(n=>{if(n.isBone)bones[n.name]=n;});
+  const needed=['pelvis','spine_01','spine_02','spine_03','Head','upperarm_l','lowerarm_l','hand_l',
+    'upperarm_r','lowerarm_r','hand_r','thigh_l','calf_l','foot_l','thigh_r','calf_r','foot_r'];
+  if(needed.some(n=>!bones[n]))throw new Error('Uniform bone missing: '+needed.filter(n=>!bones[n]).join(','));
+  const root=new THREE.Group();root.name='PanzergrenadierFieldUniform';rig.visual.add(root);
+  const mat={
+    wool:new THREE.MeshLambertMaterial({color:0x596355,side:THREE.DoubleSide}),
+    woolDark:new THREE.MeshLambertMaterial({color:0x414b43,side:THREE.DoubleSide}),
+    trouser:new THREE.MeshLambertMaterial({color:0x535b50,side:THREE.DoubleSide}),
+    leather:new THREE.MeshLambertMaterial({color:0x34302a}),
+    strap:new THREE.MeshLambertMaterial({color:0x77705a}),
+    steel:new THREE.MeshLambertMaterial({color:0x666c63}),
+    brass:new THREE.MeshLambertMaterial({color:0xa59b71}),
+    skin:new THREE.MeshLambertMaterial({color:0xb9a58a}),
+    sole:new THREE.MeshLambertMaterial({color:0x242522})
+  };
+  const unit=(g,material)=>{const mesh=new THREE.Mesh(g,material);mesh.castShadow=true;mesh.receiveShadow=true;root.add(mesh);return mesh;};
+  const chest=unit(new THREE.SphereGeometry(1,12,9),mat.wool);
+  const jacketHem=unit(new THREE.CylinderGeometry(.31,.34,1,12),mat.woolDark);
+  const belt=unit(new THREE.CylinderGeometry(.315,.315,1,12),mat.leather);
+  const collar=unit(new THREE.CylinderGeometry(.19,.23,1,10),mat.woolDark);
+  const parts=[];
+  const seg=(a,b,r1,r2,material,kind)=>{
+    const m=unit(new THREE.CylinderGeometry(r1,r2,1,10),material);
+    parts.push({a:bones[a],b:bones[b],mesh:m,kind});return m;
+  };
+  // Sleeve, trouser and boot shafts are separately fitted onto forearms,
+  // shins and thighs so bending joints never drags a rigid full-body costume.
+  for(const side of ['l','r']){
+    seg('upperarm_'+side,'lowerarm_'+side,.15,.13,mat.wool,'sleeve');
+    seg('lowerarm_'+side,'hand_'+side,.132,.097,mat.wool,'sleeve');
+    seg('thigh_'+side,'calf_'+side,.19,.145,mat.trouser,'leg');
+    seg('calf_'+side,'foot_'+side,.148,.115,mat.trouser,'leg');
+    const boot=unit(new THREE.SphereGeometry(1,10,7),mat.leather);
+    parts.push({a:bones['foot_'+side],mesh:boot,kind:'boot'});
+    const cuff=unit(new THREE.CylinderGeometry(.133,.135,1,10),mat.leather);
+    parts.push({a:bones['calf_'+side],b:bones['foot_'+side],mesh:cuff,kind:'bootCuff'});
+    const pouch=unit(new THREE.BoxGeometry(.17,.13,.105),mat.leather);
+    parts.push({a:bones.pelvis,mesh:pouch,kind:side==='l'?'pouchL':'pouchR'});
+  }
+  // Leather equipment straps: fitted to moving torso, not pinned to world.
+  const diag1=unit(new THREE.BoxGeometry(.044,1,.047),mat.strap),
+    diag2=unit(new THREE.BoxGeometry(.044,1,.047),mat.strap);
+  const magCase=unit(new THREE.BoxGeometry(.21,.25,.12),mat.leather);
+  const buckle=unit(new THREE.BoxGeometry(.095,.057,.018),mat.brass);
+  const buttons=Array.from({length:5},()=>unit(new THREE.SphereGeometry(.019,7,5),mat.brass));
+  const pack=unit(new THREE.BoxGeometry(.46,.39,.15),mat.strap);
+  // Low-profile M43-style soft field cap. No oversized WWII helmet/pot look.
+  const cap=unit(new THREE.CylinderGeometry(.205,.216,.145,14),mat.woolDark);
+  const crown=unit(new THREE.SphereGeometry(1,14,7),mat.wool);
+  const brim=unit(new THREE.BoxGeometry(.31,.028,.20),mat.woolDark);
+  const capBadge=unit(new THREE.BoxGeometry(.075,.045,.012),mat.brass);
+  function loc(name){return rig.visual.worldToLocal(bones[name].getWorldPosition(new THREE.Vector3()));}
+  const up=new THREE.Vector3(0,1,0),diff=new THREE.Vector3();
+  const positionSegment=(item)=>{
+    const a=rig.visual.worldToLocal(item.a.getWorldPosition(new THREE.Vector3()));
+    if(!item.b){item.mesh.position.copy(a);return;}
+    const b=rig.visual.worldToLocal(item.b.getWorldPosition(new THREE.Vector3()));
+    diff.copy(b).sub(a);const length=diff.length();
+    if(length<.01)return;
+    item.mesh.position.copy(a).add(b).multiplyScalar(.5);
+    item.mesh.quaternion.setFromUnitVectors(up,diff.multiplyScalar(1/length));
+    // Skeleton upper and lower segments remain proportionate while walking.
+    item.mesh.scale.set(1,length*(item.kind==='bootCuff'?.35:1.02),1);
+    if(item.kind==='bootCuff')item.mesh.position.lerp(b,.45);
+  };
+  function sync(){
+    rig.visual.updateWorldMatrix(true,true);
+    const pelvis=loc('pelvis'),upper=loc('spine_03'),lower=loc('spine_01'),head=loc('Head');
+    const shoulderL=loc('upperarm_l'),shoulderR=loc('upperarm_r');
+    const facing=bones.spine_03.getWorldQuaternion(new THREE.Quaternion());
+    const inv=rig.visual.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const q=inv.multiply(facing);
+    // Torso axis is aligned to animated spine; stays under the two-hand rifle.
+    const tor=upper.clone().sub(pelvis),height=Math.max(.25,tor.length());
+    chest.position.copy(upper).lerp(pelvis,.36);
+    chest.quaternion.copy(q);chest.scale.set(.31,height*.75,.235);
+    jacketHem.position.copy(pelvis).lerp(lower,.25);
+    jacketHem.quaternion.copy(q);jacketHem.scale.set(1,height*.42,1);
+    belt.position.copy(pelvis).lerp(lower,.22);belt.quaternion.copy(q);belt.scale.y=.075;
+    collar.position.copy(upper);collar.quaternion.copy(q);collar.scale.y=.09;
+    for(const part of parts)positionSegment(part);
+    for(const part of parts){
+      if(part.kind==='boot'){
+        part.mesh.scale.set(.125,.105,.205);
+        part.mesh.position.z+=.065;
+      }
+      if(part.kind==='pouchL'||part.kind==='pouchR'){
+        const sign=part.kind==='pouchL'?-1:1;
+        part.mesh.position.copy(pelvis).add(new THREE.Vector3(sign*.31,-.06,.10));
+        part.mesh.quaternion.copy(q);
+      }
+    }
+    const torsoCenter=upper.clone().lerp(pelvis,.48);
+    const attach=(mesh,offset,scale)=>{
+      mesh.position.copy(torsoCenter).add(offset.clone().applyQuaternion(q));
+      mesh.quaternion.copy(q);
+      if(scale)mesh.scale.copy(scale);
+    };
+    attach(diag1,new THREE.Vector3(-.12,.06,.223),new THREE.Vector3(1,height*.82,1));
+    diag1.rotateZ(-.29);
+    attach(diag2,new THREE.Vector3(.12,.06,.223),new THREE.Vector3(1,height*.82,1));
+    diag2.rotateZ(.29);
+    attach(magCase,new THREE.Vector3(.20,-.20,.235));
+    attach(buckle,new THREE.Vector3(0,-height*.38,.333));
+    for(let i=0;i<buttons.length;i++)attach(buttons[i],
+      new THREE.Vector3(0,.21-i*.105,.240));
+    attach(pack,new THREE.Vector3(0,-.02,-.248));
+    const headQ=rig.visual.getWorldQuaternion(new THREE.Quaternion()).invert()
+      .multiply(bones.Head.getWorldQuaternion(new THREE.Quaternion()));
+    const capPos=head.clone().add(new THREE.Vector3(0,.19,0));
+    cap.position.copy(capPos);cap.quaternion.copy(headQ);
+    crown.position.copy(capPos).add(new THREE.Vector3(0,.09,0));
+    crown.quaternion.copy(headQ);crown.scale.set(.206,.065,.201);
+    brim.position.copy(capPos).add(new THREE.Vector3(0,-.052,.125));
+    brim.quaternion.copy(headQ);
+    capBadge.position.copy(capPos).add(new THREE.Vector3(0,.018,.214));
+    capBadge.quaternion.copy(headQ);
+    // Detect loss of tracking rather than modifying the native motion.
+    rig.uniformDiagnostics={ready:true,attachedParts:root.children.length,skinnedMeshCount:3};
+  }
+  rig.uniform={root,parts,sync,materials:mat};
+  sync();
+}
 function nativeHeroLoad(){
   const oldMode=new URLSearchParams(location.search).get('rig')==='original';
   if(oldMode){nativeHeroLabel('СТАРЫЙ СКЕЛЕТ: выбран для сравнения. Новая модель отключена.');return;}
@@ -538,6 +667,7 @@ function nativeHeroLoad(){
       v.identity.root.visible=false;
       v.weapon.root.visible=false;
       initNativeHeroWeapon(v,v.nativeRig);
+      makeNativeHeroFieldUniform(v,v.nativeRig);
       // Green badge plus geometric marker: the native visual swap is
       // unambiguous, even when the costume looks similar from the RTS camera.
       const marker=new THREE.Mesh(
@@ -577,6 +707,7 @@ function animateNativeHeroRig(unit,v,dt){
     r.state=next;
   }
   r.mixer.update(THREE.MathUtils.clamp(Number.isFinite(dt)?dt:0,0,.08));
+  if(r.uniform)r.uniform.sync();
   updateNativeHeroWeapon(unit,v,r,dt);
   unit.g.position.set(unit.x,0,unit.z);
   unit.g.rotation.x=0;unit.g.rotation.z=0;
