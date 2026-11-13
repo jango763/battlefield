@@ -71,6 +71,21 @@ jobs:
               report.armed=observation.armed;
               report.label=await page.locator('#native-hero-rig-label').textContent();
               await page.screenshot({path:'/tmp/hero-rifle-proof.png',fullPage:false});
+              // Render a diagnostic third-person close-up without touching the
+              // gameplay camera, zoom or control settings in source files.
+              const cameraShot=await page.evaluate(()=>{
+                if(typeof cam==='undefined'||typeof R==='undefined'||typeof scene==='undefined')throw new Error('Camera test globals unavailable');
+                const savedP=cam.position.clone(),savedQ=cam.quaternion.clone();
+                try{
+                  cam.position.set(P.x+2.2,3.1,P.z+4.0);
+                  cam.lookAt(P.x,1.38,P.z);
+                  R.render(scene,cam);
+                  return R.domElement.toDataURL('image/png');
+                }finally{
+                  cam.position.copy(savedP);cam.quaternion.copy(savedQ);
+                }
+              });
+              fs.writeFileSync('/tmp/hero-rifle-close.png',Buffer.from(cameraShot.split(',')[1],'base64'));
               const valid=observation.armed&&observation.role==='hero'&&observation.metrics.ready&&
                 observation.metrics.poseUpdates>15&&
                 Number.isFinite(observation.metrics.rightError)&&
@@ -97,14 +112,14 @@ jobs:
         if: always()
         shell: bash
         run: |
-          if [ -f /tmp/hero-rifle-proof.png ]; then
+          if [ -f /tmp/hero-rifle-close.png ]; then
             python3 - <<'PY'
           import base64
-          src=open('/tmp/hero-rifle-proof.png','rb').read()
+          src=open('/tmp/hero-rifle-close.png','rb').read()
           data=base64.b64encode(src).decode('ascii')
-          print('SCREENSHOT_BEGIN',len(src),len(data))
-          for i in range(0,len(data),56000): print('SCREENSHOT_PART '+data[i:i+56000])
-          print('SCREENSHOT_END')
+          print('CLOSEUP_BEGIN',len(src),len(data))
+          for i in range(0,len(data),56000): print('CLOSEUP_PART '+data[i:i+56000])
+          print('CLOSEUP_END')
           PY
           fi
       - name: Commit browser acceptance report even on failure
