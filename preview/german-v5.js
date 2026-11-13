@@ -677,6 +677,7 @@ function dressNativeHeroFieldUniform(rig){
     for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
     updateNativeHeroFieldUniform(rig);
   }catch(error){
+    rig.ww2UniformError=String(error&&error.stack||error);
     console.warn('WW2 wardrobe fallback (original native skeleton unaffected):',error);
     if(ww2?.donor)rig.visual.remove(ww2.donor);
     if(rig.ww2Uniform)rig.visual.remove(rig.ww2Uniform.donor);

@@ -70,7 +70,10 @@ jobs:
                 return out;
               });
               Object.assign(report,data);
-              if(!data.donorReady)report.failures.push('ready WW2 donor mesh fallback');
+              if(!data.donorReady){
+                report.donorError=await page.evaluate(()=>P.germanPreview.nativeRig.ww2UniformError||'not provided');
+                report.failures.push('ready WW2 donor mesh fallback: '+report.donorError);
+              }
               else{
                 if(data.matchedBones<16)report.failures.push('bone mapping count');
                 if(data.model!=='existing-panzergrenadier')report.failures.push('donor source');
