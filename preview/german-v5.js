@@ -402,6 +402,21 @@ function animateGermanSoldier(unit,dt=.016){
   v.idleClock+=safeDt;
   // Walk cadence is linked to actual unit speed; a slightly longer cycle reduces the hurried gait.
   v.phase=(v.phase+safeDt*v.gaitSpeed/3.1*v.cadence*Math.PI*2)%(Math.PI*2);
+  if(v.heroMotion&&v.heroMotion.ready&&v.heroBaseRadius){
+    // One hero, seven joint probes: reject any oversized pose immediately
+    // before applying the rest of the weapon and upper-body IK.
+    const hip=v.bones.hips.getWorldPosition(new THREE.Vector3());
+    let radius=0;
+    for(const key of ['head','lHand','rHand','lKnee','rKnee','lFoot','rFoot']){
+      radius=Math.max(radius,v.bones[key].getWorldPosition(new THREE.Vector3()).distanceTo(hip));
+    }
+    if(!Number.isFinite(radius)||radius>v.heroBaseRadius*1.6){
+      v.heroMotion.actions.idle.stop();v.heroMotion.actions.walk.stop();
+      v.heroMotion.ready=false;
+      heroMotionStatus('Герой: возврат к обычной анимации — неверный масштаб');
+      console.warn('Hero retarget rejected at runtime:',radius,v.heroBaseRadius);
+    }
+  }
   if(!v.heroMotion||!v.heroMotion.ready)for(const r of v.rest){r.bone.quaternion.copy(r.q);r.bone.position.copy(r.p);r.bone.scale.copy(r.s);}
   unit.g.position.set(unit.x,0,unit.z);unit.g.rotation.x=0;unit.g.rotation.z=0;
   let yaw=unit.aimT==null?0:Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
