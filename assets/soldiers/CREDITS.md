@@ -22,3 +22,8 @@
 - Геометрия M43: [Kenton-GMI / muster-ww2](https://github.com/Kenton-GMI/muster-ww2), файл `src/assets/germany/infantry/kit/cap.ts`, исходный коммит `7d2fa86ebc3b999eaf085831cdcd5dccefea63d4`.
 - Автор: Kenton Wang, 2026. Лицензия MIT, полный текст: [MUSTER-LICENSE.txt](../ww2-headwear/MUSTER-LICENSE.txt).
 - Преобразовано в облегчённый GLB с сохранением оригинальной геометрии. Используется только в испытательной ветке героя.
+
+## Полевая пилотка (Schiffchen-образный силуэт)
+- Открытая геометрия: [Kenton-GMI / muster-ww2](https://github.com/Kenton-GMI/muster-ww2), исходный файл `src/assets/soviet/infantry/pilotka.ts`, коммит `7d2fa86ebc3b999eaf085831cdcd5dccefea63d4`.
+- Убрана советская звезда, форма перекрашена в feldgrau. Это стилизация под немецкую пилотку, не точная реконструкция M34.
+- Автор исходной геометрии: Kenton Wang, MIT; текст в [MUSTER-LICENSE.txt](../ww2-headwear/MUSTER-LICENSE.txt).

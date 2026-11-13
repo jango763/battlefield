@@ -386,7 +386,7 @@ function makeNativeHeroAssaultRifle(){
     ww2Manifest:null,activeModel:null,activeModelId:'fallback'};
 }
 
-const WW2_WEAPON_GAME_SCALE=1.32;
+const WW2_WEAPON_GAME_SCALE=1.40;
 function initNativeHeroWW2WeaponCatalog(rig){
   const w=rig.weapon;
   if(!w)return;
@@ -415,7 +415,20 @@ function selectNativeHeroWW2Weapon(unit,rig){
       const obj=gltf.scene;
       obj.name='WW2_'+key;
       obj.scale.setScalar(WW2_WEAPON_GAME_SCALE);
-      obj.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
+      obj.traverse(n=>{
+        if(!n.isMesh)return;
+        n.castShadow=true;n.receiveShadow=true;
+        const adjust=mat=>{
+          const m=mat.clone();
+          // Lift dark steel from near-black: preserve wood/bakelite contrast.
+          if(m.color&&m.color.r<.22&&m.color.g<.22&&m.color.b<.22)
+            m.color.lerp(new THREE.Color(0x545a56),.32);
+          if('roughness' in m)m.roughness=Math.min(m.roughness??.85,.78);
+          if('metalness' in m)m.metalness=.12;
+          return m;
+        };
+        n.material=Array.isArray(n.material)?n.material.map(adjust):adjust(n.material);
+      });
       w.root.add(obj);
       w.ww2Models.set(key,obj);
       w.ww2Pending.delete(key);
@@ -489,14 +502,16 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
   const selection=selectNativeHeroWW2Weapon(unit,rig);
   const heading=unit.aimT==null?0:
     Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
-  w.root.rotation.set(aimed?-.055:sprint?.095:-.17,
-    THREE.MathUtils.clamp(heading,-.55,.55)*(aimed?.4:0)-sign*.62,
-    sign*(aimed?.02:.038),'YXZ');
+  // Avoid looking directly down the bore (the old gun collapsed to an
+  // unrecognizable black vertical line). Show the barrel and magazine.
+  w.root.rotation.set(aimed?-.04:sprint?.08:-.095,
+    THREE.MathUtils.clamp(heading,-.7,.7)*(aimed?.75:0)-sign*(aimed?.47:1.10),
+    sign*(aimed?.018:.015),'YXZ');
   const center=new THREE.Vector3().addVectors(sr,sl).multiplyScalar(.5);
   const desiredTrigger=new THREE.Vector3(
     center.x+sign*.17,
-    center.y-(aimed?.17:.245),
-    center.z+(aimed?.22:.15)
+    center.y-(aimed?.135:.20),
+    center.z+(aimed?.31:.29)
   );
   // The physical trigger hand grip is the weapon's placement pivot.
   // Compensate source model's real grip offset before solving either arm.
@@ -773,7 +788,7 @@ function dressNativeHeroFieldUniform(rig){
     rig.ww2OutfitTemporary=null;
     for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
     updateNativeHeroFieldUniform(rig);
-    loadNativeHeroM43Cap(rig);
+    loadNativeHeroSideCap(rig);
   }catch(error){
     rig.ww2UniformError=String(error&&error.stack||error);
     console.warn('WW2 wardrobe fallback (original native skeleton unaffected):',error);
@@ -858,47 +873,39 @@ function updateNativeHeroFieldUniform(rig){
     const cap=uniform.cap,head=uniform.headBone,space=rig.visual;
     space.updateWorldMatrix(true,true);
     cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
-    cap.position.y+=.177;
     const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
     cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
-    // The donor joint is slightly behind the brow; align the woven band with
-    // the forehead, not behind the scalp, without altering the head animation.
-    cap.position.add(new THREE.Vector3(-.003,0,.044).applyQuaternion(cap.quaternion));
+    // Source geometry already includes its scalp/ridge height.
+    cap.position.add(new THREE.Vector3(0,.013,.028).applyQuaternion(cap.quaternion));
   }
 }
 
 
-function loadNativeHeroM43Cap(rig){
+function loadNativeHeroSideCap(rig){
   const u=rig.ww2Uniform;
   if(!u||!u.headBone)return;
   if(new URLSearchParams(location.search).get('headwear')==='none')return;
-  const url=new URL('../assets/ww2-headwear/m43-field-cap.glb',location.href).href;
+  const url=new URL('../assets/ww2-headwear/field-grey-sidecap.glb',location.href).href;
   new THREE.GLTFLoader().load(url,gltf=>{
-    if(!rig.ww2Uniform||rig.ww2Uniform!==u)return;
+    if(rig.ww2Uniform!==u)return;
     const cap=gltf.scene;
-    cap.name='WW2_M43_Real_Geometry_MIT';
-    // Metre-scale model; parent already inherits WW2 soldier scale.
-    // Wide enough for the whole scalp; crown rises above the hair instead
-    // of appearing as a thin ring lodged behind the forehead.
-    cap.scale.set(1.35,1.62,1.42);
-    cap.position.set(0,.205,0);
-    cap.rotation.set(0,0,0);
-    cap.traverse(n=>{if(n.isMesh){
+    cap.name='WW2_Feldgrau_SideCap_NoVisor';
+    // Original side-cap mesh uses a head-local coordinate frame, NOT
+    // the bottom of a helmet band. No large M43 vertical offset.
+    cap.scale.set(1.48,1.37,1.44);
+    cap.traverse(n=>{
+      if(!n.isMesh)return;
       n.castShadow=true;n.receiveShadow=true;
-      n.material=n.material.clone();
-      n.material.color.setHex(0x565d52);
-      n.material.roughness=.97;
-    }});
-    // Head bones in the donor GLB inherit a ~1/30 scale: do NOT parent the
-    // full-size cap under the bone or it becomes invisible inside the skull.
+      const m=n.material.clone();
+      m.color.setHex(0x4b5850);m.roughness=.98;n.material=m;
+    });
     rig.visual.add(cap);
-    u.cap=cap;
-    u.headwear='M43 (MIT source)';
+    u.cap=cap;u.headwear='Feldgrau sidecap (unmarked)';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
   },undefined,error=>{
-    console.warn('M43 headwear not loaded; using uncovered head:',error);
-    u.headwearError=String(error&&error.message||error);
+    console.warn('Sidecap unavailable: uncovered head fallback',error);
+    u.headwearError=String(error?.message||error);
   });
 }
 
