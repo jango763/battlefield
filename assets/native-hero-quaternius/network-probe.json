@@ -1,0 +1,35 @@
+{
+  "expected_sha256": "a466828c67a4acc9b2413212ce6d9cde235e3aed9b675680c14fd9673858f118",
+  "preview-original-rawcdn": {
+    "ok": true,
+    "curl_code": 0,
+    "http": "200 application/octet-stream 6465208 0.535909",
+    "stderr": "",
+    "bytes": 6465208,
+    "sha256_match": true
+  },
+  "preview-current-rawcdn": {
+    "ok": true,
+    "curl_code": 0,
+    "http": "200 application/octet-stream 6465208 0.671172",
+    "stderr": "",
+    "bytes": 6465208,
+    "sha256_match": true
+  },
+  "upstream-raw-github": {
+    "ok": true,
+    "curl_code": 0,
+    "http": "200 application/octet-stream 6465208 0.241915",
+    "stderr": "",
+    "bytes": 6465208,
+    "sha256_match": true
+  },
+  "upstream-jsdelivr": {
+    "ok": true,
+    "curl_code": 0,
+    "http": "200 model/gltf-binary 6465208 1.214956",
+    "stderr": "",
+    "bytes": 6465208,
+    "sha256_match": true
+  }
+}
