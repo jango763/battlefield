@@ -642,7 +642,7 @@ function dressNativeHeroFieldUniform(rig){
     rig.model.traverse(n=>{if(n.isBone)nativeBones.set(n.name,n);});
     donor.traverse(n=>{
       if(!n.isBone)return;
-      garmentBones.set(n.name.replace(/^mixamorig:/i,'').replace(/_\d+$/,''),n);
+      garmentBones.set(n.name.replace(/_\d+$/,'').replace(/^mixamorig[:_]?/i,''),n);
     });
     const map={
       Hips:'pelvis',Spine:'spine_01',Spine1:'spine_02',Spine2:'spine_03',
