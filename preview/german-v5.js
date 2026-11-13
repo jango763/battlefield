@@ -190,7 +190,7 @@ function attachGermanSoldier(unit){
   const headQ=anchorQ.clone().multiply(bones.head.getWorldQuaternion(new THREE.Quaternion())).invert(),chestQ=anchorQ.clone().multiply(bones.chest.getWorldQuaternion(new THREE.Quaternion())).invert();
   unit.germanPreview={anchor,figure,legacy,bones,rest,feet,footQ,weapon,identity,role,palette,headQ,chestQ,phase:0,walk:0,aim:0,yaw:0,gaitSpeed:0,idleClock:0,
     targets:{left:new THREE.Vector3(),right:new THREE.Vector3(),rear:new THREE.Vector3(),front:new THREE.Vector3()},
-    poles:{left:new THREE.Vector3(.72,1.35,-.12),right:new THREE.Vector3(-.72,1.35,-.12),lKnee:new THREE.Vector3(.24,.6,.9),rKnee:new THREE.Vector3(-.24,.6,.9)}};
+    poles:{left:new THREE.Vector3(.72,1.35,-.12),right:new THREE.Vector3(-.72,1.35,-.12),lKnee:new THREE.Vector3(.18,.6,.7),rKnee:new THREE.Vector3(-.18,.6,.7)}};
   legacy.visible=false;anchor.visible=true;
   animateGermanSoldier(unit,0);
   refreshGermanPreviewLabel();
@@ -225,7 +225,7 @@ function animateGermanSoldier(unit,dt=.016){
   v.yaw+=(THREE.MathUtils.clamp(yaw,-.9,.9)*v.aim-v.yaw)*blend;
   const sway=Math.sin(v.phase)*v.walk;
   const breathing=Math.sin(v.idleClock*1.7)*.008*(1-v.walk);
-  GermanRig.rotate(v.bones.hips,[.018*v.walk,0,sway*.018]);
+  GermanRig.rotate(v.bones.hips,[.01*v.walk,0,sway*.012]);
   GermanRig.rotate(v.bones.spine,[.03*v.walk+breathing,v.yaw*.4,-sway*.022]);
   GermanRig.rotate(v.bones.chest,[breathing*.35,v.yaw*.6,sway*.014]);
   GermanRig.rotate(v.bones.head,[0,-v.yaw*.12,0]);
