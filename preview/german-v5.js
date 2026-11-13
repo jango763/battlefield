@@ -451,7 +451,7 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
 
 /* Corporal's field-grey equipment. Cosmetic-only: original Quaternius
    skeleton, native walk cycles, assault-rifle hand IK and gameplay intact. */
-function dressNativeHeroFieldUniform(rig){
+function dressNativeHeroPrimitiveUniform(rig){
   const bones=new Map();
   rig.model.traverse(n=>{
     if(n.isBone)bones.set(n.name,n);
@@ -569,7 +569,7 @@ function dressNativeHeroFieldUniform(rig){
   rig.fieldUniform={bones,helmet,gear,boots,shoes};
   updateNativeHeroFieldUniform(rig);
 }
-function updateNativeHeroFieldUniform(rig){
+function updateNativeHeroPrimitiveUniform(rig){
   const suit=rig.fieldUniform;if(!suit)return;
   const vis=rig.visual,bones=suit.bones;
   vis.updateWorldMatrix(true,true);
@@ -595,6 +595,124 @@ function updateNativeHeroFieldUniform(rig){
     const shoe=suit.shoes[side];
     shoe.visible=true;
     shoe.position.copy(foot).add(new THREE.Vector3(0,-.03,.11));
+  }
+}
+
+
+// --- WWII donor wardrobe: an already bundled and credited Panzergrenadier GLB.
+// Its original skinned WW2 jacket, trousers, belt, pockets and web gear replace
+// the previous hard-edged procedural boxes. The native Quaternius clip mixer
+// and rifle IK remain untouched; a separate outfit skeleton only follows pose.
+// This is intentionally a preview until visual acceptance on mobile Safari.
+function dressNativeHeroFieldUniform(rig){
+  if(new URLSearchParams(location.search).get('uniform')==='prototype'){
+    dressNativeHeroPrimitiveUniform(rig);
+    return;
+  }
+  let ww2=null;
+  try{
+    if(!germanPreview.template||!germanPreview.bounds)throw Error('Panzergrenadier donor not loaded');
+    const donor=germanSkeletonClone(germanPreview.template);
+    donor.name='WW2PanzergrenadierClothing';
+    const box=germanPreview.bounds,h=box.max.y-box.min.y;
+    if(h<=.1)throw Error('Invalid WW2 donor bounds');
+    const scale=2.55/h;
+    donor.scale.setScalar(scale);
+    donor.position.set(-(box.min.x+box.max.x)*scale*.5,-box.min.y*scale,-(box.min.z+box.max.z)*scale*.5);
+    rig.visual.add(donor);
+    const originalMeshes=[],donorMeshes=[];
+    rig.model.traverse(n=>{if(n.isSkinnedMesh)originalMeshes.push(n);});
+    donor.traverse(n=>{
+      if(!n.isSkinnedMesh)return;
+      const mat=n.material,name=mat&&mat.name||'';
+      const type=/helmet|scrim/i.test(name)?'headgear':/ammopouches/i.test(name)?'pouches':'garment';
+      const german=soldierMaterial(mat,'hero');
+      const british=soldierMaterial(mat,'khaki');
+      if(type==='pouches'){
+        german.color.setHex(0xddd0b9);
+        british.color.setHex(0xe3d7b9);
+      }
+      donorMeshes.push({mesh:n,type,german,british});
+      n.material=german;
+      n.visible=type!=='headgear';
+      n.castShadow=true;n.receiveShadow=true;n.frustumCulled=false;
+    });
+    if(!donorMeshes.some(p=>p.type==='garment'))throw Error('WW2 uniform mesh missing');
+    const nativeBones=new Map(),garmentBones=new Map();
+    rig.model.traverse(n=>{if(n.isBone)nativeBones.set(n.name,n);});
+    donor.traverse(n=>{
+      if(!n.isBone)return;
+      garmentBones.set(n.name.replace(/^mixamorig:/i,'').replace(/_\d+$/,''),n);
+    });
+    const map={
+      Hips:'pelvis',Spine:'spine_01',Spine1:'spine_02',Spine2:'spine_03',
+      Neck:'neck_01',Head:'Head',
+      LeftShoulder:'clavicle_l',LeftArm:'upperarm_l',LeftForeArm:'lowerarm_l',LeftHand:'hand_l',
+      RightShoulder:'clavicle_r',RightArm:'upperarm_r',RightForeArm:'lowerarm_r',RightHand:'hand_r',
+      LeftUpLeg:'thigh_l',LeftLeg:'calf_l',LeftFoot:'foot_l',LeftToeBase:'ball_l',
+      RightUpLeg:'thigh_r',RightLeg:'calf_r',RightFoot:'foot_r',RightToeBase:'ball_r'
+    };
+    for(const side of ['Left','Right']){
+      const suffix=side==='Left'?'l':'r';
+      for(const finger of ['Thumb','Index','Middle','Ring','Pinky'])
+        for(let i=1;i<=3;i++)
+          map[side+'Hand'+finger+i]=finger.toLowerCase()+'_0'+i+'_'+suffix;
+    }
+    rig.model.updateWorldMatrix(true,true);
+    donor.updateWorldMatrix(true,true);
+    const bindings=[];
+    for(const [targetName,sourceName] of Object.entries(map)){
+      const target=garmentBones.get(targetName),source=nativeBones.get(sourceName);
+      if(!target||!source)continue;
+      bindings.push({
+        target,source,
+        sourceRestInv:source.getWorldQuaternion(new THREE.Quaternion()).invert(),
+        targetRest:target.getWorldQuaternion(new THREE.Quaternion())
+      });
+    }
+    if(bindings.length<16)throw Error('Too few compatible WW2 outfit joints: '+bindings.length);
+    ww2={donor,bindings,donorMeshes,originalMeshes,side:null,modelType:'existing-panzergrenadier',
+      headwear:'none',matchedBones:bindings.length};
+    rig.ww2Uniform=ww2;
+    for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
+    updateNativeHeroFieldUniform(rig);
+  }catch(error){
+    console.warn('WW2 wardrobe fallback (original native skeleton unaffected):',error);
+    if(ww2?.donor)rig.visual.remove(ww2.donor);
+    if(rig.ww2Uniform)rig.visual.remove(rig.ww2Uniform.donor);
+    rig.ww2Uniform=null;
+    rig.model.traverse(n=>{if(n.isSkinnedMesh)n.visible=true;});
+    dressNativeHeroPrimitiveUniform(rig);
+    // The rejected pot-shaped helmet must never return as fallback.
+    rig.fieldUniform.helmet.visible=false;
+  }
+}
+function updateNativeHeroFieldUniform(rig){
+  const uniform=rig.ww2Uniform;
+  if(!uniform){
+    updateNativeHeroPrimitiveUniform(rig);
+    return;
+  }
+  const side=(P&&P.side)==='red'?'red':'blue';
+  if(uniform.side!==side){
+    uniform.side=side;
+    for(const item of uniform.donorMeshes){
+      item.mesh.material=side==='red'?item.german:item.british;
+      // Original WWII M42 helmet is deliberately NOT substituted for M43.
+      item.mesh.visible=item.type==='garment'||(item.type==='pouches'&&side==='red');
+    }
+  }
+  // Re-target the already tested Quaternius anatomical pose to the secondary
+  // clothing skin, without modifying a single native bone / clip / rifle IK.
+  rig.model.updateWorldMatrix(true,true);
+  uniform.donor.updateWorldMatrix(true,true);
+  const sourceQ=new THREE.Quaternion(),targetQ=new THREE.Quaternion(),parentQ=new THREE.Quaternion();
+  for(const binding of uniform.bindings){
+    binding.source.getWorldQuaternion(sourceQ);
+    targetQ.copy(sourceQ).multiply(binding.sourceRestInv).multiply(binding.targetRest);
+    binding.target.parent.getWorldQuaternion(parentQ).invert();
+    binding.target.quaternion.copy(parentQ.multiply(targetQ));
+    binding.target.updateWorldMatrix(false,true);
   }
 }
 
