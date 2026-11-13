@@ -374,8 +374,86 @@ function makeNativeHeroAssaultRifle(){
   const muzzleFlash=new THREE.Mesh(new THREE.SphereGeometry(.072,7,5),flashMat);
   muzzleFlash.position.set(0,.022,.89);muzzleFlash.scale.set(.7,.7,1.8);
   muzzleFlash.visible=false;root.add(muzzleFlash);
-  return{root,trigger,support,muzzleFlash};
+  // Preserve the old test model as a safe fallback; it is hidden when a
+  // historically modelled WW2 GLB has loaded. Launcher slots are separate.
+  const fallback=new THREE.Group();fallback.name='LegacyTestRifle';
+  for(const n of [...root.children])if(n!==trigger&&n!==support&&n!==muzzleFlash)fallback.add(n);
+  root.add(fallback);
+  const launcher=makeGermanWeapon().launcher;
+  launcher.name='PrototypeLauncher';launcher.visible=false;root.add(launcher);
+  return{root,trigger,support,muzzleFlash,fallback,launcher,
+    ww2Models:new Map(),ww2Pending:new Set(),ww2Failed:new Map(),
+    ww2Manifest:null,activeModel:null,activeModelId:'fallback'};
 }
+
+const WW2_WEAPON_GAME_SCALE=1.32;
+function initNativeHeroWW2WeaponCatalog(rig){
+  const w=rig.weapon;
+  if(!w)return;
+  const url=new URL('../assets/ww2-weapons/manifest.json',location.href);
+  fetch(url).then(async response=>{
+    if(!response.ok)throw new Error('WW2 manifest HTTP '+response.status);
+    return response.json();
+  }).then(manifest=>{
+    const expected=['de-kar98k','de-mp40','de-mg42','uk-lee-enfield','uk-sten','uk-bren'];
+    if(expected.some(key=>!manifest.weapons?.[key]?.trigger||!manifest.weapons[key]?.support))
+      throw new Error('Incomplete licensed WW2 weapon catalog');
+    w.ww2Manifest=manifest;
+  }).catch(error=>{w.ww2CatalogError=String(error);console.warn('WW2 catalog fallback:',error);});
+}
+function selectNativeHeroWW2Weapon(unit,rig){
+  const w=rig.weapon;
+  const side=unit.side==='red'?'red':'blue',slot=Math.max(0,Math.min(5,unit.wpn|0));
+  const ids=side==='red'?['de-kar98k','de-mp40','de-mg42','de-kar98k']:
+    ['uk-lee-enfield','uk-sten','uk-bren','uk-lee-enfield'];
+  const key=slot>=4?null:ids[slot],catalog=w.ww2Manifest,info=key?catalog?.weapons?.[key]:null;
+  if(info&&!w.ww2Models.has(key)&&!w.ww2Pending.has(key)&&!w.ww2Failed.has(key)){
+    w.ww2Pending.add(key);
+    const url=new URL('../assets/ww2-weapons/'+info.file,location.href);
+    new THREE.GLTFLoader().load(url.href,gltf=>{
+      if(!rig.weapon||rig.weapon!==w)return;
+      const obj=gltf.scene;
+      obj.name='WW2_'+key;
+      obj.scale.setScalar(WW2_WEAPON_GAME_SCALE);
+      obj.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
+      w.root.add(obj);
+      w.ww2Models.set(key,obj);
+      w.ww2Pending.delete(key);
+    },undefined,error=>{
+      w.ww2Pending.delete(key);
+      w.ww2Failed.set(key,String(error?.message||error));
+      console.warn('WW2 weapon fallback '+key,error);
+    });
+  }
+  const active=!!(info&&w.ww2Models.has(key));
+  for(const [name,model] of w.ww2Models)model.visible=active&&name===key;
+  w.fallback.visible=!active&&slot<4;
+  w.launcher.visible=slot>=4;
+  w.activeModelId=active?key:slot>=4?'launcher-prototype':'fallback';
+  w.activeModel=active?info:null;
+  const vec=(data)=>new THREE.Vector3().fromArray(data).multiplyScalar(WW2_WEAPON_GAME_SCALE);
+  if(active){
+    w.trigger.position.copy(vec(info.trigger)).addScaledVector(new THREE.Vector3().fromArray(info.triggerPalm),.013);
+    w.support.position.copy(vec(info.support)).addScaledVector(new THREE.Vector3().fromArray(info.supportPalm),.014);
+    w.muzzleFlash.position.copy(vec(info.muzzle));
+  }else{
+    w.trigger.position.set(0,-.105,-.16);
+    w.support.position.set(0,-.10,slot>=4?.32:.35);
+    w.muzzleFlash.position.set(0,.022,slot>=4?1.0:.89);
+  }
+  // Sniper slots keep their established game rules and use the same
+  // rifle mesh with a small optical attachment. No stat changes.
+  if(!w.scope){
+    const scope=new THREE.Group();scope.name='SniperOpticOnly';
+    const mat=new THREE.MeshLambertMaterial({color:0x272d2b});
+    const tube=new THREE.Mesh(new THREE.CylinderGeometry(.023,.025,.20,12),mat);
+    tube.rotation.x=Math.PI/2;tube.position.set(0,.13,.12);scope.add(tube);
+    w.root.add(scope);w.scope=scope;
+  }
+  w.scope.visible=active&&slot===3;
+  return w.activeModelId;
+}
+
 function initNativeHeroWeapon(v,rig){
   const boneMap=new Map();
   rig.model.traverse(n=>{if(n.isBone)boneMap.set(n.name,n);});
@@ -397,46 +475,46 @@ function initNativeHeroWeapon(v,rig){
     rig.weaponHandQ[side]=inv.multiply(q);
   }
   rig.weaponDiagnostics={ready:false,rightError:null,leftError:null,poseUpdates:0};
+  initNativeHeroWW2WeaponCatalog(rig);
 }
 function updateNativeHeroWeapon(unit,v,rig,dt){
   if(!rig.weapon||!rig.hands)return;
   const vis=rig.visual,w=rig.weapon;
   vis.updateWorldMatrix(true,true);
-  const getLocal=b=>vis.worldToLocal(b.getWorldPosition(new THREE.Vector3()));
-  const sr=getLocal(rig.hands.right.upper),sl=getLocal(rig.hands.left.upper);
-  const rightSign=Math.sign(sr.x-sl.x)||-1;
-  const aimed=unit.aim>0;
+  const local=bone=>vis.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
+  const sr=local(rig.hands.right.upper),sl=local(rig.hands.left.upper);
+  const sign=Math.sign(sr.x-sl.x)||-1;
+  const aimed=unit.aim>0,speed=Math.max(0,unit.sv||0);
+  const sprint=speed>4.2;
+  const selection=selectNativeHeroWW2Weapon(unit,rig);
   const heading=unit.aimT==null?0:
     Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
-  // Stable high-ready posture while moving; raised to a proper shoulder line
-  // for aiming. The body and the legs still use the original animation.
-  // The butt starts inside the RIGHT shoulder pocket; the barrel is yawed
-  // inward across the chest rather than sticking out of the sternum.
-  w.root.position.set((sr.x+sl.x)*.5+rightSign*.17,
-    (sr.y+sl.y)*.5-(aimed?.07:.14),
-    (sr.z+sl.z)*.5+.31);
-  w.root.rotation.set(aimed?.02:.065,
-    THREE.MathUtils.clamp(heading,-.55,.55)*(aimed?.4:0)-rightSign*.25,
-    rightSign*.055,'YXZ');
-  // Wrists must approach the correct sides of the narrow rifle stock.
-  w.trigger.position.x=rightSign*.06;
-  w.support.position.x=-rightSign*.08;
+  w.root.rotation.set(aimed?.025:sprint?.10:.065,
+    THREE.MathUtils.clamp(heading,-.55,.55)*(aimed?.4:0)-sign*.25,
+    sign*(aimed?.026:.055),'YXZ');
+  const center=new THREE.Vector3().addVectors(sr,sl).multiplyScalar(.5);
+  const desiredTrigger=new THREE.Vector3(
+    center.x+sign*.17,
+    center.y-(aimed?.17:.245),
+    center.z+(aimed?.23:.15)
+  );
+  // The physical trigger hand grip is the weapon's placement pivot.
+  // Compensate source model's real grip offset before solving either arm.
+  w.root.position.copy(desiredTrigger).sub(w.trigger.position.clone().applyQuaternion(w.root.quaternion));
   w.muzzleFlash.visible=unit.kick>0;
-  // First set the weapon placement, then solve both independent arm chains
-  // to its physical grip anchors using the Quaternius shoulder and elbow.
   vis.updateWorldMatrix(true,true);
-  const targets={
-    right:getLocal(w.trigger),
-    left:getLocal(w.support)
-  };
+  const targets={right:local(w.trigger),left:local(w.support)};
   const poles={
-    right:sr.clone().add(new THREE.Vector3(rightSign*.53,-.35,-.16)),
-    left:sl.clone().add(new THREE.Vector3(-rightSign*.53,-.38,-.12))
+    right:sr.clone().add(new THREE.Vector3(sign*.51,-.27,-.10)),
+    left:sl.clone().add(new THREE.Vector3(-sign*.48,-.29,.16))
   };
   for(const side of ['right','left']){
     const a=rig.hands[side];
     GermanRig.solve(vis,a.upper,a.elbow,a.hand,targets[side],poles[side]);
-    GermanRig.orient(vis,a.hand,rig.weaponHandQ[side]);
+    // Wrist rotation tracks the weapon instead of preserving a frozen world
+    // orientation as the muzzle moves between carry, aiming and sprint.
+    const orientation=w.root.quaternion.clone().multiply(rig.weaponHandQ[side]);
+    GermanRig.orient(vis,a.hand,orientation);
   }
   vis.updateWorldMatrix(true,true);
   const rightError=rig.hands.right.hand.getWorldPosition(new THREE.Vector3())
@@ -444,8 +522,11 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
   const leftError=rig.hands.left.hand.getWorldPosition(new THREE.Vector3())
     .distanceTo(w.support.getWorldPosition(new THREE.Vector3()));
   rig.weaponDiagnostics={
-    ready:true,rightError,leftError,poseUpdates:(rig.weaponDiagnostics.poseUpdates||0)+1,
-    gaitState:rig.state,aimed,visible:w.root.visible
+    ready:true,rightError,leftError,
+    poseUpdates:(rig.weaponDiagnostics.poseUpdates||0)+1,
+    gaitState:rig.state,aimed,sprint,
+    weaponId:selection,weaponSlot:unit.wpn,side:unit.side,
+    visible:w.root.visible,handTargets:{right:targets.right.toArray(),left:targets.left.toArray()}
   };
 }
 
@@ -729,7 +810,7 @@ function updateNativeHeroFieldUniform(rig){
     space.updateWorldMatrix(true,true);
     // Cap pivot is the wearer's forehead band, ~0.27m above Mixamo Head joint.
     cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
-    cap.position.y+=.19;
+    cap.position.y+=.155;
     const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
     cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
   }
@@ -746,7 +827,7 @@ function loadNativeHeroM43Cap(rig){
     const cap=gltf.scene;
     cap.name='WW2_M43_Real_Geometry_MIT';
     // Metre-scale model; parent already inherits WW2 soldier scale.
-    cap.scale.setScalar(1.45);
+    cap.scale.setScalar(1.20);
     cap.position.set(0,.205,0);
     cap.rotation.set(0,0,0);
     cap.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
