@@ -1,6 +1,6 @@
 {
-  "modelLoaded": false,
-  "finalLabel": "ОШИБКА СКЕЛЕТА v17: прежний герой. Причина: hero-three-clips-lite.glb: оба источника недоступны",
+  "modelLoaded": true,
+  "finalLabel": "НОВЫЙ СКЕЛЕТ v17: АКТИВЕН ✓ LOCAL + LOCAL. Зелёное кольцо над героем.",
   "logs": [
     "warning: A parser-blocking, cross site (i.e. different eTLD+1) script, https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.",
     "warning: A parser-blocking, cross site (i.e. different eTLD+1) script, https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.",
@@ -8,9 +8,7 @@
     "warning: A parser-blocking, cross site (i.e. different eTLD+1) script, https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.",
     "error: Failed to load resource: the server responded with a status of 404 (File not found)",
     "network: http://127.0.0.1:8777/sdk.js net::ERR_ABORTED",
-    "warning: Native GLB origin failed http://127.0.0.1:8777/assets/native-hero-quaternius/hero-three-clips-lite.glb TypeError: Cannot read properties of null (reading 'array')\n    at https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js:3049:39\n    at async Promise.all (index 0)\n    at async Promise.all (index 1)",
-    "error: Failed to load resource: the server responded with a status of 404 ()",
-    "warning: Native GLB origin failed https://raw.githubusercontent.com/jango763/battlefield/main/assets/native-hero-quaternius/hero-three-clips-lite.glb ProgressEvent",
+    "info: Quaternius native hero rig ready {skeletonBones: 65, skinnedMeshes: 3, clips: Array(3)}",
     "pageerror: No parent to post message",
     "pageerror: No parent to post message",
     "pageerror: No parent to post message",
@@ -26,10 +24,7 @@
     "pageerror: No parent to post message",
     "pageerror: No parent to post message",
     "pageerror: No parent to post message",
-    "pageerror: No parent to post message",
-    "error: Failed to load resource: the server responded with a status of 404 ()",
-    "warning: Native GLB origin failed https://cdn.jsdelivr.net/gh/jango763/battlefield@main/assets/native-hero-quaternius/hero-three-clips-lite.glb ProgressEvent",
-    "warning: Native hero rig fallback to original: Error: hero-three-clips-lite.glb: оба источника недоступны\n    at loadFile (http://127.0.0.1:8777/preview/formation-replenishment-v3.html:772:11)\n    at async Promise.all (index 1)"
+    "pageerror: No parent to post message"
   ],
   "browser": "Chromium software WebGL",
   "screen": "mobile 390x844"
