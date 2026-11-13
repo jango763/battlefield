@@ -1,0 +1,49 @@
+name: Probe native hero GLB delivery
+on:
+  push:
+    branches:
+      - test/hero-native-selfhosted-assets-20261113
+    paths:
+      - .github/workflows/probe-hero-urls.yml
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: HTTP probe exactly the URLs used by the user test
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import subprocess,pathlib,hashlib,json
+          base=pathlib.Path('assets/native-hero-quaternius')
+          asset='night-striker.glb'
+          urls={
+            'preview-original-rawcdn':'https://rawcdn.githack.com/jango763/battlefield/bfda29bc5d108f276883df4cc385c561327b7b7d/assets/native-hero-quaternius/'+asset,
+            'preview-current-rawcdn':'https://rawcdn.githack.com/jango763/battlefield/bb27f8129b0082f33860108ae2c3feefb45a77cf/assets/native-hero-quaternius/'+asset,
+            'upstream-raw-github':'https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/aa02a4e6d8337a0604d2da131bcbbeb1f01badf0/public/assets/vendor/quaternius/'+asset,
+            'upstream-jsdelivr':'https://cdn.jsdelivr.net/gh/Seyamalam/blood-league-kickoff@aa02a4e6d8337a0604d2da131bcbbeb1f01badf0/public/assets/vendor/quaternius/'+asset,
+          }
+          expected=hashlib.sha256((base/asset).read_bytes()).hexdigest()
+          result={'expected_sha256':expected}
+          for name,url in urls.items():
+            file=pathlib.Path('/tmp/hero-probe-'+name+'.glb')
+            command=['curl','--fail','--location','--silent','--show-error','--max-time','35','--connect-timeout','10','-w','\\n%{http_code} %{content_type} %{size_download} %{time_total}','-o',str(file),url]
+            p=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+            match=file.is_file() and hashlib.sha256(file.read_bytes()).hexdigest()==expected
+            result[name]={'ok':p.returncode==0 and match,'curl_code':p.returncode,'http':p.stdout.strip()[-250:],'stderr':p.stderr.strip()[-240:],'bytes':file.stat().st_size if file.exists() else 0,'sha256_match':match}
+            print(name,result[name])
+          (base/'network-probe.json').write_text(json.dumps(result,indent=2))
+          PY
+      - name: Commit diagnostic report
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/native-hero-quaternius/network-probe.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'test(hero): audit actual GLB HTTP delivery URLs'
+            git push origin HEAD:refs/heads/test/hero-native-selfhosted-assets-20261113
+          fi

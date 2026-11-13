@@ -1,0 +1,69 @@
+name: Browser smoke test for native hero rig
+on:
+  push:
+    branches:
+      - test/hero-native-lite-20261113
+    paths:
+      - .github/workflows/smoke-test-hero-rig.yml
+      - assets/native-hero-quaternius/hero-three-clips-lite.glb
+permissions:
+  contents: write
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chrome automation
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/hero-playwright playwright@1.58.2
+          /tmp/hero-playwright/node_modules/.bin/playwright install chromium
+      - name: Run game locally and wait for an actually active new rig
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/hero-http.log 2>&1 &
+          sleep 2
+          node - <<'JS'
+          const {chromium}=require('/tmp/hero-playwright/node_modules/playwright');
+          const fs=require('fs');
+          (async()=>{
+            const out={modelLoaded:false,finalLabel:'',logs:[],browser:'Chromium software WebGL',screen:'mobile 390x844'};
+            let browser;
+            try{
+              browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
+              const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+              page.on('console',m=>{if(m.type()!=='log'&&out.logs.length<35)out.logs.push(m.type()+': '+m.text().slice(0,550))});
+              page.on('pageerror',e=>out.logs.push('pageerror: '+e.message.slice(0,240)));
+              page.on('requestfailed',r=>out.logs.push('network: '+r.url().slice(0,160)+' '+r.failure()?.errorText));
+              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html',{waitUntil:'domcontentloaded',timeout:55000});
+              const until=Date.now()+85000;
+              while(Date.now()<until){
+                const label=await page.locator('#native-hero-rig-label').textContent().catch(()=>'');
+                out.finalLabel=label||out.finalLabel;
+                if(/АКТИВЕН/.test(label)){out.modelLoaded=true;break;}
+                if(/ОШИБКА СКЕЛЕТА|НЕ ВКЛЮЧИЛСЯ|Не удалось загрузить игру/.test(label))break;
+                await page.waitForTimeout(2000);
+              }
+              await page.screenshot({path:'/tmp/hero-smoke.png'});
+            }catch(e){out.logs.push('exception: '+e.message.slice(0,400));}
+            finally{
+              if(browser)await browser.close();
+              fs.writeFileSync('assets/native-hero-quaternius/browser-test-report.json',JSON.stringify(out,null,2));
+              console.log(JSON.stringify(out,null,2));
+            }
+          })();
+          JS
+      - name: Commit browser diagnostic report
+        if: always()
+        shell: bash
+        run: |
+          if [ -f assets/native-hero-quaternius/browser-test-report.json ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add assets/native-hero-quaternius/browser-test-report.json
+            if ! git diff --cached --quiet; then
+              git commit -m 'test(hero): capture browser rig activation report'
+              git push origin HEAD:refs/heads/test/hero-native-lite-20261113
+            fi
+          fi

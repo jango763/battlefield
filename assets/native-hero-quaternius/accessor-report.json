@@ -1,0 +1,47 @@
+{
+  "clip_names": [
+    "Idle_Loop",
+    "Jog_Fwd_Loop",
+    "Sprint_Loop"
+  ],
+  "missing": [],
+  "null_accessor": [
+    {
+      "clip": "Idle_Loop",
+      "kind": "output",
+      "index": 569,
+      "accessor": {
+        "type": "VEC3",
+        "componentType": 5126,
+        "count": 2
+      },
+      "path": "translation"
+    },
+    {
+      "clip": "Jog_Fwd_Loop",
+      "kind": "output",
+      "index": 569,
+      "accessor": {
+        "type": "VEC3",
+        "componentType": 5126,
+        "count": 2
+      },
+      "path": "translation"
+    },
+    {
+      "clip": "Sprint_Loop",
+      "kind": "output",
+      "index": 569,
+      "accessor": {
+        "type": "VEC3",
+        "componentType": 5126,
+        "count": 2
+      },
+      "path": "translation"
+    }
+  ],
+  "issues": [],
+  "sparse_count": 0,
+  "channels": 585,
+  "accessors": 570
+}

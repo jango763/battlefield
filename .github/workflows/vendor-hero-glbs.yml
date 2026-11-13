@@ -1,0 +1,66 @@
+name: Vendor native hero GLBs (test branch only)
+on:
+  push:
+    branches:
+      - test/hero-native-selfhosted-assets-20261113
+    paths:
+      - .github/workflows/vendor-hero-glbs.yml
+permissions:
+  contents: write
+jobs:
+  vendor-native-rig:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download pinned CC0 Quaternius assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assets/native-hero-quaternius
+          for name in night-striker.glb universal-animation-library.glb; do
+            dest="assets/native-hero-quaternius/${name}"
+            src="https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/aa02a4e6d8337a0604d2da131bcbbeb1f01badf0/public/assets/vendor/quaternius/${name}"
+            mirror="https://cdn.jsdelivr.net/gh/Seyamalam/blood-league-kickoff@aa02a4e6d8337a0604d2da131bcbbeb1f01badf0/public/assets/vendor/quaternius/${name}"
+            if ! curl --fail --location --retry 3 --connect-timeout 15 --max-time 120 --silent --show-error --output "$dest" "$src"; then
+              curl --fail --location --retry 3 --connect-timeout 15 --max-time 120 --silent --show-error --output "$dest" "$mirror"
+            fi
+            test "$(wc -c < "$dest")" -gt 200000
+            ls -lh "$dest"
+          done
+      - name: Validate binary GLBs and matching native skeleton clips
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,struct,pathlib
+          folder=pathlib.Path('assets/native-hero-quaternius')
+          def read(path):
+              content=path.read_bytes()
+              assert content[:4]==b'glTF',f'{path}: not GLB'
+              assert struct.unpack_from('<I',content,4)[0]==2,f'{path}: not v2'
+              assert struct.unpack_from('<I',content,8)[0]==len(content),f'{path}: length mismatch'
+              length,kind=struct.unpack_from('<II',content,12)
+              assert kind==0x4E4F534A,f'{path}: missing JSON'
+              doc=json.loads(content[20:20+length].decode('utf-8'))
+              return doc
+          char=read(folder/'night-striker.glb')
+          animations=read(folder/'universal-animation-library.glb')
+          joints={x.get('name') for x in char.get('nodes',[])}
+          required={'pelvis','thigh_l','calf_l','foot_l','thigh_r','calf_r','foot_r'}
+          assert required.issubset(joints),f'Bones missing: {required-joints}'
+          clips={x.get('name') for x in animations.get('animations',[])}
+          required_clips={'Idle_Loop','Jog_Fwd_Loop','Sprint_Loop'}
+          assert required_clips.issubset(clips),f'Clips missing: {required_clips-clips}'
+          assert len(char.get('skins',[]))>0,'No skin on character'
+          print('Validated bones, GLB structure and clips:',sorted(required_clips))
+          PY
+      - name: Commit test assets only into current test branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/native-hero-quaternius/night-striker.glb assets/native-hero-quaternius/universal-animation-library.glb
+          if git diff --cached --quiet; then echo 'Assets already present'; exit 0; fi
+          git commit -m 'test(hero): bundle validated CC0 native rig and animations'
+          git push origin HEAD:refs/heads/test/hero-native-selfhosted-assets-20261113

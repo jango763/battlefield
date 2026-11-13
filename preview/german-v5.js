@@ -211,6 +211,7 @@ function disposeGermanSoldier(unit){
 }
 function animateGermanSoldier(unit,dt=.016){
   const v=unit.germanPreview;if(!v)return;
+  if(v.nativeRig&&animateNativeHeroRig(unit,v,dt))return;
   v.legacy.visible=false;v.anchor.visible=true;
   // Visual locomotion is independent of combat speed, collision and gameplay.
   // Filter speed so the stride cycle decelerates naturally instead of snapping.
@@ -312,6 +313,166 @@ function animateGermanSoldier(unit,dt=.016){
   v.identity.band.material.color.setHex((hero?unit.side:unit.t)==='red'?0x9e4a44:0x4d7391);
   v.anchor.updateWorldMatrix(true,true);
 }
+// Native rig diagnostic: Quaternius mesh + its OWN skeleton + animation library.
+// No retargeting and no changes to the army or gameplay. Only the HERO.
+// Assets from https://github.com/Seyamalam/blood-league-kickoff/ (CC0
+// Quaternius, see docs/ASSET_CREDITS.md in upstream), pinned to source commit.
+// Keep every fallback on the same exact test build and use the stripped
+// assets. Derive the commit from the immutable GitHack preview URL.
+const NATIVE_HERO_REF=location.pathname.split('/').filter(Boolean)[2]||'main';
+const NATIVE_HERO_ASSET_ROOTS=[
+  new URL('../assets/native-hero-quaternius/',location.href).href,
+  'https://raw.githubusercontent.com/jango763/battlefield/'+NATIVE_HERO_REF+'/assets/native-hero-quaternius/',
+  'https://cdn.jsdelivr.net/gh/jango763/battlefield@'+NATIVE_HERO_REF+'/assets/native-hero-quaternius/'
+];
+function nativeHeroLabel(msg){
+  let node=document.getElementById('native-hero-rig-label');
+  if(!node){
+    node=document.createElement('div');node.id='native-hero-rig-label';
+    node.style.cssText='position:fixed;z-index:1000;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 118px);max-width:390px;min-height:44px;padding:10px 12px;color:white;background:#6d280bfa;border:2px solid #ffd45b;border-radius:8px;box-shadow:0 2px 14px #000c;font:700 15px/1.3 Arial;pointer-events:none';
+    document.body.appendChild(node);
+  }
+  node.textContent=msg;
+  node.style.background=/^НОВЫЙ СКЕЛЕТ v17: АКТИВЕН/.test(msg)?'#16582efa':/^СТАРЫЙ СКЕЛЕТ/.test(msg)?'#314255f5':'#6d280bfa';
+}
+function nativeHeroLoad(){
+  const oldMode=new URLSearchParams(location.search).get('rig')==='original';
+  if(oldMode){nativeHeroLabel('СТАРЫЙ СКЕЛЕТ: выбран для сравнения. Новая модель отключена.');return;}
+  if(germanPreview.nativeHeroRequested)return;
+  germanPreview.nativeHeroRequested=true;
+  if(typeof THREE.GLTFLoader!=='function'){nativeHeroLabel('ОШИБКА: нет загрузчика GLTFLoader. Используется старая модель.');return;}
+  nativeHeroLabel('СКЕЛЕТ v17: облегчённые GLB 1,5 МБ — начинаю загрузку.');
+  // Try GitHub raw first, then a pinned jsDelivr mirror. Errors are
+  // visible instead of silently falling back to the unchanged hero.
+  const nativeHeroOrigins={};
+  const loadFile=async(name)=>{
+    let lastError=null;
+    for(let i=0;i<NATIVE_HERO_ASSET_ROOTS.length;i++){
+      const url=NATIVE_HERO_ASSET_ROOTS[i]+name;
+      const loader=new THREE.GLTFLoader();
+      let timer;
+      try{
+        const gltf=await Promise.race([
+          new Promise((resolve,reject)=>loader.load(url,resolve,e=>{
+            if(e&&e.total>0){
+              const percent=Math.min(99,Math.round(e.loaded/e.total*100));
+              nativeHeroLabel('СКЕЛЕТ v17: '+name+' '+percent+'% (источник '+(i+1)+'/3)');
+            }
+          },error=>reject(error||new Error('Ошибка GLB')))),
+          new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Превышено время загрузки: '+name)),18000);})
+        ]);
+        nativeHeroOrigins[name]=(i===0?'LOCAL':i===1?'GitHub Raw':'jsDelivr');
+        return gltf;
+      }catch(e){
+        lastError=e;
+        console.warn('Native GLB origin failed',url,e);
+      }finally{clearTimeout(timer);}
+    }
+    throw new Error(name+': '+(lastError&&lastError.message||'оба источника недоступны'));
+  };
+  Promise.all([loadFile('night-striker-lite.glb'),loadFile('hero-three-clips-lite.glb')]).then(([character,library])=>{
+    const unit=P,v=unit&&unit.germanPreview;
+    if(!v||v.role!=='hero'||v.nativeRig)throw new Error('Нет подготовленного героя');
+    const model=character.scene;
+    const bones=new Set();
+    let meshCount=0;
+    model.traverse(n=>{if(n.isBone)bones.add(n.name);if(n.isSkinnedMesh)meshCount++;});
+    const required=['pelvis','thigh_l','calf_l','foot_l','thigh_r','calf_r','foot_r'];
+    if(meshCount===0||required.some(name=>!bones.has(name)))throw new Error('Не найден полный скелет Quaternius');
+    const clips=new Map((library.animations||[]).map(a=>[a.name,a]));
+    const selected={
+      idle:clips.get('Idle_Loop'),
+      jog:clips.get('Jog_Fwd_Loop'),
+      sprint:clips.get('Sprint_Loop')
+    };
+    if(Object.values(selected).some(clip=>!clip||!clip.tracks.length||!Number.isFinite(clip.duration)||clip.duration<=0)){
+      throw new Error('В библиотеке нет Idle / Jog / Sprint');
+    }
+    model.updateMatrixWorld(true);
+    const box=new THREE.Box3().setFromObject(model);
+    const height=box.max.y-box.min.y;
+    if(!Number.isFinite(height)||height<.2||height>1000)throw new Error('Неверный размер исходной модели');
+    const factor=2.55/height;
+    // Bounds are applied at the SAME visual-anchor height as the old hero.
+    // The original skeleton, its skin weights and relative bone transforms
+    // stay together. Only the whole model gets a single uniform scale.
+    const visual=new THREE.Group();visual.name='QuaterniusHeroRigDiagnostic';
+    model.scale.multiplyScalar(factor);
+    model.position.set(-(box.min.x+box.max.x)*.5*factor,-box.min.y*factor,-(box.min.z+box.max.z)*.5*factor);
+    visual.add(model);
+    // Native clips only: this avoids passing their joint transforms into
+    // the unrelated Panzergrenadier (Mixamo) skeleton entirely.
+    const mixer=new THREE.AnimationMixer(model);
+    const actions={};
+    for(const [key,clip] of Object.entries(selected)){
+      // Game simulation owns locomotion position; a GLB must not drive a root
+      // object across the map. Keep local hip motion for natural foot plants.
+      const safe=clip.clone();
+      safe.tracks=safe.tracks.filter(t=>!/\.scale$/.test(t.name)&&
+        !/(?:^|[./])root(?:\]|\.|_)?(?:position)?\.position$/.test(t.name));
+      if(safe.tracks.length<6)throw new Error('Недостаточно скелетных каналов: '+clip.name);
+      actions[key]=mixer.clipAction(safe);
+    }
+    actions.idle.play();
+    const oldFigureVisible=v.figure.visible;
+    const oldIdentityVisible=v.identity.root.visible;
+    const oldWeaponVisible=v.weapon.root.visible;
+    try{
+      v.anchor.add(visual);
+      v.nativeRig={visual,model,mixer,actions,state:'idle',previous:{oldFigureVisible,oldIdentityVisible,oldWeaponVisible}};
+      // Visual-only replacement; the old rig stays available as an instant
+      // fallback. No army mesh/skeleton or gameplay unit is touched.
+      v.figure.visible=false;
+      v.identity.root.visible=false;
+      v.weapon.root.visible=false;
+      // Green badge plus geometric marker: the native visual swap is
+      // unambiguous, even when the costume looks similar from the RTS camera.
+      const marker=new THREE.Mesh(
+        new THREE.TorusGeometry(.32,.055,6,16),
+        new THREE.MeshBasicMaterial({color:0x00ffbc,depthTest:false})
+      );
+      marker.name='NativeRigDiagnosticMarker';
+      marker.rotation.x=Math.PI/2;
+      marker.position.set(0,2.92,0);
+      marker.renderOrder=120;
+      visual.add(marker);
+      nativeHeroLabel('НОВЫЙ СКЕЛЕТ v17: АКТИВЕН ✓ '+nativeHeroOrigins['night-striker-lite.glb']+' + '+nativeHeroOrigins['hero-three-clips-lite.glb']+'. Зелёное кольцо над героем.');
+      console.info('Quaternius native hero rig ready',{
+        skeletonBones:bones.size,skinnedMeshes:meshCount,clips:Object.keys(actions)
+      });
+    }catch(e){
+      v.figure.visible=oldFigureVisible;v.identity.root.visible=oldIdentityVisible;
+      v.weapon.root.visible=oldWeaponVisible;
+      v.nativeRig=null;
+      v.anchor.remove(visual);
+      throw e;
+    }
+  }).catch(e=>{
+    console.warn('Native hero rig fallback to original:',e);
+    nativeHeroLabel('ОШИБКА СКЕЛЕТА v17: прежний герой. Причина: '+e.message);
+  });
+}
+function animateNativeHeroRig(unit,v,dt){
+  const r=v.nativeRig;
+  if(!r)return false;
+  const speed=Math.max(0,Number.isFinite(unit.sv)?unit.sv:0);
+  const next=speed<.28?'idle':speed<4.2?'jog':'sprint';
+  if(r.state!==next){
+    const old=r.actions[r.state],action=r.actions[next];
+    old.fadeOut(.16);
+    action.reset().fadeIn(.16).play();
+    r.state=next;
+  }
+  r.mixer.update(THREE.MathUtils.clamp(Number.isFinite(dt)?dt:0,0,.08));
+  unit.g.position.set(unit.x,0,unit.z);
+  unit.g.rotation.x=0;unit.g.rotation.z=0;
+  if(speed<.6&&unit.aim>0&&unit.aimT!=null){
+    const yaw=Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
+    unit.g.rotation.y+=yaw*(1-Math.exp(-Math.max(0,dt)*7));
+  }
+  v.legacy.visible=false;v.anchor.visible=true;
+  return true;
+}
 function loadGermanSoldierPreview(){
   if(typeof THREE.GLTFLoader!=='function'){germanPreviewLabel('Модель недоступна — исходные бойцы');return;}
   try{
@@ -325,6 +486,7 @@ function loadGermanSoldierPreview(){
         germanPreview.template=figure;germanPreview.bounds=bounds;
         const queue=[P,...U,...germanPreview.pending];germanPreview.pending.length=0;
         for(const u of queue)if(u.hp>0)attachGermanSoldier(u);
+        nativeHeroLoad();
         refreshGermanPreviewLabel();
       }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');}
     },e=>{console.error(e);germanPreviewLabel('Ошибка загрузки — исходные бойцы');});

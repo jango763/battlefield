@@ -1,0 +1,31 @@
+{
+  "modelLoaded": true,
+  "finalLabel": "НОВЫЙ СКЕЛЕТ v17: АКТИВЕН ✓ LOCAL + LOCAL. Зелёное кольцо над героем.",
+  "logs": [
+    "warning: A parser-blocking, cross site (i.e. different eTLD+1) script, https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.",
+    "warning: A parser-blocking, cross site (i.e. different eTLD+1) script, https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.",
+    "warning: A parser-blocking, cross site (i.e. different eTLD+1) script, https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.",
+    "warning: A parser-blocking, cross site (i.e. different eTLD+1) script, https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.",
+    "error: Failed to load resource: the server responded with a status of 404 (File not found)",
+    "network: http://127.0.0.1:8777/sdk.js net::ERR_ABORTED",
+    "info: Quaternius native hero rig ready {skeletonBones: 65, skinnedMeshes: 3, clips: Array(3)}",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "warning: Error: No parent to post message\n    at e.postToParent (https://yandex.ru/games/sdk/v2:1:14416)\n    at window.loadEnvironmentPromise.window.loadEnvironmentPromise.Promise.then.t (https://yandex.ru/games/sdk/v2:1:81933)\n    at new Promise (<anonymous>)\n    at https://yandex.ru/games/sdk/v2:1:81880",
+    "warning: Error: No parent to post message\n    at e.postToParent (https://yandex.ru/games/sdk/v2:1:14416)\n    at s (https://yandex.ru/games/sdk/v2:1:8239)\n    at i (https://yandex.ru/games/sdk/v2:1:8314)\n    at https://yandex.ru/games/sdk/v2:1:91429",
+    "warning: Error: Can not get appId from environment\n    at a (https://yandex.ru/games/sdk/v2:1:9950)\n    at Object.sendOnceDeprecatedUsage (https://yandex.ru/games/sdk/v2:1:10247)\n    at https://yandex.ru/games/sdk/v2:1:72631\n    at https://yandex.ru/games/sdk/v2:1:72824\n    at ea (https://yandex.ru/games/sdk/v2:1:72830)\n    at new Va (https://yandex.ru/games/sdk/v2:1:83455)\n    at https://yandex.ru/games/sdk/v2:1:88556",
+    "warning: Error: SDK environment: `window.YandexGamesSDKEnvironment` is undefined\n    at Y (https://yandex.ru/games/sdk/v2:1:30583)\n    at get isTelegram (https://yandex.ru/games/sdk/v2:1:30911)\n    at https://yandex.ru/games/sdk/v2:1:88580",
+    "warning: Error: No parent to post message\n    at e.postToParent (https://yandex.ru/games/sdk/v2:1:14416)\n    at s (https://yandex.ru/games/sdk/v2:1:8239)\n    at i (https://yandex.ru/games/sdk/v2:1:8314)\n    at a (https://yandex.ru/games/sdk/v2:1:9949)\n    at Object.sendOnceDeprecatedUsage (https://yandex.ru/games/sdk/v2:1:10247)\n    at https://yandex.ru/games/sdk/v2:1:72631\n    at https://yandex.ru/games/sdk/v2:1:72824\n    at ea (https://yandex.ru/games/sdk/v2:1:72830)\n    at new Va (https://yandex.ru/games/sdk/v2:1:83455)\n    at https://yandex.ru/games",
+    "warning: Error: No parent to post message\n    at e.postToParent (https://yandex.ru/games/sdk/v2:1:14416)\n    at s (https://yandex.ru/games/sdk/v2:1:8239)\n    at i (https://yandex.ru/games/sdk/v2:1:8314)\n    at Y (https://yandex.ru/games/sdk/v2:1:30582)\n    at get isTelegram (https://yandex.ru/games/sdk/v2:1:30911)\n    at https://yandex.ru/games/sdk/v2:1:88580",
+    "warning: Error: No parent to post message\n    at e.postToParent (https://yandex.ru/games/sdk/v2:1:14416)\n    at N.updateDisabledState (https://yandex.ru/games/sdk/v2:1:25547)\n    at new N (https://yandex.ru/games/sdk/v2:1:24151)\n    at new Va (https://yandex.ru/games/sdk/v2:1:84278)\n    at https://yandex.ru/games/sdk/v2:1:88556",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message"
+  ],
+  "browser": "Chromium software WebGL",
+  "screen": "mobile 390x844"
+}
