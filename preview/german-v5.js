@@ -489,14 +489,14 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
   const selection=selectNativeHeroWW2Weapon(unit,rig);
   const heading=unit.aimT==null?0:
     Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
-  w.root.rotation.set(aimed?.025:sprint?.10:.065,
-    THREE.MathUtils.clamp(heading,-.55,.55)*(aimed?.4:0)-sign*.25,
-    sign*(aimed?.026:.055),'YXZ');
+  w.root.rotation.set(aimed?-.055:sprint?.095:-.17,
+    THREE.MathUtils.clamp(heading,-.55,.55)*(aimed?.4:0)-sign*.62,
+    sign*(aimed?.02:.038),'YXZ');
   const center=new THREE.Vector3().addVectors(sr,sl).multiplyScalar(.5);
   const desiredTrigger=new THREE.Vector3(
     center.x+sign*.17,
     center.y-(aimed?.17:.245),
-    center.z+(aimed?.23:.15)
+    center.z+(aimed?.22:.15)
   );
   // The physical trigger hand grip is the weapon's placement pivot.
   // Compensate source model's real grip offset before solving either arm.
@@ -506,7 +506,7 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
   const targets={right:local(w.trigger),left:local(w.support)};
   const poles={
     right:sr.clone().add(new THREE.Vector3(sign*.51,-.27,-.10)),
-    left:sl.clone().add(new THREE.Vector3(-sign*.48,-.29,.16))
+    left:sl.clone().add(new THREE.Vector3(-sign*.48,-.27,.23))
   };
   for(const side of ['right','left']){
     const a=rig.hands[side];
@@ -811,6 +811,9 @@ function updateNativeHeroFieldUniform(rig){
     // Cap pivot is the wearer's forehead band, ~0.27m above Mixamo Head joint.
     cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
     cap.position.y+=.155;
+    // The donor Head joint is behind the modelled brow; fit the whole cap
+    // forward and slightly to the wearer's left rather than exposing scalp.
+    cap.position.add(new THREE.Vector3(-.062,0,.068).applyQuaternion(cap.quaternion));
     const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
     cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
   }
@@ -827,7 +830,7 @@ function loadNativeHeroM43Cap(rig){
     const cap=gltf.scene;
     cap.name='WW2_M43_Real_Geometry_MIT';
     // Metre-scale model; parent already inherits WW2 soldier scale.
-    cap.scale.setScalar(1.20);
+    cap.scale.setScalar(1.30);
     cap.position.set(0,.205,0);
     cap.rotation.set(0,0,0);
     cap.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
