@@ -249,7 +249,8 @@ function animateGermanSoldier(unit,dt=.016){
       t.z+=stride*(1-2*smooth);
       // Slight toe-off near the end of stance, not the whole planted phase.
       const toe=THREE.MathUtils.clamp((q-.72)/.28,0,1);
-      footRoll=.065*toe*toe*v.walk;
+      const toeArc=Math.sin(Math.PI*toe);
+      footRoll=.065*toeArc*toeArc*v.walk;
     }else{
       const q=(phase-stance)/(1-stance),smooth=q*q*(3-2*q);
       t.z+=stride*(-1+2*smooth);
@@ -257,7 +258,7 @@ function animateGermanSoldier(unit,dt=.016){
       // zero vertical velocity at contact, avoiding a robotic kick.
       const arc=Math.sin(Math.PI*q);
       t.y+=lift*arc*arc;
-      footRoll=-.045*arc*v.walk;
+      footRoll=-.045*arc*arc*v.walk;
     }
     GermanRig.solve(v.anchor,side==='left'?v.bones.lUp:v.bones.rUp,side==='left'?v.bones.lKnee:v.bones.rKnee,footBone,t,side==='left'?v.poles.lKnee:v.poles.rKnee);
     GermanRig.orient(v.anchor,footBone,v.footQ[side]);
