@@ -756,8 +756,14 @@ function dressNativeHeroFieldUniform(rig){
       '; nativeNames='+JSON.stringify([...nativeBones.keys()].slice(0,24))+
       '; donorNames='+JSON.stringify([...garmentBones.keys()].slice(0,24))+
       '; rawDonor='+JSON.stringify([...garmentBones.values()].slice(0,10).map(n=>n.name)));
+    const donorHands={
+      right:{upper:garmentBones.get('RightArm'),elbow:garmentBones.get('RightForeArm'),hand:garmentBones.get('RightHand')},
+      left:{upper:garmentBones.get('LeftArm'),elbow:garmentBones.get('LeftForeArm'),hand:garmentBones.get('LeftHand')}
+    };
+    if(Object.values(donorHands).some(h=>!h.upper||!h.elbow||!h.hand))
+      throw new Error('WW2 uniform sleeve/hand joints missing');
     ww2={donor,bindings,donorMeshes,originalMeshes,side:null,modelType:'existing-panzergrenadier',
-      headwear:'none',headBone:garmentBones.get('Head'),matchedBones:bindings.length};
+      headwear:'none',headBone:garmentBones.get('Head'),donorHands,matchedBones:bindings.length};
     rig.ww2Uniform=ww2;
     rig.ww2OutfitTemporary=null;
     for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
@@ -805,17 +811,42 @@ function updateNativeHeroFieldUniform(rig){
     binding.target.quaternion.copy(parentQ.multiply(targetQ));
     binding.target.updateWorldMatrix(false,true);
   }
+  // The WW2 uniform is SKINNED TO A SEPARATE MIXAMO SKELETON.
+  // Matching rotations alone cannot place its wrists on the rifle: the two
+  // skeletons have different upper-arm lengths and bind-space pivots.
+  // Follow the accepted Quaternius IK with a separate visual-only sleeve IK.
+  if(uniform.donorHands&&rig.weapon){
+    const vis=rig.visual,w=rig.weapon,arms=uniform.donorHands;
+    vis.updateWorldMatrix(true,true);
+    const local=bone=>vis.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
+    const right=local(arms.right.upper),left=local(arms.left.upper);
+    const sign=Math.sign(right.x-left.x)||-1;
+    const pairs=[
+      ['right',w.trigger,right.clone().add(new THREE.Vector3(sign*.47,-.28,-.04))],
+      ['left',w.support,left.clone().add(new THREE.Vector3(-sign*.50,-.29,.18))]
+    ];
+    const errors={};
+    for(const [side,grip,pole] of pairs){
+      const arm=arms[side],goal=local(grip);
+      GermanRig.solve(vis,arm.upper,arm.elbow,arm.hand,goal,pole);
+      errors[side]=arm.hand.getWorldPosition(new THREE.Vector3()).distanceTo(grip.getWorldPosition(new THREE.Vector3()));
+    }
+    uniform.visualGripErrors=errors;
+    if(rig.weaponDiagnostics){
+      rig.weaponDiagnostics.visibleRightError=errors.right;
+      rig.weaponDiagnostics.visibleLeftError=errors.left;
+    }
+  }
   if(uniform.cap&&uniform.headBone){
     const cap=uniform.cap,head=uniform.headBone,space=rig.visual;
     space.updateWorldMatrix(true,true);
-    // Cap pivot is the wearer's forehead band, ~0.27m above Mixamo Head joint.
     cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
     cap.position.y+=.155;
-    // The donor Head joint is behind the modelled brow; fit the whole cap
-    // forward and slightly to the wearer's left rather than exposing scalp.
-    cap.position.add(new THREE.Vector3(-.062,0,.068).applyQuaternion(cap.quaternion));
     const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
     cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
+    // The donor joint is slightly behind the brow; align the woven band with
+    // the forehead, not behind the scalp, without altering the head animation.
+    cap.position.add(new THREE.Vector3(-.008,0,.022).applyQuaternion(cap.quaternion));
   }
 }
 
