@@ -15,7 +15,7 @@
   try{
     const chunks=new Array(17);let next=0,done=0;
     const worker=async()=>{while(next<17){const i=next++;chunks[i]=await get('parts/german-'+String(i).padStart(3,'0')+'.txt');progress.textContent='Загрузка игры: '+Math.round(++done/18*100)+'%';}};
-    const work=await Promise.all([get('german-v5.js?v=20261113-2'),...Array.from({length:4},worker)]);
+    const work=await Promise.all([get('german-v5.js?v=20261113-6'),...Array.from({length:4},worker)]);
     let html=chunks.join('');const start='// === Preview integration: German WW2 Panzergrenadier (red faction) ===',end='// === End of preview integration ===';
     const a=html.indexOf(start),b=html.indexOf(end,a);if(a<0||b<a)throw new Error('Не найдена основа тестовой версии');
     html=html.slice(0,a)+work[0]+html.slice(b+end.length);
@@ -31,6 +31,11 @@
     if(html.split('pm.mf.getWorldPosition(mzV);').length!==3)throw new Error('Изменилось крепление прицела');
     html=html.split('pm.mf.getWorldPosition(mzV);').join('(P.germanPreview?P.germanPreview.weapon.flash:pm.mf).getWorldPosition(mzV);');
     html=once(html,'<title>Серый наёмник: линия фронта</title>','<title>Капрал на линии фронта</title>');
+    html=once(html,'document.body.prepend(R.domElement);','document.body.prepend(R.domElement);'+"\n// WebGL context recovery: display a non-blocking status while Three.js restores the renderer.\nconst glRecoveryMessage=document.createElement('div');\nglRecoveryMessage.id='webgl-recovery-message';\nglRecoveryMessage.style.cssText='position:fixed;z-index:99999;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 12px);padding:12px 16px;text-align:center;background:rgba(25,29,25,.95);color:#fff;font:14px Arial,sans-serif;border:1px solid #9f946f;border-radius:8px';\nglRecoveryMessage.textContent='Восстанавливаем графику… ';\nglRecoveryMessage.hidden=true;\nconst glReload=document.createElement('button');\nglReload.type='button';glReload.textContent='Перезапустить игру';glReload.hidden=true;\nglReload.style.cssText='margin:8px 0 0;padding:8px 12px';\nglReload.addEventListener('click',()=>location.reload());\nglRecoveryMessage.appendChild(glReload);document.body.appendChild(glRecoveryMessage);\nlet glRecoveryTimer=0;\nR.domElement.addEventListener('webglcontextlost',event=>{\n  event.preventDefault();\n  glRecoveryMessage.hidden=false;glReload.hidden=true;\n  clearTimeout(glRecoveryTimer);\n  glRecoveryTimer=setTimeout(()=>{glReload.hidden=false;},5000);\n});\nR.domElement.addEventListener('webglcontextrestored',()=>{\n  clearTimeout(glRecoveryTimer);glRecoveryMessage.hidden=true;glReload.hidden=true;\n});" );
+// Visual pass 1: unify terrain, atmospheric fog and daylight with infantry palette.
+    html=once(html,"scene.background=new THREE.Color(0x8a8780);scene.fog=new THREE.Fog(0x938d80,70,175);","scene.background=new THREE.Color(0x85877f);scene.fog=new THREE.Fog(0x82857d,70,175);");
+    html=once(html,"scene.add(new THREE.HemisphereLight(0xe6e0cc,0x5a5238,.9));const sun=new THREE.DirectionalLight(0xffd9a0,1);","scene.add(new THREE.HemisphereLight(0xe5e5dc,0x50544b,.95));const sun=new THREE.DirectionalLight(0xf6e5c7,.9);");
+    html=once(html,"tex('#54402c',['#46341f','#62503a','#3a2b1c','#6b5a44','#4f5a60'],650,[20,14])","tex('#595c4e',['#4c5346','#6e6854','#41483e','#77725e','#5e625b'],650,[20,14])");
     progress.textContent='Запуск…';document.open();document.write(html);document.close();
   }catch(e){error.textContent='Не удалось загрузить игру: '+(e.name==='AbortError'?'превышено время ожидания':e.message);progress.textContent='Загрузка прервана';retry.hidden=false;}
 })();

@@ -2,7 +2,7 @@
 // Gameplay, damage and input stay in the original game.
 // Model: britdawgmasterfunk, CC BY 4.0; see assets/soldiers/CREDITS.md.
 const creditsLink=document.createElement('a');creditsLink.textContent='Авторы моделей';creditsLink.href='../assets/soldiers/CREDITS.md';creditsLink.target='_blank';creditsLink.rel='noopener';creditsLink.style.cssText='position:fixed;z-index:23;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 113px);font:10px Arial;color:#e7dec8;background:#20251dcc;padding:3px 5px';document.body.appendChild(creditsLink);
-const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null};
+const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null,visualSequence:0};
 function germanPreviewLabel(message){const e=document.getElementById('german-preview-status');if(e){e.hidden=!message;if(e.textContent!==message)e.textContent=message;}}
 function soldierRole(unit){return unit.kind==='p'?'hero':unit.cmd?'captain':unit.eng?'engineer':'infantry';}
 function soldierPalette(unit){return unit.kind==='p'?'hero':unit.t==='red'?'grey':'khaki';}
@@ -188,9 +188,14 @@ function attachGermanSoldier(unit){
   const anchorQ=anchor.getWorldQuaternion(new THREE.Quaternion()).invert();
   const footQ={left:anchorQ.clone().multiply(bones.lFoot.getWorldQuaternion(new THREE.Quaternion())),right:anchorQ.clone().multiply(bones.rFoot.getWorldQuaternion(new THREE.Quaternion()))};
   const headQ=anchorQ.clone().multiply(bones.head.getWorldQuaternion(new THREE.Quaternion())).invert(),chestQ=anchorQ.clone().multiply(bones.chest.getWorldQuaternion(new THREE.Quaternion())).invert();
-  unit.germanPreview={anchor,figure,legacy,bones,rest,feet,footQ,weapon,identity,role,palette,headQ,chestQ,phase:0,walk:0,aim:0,yaw:0,gaitSpeed:0,idleClock:0,
+  // Visual-only stagger. No Math.random(): the game's RNG stays untouched.
+  const visualIndex=++germanPreview.visualSequence;
+  unit.germanPreview={anchor,figure,legacy,bones,rest,feet,footQ,weapon,identity,role,palette,headQ,chestQ,
+    phase:(visualIndex*2.399963229728653)%(Math.PI*2),walk:0,aim:0,yaw:0,gaitSpeed:0,
+    idleClock:visualIndex*.83,cadence:1+.035*Math.sin(visualIndex*2.17),strideScale:1+.035*Math.cos(visualIndex*1.71),
+    prevHeading:unit.g.rotation.y,turnLean:0,
     targets:{left:new THREE.Vector3(),right:new THREE.Vector3(),rear:new THREE.Vector3(),front:new THREE.Vector3()},
-    poles:{left:new THREE.Vector3(.72,1.35,-.12),right:new THREE.Vector3(-.72,1.35,-.12),lKnee:new THREE.Vector3(.24,.6,.9),rKnee:new THREE.Vector3(-.24,.6,.9)}};
+    poles:{left:new THREE.Vector3(.72,1.35,-.12),right:new THREE.Vector3(-.72,1.35,-.12),lKnee:new THREE.Vector3(.18,.6,.7),rKnee:new THREE.Vector3(-.18,.6,.7)}};
   legacy.visible=false;anchor.visible=true;
   animateGermanSoldier(unit,0);
   refreshGermanPreviewLabel();
@@ -216,45 +221,73 @@ function animateGermanSoldier(unit,dt=.016){
   v.walk+=(Math.min(1,speed/4.5)-v.walk)*(1-Math.exp(-safeDt*(speed>.2?8:11)));
   v.aim+=((unit.aim>0?1:0)-v.aim)*blend;
   v.idleClock+=safeDt;
-  // One full gait cycle per ~2.85 game units, not 1.7 (previous rapid march).
-  v.phase=(v.phase+safeDt*v.gaitSpeed/2.85*Math.PI*2)%(Math.PI*2);
+  // Walk cadence is linked to actual unit speed; a slightly longer cycle reduces the hurried gait.
+  v.phase=(v.phase+safeDt*v.gaitSpeed/3.1*v.cadence*Math.PI*2)%(Math.PI*2);
   for(const r of v.rest){r.bone.quaternion.copy(r.q);r.bone.position.copy(r.p);}
   unit.g.position.set(unit.x,0,unit.z);unit.g.rotation.x=0;unit.g.rotation.z=0;
   let yaw=unit.aimT==null?0:Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
   if(speed<.6&&unit.aim>0){const turn=yaw*(1-Math.exp(-safeDt*7));unit.g.rotation.y+=turn;yaw-=turn;}
+  // Follow changes in facing with restrained body lean, without steering the unit.
+  const headingChange=Math.atan2(Math.sin(unit.g.rotation.y-v.prevHeading),Math.cos(unit.g.rotation.y-v.prevHeading));
+  v.prevHeading=unit.g.rotation.y;
+  const turnGoal=THREE.MathUtils.clamp(headingChange/Math.max(safeDt,1/120),-2,2)*.017*v.walk;
+  v.turnLean+=(turnGoal-v.turnLean)*(1-Math.exp(-safeDt*8));
   v.yaw+=(THREE.MathUtils.clamp(yaw,-.9,.9)*v.aim-v.yaw)*blend;
   const sway=Math.sin(v.phase)*v.walk;
   const breathing=Math.sin(v.idleClock*1.7)*.008*(1-v.walk);
-  GermanRig.rotate(v.bones.hips,[.018*v.walk,0,sway*.018]);
-  GermanRig.rotate(v.bones.spine,[.045*v.walk+breathing,v.yaw*.4,-sway*.022]);
-  GermanRig.rotate(v.bones.chest,[breathing*.35,v.yaw*.6,sway*.014]);
-  GermanRig.rotate(v.bones.head,[0,-v.yaw*.12,0]);
-  // Keep the pelvis stable: excessive vertical oscillation makes figures bounce.
+  // The shoulder girdle counter-rotates against the pelvis during a stride.
+  // Small, phase-offset motion preserves a steady rifle while reducing the
+  // rigid, synchronized "robot march" silhouette.
+  const shoulderCounter=Math.sin(v.phase+.32)*.025*v.walk;
+  GermanRig.rotate(v.bones.hips,[.01*v.walk,0,sway*.012]);
+  GermanRig.rotate(v.bones.spine,[.03*v.walk+breathing,v.yaw*.4+shoulderCounter*.55,-sway*.020+v.turnLean]);
+  GermanRig.rotate(v.bones.chest,[breathing*.35,v.yaw*.6-shoulderCounter*.8,sway*.014+v.turnLean*.35]);
+  GermanRig.rotate(v.bones.head,[0,-v.yaw*.12-shoulderCounter*.24,0]);
+  // Keep the silhouette upright while gently transferring weight toward
+  // the planted leg. Use the rig's actual left/right axes, not an assumed axis.
   const bob=(1-Math.cos(v.phase*2))*.0055*v.walk;
+  const leftAxis=Math.sign(v.feet.left.x-v.feet.right.x)||-1;
+  v.anchor.position.x=leftAxis*Math.sin(v.phase)*.024*v.walk;
   v.anchor.position.y=-.012*v.walk+bob;
-  // SAFE GAIT v5: targets stay in local body coordinates; v4 world-pinned
-  // contacts stretched and twisted the legs on turns and changes of speed.
-  // Smooth easing and conservative displacement keep both knees within reach.
-  const stride=.20*v.walk,lift=.065*v.walk,stance=.63;
+  // Feet follow continuous stance/swing arcs in the character's local space.
+  // Keep IK targets conservative to avoid snapping the knees on turns.
+  const stride=.26*v.walk*v.strideScale,lift=.105*v.walk,stance=.60;
   for(const [side,offset] of [['left',0],['right',.5]]){
     const phase=((v.phase/(Math.PI*2)+offset)%1+1)%1;
     const t=v.targets[side],f=v.feet[side];
+    const footBone=side==='left'?v.bones.lFoot:v.bones.rFoot;
     t.copy(f);
+    let footRoll=0;
     if(phase<stance){
       const q=phase/stance,smooth=q*q*(3-2*q);
       t.z+=stride*(1-2*smooth);
+      // Slight toe-off near the end of stance, not the whole planted phase.
+      const toe=THREE.MathUtils.clamp((q-.72)/.28,0,1);
+      const toeArc=Math.sin(Math.PI*toe);
+      footRoll=.065*toeArc*toeArc*v.walk;
     }else{
       const q=(phase-stance)/(1-stance),smooth=q*q*(3-2*q);
       t.z+=stride*(-1+2*smooth);
-      t.y+=lift*Math.sin(Math.PI*q);
+      // Squared sine eases the foot off and back onto the ground with
+      // zero vertical velocity at contact, avoiding a robotic kick.
+      const arc=Math.sin(Math.PI*q);
+      t.y+=lift*arc*arc;
+      footRoll=-.045*arc*arc*v.walk;
     }
-    GermanRig.solve(v.anchor,side==='left'?v.bones.lUp:v.bones.rUp,side==='left'?v.bones.lKnee:v.bones.rKnee,side==='left'?v.bones.lFoot:v.bones.rFoot,t,side==='left'?v.poles.lKnee:v.poles.rKnee);
-    GermanRig.orient(v.anchor,side==='left'?v.bones.lFoot:v.bones.rFoot,v.footQ[side]);
+    GermanRig.solve(v.anchor,side==='left'?v.bones.lUp:v.bones.rUp,side==='left'?v.bones.lKnee:v.bones.rKnee,footBone,t,side==='left'?v.poles.lKnee:v.poles.rKnee);
+    GermanRig.orient(v.anchor,footBone,v.footQ[side]);
+    GermanRig.rotate(footBone,[footRoll,0,0]);
   }
   const recoil=unit.kick>0?Math.min(1,unit.kick/.1)*.035:0;
-  const w=v.weapon.root;w.position.set(-.11,1.78+v.aim*.12+Math.sin(v.phase*2)*.006*v.walk+breathing*.6,.19-recoil);
+  // Both hands remain IK-locked to the weapon. The entire weapon-and-hands
+  // assembly follows a restrained carry rhythm which fades while aiming.
+  const carry=v.walk*(1-.7*v.aim);
+  const carrySway=Math.sin(v.phase-.35)*carry;
+  const carryRise=Math.sin(v.phase*2-.45)*carry;
+  const w=v.weapon.root;
+  w.position.set(-.11+carrySway*.012,1.78+v.aim*.12+carryRise*.008+breathing*.6,.19-recoil+Math.cos(v.phase)*carry*.009);
   w.position.applyAxisAngle(new THREE.Vector3(0,1,0),v.yaw);
-  w.rotation.set(.28*(1-v.aim),v.yaw,-.04+sway*.009,'YXZ');
+  w.rotation.set(.28*(1-v.aim)+carryRise*.007,v.yaw+carrySway*.012,-.04+sway*.009*(1-.6*v.aim),'YXZ');
   v.anchor.updateWorldMatrix(true,true);
   v.targets.rear.copy(v.weapon.rear.getWorldPosition(new THREE.Vector3()));v.anchor.worldToLocal(v.targets.rear);
   v.targets.front.copy(v.weapon.front.getWorldPosition(new THREE.Vector3()));v.anchor.worldToLocal(v.targets.front);
