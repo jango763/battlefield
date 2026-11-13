@@ -1,0 +1,75 @@
+name: Bake WWII side cap mesh (MIT)
+on:
+  push:
+    branches: [feature/ww2-sidecap-weapon-profile-20261114]
+    paths:
+      - .github/workflows/build-ww2-sidecap.yml
+permissions:
+  contents: write
+jobs:
+  bake:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get pinned MIT WWII cap mesh
+        run: |
+          git clone --quiet https://github.com/Kenton-GMI/muster-ww2.git /tmp/muster-ww2
+          cd /tmp/muster-ww2
+          git checkout --quiet 7d2fa86ebc3b999eaf085831cdcd5dccefea63d4
+          npm ci --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund tsx
+      - name: Bake unmarked side cap without peak or Soviet star
+        shell: bash
+        run: |
+          cat >/tmp/muster-ww2/export-sidecap.ts <<'JS'
+          import fs from 'node:fs';
+          import * as THREE from 'three';
+          import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+          import { pilotkaGeometry } from './src/assets/soviet/infantry/pilotka.ts';
+          class NodeFileReader {
+            result:any=null;onload:any=null;onloadend:any=null;onerror:any=null;
+            async readAsArrayBuffer(blob:Blob){try{this.result=await blob.arrayBuffer();this.onload?.({target:this});this.onloadend?.({target:this});}catch(e){this.onerror?.(e)}}
+            async readAsDataURL(blob:Blob){try{this.result='data:'+blob.type+';base64,'+Buffer.from(await blob.arrayBuffer()).toString('base64');this.onload?.({target:this});this.onloadend?.({target:this});}catch(e){this.onerror?.(e)}}
+          }
+          (globalThis as any).FileReader=NodeFileReader;
+          const {cap}=pilotkaGeometry();
+          cap.computeBoundingBox();cap.computeVertexNormals();
+          const mat=new THREE.MeshStandardMaterial({name:'Feldgrau_Unmarked_Sidecap',color:0x566054,metalness:0,roughness:.97,side:THREE.DoubleSide});
+          const mesh=new THREE.Mesh(cap,mat);
+          mesh.name='WW2_Feldgrau_Unmarked_SideCap';
+          const root=new THREE.Group();root.name='WW2_Sidecap';root.add(mesh);
+          const out=Buffer.from(await new GLTFExporter().parseAsync(root,{binary:true,trs:true}) as ArrayBuffer);
+          if(out.toString('ascii',0,4)!=='glTF')throw Error('Not a GLB');
+          fs.mkdirSync(process.env.GITHUB_WORKSPACE+'/assets/ww2-headwear',{recursive:true});
+          fs.writeFileSync(process.env.GITHUB_WORKSPACE+'/assets/ww2-headwear/field-grey-sidecap.glb',out);
+          const bounding=cap.boundingBox!;
+          const report={source:'Kenton-GMI/muster-ww2',source_commit:'7d2fa86ebc3b999eaf085831cdcd5dccefea63d4',
+            derived_from:'src/assets/soviet/infantry/pilotka.ts',license:'MIT',
+            treatment:'unmarked field-grey sidecap; original Soviet star mesh omitted; design references German M34 Schiffchen',
+            vertices:cap.getAttribute('position').count,triangles:(cap.index?.count||cap.getAttribute('position').count)/3,
+            bounds:{min:bounding.min.toArray(),max:bounding.max.toArray()},bytes:out.length};
+          fs.writeFileSync(process.env.GITHUB_WORKSPACE+'/assets/ww2-headwear/sidecap-build-report.json',JSON.stringify(report,null,2));
+          console.log(JSON.stringify(report,null,2));
+          JS
+          cd /tmp/muster-ww2
+          ./node_modules/.bin/tsx export-sidecap.ts
+      - name: Document original author and geometry adaptation
+        run: |
+          cat >assets/ww2-headwear/SIDECAP-SOURCE.md <<'EOT'
+          # Unmarked field-grey WWII side cap (pilotka / Schiffchen silhouette)
+          Geometry adapted from: Kenton-GMI/muster-ww2
+          Pinned original commit: 7d2fa86ebc3b999eaf085831cdcd5dccefea63d4
+          Original code: src/assets/soviet/infantry/pilotka.ts (Soviet enlisted sidecap)
+          Adaptations: original Soviet red star omitted, muted German field-grey cloth, no peak.
+          This is a generic boat-shaped side cap, NOT a claim of exact M34 replica.
+          Copyright (c) 2026 Kenton Wang
+          License MIT: see MUSTER-LICENSE.txt in this directory.
+          EOT
+      - name: Commit model to isolated experiment branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/ww2-headwear/
+          git commit -m 'assets: export unmarked WWII side cap mesh from MIT source' || exit 0
+          git push origin HEAD:refs/heads/feature/ww2-sidecap-weapon-profile-20261114
