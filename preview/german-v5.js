@@ -2,18 +2,45 @@
 // Gameplay, damage and input stay in the original game.
 // Model: britdawgmasterfunk, CC BY 4.0; see assets/soldiers/CREDITS.md.
 const creditsLink=document.createElement('a');creditsLink.textContent='Авторы моделей';creditsLink.href='../assets/soldiers/CREDITS.md';creditsLink.target='_blank';creditsLink.rel='noopener';creditsLink.style.cssText='position:fixed;z-index:23;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 113px);font:10px Arial;color:#e7dec8;background:#20251dcc;padding:3px 5px';document.body.appendChild(creditsLink);
-const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null,visualSequence:0,clips:[]};
+const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null,visualSequence:0,clips:[],heroSource:null,heroLoading:false};
 function germanPreviewLabel(message){const e=document.getElementById('german-preview-status');if(e){e.hidden=!message;if(e.textContent!==message)e.textContent=message;}}
 function soldierRole(unit){return unit.kind==='p'?'hero':unit.cmd?'captain':unit.eng?'engineer':'infantry';}
 function soldierPalette(unit){return unit.kind==='p'?'hero':unit.t==='red'?'grey':'khaki';}
 // Hero-only state controller. The clip mixer is prepared for validated humanoid
 // animations; until compatible source clips are supplied the existing IK pose
 // generator remains the safe fallback. Army units never instantiate this.
+// Three.js r128 classic is used in this game; keep the retarget utility on
+// that same runtime. Source: official three.js Soldier.glb animation example.
+// The source model is used ONLY for animation; its mesh is never displayed.
+const HERO_SOURCE_GLTF='https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/models/gltf/Soldier.glb';
+const HERO_RETARGET_JS='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js';
+function heroMotionStatus(message){
+  let el=document.getElementById('hero-motion-status');
+  if(!el){
+    el=document.createElement('div');el.id='hero-motion-status';
+    el.style.cssText='position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 66px);z-index:24;max-width:235px;padding:5px 8px;background:#273026dd;color:#f0e9d4;border:1px solid #91876b;font:11px Arial;pointer-events:none';
+    document.body.appendChild(el);
+  }
+  el.textContent=message;
+}
+function heroSkinnedMesh(scene){
+  let best=null;
+  scene.traverse(n=>{if(n.isSkinnedMesh&&n.skeleton&&(!best||n.skeleton.bones.length>best.skeleton.bones.length))best=n;});
+  return best;
+}
+function heroBoneKey(name){
+  return name.replace(/^.*[:|]/,'').replace(/^mixamorig/i,'').replace(/_\d+$/,'').replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+}
 function createHeroMotionController(figure){
   const weights={idle:1,walk:0,aim:0};
   return {
-    mixer:new THREE.AnimationMixer(figure),weights,state:'idle',
-    // Aim is an upper-body layer, so walk and aim may coexist.
+    mixer:new THREE.AnimationMixer(figure),weights,state:'idle',ready:false,actions:null,
+    install(mixer,idle,walk){
+      this.mixer=mixer;this.actions={idle,walk};
+      idle.setEffectiveWeight(1);walk.setEffectiveWeight(0);
+      idle.play();walk.play();this.ready=true;
+      this.mixer.update(0);
+    },
     update(dt,speed,aiming){
       const walkTarget=THREE.MathUtils.clamp(speed/4.5,0,1);
       const aimTarget=aiming?1:0;
@@ -23,12 +50,80 @@ function createHeroMotionController(figure){
       weights.aim+=(aimTarget-weights.aim)*aimEase;
       weights.idle=1-weights.walk;
       this.state=weights.aim>.55?'aim':weights.walk>.18?'walk':'idle';
-      // Mixer remains action-free until authored clips are retargeted and
-      // checked against this specific skeleton; never mix unverified tracks.
+      if(this.ready){
+        this.actions.idle.setEffectiveWeight(weights.idle);
+        this.actions.walk.setEffectiveWeight(weights.walk);
+      }
       this.mixer.update(dt);
       return weights;
     }
   };
+}
+function tryInstallHeroSource(unit){
+  const v=unit&&unit.germanPreview;
+  if(!v||v.role!=='hero'||!v.heroMotion||v.heroMotion.ready||!germanPreview.heroSource||!THREE.SkeletonUtils)return;
+  const source=germanPreview.heroSource;
+  const sourceMesh=heroSkinnedMesh(source.scene),targetMesh=heroSkinnedMesh(v.figure);
+  if(!sourceMesh||!targetMesh)throw new Error('У модели нет SkinnedMesh');
+  const sourceByKey=new Map();
+  for(const bone of sourceMesh.skeleton.bones)sourceByKey.set(heroBoneKey(bone.name),bone.name);
+  const names={};
+  for(const bone of targetMesh.skeleton.bones){
+    const match=sourceByKey.get(heroBoneKey(bone.name));
+    if(match)names[bone.name]=match;
+  }
+  const required=[v.bones.hips,v.bones.lUp,v.bones.rUp,v.bones.lKnee,v.bones.rKnee,v.bones.lFoot,v.bones.rFoot];
+  if(required.some(b=>!names[b.name]))throw new Error('Кости ног не сопоставлены');
+  const idle=source.animations.find(a=>/^idle$/i.test(a.name))||source.animations.find(a=>/idle/i.test(a.name));
+  const walk=source.animations.find(a=>/^walk$/i.test(a.name))||source.animations.find(a=>/walk/i.test(a.name));
+  if(!idle||!walk)throw new Error('В Soldier.glb нет Idle или Walk');
+  const saved=v.rest.map(r=>({bone:r.bone,q:r.bone.quaternion.clone(),p:r.bone.position.clone()}));
+  const options={names,hip:names[v.bones.hips.name],fps:24,preservePosition:true,preseveMatrix:true};
+  try{
+    const makeClip=(clip)=>{
+      sourceMesh.skeleton.pose();source.scene.updateMatrixWorld(true);
+      targetMesh.skeleton.pose();v.figure.updateMatrixWorld(true);
+      const converted=THREE.SkeletonUtils.retargetClip(targetMesh,sourceMesh,clip,options);
+      // Reject root translation: gameplay already owns the hero position.
+      converted.tracks=converted.tracks.filter(t=>/\.quaternion$/.test(t.name));
+      if(converted.tracks.length<7||converted.tracks.some(t=>t.values.some(x=>!Number.isFinite(x))))throw new Error('Недостаточно корректных каналов: '+clip.name);
+      converted.resetDuration();return converted;
+    };
+    const idleClip=makeClip(idle),walkClip=makeClip(walk);
+    const mixer=new THREE.AnimationMixer(targetMesh);
+    const idleAction=mixer.clipAction(idleClip),walkAction=mixer.clipAction(walkClip);
+    v.heroMotion.install(mixer,idleAction,walkAction);
+    heroMotionStatus('Герой: Idle / Walk из Soldier.glb');
+    console.info('Hero retarget active:',{clips:[idle.name,walk.name],mappedBones:Object.keys(names).length});
+  }finally{
+    // Retargeting samples bind poses: restore the original figure after baking.
+    for(const r of saved){r.bone.quaternion.copy(r.q);r.bone.position.copy(r.p);}
+    v.figure.updateMatrixWorld(true);
+    sourceMesh.skeleton.pose();source.scene.updateMatrixWorld(true);
+  }
+}
+function loadHeroSourceAnimation(){
+  if(germanPreview.heroLoading)return;
+  germanPreview.heroLoading=true;
+  heroMotionStatus('Герой: загрузка анимаций Idle / Walk…');
+  const utility=new Promise((resolve,reject)=>{
+    if(THREE.SkeletonUtils&&THREE.SkeletonUtils.retargetClip){resolve();return;}
+    const el=document.createElement('script');el.src=HERO_RETARGET_JS;el.async=true;
+    el.onload=()=>THREE.SkeletonUtils&&THREE.SkeletonUtils.retargetClip?resolve():reject(new Error('Нет SkeletonUtils'));
+    el.onerror=()=>reject(new Error('SkeletonUtils не загрузился'));
+    document.head.appendChild(el);
+  });
+  const source=new Promise((resolve,reject)=>{
+    new THREE.GLTFLoader().load(HERO_SOURCE_GLTF,resolve,undefined,()=>reject(new Error('Soldier.glb не загрузился')));
+  });
+  Promise.all([utility,source]).then(([,gltf])=>{
+    if(!gltf.animations||!gltf.animations.length)throw new Error('В Soldier.glb нет анимаций');
+    germanPreview.heroSource=gltf;
+    tryInstallHeroSource(P);
+  }).catch(err=>{
+    console.warn('Hero clip fallback: procedural animation retained',err);
+    heroMotionStatus('Герой: резервная анимация — '+err.message);
+  });
 }
 // A shared cloth mask excludes skin, hands and boots. Texture detail remains,
 // while the uniform's hue is controlled separately from leather and equipment.
@@ -223,6 +318,9 @@ function attachGermanSoldier(unit){
   if(role==='hero')unit.germanPreview.heroMotion=createHeroMotionController(figure);
   legacy.visible=false;anchor.visible=true;
   animateGermanSoldier(unit,0);
+  if(role==='hero'&&germanPreview.heroSource){
+    try{tryInstallHeroSource(unit);}catch(e){console.warn(e);heroMotionStatus('Герой: резервная анимация — '+e.message);}
+  }
   refreshGermanPreviewLabel();
 }
 function refreshGermanPreviewLabel(){
@@ -254,7 +352,7 @@ function animateGermanSoldier(unit,dt=.016){
   v.idleClock+=safeDt;
   // Walk cadence is linked to actual unit speed; a slightly longer cycle reduces the hurried gait.
   v.phase=(v.phase+safeDt*v.gaitSpeed/3.1*v.cadence*Math.PI*2)%(Math.PI*2);
-  for(const r of v.rest){r.bone.quaternion.copy(r.q);r.bone.position.copy(r.p);}
+  if(!v.heroMotion||!v.heroMotion.ready)for(const r of v.rest){r.bone.quaternion.copy(r.q);r.bone.position.copy(r.p);}
   unit.g.position.set(unit.x,0,unit.z);unit.g.rotation.x=0;unit.g.rotation.z=0;
   let yaw=unit.aimT==null?0:Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
   if(speed<.6&&unit.aim>0){const turn=yaw*(1-Math.exp(-safeDt*7));unit.g.rotation.y+=turn;yaw-=turn;}
@@ -269,6 +367,7 @@ function animateGermanSoldier(unit,dt=.016){
   // The shoulder girdle counter-rotates against the pelvis during a stride.
   // Small, phase-offset motion preserves a steady rifle while reducing the
   // rigid, synchronized "robot march" silhouette.
+  if(!v.heroMotion||!v.heroMotion.ready){
   const shoulderCounter=Math.sin(v.phase+.32)*.025*v.walk;
   GermanRig.rotate(v.bones.hips,[.01*v.walk,0,sway*.012]);
   GermanRig.rotate(v.bones.spine,[.03*v.walk+breathing,v.yaw*.4+shoulderCounter*.55,-sway*.020+v.turnLean]);
@@ -308,6 +407,13 @@ function animateGermanSoldier(unit,dt=.016){
     GermanRig.solve(v.anchor,side==='left'?v.bones.lUp:v.bones.rUp,side==='left'?v.bones.lKnee:v.bones.rKnee,footBone,t,side==='left'?v.poles.lKnee:v.poles.rKnee);
     GermanRig.orient(v.anchor,footBone,v.footQ[side]);
     GermanRig.rotate(footBone,[footRoll,0,0]);
+  }
+  }else{
+    // Imported leg/torso animation comes from the retargeted clips. Arm/hand
+    // IK below still locks both palms onto the game's existing weapon.
+    v.anchor.position.x=0;v.anchor.position.y=0;
+    GermanRig.rotate(v.bones.chest,[0,v.yaw*.3,0]);
+    GermanRig.rotate(v.bones.head,[0,-v.yaw*.12,0]);
   }
   const recoil=unit.kick>0?Math.min(1,unit.kick/.1)*.035:0;
   // Both hands remain IK-locked to the weapon. The entire weapon-and-hands
@@ -357,6 +463,7 @@ function loadGermanSoldierPreview(){
         germanPreview.clips=gltf.animations||[]; // Inspect clips before retargeting; do not auto-play.
         const queue=[P,...U,...germanPreview.pending];germanPreview.pending.length=0;
         for(const u of queue)if(u.hp>0)attachGermanSoldier(u);
+        loadHeroSourceAnimation();
         refreshGermanPreviewLabel();
       }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');}
     },e=>{console.error(e);germanPreviewLabel('Ошибка загрузки — исходные бойцы');});
