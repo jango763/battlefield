@@ -317,12 +317,13 @@ function animateGermanSoldier(unit,dt=.016){
 // No retargeting and no changes to the army or gameplay. Only the HERO.
 // Assets from https://github.com/Seyamalam/blood-league-kickoff/ (CC0
 // Quaternius, see docs/ASSET_CREDITS.md in upstream), pinned to source commit.
-// Prefer files bundled with this exact preview branch, avoiding iOS CDN
-// restrictions. Remote mirrors are used only if the self-hosted assets fail.
+// Keep every fallback on the same exact test build and use the stripped
+// assets. Derive the commit from the immutable GitHack preview URL.
+const NATIVE_HERO_REF=location.pathname.split('/').filter(Boolean)[2]||'main';
 const NATIVE_HERO_ASSET_ROOTS=[
-  new URL('../assets/native-hero-quaternius/',document.baseURI).href,
-  'https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/aa02a4e6d8337a0604d2da131bcbbeb1f01badf0/public/assets/vendor/quaternius/',
-  'https://cdn.jsdelivr.net/gh/Seyamalam/blood-league-kickoff@aa02a4e6d8337a0604d2da131bcbbeb1f01badf0/public/assets/vendor/quaternius/'
+  new URL('../assets/native-hero-quaternius/',location.href).href,
+  'https://raw.githubusercontent.com/jango763/battlefield/'+NATIVE_HERO_REF+'/assets/native-hero-quaternius/',
+  'https://cdn.jsdelivr.net/gh/jango763/battlefield@'+NATIVE_HERO_REF+'/assets/native-hero-quaternius/'
 ];
 function nativeHeroLabel(msg){
   let node=document.getElementById('native-hero-rig-label');
@@ -332,7 +333,7 @@ function nativeHeroLabel(msg){
     document.body.appendChild(node);
   }
   node.textContent=msg;
-  node.style.background=/^НОВЫЙ СКЕЛЕТ: АКТИВЕН/.test(msg)?'#16582efa':/^СТАРЫЙ СКЕЛЕТ/.test(msg)?'#314255f5':'#6d280bfa';
+  node.style.background=/^НОВЫЙ СКЕЛЕТ v17: АКТИВЕН/.test(msg)?'#16582efa':/^СТАРЫЙ СКЕЛЕТ/.test(msg)?'#314255f5':'#6d280bfa';
 }
 function nativeHeroLoad(){
   const oldMode=new URLSearchParams(location.search).get('rig')==='original';
@@ -340,7 +341,7 @@ function nativeHeroLoad(){
   if(germanPreview.nativeHeroRequested)return;
   germanPreview.nativeHeroRequested=true;
   if(typeof THREE.GLTFLoader!=='function'){nativeHeroLabel('ОШИБКА: нет загрузчика GLTFLoader. Используется старая модель.');return;}
-  nativeHeroLabel('НОВЫЙ СКЕЛЕТ: загрузка 0%. Старая модель пока на экране.');
+  nativeHeroLabel('СКЕЛЕТ v17: облегчённые GLB 1,5 МБ — начинаю загрузку.');
   // Try GitHub raw first, then a pinned jsDelivr mirror. Errors are
   // visible instead of silently falling back to the unchanged hero.
   const nativeHeroOrigins={};
@@ -355,10 +356,10 @@ function nativeHeroLoad(){
           new Promise((resolve,reject)=>loader.load(url,resolve,e=>{
             if(e&&e.total>0){
               const percent=Math.min(99,Math.round(e.loaded/e.total*100));
-              nativeHeroLabel('НОВЫЙ СКЕЛЕТ: '+name+' '+percent+'% (источник '+(i+1)+'/3)');
+              nativeHeroLabel('СКЕЛЕТ v17: '+name+' '+percent+'% (источник '+(i+1)+'/3)');
             }
           },error=>reject(error||new Error('Ошибка GLB')))),
-          new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Превышено время загрузки: '+name)),45000);})
+          new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Превышено время загрузки: '+name)),18000);})
         ]);
         nativeHeroOrigins[name]=(i===0?'LOCAL':i===1?'GitHub Raw':'jsDelivr');
         return gltf;
@@ -369,7 +370,7 @@ function nativeHeroLoad(){
     }
     throw new Error(name+': '+(lastError&&lastError.message||'оба источника недоступны'));
   };
-  Promise.all([loadFile('night-striker.glb'),loadFile('universal-animation-library.glb')]).then(([character,library])=>{
+  Promise.all([loadFile('night-striker-lite.glb'),loadFile('hero-three-clips-lite.glb')]).then(([character,library])=>{
     const unit=P,v=unit&&unit.germanPreview;
     if(!v||v.role!=='hero'||v.nativeRig)throw new Error('Нет подготовленного героя');
     const model=character.scene;
@@ -435,7 +436,7 @@ function nativeHeroLoad(){
       marker.position.set(0,2.92,0);
       marker.renderOrder=120;
       visual.add(marker);
-      nativeHeroLabel('НОВЫЙ СКЕЛЕТ: АКТИВЕН ✓ '+nativeHeroOrigins['night-striker.glb']+' + '+nativeHeroOrigins['universal-animation-library.glb']+'. Зелёное кольцо над героем.');
+      nativeHeroLabel('НОВЫЙ СКЕЛЕТ v17: АКТИВЕН ✓ '+nativeHeroOrigins['night-striker-lite.glb']+' + '+nativeHeroOrigins['hero-three-clips-lite.glb']+'. Зелёное кольцо над героем.');
       console.info('Quaternius native hero rig ready',{
         skeletonBones:bones.size,skinnedMeshes:meshCount,clips:Object.keys(actions)
       });
@@ -448,7 +449,7 @@ function nativeHeroLoad(){
     }
   }).catch(e=>{
     console.warn('Native hero rig fallback to original:',e);
-    nativeHeroLabel('НОВЫЙ СКЕЛЕТ НЕ ВКЛЮЧИЛСЯ. Показывается прежний герой. Причина: '+e.message);
+    nativeHeroLabel('ОШИБКА СКЕЛЕТА v17: прежний герой. Причина: '+e.message);
   });
 }
 function animateNativeHeroRig(unit,v,dt){
