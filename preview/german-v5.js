@@ -367,9 +367,9 @@ function makeNativeHeroAssaultRifle(){
   // Grip positions are wrist attachment points in rifle-local coordinates,
   // never applied as world or gameplay positions.
   const trigger=new THREE.Object3D();
-  trigger.position.set(0,-.105,-.12);root.add(trigger);
+  trigger.position.set(0,-.105,-.16);root.add(trigger);
   const support=new THREE.Object3D();
-  support.position.set(0,-.112,.31);root.add(support);
+  support.position.set(0,-.10,.35);root.add(support);
   const muzzleFlash=new THREE.Mesh(new THREE.SphereGeometry(.072,7,5),flashMat);
   muzzleFlash.position.set(0,.022,.89);muzzleFlash.scale.set(.7,.7,1.8);
   muzzleFlash.visible=false;root.add(muzzleFlash);
@@ -409,12 +409,17 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
     Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
   // Stable high-ready posture while moving; raised to a proper shoulder line
   // for aiming. The body and the legs still use the original animation.
-  w.root.position.set((sr.x+sl.x)*.5+rightSign*.055,
-    (sr.y+sl.y)*.5-(aimed?.10:.21),
-    (sr.z+sl.z)*.5+.27);
-  w.root.rotation.set(aimed?.035:.115,
-    THREE.MathUtils.clamp(heading,-.55,.55)*(aimed?.4:0)+rightSign*.09,
-    rightSign*.032,'YXZ');
+  // The butt starts inside the RIGHT shoulder pocket; the barrel is yawed
+  // inward across the chest rather than sticking out of the sternum.
+  w.root.position.set((sr.x+sl.x)*.5+rightSign*.17,
+    (sr.y+sl.y)*.5-(aimed?.07:.14),
+    (sr.z+sl.z)*.5+.31);
+  w.root.rotation.set(aimed?.02:.065,
+    THREE.MathUtils.clamp(heading,-.55,.55)*(aimed?.4:0)-rightSign*.25,
+    rightSign*.055,'YXZ');
+  // Wrists must approach the correct sides of the narrow rifle stock.
+  w.trigger.position.x=rightSign*.06;
+  w.support.position.x=-rightSign*.08;
   w.muzzleFlash.visible=unit.kick>0;
   // First set the weapon placement, then solve both independent arm chains
   // to its physical grip anchors using the Quaternius shoulder and elbow.
@@ -424,8 +429,8 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
     left:getLocal(w.support)
   };
   const poles={
-    right:sr.clone().add(new THREE.Vector3(rightSign*.63,-.30,-.16)),
-    left:sl.clone().add(new THREE.Vector3(-rightSign*.63,-.28,-.12))
+    right:sr.clone().add(new THREE.Vector3(rightSign*.53,-.35,-.16)),
+    left:sl.clone().add(new THREE.Vector3(-rightSign*.53,-.38,-.12))
   };
   for(const side of ['right','left']){
     const a=rig.hands[side];
