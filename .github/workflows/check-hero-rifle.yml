@@ -46,6 +46,25 @@ jobs:
                 return {metrics:{...d},armed,counts,weaponName:rig.weapon?.root.name,role:P.germanPreview.role};
               });
               report.metrics=observation.metrics;
+              report.poseStates=await page.evaluate(()=>{
+                const hero=P,view=hero.germanPreview,rig=view.nativeRig;
+                const before={sv:hero.sv,aim:hero.aim,aimT:hero.aimT};
+                const results={};
+                const sample=(name,speed,aim)=>{
+                  hero.sv=speed;hero.aim=aim;
+                  hero.aimT=hero.g.rotation.y;
+                  for(let i=0;i<25;i++)animateNativeHeroRig(hero,view,1/60);
+                  results[name]={...rig.weaponDiagnostics};
+                };
+                try{
+                  sample('jog',3.6,0);
+                  sample('sprint',5.4,0);
+                  sample('aim',0,1);
+                }finally{
+                  hero.sv=before.sv;hero.aim=before.aim;hero.aimT=before.aimT;
+                }
+                return results;
+              });
               report.locomotionClips=Object.keys(observation.counts);
               report.clipTrackCounts=observation.counts;
               report.weaponName=observation.weaponName;
@@ -57,7 +76,11 @@ jobs:
                 Number.isFinite(observation.metrics.rightError)&&
                 Number.isFinite(observation.metrics.leftError)&&
                 observation.metrics.rightError<.28&&observation.metrics.leftError<.28&&
-                report.locomotionClips.includes('jog')&&report.locomotionClips.includes('sprint');
+                report.locomotionClips.includes('jog')&&report.locomotionClips.includes('sprint')&&
+                ['jog','sprint','aim'].every(state=>{
+                  const d=report.poseStates?.[state];
+                  return d&&d.ready&&d.rightError<.28&&d.leftError<.28;
+                })&&report.poseStates.sprint.gaitState==='sprint'&&report.poseStates.aim.aimed===true;
               report.success=!!valid;
               if(!valid)report.errors.push('Hand targets, clips or bones failed acceptance threshold');
             }catch(e){report.errors.push('exception: '+e.message)}
@@ -70,6 +93,20 @@ jobs:
             }
           })();
           JS
+      - name: Emit compressed screenshot for visual QA
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/hero-rifle-proof.png ]; then
+            python3 - <<'PY'
+          import base64
+          src=open('/tmp/hero-rifle-proof.png','rb').read()
+          data=base64.b64encode(src).decode('ascii')
+          print('SCREENSHOT_BEGIN',len(src),len(data))
+          for i in range(0,len(data),56000): print('SCREENSHOT_PART '+data[i:i+56000])
+          print('SCREENSHOT_END')
+          PY
+          fi
       - name: Commit browser acceptance report even on failure
         if: always()
         shell: bash
