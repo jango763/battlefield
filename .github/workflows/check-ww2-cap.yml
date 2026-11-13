@@ -1,11 +1,11 @@
 name: WW2 M43 cap and field uniform browser validation
 on:
   push:
-    branches: [feature/ww2-cap-uniform-20261113]
+    branches: [feature/ww2-m43-cap-asset-20261113]
     paths:
       - preview/german-v5.js
       - preview/formation-replenishment-v3.html
-      - .github/workflows/check-ww2-cap-uniform.yml
+      - .github/workflows/check-ww2-cap.yml
 permissions:
   contents: read
 jobs:
