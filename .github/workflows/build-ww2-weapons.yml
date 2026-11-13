@@ -22,6 +22,15 @@ jobs:
       - name: Bake 6 3D models preserving true weapon grip coordinates
         shell: bash
         run: |
+          # Headless export: skip the tiny Bren receiver lettering; its helper needs browser canvas.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/muster-ww2/src/assets/uk/weapons/bren-mk2/body.ts')
+          s=p.read_text()
+          a=s.index('    // stamped marking on the right side of the body')
+          b=s.index('    // rear face plate',a)
+          p.write_text(s[:a]+'    // Tiny decal omitted in the browser-friendly GLB bake.\\n'+s[b:])
+          PY
           cat > /tmp/muster-ww2/export-weapons.ts <<'JS'
           import fs from 'node:fs';
           import * as THREE from 'three';
