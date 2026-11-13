@@ -94,6 +94,26 @@ jobs:
           names=('Idle_Loop','Jog_Fwd_Loop','Sprint_Loop')
           chosen=[a for a in anim['animations'] if a.get('name') in names]
           assert len(chosen)==3,{a['name'] for a in chosen}
+          # glTF 2.0 permits accessors without bufferView: their contents are
+          # implicitly zero. Three.js r128 GLTFLoader mishandles them in
+          # animation tracks and dereferences null.array. Materialize their
+          # exact specified all-zero contents, keeping every original channel.
+          sizes={'SCALAR':1,'VEC2':2,'VEC3':3,'VEC4':4,'MAT2':4,'MAT3':9,'MAT4':16}
+          bytesize={5120:1,5121:1,5122:2,5123:2,5125:4,5126:4}
+          synthesized=0
+          for clip in chosen:
+              for sampler in clip['samplers']:
+                  for kind in ('input','output'):
+                      accessor=anim['accessors'][sampler[kind]]
+                      if 'bufferView' in accessor or 'sparse' in accessor:continue
+                      data+=bytes((-len(data))%4)
+                      size=accessor['count']*sizes[accessor['type']]*bytesize[accessor['componentType']]
+                      accessor['bufferView']=len(anim['bufferViews'])
+                      anim['bufferViews'].append({'buffer':0,'byteOffset':len(data),'byteLength':size})
+                      data+=bytes(size)
+                      synthesized+=1
+          assert synthesized==1,('Unexpected zero-filled accessors',synthesized)
+          print('Made the 1 legitimate zero-initialized accessor explicit for Three.js r128')
           anim['animations']=chosen
           for node in anim['nodes']:
               node.pop('mesh',None)
