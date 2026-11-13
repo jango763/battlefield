@@ -1,0 +1,138 @@
+name: Generate lightweight hero animation diagnostics
+on:
+  push:
+    branches:
+      - test/hero-native-lite-20261113
+    paths:
+      - .github/workflows/build-lite-hero-glbs.yml
+permissions:
+  contents: write
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Strip textures and unused animation clips without re-rigging
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,struct,pathlib,copy
+          path=pathlib.Path('assets/native-hero-quaternius')
+          def read(name):
+              raw=(path/name).read_bytes()
+              assert raw[:4]==b'glTF' and struct.unpack_from('<I',raw,4)[0]==2
+              jlen,jtyp=struct.unpack_from('<II',raw,12)
+              assert jtyp==0x4e4f534a
+              start=20+jlen
+              blen,btyp=struct.unpack_from('<II',raw,start)
+              assert btyp==0x004e4942
+              return json.loads(raw[20:20+jlen]),raw[start+8:start+8+blen]
+          def pack(doc,binchunk,needed):
+              old=doc['bufferViews']
+              mapping={}
+              newviews=[]
+              data=bytearray()
+              for idx,v in enumerate(old):
+                  if idx not in needed:continue
+                  mapping[idx]=len(newviews)
+                  while len(data)%4:data.append(0)
+                  clone=copy.deepcopy(v)
+                  offset=v.get('byteOffset',0)
+                  size=v['byteLength']
+                  clone['byteOffset']=len(data)
+                  newviews.append(clone)
+                  data.extend(binchunk[offset:offset+size])
+              doc['bufferViews']=newviews
+              doc['buffers']=[{'byteLength':len(data)}]
+              return data,mapping
+          def accessor_refs(accessors):
+              used=set()
+              for a in accessors:
+                  if 'bufferView' in a:used.add(a['bufferView'])
+                  sparse=a.get('sparse')
+                  if sparse:
+                      used.add(sparse['indices']['bufferView'])
+                      used.add(sparse['values']['bufferView'])
+              return used
+          def remap_accessors(accessors,mapping):
+              for a in accessors:
+                  if 'bufferView' in a:a['bufferView']=mapping[a['bufferView']]
+                  sparse=a.get('sparse')
+                  if sparse:
+                      sparse['indices']['bufferView']=mapping[sparse['indices']['bufferView']]
+                      sparse['values']['bufferView']=mapping[sparse['values']['bufferView']]
+          def write(name,doc,data):
+              j=json.dumps(doc,separators=(',',':'),ensure_ascii=False).encode()
+              j+=b' '*((-len(j))%4)
+              while len(data)%4:data.append(0)
+              total=12+8+len(j)+8+len(data)
+              out=struct.pack('<III',0x46546c67,2,total)
+              out+=struct.pack('<II',len(j),0x4e4f534a)+j
+              out+=struct.pack('<II',len(data),0x004e4942)+data
+              (path/name).write_bytes(out)
+              assert len(out)==total
+              print(name,len(out))
+          doc,data=read('night-striker.glb')
+          assert not doc.get('extensionsRequired')
+          for m in doc.get('materials',[]):
+              pbr=m.setdefault('pbrMetallicRoughness',{})
+              pbr.pop('baseColorTexture',None)
+              pbr.pop('metallicRoughnessTexture',None)
+              pbr['baseColorFactor']=[0.48,0.55,0.46,1]
+              pbr['metallicFactor']=0
+              pbr['roughnessFactor']=.85
+              for key in ('normalTexture','occlusionTexture','emissiveTexture'):
+                  m.pop(key,None)
+          for key in ('images','textures','samplers'):
+              doc.pop(key,None)
+          used=accessor_refs(doc.get('accessors',[]))
+          data,mapping=pack(doc,data,used)
+          remap_accessors(doc.get('accessors',[]),mapping)
+          write('night-striker-lite.glb',doc,data)
+          anim,data=read('universal-animation-library.glb')
+          names=('Idle_Loop','Jog_Fwd_Loop','Sprint_Loop')
+          chosen=[a for a in anim['animations'] if a.get('name') in names]
+          assert len(chosen)==3,{a['name'] for a in chosen}
+          anim['animations']=chosen
+          for node in anim['nodes']:
+              node.pop('mesh',None)
+              node.pop('skin',None)
+          for key in ('meshes','skins','materials','textures','images','samplers'):
+              if key!='samplers':anim.pop(key,None)
+          # Animation samplers are nested in each clip; preserve them.
+          needed_indices=set()
+          for clip in chosen:
+              for sampler in clip['samplers']:
+                  needed_indices.add(sampler['input'])
+                  needed_indices.add(sampler['output'])
+          acc_map={old:i for i,old in enumerate(sorted(needed_indices))}
+          selected_acc=[copy.deepcopy(anim['accessors'][i]) for i in sorted(needed_indices)]
+          for clip in chosen:
+              for sampler in clip['samplers']:
+                  sampler['input']=acc_map[sampler['input']]
+                  sampler['output']=acc_map[sampler['output']]
+          anim['accessors']=selected_acc
+          used=accessor_refs(selected_acc)
+          data,mapping=pack(anim,data,used)
+          remap_accessors(anim['accessors'],mapping)
+          write('hero-three-clips-lite.glb',anim,data)
+          # Reopen the written files and validate the native node labels.
+          c,_=read('night-striker-lite.glb')
+          a,_=read('hero-three-clips-lite.glb')
+          cn={x.get('name') for x in c['nodes']}
+          assert set(('pelvis','thigh_l','calf_l','foot_l','thigh_r','calf_r','foot_r'))<=cn
+          target={a['nodes'][ch['target']['node']].get('name') for clip in a['animations'] for ch in clip['channels']}
+          assert target<=cn,(target-cn)
+          assert len(a['animations'])==3
+          PY
+      - name: Commit optimized test assets to this branch only
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/native-hero-quaternius/night-striker-lite.glb assets/native-hero-quaternius/hero-three-clips-lite.glb
+          if ! git diff --cached --quiet; then
+            git commit -m 'test(hero): lightweight textureless native rig and three native clips'
+            git push origin HEAD:refs/heads/test/hero-native-lite-20261113
+          fi
