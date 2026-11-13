@@ -225,10 +225,14 @@ function animateGermanSoldier(unit,dt=.016){
   v.yaw+=(THREE.MathUtils.clamp(yaw,-.9,.9)*v.aim-v.yaw)*blend;
   const sway=Math.sin(v.phase)*v.walk;
   const breathing=Math.sin(v.idleClock*1.7)*.008*(1-v.walk);
+  // The shoulder girdle counter-rotates against the pelvis during a stride.
+  // Small, phase-offset motion preserves a steady rifle while reducing the
+  // rigid, synchronized "robot march" silhouette.
+  const shoulderCounter=Math.sin(v.phase+.32)*.025*v.walk;
   GermanRig.rotate(v.bones.hips,[.01*v.walk,0,sway*.012]);
-  GermanRig.rotate(v.bones.spine,[.03*v.walk+breathing,v.yaw*.4,-sway*.022]);
-  GermanRig.rotate(v.bones.chest,[breathing*.35,v.yaw*.6,sway*.014]);
-  GermanRig.rotate(v.bones.head,[0,-v.yaw*.12,0]);
+  GermanRig.rotate(v.bones.spine,[.03*v.walk+breathing,v.yaw*.4+shoulderCounter*.55,-sway*.020]);
+  GermanRig.rotate(v.bones.chest,[breathing*.35,v.yaw*.6-shoulderCounter*.8,sway*.014]);
+  GermanRig.rotate(v.bones.head,[0,-v.yaw*.12-shoulderCounter*.24,0]);
   // Keep the silhouette upright while gently transferring weight toward
   // the planted leg. Use the rig's actual left/right axes, not an assumed axis.
   const bob=(1-Math.cos(v.phase*2))*.0055*v.walk;
@@ -265,9 +269,15 @@ function animateGermanSoldier(unit,dt=.016){
     GermanRig.rotate(footBone,[footRoll,0,0]);
   }
   const recoil=unit.kick>0?Math.min(1,unit.kick/.1)*.035:0;
-  const w=v.weapon.root;w.position.set(-.11,1.78+v.aim*.12+Math.sin(v.phase*2)*.006*v.walk+breathing*.6,.19-recoil);
+  // Both hands remain IK-locked to the weapon. The entire weapon-and-hands
+  // assembly follows a restrained carry rhythm which fades while aiming.
+  const carry=v.walk*(1-.7*v.aim);
+  const carrySway=Math.sin(v.phase-.35)*carry;
+  const carryRise=Math.sin(v.phase*2-.45)*carry;
+  const w=v.weapon.root;
+  w.position.set(-.11+carrySway*.012,1.78+v.aim*.12+carryRise*.008+breathing*.6,.19-recoil+Math.cos(v.phase)*carry*.009);
   w.position.applyAxisAngle(new THREE.Vector3(0,1,0),v.yaw);
-  w.rotation.set(.28*(1-v.aim),v.yaw,-.04+sway*.009,'YXZ');
+  w.rotation.set(.28*(1-v.aim)+carryRise*.007,v.yaw+carrySway*.012,-.04+sway*.009*(1-.6*v.aim),'YXZ');
   v.anchor.updateWorldMatrix(true,true);
   v.targets.rear.copy(v.weapon.rear.getWorldPosition(new THREE.Vector3()));v.anchor.worldToLocal(v.targets.rear);
   v.targets.front.copy(v.weapon.front.getWorldPosition(new THREE.Vector3()));v.anchor.worldToLocal(v.targets.front);
