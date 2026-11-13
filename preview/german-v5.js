@@ -77,7 +77,32 @@ function tryInstallHeroSource(unit){
   const idle=source.animations.find(a=>/^idle$/i.test(a.name))||source.animations.find(a=>/idle/i.test(a.name));
   const walk=source.animations.find(a=>/^walk$/i.test(a.name))||source.animations.find(a=>/walk/i.test(a.name));
   if(!idle||!walk)throw new Error('В Soldier.glb нет Idle или Walk');
-  const saved=v.rest.map(r=>({bone:r.bone,q:r.bone.quaternion.clone(),p:r.bone.position.clone()}));
+  // SkeletonUtils.pose()/retargetClip() can change scale as well as rotation.
+  // An earlier version restored only quaternion and position, leaving
+  // stretched skeleton transforms and an enormous-looking hero.
+  const saved=v.rest.map(r=>({bone:r.bone,q:r.bone.quaternion.clone(),p:r.bone.position.clone(),s:r.bone.scale.clone()}));
+  const restore=()=>{
+    for(const r of saved){
+      r.bone.quaternion.copy(r.q);
+      r.bone.position.copy(r.p);
+      r.bone.scale.copy(r.s);
+    }
+    v.figure.updateMatrixWorld(true);
+  };
+  const jointRadius=()=>{
+    v.figure.updateMatrixWorld(true);
+    const hip=v.bones.hips.getWorldPosition(new THREE.Vector3());
+    let radius=0;
+    for(const key of ['head','lHand','rHand','lKnee','rKnee','lFoot','rFoot']){
+      const dist=v.bones[key].getWorldPosition(new THREE.Vector3()).distanceTo(hip);
+      if(!Number.isFinite(dist))return Infinity;
+      radius=Math.max(radius,dist);
+    }
+    return radius;
+  };
+  const normalRadius=jointRadius();
+  if(!Number.isFinite(normalRadius)||normalRadius<=.01)throw new Error('Неверный размер исходного героя');
+  v.heroBaseRadius=normalRadius;
   const options={names,hip:names[v.bones.hips.name],fps:24,preservePosition:true,preserveMatrix:true};
   try{
     const makeClip=(clip)=>{
@@ -90,6 +115,32 @@ function tryInstallHeroSource(unit){
       converted.resetDuration();return converted;
     };
     const idleClip=makeClip(idle),walkClip=makeClip(walk);
+    // Before enabling real actions, sample both clips in isolation. If the
+    // retargeted skeleton grows outside a conservative size envelope, reject
+    // the clips and keep the previously working procedural hero.
+    for(const clip of [idleClip,walkClip]){
+      restore();
+      const testMixer=new THREE.AnimationMixer(targetMesh),action=testMixer.clipAction(clip);
+      action.play();
+      try{
+        for(const fraction of [0,.25,.5,.75]){
+          testMixer.setTime(clip.duration*fraction);
+          const radius=jointRadius();
+          if(radius>normalRadius*1.6||radius<normalRadius*.45||!Number.isFinite(radius)){
+            throw new Error('Ненормальный размер скелета: '+clip.name);
+          }
+          for(const r of saved){
+            const size=r.bone.scale;
+            if(!Number.isFinite(size.x+size.y+size.z)||
+                Math.abs(size.x-r.s.x)>.001||Math.abs(size.y-r.s.y)>.001||Math.abs(size.z-r.s.z)>.001){
+              throw new Error('Сбой масштаба кости: '+r.bone.name);
+            }
+          }
+        }
+      }finally{
+        action.stop();testMixer.stopAllAction();restore();
+      }
+    }
     const mixer=new THREE.AnimationMixer(targetMesh);
     const idleAction=mixer.clipAction(idleClip),walkAction=mixer.clipAction(walkClip);
     v.heroMotion.install(mixer,idleAction,walkAction);
@@ -97,8 +148,7 @@ function tryInstallHeroSource(unit){
     console.info('Hero retarget active:',{clips:[idle.name,walk.name],mappedBones:Object.keys(names).length});
   }finally{
     // Retargeting samples bind poses: restore the original figure after baking.
-    for(const r of saved){r.bone.quaternion.copy(r.q);r.bone.position.copy(r.p);}
-    v.figure.updateMatrixWorld(true);
+    restore();
     sourceMesh.skeleton.pose();source.scene.updateMatrixWorld(true);
   }
 }
@@ -289,7 +339,7 @@ function attachGermanSoldier(unit){
   figure.scale.setScalar(factor);figure.position.set(-(bounds.min.x+bounds.max.x)*factor/2,-bounds.min.y*factor,0);
   const names={hips:'Hips',spine:'Spine',chest:'Spine2',head:'Head',lUp:'LeftUpLeg',rUp:'RightUpLeg',lKnee:'LeftLeg',rKnee:'RightLeg',lFoot:'LeftFoot',rFoot:'RightFoot',lArm:'LeftArm',rArm:'RightArm',lFore:'LeftForeArm',rFore:'RightForeArm',lHand:'LeftHand',rHand:'RightHand'};
   const bones={},rest=[];
-  figure.traverse(n=>{if(!n.isBone)return;rest.push({bone:n,q:n.quaternion.clone(),p:n.position.clone()});
+  figure.traverse(n=>{if(!n.isBone)return;rest.push({bone:n,q:n.quaternion.clone(),p:n.position.clone(),s:n.scale.clone()});
     for(const [key,name] of Object.entries(names))if(new RegExp(name+'_\\d+$','i').test(n.name))bones[key]=n;
   });
   if(Object.values(names).some((_,i)=>!bones[Object.keys(names)[i]])){console.warn('Не найдены кости немецкого бойца');return;}
@@ -352,7 +402,7 @@ function animateGermanSoldier(unit,dt=.016){
   v.idleClock+=safeDt;
   // Walk cadence is linked to actual unit speed; a slightly longer cycle reduces the hurried gait.
   v.phase=(v.phase+safeDt*v.gaitSpeed/3.1*v.cadence*Math.PI*2)%(Math.PI*2);
-  if(!v.heroMotion||!v.heroMotion.ready)for(const r of v.rest){r.bone.quaternion.copy(r.q);r.bone.position.copy(r.p);}
+  if(!v.heroMotion||!v.heroMotion.ready)for(const r of v.rest){r.bone.quaternion.copy(r.q);r.bone.position.copy(r.p);r.bone.scale.copy(r.s);}
   unit.g.position.set(unit.x,0,unit.z);unit.g.rotation.x=0;unit.g.rotation.z=0;
   let yaw=unit.aimT==null?0:Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
   if(speed<.6&&unit.aim>0){const turn=yaw*(1-Math.exp(-safeDt*7));unit.g.rotation.y+=turn;yaw-=turn;}
