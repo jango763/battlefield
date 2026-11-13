@@ -211,6 +211,7 @@ function disposeGermanSoldier(unit){
 }
 function animateGermanSoldier(unit,dt=.016){
   const v=unit.germanPreview;if(!v)return;
+  if(v.nativeRig&&animateNativeHeroRig(unit,v,dt))return;
   v.legacy.visible=false;v.anchor.visible=true;
   // Visual locomotion is independent of combat speed, collision and gameplay.
   // Filter speed so the stride cycle decelerates naturally instead of snapping.
@@ -312,6 +313,122 @@ function animateGermanSoldier(unit,dt=.016){
   v.identity.band.material.color.setHex((hero?unit.side:unit.t)==='red'?0x9e4a44:0x4d7391);
   v.anchor.updateWorldMatrix(true,true);
 }
+// Native rig diagnostic: Quaternius mesh + its OWN skeleton + animation library.
+// No retargeting and no changes to the army or gameplay. Only the HERO.
+// Assets from https://github.com/Seyamalam/blood-league-kickoff/ (CC0
+// Quaternius, see docs/ASSET_CREDITS.md in upstream), pinned to source commit.
+const NATIVE_HERO_ASSET_ROOT='https://cdn.jsdelivr.net/gh/Seyamalam/blood-league-kickoff@aa02a4e6d8337a0604d2da131bcbbeb1f01badf0/public/assets/vendor/quaternius/';
+function nativeHeroLabel(msg){
+  let node=document.getElementById('native-hero-rig-label');
+  if(!node){
+    node=document.createElement('div');node.id='native-hero-rig-label';
+    node.style.cssText='position:fixed;z-index:24;left:12px;top:calc(env(safe-area-inset-top,0px) + 63px);max-width:250px;padding:7px 9px;color:#f5ecda;background:#1d271fdf;border:1px solid #b6a267;border-radius:4px;font:12px/1.3 Arial;pointer-events:none';
+    document.body.appendChild(node);
+  }
+  node.textContent=msg;
+}
+function nativeHeroLoad(){
+  if(new URLSearchParams(location.search).get('rig')==='original')return;
+  if(germanPreview.nativeHeroRequested||typeof THREE.GLTFLoader!=='function')return;
+  germanPreview.nativeHeroRequested=true;
+  nativeHeroLabel('Проверка скелета Quaternius: загружаю модель и движения…');
+  const get=url=>new Promise((resolve,reject)=>new THREE.GLTFLoader().load(url,resolve,undefined,reject));
+  const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Истекло время загрузки')),20000));
+  Promise.race([Promise.all([
+    get(NATIVE_HERO_ASSET_ROOT+'night-striker.glb'),
+    get(NATIVE_HERO_ASSET_ROOT+'universal-animation-library.glb')
+  ]),timeout]).then(([character,library])=>{
+    const unit=P,v=unit&&unit.germanPreview;
+    if(!v||v.role!=='hero'||v.nativeRig)throw new Error('Нет подготовленного героя');
+    const model=character.scene;
+    const bones=new Set();
+    let meshCount=0;
+    model.traverse(n=>{if(n.isBone)bones.add(n.name);if(n.isSkinnedMesh)meshCount++;});
+    const required=['pelvis','thigh_l','calf_l','foot_l','thigh_r','calf_r','foot_r'];
+    if(meshCount===0||required.some(name=>!bones.has(name)))throw new Error('Не найден полный скелет Quaternius');
+    const clips=new Map((library.animations||[]).map(a=>[a.name,a]));
+    const selected={
+      idle:clips.get('Idle_Loop'),
+      jog:clips.get('Jog_Fwd_Loop'),
+      sprint:clips.get('Sprint_Loop')
+    };
+    if(Object.values(selected).some(clip=>!clip||!clip.tracks.length||!Number.isFinite(clip.duration)||clip.duration<=0)){
+      throw new Error('В библиотеке нет Idle / Jog / Sprint');
+    }
+    model.updateMatrixWorld(true);
+    const box=new THREE.Box3().setFromObject(model);
+    const height=box.max.y-box.min.y;
+    if(!Number.isFinite(height)||height<.2||height>1000)throw new Error('Неверный размер исходной модели');
+    const factor=2.55/height;
+    // Bounds are applied at the SAME visual-anchor height as the old hero.
+    // The original skeleton, its skin weights and relative bone transforms
+    // stay together. Only the whole model gets a single uniform scale.
+    const visual=new THREE.Group();visual.name='QuaterniusHeroRigDiagnostic';
+    model.scale.multiplyScalar(factor);
+    model.position.set(-(box.min.x+box.max.x)*.5*factor,-box.min.y*factor,-(box.min.z+box.max.z)*.5*factor);
+    visual.add(model);
+    // Native clips only: this avoids passing their joint transforms into
+    // the unrelated Panzergrenadier (Mixamo) skeleton entirely.
+    const mixer=new THREE.AnimationMixer(model);
+    const actions={};
+    for(const [key,clip] of Object.entries(selected)){
+      // Game simulation owns locomotion position; a GLB must not drive a root
+      // object across the map. Keep local hip motion for natural foot plants.
+      const safe=clip.clone();
+      safe.tracks=safe.tracks.filter(t=>!/\.scale$/.test(t.name)&&
+        !/(?:^|[./])root(?:\]|\.|_)?(?:position)?\.position$/.test(t.name));
+      if(safe.tracks.length<6)throw new Error('Недостаточно скелетных каналов: '+clip.name);
+      actions[key]=mixer.clipAction(safe);
+    }
+    actions.idle.play();
+    const oldFigureVisible=v.figure.visible;
+    const oldIdentityVisible=v.identity.root.visible;
+    const oldWeaponVisible=v.weapon.root.visible;
+    try{
+      v.anchor.add(visual);
+      v.nativeRig={visual,model,mixer,actions,state:'idle',previous:{oldFigureVisible,oldIdentityVisible,oldWeaponVisible}};
+      // Visual-only replacement; the old rig stays available as an instant
+      // fallback. No army mesh/skeleton or gameplay unit is touched.
+      v.figure.visible=false;
+      v.identity.root.visible=false;
+      v.weapon.root.visible=false;
+      nativeHeroLabel('Герой: родной скелет Quaternius + Idle/Jog/Sprint (тест внешности)');
+      console.info('Quaternius native hero rig ready',{
+        skeletonBones:bones.size,skinnedMeshes:meshCount,clips:Object.keys(actions)
+      });
+    }catch(e){
+      v.figure.visible=oldFigureVisible;v.identity.root.visible=oldIdentityVisible;
+      v.weapon.root.visible=oldWeaponVisible;
+      v.nativeRig=null;
+      v.anchor.remove(visual);
+      throw e;
+    }
+  }).catch(e=>{
+    console.warn('Native hero rig fallback to original:',e);
+    nativeHeroLabel('Герой: обычная модель (источник не загрузился: '+e.message+')');
+  });
+}
+function animateNativeHeroRig(unit,v,dt){
+  const r=v.nativeRig;
+  if(!r)return false;
+  const speed=Math.max(0,Number.isFinite(unit.sv)?unit.sv:0);
+  const next=speed<.28?'idle':speed<4.2?'jog':'sprint';
+  if(r.state!==next){
+    const old=r.actions[r.state],action=r.actions[next];
+    old.fadeOut(.16);
+    action.reset().fadeIn(.16).play();
+    r.state=next;
+  }
+  r.mixer.update(THREE.MathUtils.clamp(Number.isFinite(dt)?dt:0,0,.08));
+  unit.g.position.set(unit.x,0,unit.z);
+  unit.g.rotation.x=0;unit.g.rotation.z=0;
+  if(speed<.6&&unit.aim>0&&unit.aimT!=null){
+    const yaw=Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
+    unit.g.rotation.y+=yaw*(1-Math.exp(-Math.max(0,dt)*7));
+  }
+  v.legacy.visible=false;v.anchor.visible=true;
+  return true;
+}
 function loadGermanSoldierPreview(){
   if(typeof THREE.GLTFLoader!=='function'){germanPreviewLabel('Модель недоступна — исходные бойцы');return;}
   try{
@@ -325,6 +442,7 @@ function loadGermanSoldierPreview(){
         germanPreview.template=figure;germanPreview.bounds=bounds;
         const queue=[P,...U,...germanPreview.pending];germanPreview.pending.length=0;
         for(const u of queue)if(u.hp>0)attachGermanSoldier(u);
+        nativeHeroLoad();
         refreshGermanPreviewLabel();
       }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');}
     },e=>{console.error(e);germanPreviewLabel('Ошибка загрузки — исходные бойцы');});
