@@ -1,0 +1,153 @@
+name: Hero field uniform browser acceptance
+on:
+  push:
+    branches: [feature/hero-field-uniform-20261114]
+    paths:
+      - .github/workflows/check-hero-uniform.yml
+      - preview/german-v5.js
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/hero-playwright playwright@1.58.2
+          /tmp/hero-playwright/node_modules/.bin/playwright install chromium
+      - name: Verify hero native rig and 2 arm contact distances
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/weapon-http.log 2>&1 &
+          sleep 2
+          node - <<'JS'
+          const {chromium}=require('/tmp/hero-playwright/node_modules/playwright');
+          const fs=require('fs');
+          (async()=>{
+            const report={success:false,label:'',metrics:null,errors:[],locomotionClips:[],weaponName:'',elapsedMs:0};
+            let browser;
+            const start=Date.now();
+            try{
+              browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
+              const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true});
+              page.on('pageerror',e=>{if(report.errors.length<12)report.errors.push('pageerror: '+e.message)});
+              page.on('console',m=>{if(m.type()==='error'&&report.errors.length<12)report.errors.push('console: '+m.text())});
+              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html',{waitUntil:'domcontentloaded',timeout:50000});
+              await page.waitForFunction(()=>{
+                try{return !!(P&&P.germanPreview&&P.germanPreview.nativeRig&&P.germanPreview.nativeRig.weaponDiagnostics&&P.germanPreview.nativeRig.weaponDiagnostics.poseUpdates>15);}
+                catch(e){return false;}
+              },{timeout:80000});
+              const observation=await page.evaluate(()=>{
+                const rig=P.germanPreview.nativeRig;
+                const d=rig.weaponDiagnostics;
+                const armed=rig.weapon&&rig.weapon.root&&rig.weapon.root.parent===rig.visual;
+                const counts=Object.fromEntries(Object.entries(rig.actions).map(([k,a])=>[k,a.getClip().tracks.length]));
+                return {metrics:{...d},armed,counts,weaponName:rig.weapon?.root.name,role:P.germanPreview.role};
+              });
+              report.metrics=observation.metrics;
+              report.poseStates=await page.evaluate(()=>{
+                const hero=P,view=hero.germanPreview,rig=view.nativeRig;
+                const before={sv:hero.sv,aim:hero.aim,aimT:hero.aimT};
+                const results={};
+                const sample=(name,speed,aim)=>{
+                  hero.sv=speed;hero.aim=aim;
+                  hero.aimT=hero.g.rotation.y;
+                  for(let i=0;i<25;i++)animateNativeHeroRig(hero,view,1/60);
+                  results[name]={...rig.weaponDiagnostics};
+                };
+                try{
+                  sample('jog',3.6,0);
+                  sample('sprint',5.4,0);
+                  sample('aim',0,1);
+                }finally{
+                  hero.sv=before.sv;hero.aim=before.aim;hero.aimT=before.aimT;
+                }
+                return results;
+              });
+              report.locomotionClips=Object.keys(observation.counts);
+              report.clipTrackCounts=observation.counts;
+              report.weaponName=observation.weaponName;
+              report.armed=observation.armed;
+              report.uniform=await page.evaluate(()=>{
+                const r=P.germanPreview.nativeRig,u=r.uniform;
+                if(!u)return null;
+                r.uniform.sync();
+                const materials=u.root.children.map(n=>n.material?.color?.getHex?.()).filter(Boolean);
+                return {exists:true,meshCount:u.root.children.length,materialColors:[...new Set(materials)],
+                  boots:u.parts.filter(p=>p.kind==='boot').length,
+                  sleeves:u.parts.filter(p=>p.kind==='sleeve').length,
+                  attached:u.root.parent===r.visual,
+                  weaponStillAttached:r.weapon.root.parent===r.visual,
+                  name:u.root.name};
+              });
+              report.label=await page.locator('#native-hero-rig-label').textContent();
+              await page.screenshot({path:'/tmp/hero-uniform-proof.png',fullPage:false});
+              // Render a diagnostic third-person close-up without touching the
+              // gameplay camera, zoom or control settings in source files.
+              const cameraShot=await page.evaluate(()=>{
+                if(typeof cam==='undefined'||typeof R==='undefined'||typeof scene==='undefined')throw new Error('Camera test globals unavailable');
+                const savedP=cam.position.clone(),savedQ=cam.quaternion.clone();
+                try{
+                  cam.position.set(P.x+2.2,3.1,P.z+4.0);
+                  cam.lookAt(P.x,1.38,P.z);
+                  R.render(scene,cam);
+                  return R.domElement.toDataURL('image/png');
+                }finally{
+                  cam.position.copy(savedP);cam.quaternion.copy(savedQ);
+                }
+              });
+              fs.writeFileSync('/tmp/hero-uniform-close.png',Buffer.from(cameraShot.split(',')[1],'base64'));
+              const valid=observation.armed&&observation.role==='hero'&&observation.metrics.ready&&
+                observation.metrics.poseUpdates>15&&
+                Number.isFinite(observation.metrics.rightError)&&
+                Number.isFinite(observation.metrics.leftError)&&
+                observation.metrics.rightError<.28&&observation.metrics.leftError<.28&&
+                report.locomotionClips.includes('jog')&&report.locomotionClips.includes('sprint')&&
+                ['jog','sprint','aim'].every(state=>{
+                  const d=report.poseStates?.[state];
+                  return d&&d.ready&&d.rightError<.28&&d.leftError<.28;
+                })&&report.poseStates.sprint.gaitState==='sprint'&&report.poseStates.aim.aimed===true;
+              report.success=!!valid&&!!report.uniform&&report.uniform.meshCount>=26&&
+                report.uniform.boots===2&&report.uniform.sleeves===4&&
+                report.uniform.attached&&report.uniform.weaponStillAttached;
+              if(!valid)report.errors.push('Hand targets, clips or bones failed acceptance threshold');
+            }catch(e){report.errors.push('exception: '+e.message)}
+            finally{
+              report.elapsedMs=Date.now()-start;
+              fs.writeFileSync('assets/native-hero-quaternius/hero-uniform-browser-report.json',JSON.stringify(report,null,2));
+              console.log(JSON.stringify(report,null,2));
+              if(browser)await browser.close();
+              if(!report.success)process.exitCode=1;
+            }
+          })();
+          JS
+      - name: Emit compressed screenshot for visual QA
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/hero-uniform-close.png ]; then
+            python3 - <<'PY'
+          import base64
+          src=open('/tmp/hero-uniform-close.png','rb').read()
+          data=base64.b64encode(src).decode('ascii')
+          print('CLOSEUP_BEGIN',len(src),len(data))
+          for i in range(0,len(data),56000): print('CLOSEUP_PART '+data[i:i+56000])
+          print('CLOSEUP_END')
+          PY
+          fi
+      - name: Commit browser acceptance report even on failure
+        if: always()
+        shell: bash
+        run: |
+          if [ -f assets/native-hero-quaternius/hero-uniform-browser-report.json ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add assets/native-hero-quaternius/hero-uniform-browser-report.json
+            if ! git diff --cached --quiet; then
+              git commit -m 'test(hero): field uniform browser validation report'
+              git push origin HEAD:refs/heads/feature/hero-field-uniform-20261114
+            fi
+          fi
