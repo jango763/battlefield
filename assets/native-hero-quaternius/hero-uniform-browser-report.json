@@ -1,0 +1,84 @@
+{
+  "success": true,
+  "label": "НОВЫЙ СКЕЛЕТ v17: АКТИВЕН ✓ LOCAL + LOCAL. Зелёное кольцо над героем.",
+  "metrics": {
+    "ready": true,
+    "rightError": 1.883041697764227e-8,
+    "leftError": 5.348549649634137e-8,
+    "poseUpdates": 17,
+    "gaitState": "idle",
+    "aimed": false,
+    "visible": true
+  },
+  "errors": [
+    "console: Failed to load resource: the server responded with a status of 404 (File not found)",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message"
+  ],
+  "locomotionClips": [
+    "idle",
+    "jog",
+    "sprint"
+  ],
+  "weaponName": "NativeHeroTwoHandRifle",
+  "elapsedMs": 6823,
+  "poseStates": {
+    "jog": {
+      "ready": true,
+      "rightError": 1.656722090359185e-8,
+      "leftError": 1.583911986734665e-8,
+      "poseUpdates": 42,
+      "gaitState": "jog",
+      "aimed": false,
+      "visible": true
+    },
+    "sprint": {
+      "ready": true,
+      "rightError": 1.550215907833455e-8,
+      "leftError": 7.212625545899097e-9,
+      "poseUpdates": 67,
+      "gaitState": "sprint",
+      "aimed": false,
+      "visible": true
+    },
+    "aim": {
+      "ready": true,
+      "rightError": 1.0714167574224018e-8,
+      "leftError": 1.7575963644997262e-8,
+      "poseUpdates": 92,
+      "gaitState": "idle",
+      "aimed": true,
+      "visible": true
+    }
+  },
+  "clipTrackCounts": {
+    "idle": 129,
+    "jog": 129,
+    "sprint": 129
+  },
+  "armed": true,
+  "uniform": {
+    "exists": true,
+    "meshCount": 32,
+    "materialColors": [
+      5858133,
+      4279107,
+      3420202,
+      5462864,
+      7827546,
+      10853233
+    ],
+    "boots": 2,
+    "sleeves": 4,
+    "attached": true,
+    "weaponStillAttached": true,
+    "name": "PanzergrenadierFieldUniform"
+  }
+}
