@@ -5,6 +5,7 @@ on:
       - test/hero-native-lite-20261113
     paths:
       - .github/workflows/smoke-test-hero-rig.yml
+      - assets/native-hero-quaternius/hero-three-clips-lite.glb
 permissions:
   contents: write
 jobs:
