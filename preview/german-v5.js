@@ -56,11 +56,29 @@ function makeSoldierIdentity(role,palette){
   const box=(group,mat,w,h,d,x,y,z)=>add(group,new THREE.BoxGeometry(w,h,d),mat,x,y,z);
   const oval=(group,mat,x,y,z,sx,sy,sz)=>{const m=add(group,new THREE.SphereGeometry(1,16,10),mat,x,y,z);m.scale.set(sx,sy,sz);return m;};
   if(role==='hero'){
-    oval(head,new THREE.MeshLambertMaterial({color:0x593d44}),.03,.245,0,.235,.075,.22).rotation.z=-.16;
-    oval(head,brass,-.09,.25,.20,.028,.032,.012);
-    box(body,leather,.06,.43,.025,.16,-.14,.18).rotation.z=-.3;
-    box(body,dark,.12,.27,.12,.31,-.61,.06);
-    box(body,cloth,.35,.40,.20,0,-.13,-.27);
+    // A softer, legible silhouette for the player character. All pieces are
+    // attached to the existing head/chest bone proxies, never gameplay meshes.
+    // Beret: shallow cloth crown and folded edge rather than a flat block.
+    const beret=new THREE.MeshLambertMaterial({color:0x554249});
+    oval(head,beret,.03,.235,-.025,.245,.078,.215).rotation.z=-.14;
+    oval(head,beret,-.035,.207,.005,.19,.037,.195).rotation.z=-.12;
+    oval(head,brass,-.09,.235,.204,.023,.025,.012);
+    // Webbing: narrow diagonal leather straps and subdued hardware.
+    const leftStrap=add(body,new THREE.CylinderGeometry(.025,.025,.55,8),leather,-.10,-.15,.185);
+    leftStrap.rotation.z=-.49;
+    const rightStrap=add(body,new THREE.CylinderGeometry(.019,.019,.47,8),leather,.12,-.18,.18);
+    rightStrap.rotation.z=.40;
+    box(body,metal,.07,.045,.019,.045,-.33,.218);
+    // Rounded field pack with a small upper flap; no oversized cube.
+    oval(body,cloth,0,-.17,-.265,.22,.26,.12);
+    oval(body,leather,0,.055,-.285,.19,.07,.103);
+    // Belt pouches and a compact right-side holster.
+    oval(body,leather,-.31,-.47,.105,.105,.145,.065);
+    oval(body,leather,.30,-.49,.100,.09,.14,.065);
+    oval(body,dark,.325,-.48,.172,.046,.095,.025);
+    // Rolled kit follows the lower pack; rounded rather than brick-shaped.
+    const roll=add(body,new THREE.CylinderGeometry(.075,.075,.41,10),cloth,0,-.51,-.275);
+    roll.rotation.z=Math.PI/2;
   }else if(role==='captain'){
     add(head,new THREE.CylinderGeometry(.205,.18,.09,20),cloth,0,.295,0);
     add(head,new THREE.CylinderGeometry(.19,.19,.075,20),dark,0,.22,0);
