@@ -152,6 +152,157 @@ function makeGermanWeapon(){
   const rear=new THREE.Object3D(),front=new THREE.Object3D();rear.position.set(-.025,-.07,-.035);front.position.set(.03,-.065,.20);root.add(rear,front);
   root.name='GermanWeapon';return{root,flash,rear,front,rifle,machineGun,launcher,scope,magazine,barrel};
 }
+// Author-owned keyframed hero locomotion on the EXISTING Panzergrenadier rig.
+// Unlike the infantry's legacy sine-foot motion, each heel has a world-space
+// contact point during stance. The opposite leg travels through named poses.
+// No external models, mocap clips, network requests or changes to gameplay.
+function buildHeroGait(v,unit){
+  const keys=[0,.125,.25,.375,.5,.625,.75,.875,1];
+  // Each tuple is [pitch, twist, roll] in radians. Eight authored contact,
+  // loading, passing and push-off poses, cyclically joined by quaternions.
+  const poses={
+    hips:[[.015,-.075,-.032],[.035,-.05,-.045],[.015,0,-.025],[-.008,.055,.016],[.015,.075,.032],[.035,.05,.045],[.015,0,.025],[-.008,-.055,-.016],[.015,-.075,-.032]],
+    spine:[[-.025,.048,.024],[-.04,.03,.018],[-.03,0,.010],[-.01,-.038,-.015],[-.025,-.048,-.024],[-.04,-.03,-.018],[-.03,0,-.010],[-.01,.038,.015],[-.025,.048,.024]],
+    chest:[[.014,.055,.010],[.009,.045,-.005],[.018,.006,-.01],[.02,-.045,-.018],[.014,-.055,-.010],[.009,-.045,.005],[.018,-.006,.01],[.02,.045,.018],[.014,.055,.010]],
+    head:[[0,-.024,-.004],[0,-.015,0],[0,0,0],[0,.019,.005],[0,.024,.004],[0,.015,0],[0,0,0],[0,-.019,-.005],[0,-.024,-.004]]
+  };
+  const tracks=[];
+  for(const [role,angles] of Object.entries(poses)){
+    const bone=v.bones[role],rest=v.rest.find(r=>r.bone===bone);
+    if(!bone||!rest)throw new Error('Не найдена кость ключевой анимации: '+role);
+    const values=[],euler=new THREE.Euler(0,0,0,'YXZ'),q=new THREE.Quaternion();
+    for(const [pitch,twist,roll] of angles){
+      euler.set(pitch,twist,roll,'YXZ');
+      q.copy(rest.q).multiply(new THREE.Quaternion().setFromEuler(euler)).normalize();
+      values.push(q.x,q.y,q.z,q.w);
+    }
+    // Three.js r128 resolves bone nodes by their real model names.
+    tracks.push(new THREE.QuaternionKeyframeTrack(bone.name+'.quaternion',keys,values));
+  }
+  const mixer=new THREE.AnimationMixer(v.figure);
+  const clip=new THREE.AnimationClip('HeroWalkEightKeyPoses',1,tracks);
+  const action=mixer.clipAction(clip);
+  action.setLoop(THREE.LoopRepeat,Infinity);action.play();action.setEffectiveWeight(0);
+  const p=v.bones,wp=(bone)=>bone.getWorldPosition(new THREE.Vector3());
+  v.anchor.updateWorldMatrix(true,true);
+  const legLeft=wp(p.lUp).distanceTo(wp(p.lKnee))+wp(p.lKnee).distanceTo(wp(p.lFoot));
+  const legRight=wp(p.rUp).distanceTo(wp(p.rKnee))+wp(p.rKnee).distanceTo(wp(p.rFoot));
+  const legLength=(legLeft+legRight)*.5;
+  if(!Number.isFinite(legLength)||legLength<.08)throw new Error('Неверная длина ног');
+  const initial=(side)=>v.anchor.localToWorld(v.feet[side].clone());
+  return {
+    mixer,action,phase:0,lastX:unit.x,lastZ:unit.z,legLength,
+    stepCount:0,
+    feet:{
+      left:{stance:true,pin:initial('left'),start:initial('left'),landing:initial('left')},
+      right:{stance:false,pin:initial('right'),start:initial('right'),landing:initial('right')}
+    }
+  };
+}
+function heroWalkCurve(a,b,t){
+  const q=THREE.MathUtils.clamp(t,0,1);
+  return a+(b-a)*q*q*(3-2*q);
+}
+function updateHeroGait(unit,v,dt){
+  const gait=v.heroGait;
+  if(!gait)return false;
+  try{
+    const dx=unit.x-gait.lastX,dz=unit.z-gait.lastZ;
+    gait.lastX=unit.x;gait.lastZ=unit.z;
+    const distance=Math.hypot(dx,dz);
+    const measured=dt>.0001?distance/dt:0;
+    // Detect warps; never drag a planted foot across teleports or respawns.
+    const warp=distance>gait.legLength*1.2;
+    const moving=dt>0&&measured>.08&&!warp&&v.walk>.04;
+    if(warp){
+      gait.phase=0;
+      for(const side of ['left','right']){
+        const p=v.anchor.localToWorld(v.feet[side].clone());
+        const f=gait.feet[side];f.pin.copy(p);f.start.copy(p);f.landing.copy(p);
+        f.stance=side==='left';
+      }
+    }else if(moving){
+      // Distance-based phase prevents moonwalking when the frame rate changes.
+      gait.phase=(gait.phase+Math.min(distance/(gait.legLength*1.37),.12))%1;
+    }
+    v.phase=gait.phase*Math.PI*2;
+    // Keyframe pose is layered over the rest-pose skeleton after the reset.
+    gait.action.setEffectiveWeight(v.walk);
+    gait.mixer.setTime(gait.phase);
+    const breathe=Math.sin(v.idleClock*1.7)*.007*(1-v.walk);
+    GermanRig.rotate(v.bones.spine,[breathe,v.yaw*.40,v.turnLean*.7]);
+    GermanRig.rotate(v.bones.chest,[breathe*.3,v.yaw*.60,v.turnLean*.2]);
+    GermanRig.rotate(v.bones.head,[0,-v.yaw*.12,0]);
+    // Lowered pelvis when the weight first settles; raised during mid-passing.
+    const bodyDrop=[-.022,-.029,-.006,.008,-.022,-.029,-.006,.008,-.022];
+    const i=Math.min(7,Math.floor(gait.phase*8)),t=(gait.phase-i*.125)*8;
+    v.anchor.position.set(
+      Math.sin(gait.phase*Math.PI*2)*.015*v.walk,
+      heroWalkCurve(bodyDrop[i],bodyDrop[i+1],t)*v.walk,
+      0
+    );
+    v.anchor.updateWorldMatrix(true,true);
+    const facing=new THREE.Vector3(0,0,1).transformDirection(v.anchor.matrixWorld);
+    const hip=v.bones.hips.getWorldPosition(new THREE.Vector3());
+    for(const [side,offset] of [['left',0],['right',.5]]){
+      const foot=gait.feet[side];
+      const p=(gait.phase+offset)%1;
+      const stance=p<.60;
+      const neutral=v.anchor.localToWorld(v.feet[side].clone());
+      if(foot.stance!==stance){
+        if(stance){
+          foot.pin.copy(foot.landing);
+          gait.stepCount++;
+        }else{
+          foot.start.copy(foot.pin);
+          // Predict a modest forward touchdown; no root motion is added.
+          // Clamp to a portion of anatomical leg reach.
+          const lead=Math.min(gait.legLength*.23,Math.max(gait.legLength*.07,measured*.11));
+          foot.landing.copy(neutral).addScaledVector(facing,lead);
+        }
+        foot.stance=stance;
+      }
+      const point=new THREE.Vector3();
+      let toe=0;
+      if(stance&&moving){
+        point.copy(foot.pin);
+        const q=p/.60;
+        toe=q>.76?.12*heroWalkCurve(0,1,(q-.76)/.24):-.03*(1-heroWalkCurve(0,1,q/.25));
+      }else if(!stance&&moving){
+        const q=(p-.60)/.40;
+        const t=heroWalkCurve(0,1,q);
+        point.copy(foot.start).lerp(foot.landing,t);
+        // A lifted toe clears the ground, with eased heel contact.
+        const lift=Math.pow(Math.sin(Math.PI*q),1.35);
+        point.y+=gait.legLength*.16*lift;
+        toe=-.085*lift;
+      }else{
+        // Idle/stop: smoothly return both heels to their bind-pose positions.
+        point.copy(neutral);
+      }
+      // A sudden direction change must not stretch the leg past its reach.
+      if(point.distanceTo(hip)>gait.legLength*.93){
+        const safe=point.clone().sub(hip).setLength(gait.legLength*.93).add(hip);
+        point.lerp(safe,.85);
+      }
+      const local=v.anchor.worldToLocal(point);
+      const upper=side==='left'?v.bones.lUp:v.bones.rUp;
+      const knee=side==='left'?v.bones.lKnee:v.bones.rKnee;
+      const end=side==='left'?v.bones.lFoot:v.bones.rFoot;
+      GermanRig.solve(v.anchor,upper,knee,end,local,side==='left'?v.poles.lKnee:v.poles.rKnee);
+      GermanRig.orient(v.anchor,end,v.footQ[side]);
+      GermanRig.rotate(end,[toe*v.walk,0,0]);
+    }
+    return true;
+  }catch(error){
+    // Hero animation is visual-only. Never allow a bad pose to stop the game.
+    console.warn('Hero keyframed gait disabled; restoring legacy locomotion',error);
+    v.heroGait=null;
+    for(const r of v.rest){r.bone.quaternion.copy(r.q);r.bone.position.copy(r.p);}
+    v.anchor.position.set(0,0,0);
+    return false;
+  }
+}
 function attachGermanSoldier(unit){
   if(unit.germanPreview||unit.hp<=0)return;
   if(!germanPreview.template){if(!germanPreview.pending.includes(unit))germanPreview.pending.push(unit);return;}
@@ -196,6 +347,11 @@ function attachGermanSoldier(unit){
     prevHeading:unit.g.rotation.y,turnLean:0,
     targets:{left:new THREE.Vector3(),right:new THREE.Vector3(),rear:new THREE.Vector3(),front:new THREE.Vector3()},
     poles:{left:new THREE.Vector3(.72,1.35,-.12),right:new THREE.Vector3(-.72,1.35,-.12),lKnee:new THREE.Vector3(.18,.6,.7),rKnee:new THREE.Vector3(-.18,.6,.7)}};
+  // A/B switch: ?gait=old keeps the legacy hero, all army units use legacy.
+  if(role==='hero'&&new URLSearchParams(location.search).get('gait')!=='old'){
+    try{unit.germanPreview.heroGait=buildHeroGait(unit.germanPreview,unit);}
+    catch(e){console.warn('Hero gait init fallback',e);}
+  }
   legacy.visible=false;anchor.visible=true;
   animateGermanSoldier(unit,0);
   refreshGermanPreviewLabel();
@@ -233,8 +389,11 @@ function animateGermanSoldier(unit,dt=.016){
   const turnGoal=THREE.MathUtils.clamp(headingChange/Math.max(safeDt,1/120),-2,2)*.017*v.walk;
   v.turnLean+=(turnGoal-v.turnLean)*(1-Math.exp(-safeDt*8));
   v.yaw+=(THREE.MathUtils.clamp(yaw,-.9,.9)*v.aim-v.yaw)*blend;
+  const heroKeyframed=v.heroGait?updateHeroGait(unit,v,safeDt):false;
   const sway=Math.sin(v.phase)*v.walk;
   const breathing=Math.sin(v.idleClock*1.7)*.008*(1-v.walk);
+  if(!heroKeyframed){
+  // Existing army code is retained unchanged. Also the hero's A/B fallback.
   // The shoulder girdle counter-rotates against the pelvis during a stride.
   // Small, phase-offset motion preserves a steady rifle while reducing the
   // rigid, synchronized "robot march" silhouette.
@@ -277,6 +436,7 @@ function animateGermanSoldier(unit,dt=.016){
     GermanRig.solve(v.anchor,side==='left'?v.bones.lUp:v.bones.rUp,side==='left'?v.bones.lKnee:v.bones.rKnee,footBone,t,side==='left'?v.poles.lKnee:v.poles.rKnee);
     GermanRig.orient(v.anchor,footBone,v.footQ[side]);
     GermanRig.rotate(footBone,[footRoll,0,0]);
+  }
   }
   const recoil=unit.kick>0?Math.min(1,unit.kick/.1)*.035:0;
   // Both hands remain IK-locked to the weapon. The entire weapon-and-hands
