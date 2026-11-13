@@ -3,8 +3,8 @@
   "label": "НОВЫЙ СКЕЛЕТ v17: АКТИВЕН ✓ LOCAL + LOCAL. Зелёное кольцо над героем.",
   "metrics": {
     "ready": true,
-    "rightError": 6.890376217222124e-9,
-    "leftError": 4.6758898059709314e-8,
+    "rightError": 2.389589880148806e-8,
+    "leftError": 4.2583385931793395e-8,
     "poseUpdates": 17,
     "gaitState": "idle",
     "aimed": false,
@@ -28,7 +28,7 @@
     "sprint"
   ],
   "weaponName": "NativeHeroTwoHandRifle",
-  "elapsedMs": 3585,
+  "elapsedMs": 5910,
   "poseStates": {
     "jog": {
       "ready": true,
