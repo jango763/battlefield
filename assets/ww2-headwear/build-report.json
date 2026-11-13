@@ -1,0 +1,9 @@
+{
+  "source": "Kenton-GMI/muster-ww2",
+  "source_commit": "7d2fa86ebc3b999eaf085831cdcd5dccefea63d4",
+  "model": "src/assets/germany/infantry/kit/cap.ts",
+  "license": "MIT",
+  "meshes": 9,
+  "triangles": 6112,
+  "bytes": 147416
+}
