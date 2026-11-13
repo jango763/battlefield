@@ -1,0 +1,85 @@
+name: Hero two-handed weapon browser acceptance
+on:
+  push:
+    branches: [feature/hero-native-rifle-ready-20261113]
+    paths: [.github/workflows/check-hero-rifle.yml]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/hero-playwright playwright@1.58.2
+          /tmp/hero-playwright/node_modules/.bin/playwright install chromium
+      - name: Verify hero native rig and 2 arm contact distances
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/weapon-http.log 2>&1 &
+          sleep 2
+          node - <<'JS'
+          const {chromium}=require('/tmp/hero-playwright/node_modules/playwright');
+          const fs=require('fs');
+          (async()=>{
+            const report={success:false,label:'',metrics:null,errors:[],locomotionClips:[],weaponName:'',elapsedMs:0};
+            let browser;
+            const start=Date.now();
+            try{
+              browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
+              const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true});
+              page.on('pageerror',e=>{if(report.errors.length<12)report.errors.push('pageerror: '+e.message)});
+              page.on('console',m=>{if(m.type()==='error'&&report.errors.length<12)report.errors.push('console: '+m.text())});
+              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html',{waitUntil:'domcontentloaded',timeout:50000});
+              await page.waitForFunction(()=>{
+                try{return !!(P&&P.germanPreview&&P.germanPreview.nativeRig&&P.germanPreview.nativeRig.weaponDiagnostics&&P.germanPreview.nativeRig.weaponDiagnostics.poseUpdates>15);}
+                catch(e){return false;}
+              },{timeout:80000});
+              const observation=await page.evaluate(()=>{
+                const rig=P.germanPreview.nativeRig;
+                const d=rig.weaponDiagnostics;
+                const armed=rig.weapon&&rig.weapon.root&&rig.weapon.root.parent===rig.visual;
+                const counts=Object.fromEntries(Object.entries(rig.actions).map(([k,a])=>[k,a.getClip().tracks.length]));
+                return {metrics:{...d},armed,counts,weaponName:rig.weapon?.root.name,role:P.germanPreview.role};
+              });
+              report.metrics=observation.metrics;
+              report.locomotionClips=Object.keys(observation.counts);
+              report.clipTrackCounts=observation.counts;
+              report.weaponName=observation.weaponName;
+              report.armed=observation.armed;
+              report.label=await page.locator('#native-hero-rig-label').textContent();
+              await page.screenshot({path:'/tmp/hero-rifle-proof.png',fullPage:false});
+              const valid=observation.armed&&observation.role==='hero'&&observation.metrics.ready&&
+                observation.metrics.poseUpdates>15&&
+                Number.isFinite(observation.metrics.rightError)&&
+                Number.isFinite(observation.metrics.leftError)&&
+                observation.metrics.rightError<.28&&observation.metrics.leftError<.28&&
+                report.locomotionClips.includes('jog')&&report.locomotionClips.includes('sprint');
+              report.success=!!valid;
+              if(!valid)report.errors.push('Hand targets, clips or bones failed acceptance threshold');
+            }catch(e){report.errors.push('exception: '+e.message)}
+            finally{
+              report.elapsedMs=Date.now()-start;
+              fs.writeFileSync('assets/native-hero-quaternius/hero-rifle-browser-report.json',JSON.stringify(report,null,2));
+              console.log(JSON.stringify(report,null,2));
+              if(browser)await browser.close();
+              if(!report.success)process.exitCode=1;
+            }
+          })();
+          JS
+      - name: Commit browser acceptance report even on failure
+        if: always()
+        shell: bash
+        run: |
+          if [ -f assets/native-hero-quaternius/hero-rifle-browser-report.json ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add assets/native-hero-quaternius/hero-rifle-browser-report.json
+            if ! git diff --cached --quiet; then
+              git commit -m 'test(hero): native rifle pose browser validation result'
+              git push origin HEAD:refs/heads/feature/hero-native-rifle-ready-20261113
+            fi
+          fi
