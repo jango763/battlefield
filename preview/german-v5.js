@@ -335,6 +335,118 @@ function nativeHeroLabel(msg){
   node.textContent=msg;
   node.style.background=/^НОВЫЙ СКЕЛЕТ v17: АКТИВЕН/.test(msg)?'#16582efa':/^СТАРЫЙ СКЕЛЕТ/.test(msg)?'#314255f5':'#6d280bfa';
 }
+// Hero-only native Quaternius rifle hold. This applies AFTER the native
+// animation mixer, so the accepted walk/run/leg clips stay unchanged.
+// Right hand controls the stock/trigger, left palm supports the fore-end.
+function makeNativeHeroAssaultRifle(){
+  const root=new THREE.Group();
+  root.name='NativeHeroTwoHandRifle';
+  const steel=new THREE.MeshLambertMaterial({color:0x313733}),
+    dark=new THREE.MeshLambertMaterial({color:0x212623}),
+    wood=new THREE.MeshLambertMaterial({color:0x6a4730}),
+    edge=new THREE.MeshLambertMaterial({color:0x464c44}),
+    flashMat=new THREE.MeshBasicMaterial({color:0xffe09b});
+  const cube=(mat,x,y,z,px,py,pz,group=root)=>{
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(x,y,z),mat);
+    mesh.position.set(px,py,pz);mesh.castShadow=true;group.add(mesh);return mesh;
+  };
+  // STG-44-inspired field rifle, recognizable side profile, one rigid object.
+  // +Z is forward. Stock remains against the right upper torso.
+  cube(wood,.115,.135,.36,0,-.017,-.32);
+  cube(wood,.19,.18,.11,0,-.08,-.49);
+  cube(steel,.13,.12,.38,0,.006,-.055);
+  cube(edge,.11,.10,.29,0,.025,.18);
+  cube(wood,.14,.105,.29,0,-.033,.31);
+  cube(dark,.045,.11,.13,0,-.112,-.12); // pistol grip
+  cube(steel,.095,.18,.095,0,-.156,.025).rotation.x=-.17; // magazine
+  cube(edge,.047,.038,.11,0,.097,-.15);
+  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.022,.026,.45,9),steel);
+  barrel.rotation.x=Math.PI/2;barrel.position.set(0,.022,.57);barrel.castShadow=true;root.add(barrel);
+  cube(dark,.055,.043,.065,0,.045,.84);
+  cube(dark,.021,.075,.017,0,.101,.48);
+  // Grip positions are wrist attachment points in rifle-local coordinates,
+  // never applied as world or gameplay positions.
+  const trigger=new THREE.Object3D();
+  trigger.position.set(0,-.105,-.16);root.add(trigger);
+  const support=new THREE.Object3D();
+  support.position.set(0,-.10,.35);root.add(support);
+  const muzzleFlash=new THREE.Mesh(new THREE.SphereGeometry(.072,7,5),flashMat);
+  muzzleFlash.position.set(0,.022,.89);muzzleFlash.scale.set(.7,.7,1.8);
+  muzzleFlash.visible=false;root.add(muzzleFlash);
+  return{root,trigger,support,muzzleFlash};
+}
+function initNativeHeroWeapon(v,rig){
+  const boneMap=new Map();
+  rig.model.traverse(n=>{if(n.isBone)boneMap.set(n.name,n);});
+  const names=['upperarm_r','lowerarm_r','hand_r','upperarm_l','lowerarm_l','hand_l'];
+  if(names.some(name=>!boneMap.has(name)))throw new Error('Нет костей хвата оружия: '+names.filter(name=>!boneMap.has(name)).join(','));
+  const hands={
+    right:{upper:boneMap.get('upperarm_r'),elbow:boneMap.get('lowerarm_r'),hand:boneMap.get('hand_r')},
+    left:{upper:boneMap.get('upperarm_l'),elbow:boneMap.get('lowerarm_l'),hand:boneMap.get('hand_l')}
+  };
+  v.anchor.updateWorldMatrix(true,true);
+  const weapon=makeNativeHeroAssaultRifle();
+  rig.visual.add(weapon.root);
+  rig.weapon=weapon;
+  rig.hands=hands;
+  rig.weaponHandQ={};
+  for(const side of ['right','left']){
+    const q=hands[side].hand.getWorldQuaternion(new THREE.Quaternion());
+    const inv=rig.visual.getWorldQuaternion(new THREE.Quaternion()).invert();
+    rig.weaponHandQ[side]=inv.multiply(q);
+  }
+  rig.weaponDiagnostics={ready:false,rightError:null,leftError:null,poseUpdates:0};
+}
+function updateNativeHeroWeapon(unit,v,rig,dt){
+  if(!rig.weapon||!rig.hands)return;
+  const vis=rig.visual,w=rig.weapon;
+  vis.updateWorldMatrix(true,true);
+  const getLocal=b=>vis.worldToLocal(b.getWorldPosition(new THREE.Vector3()));
+  const sr=getLocal(rig.hands.right.upper),sl=getLocal(rig.hands.left.upper);
+  const rightSign=Math.sign(sr.x-sl.x)||-1;
+  const aimed=unit.aim>0;
+  const heading=unit.aimT==null?0:
+    Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
+  // Stable high-ready posture while moving; raised to a proper shoulder line
+  // for aiming. The body and the legs still use the original animation.
+  // The butt starts inside the RIGHT shoulder pocket; the barrel is yawed
+  // inward across the chest rather than sticking out of the sternum.
+  w.root.position.set((sr.x+sl.x)*.5+rightSign*.17,
+    (sr.y+sl.y)*.5-(aimed?.07:.14),
+    (sr.z+sl.z)*.5+.31);
+  w.root.rotation.set(aimed?.02:.065,
+    THREE.MathUtils.clamp(heading,-.55,.55)*(aimed?.4:0)-rightSign*.25,
+    rightSign*.055,'YXZ');
+  // Wrists must approach the correct sides of the narrow rifle stock.
+  w.trigger.position.x=rightSign*.06;
+  w.support.position.x=-rightSign*.08;
+  w.muzzleFlash.visible=unit.kick>0;
+  // First set the weapon placement, then solve both independent arm chains
+  // to its physical grip anchors using the Quaternius shoulder and elbow.
+  vis.updateWorldMatrix(true,true);
+  const targets={
+    right:getLocal(w.trigger),
+    left:getLocal(w.support)
+  };
+  const poles={
+    right:sr.clone().add(new THREE.Vector3(rightSign*.53,-.35,-.16)),
+    left:sl.clone().add(new THREE.Vector3(-rightSign*.53,-.38,-.12))
+  };
+  for(const side of ['right','left']){
+    const a=rig.hands[side];
+    GermanRig.solve(vis,a.upper,a.elbow,a.hand,targets[side],poles[side]);
+    GermanRig.orient(vis,a.hand,rig.weaponHandQ[side]);
+  }
+  vis.updateWorldMatrix(true,true);
+  const rightError=rig.hands.right.hand.getWorldPosition(new THREE.Vector3())
+    .distanceTo(w.trigger.getWorldPosition(new THREE.Vector3()));
+  const leftError=rig.hands.left.hand.getWorldPosition(new THREE.Vector3())
+    .distanceTo(w.support.getWorldPosition(new THREE.Vector3()));
+  rig.weaponDiagnostics={
+    ready:true,rightError,leftError,poseUpdates:(rig.weaponDiagnostics.poseUpdates||0)+1,
+    gaitState:rig.state,aimed,visible:w.root.visible
+  };
+}
 function nativeHeroLoad(){
   const oldMode=new URLSearchParams(location.search).get('rig')==='original';
   if(oldMode){nativeHeroLabel('СТАРЫЙ СКЕЛЕТ: выбран для сравнения. Новая модель отключена.');return;}
@@ -425,6 +537,7 @@ function nativeHeroLoad(){
       v.figure.visible=false;
       v.identity.root.visible=false;
       v.weapon.root.visible=false;
+      initNativeHeroWeapon(v,v.nativeRig);
       // Green badge plus geometric marker: the native visual swap is
       // unambiguous, even when the costume looks similar from the RTS camera.
       const marker=new THREE.Mesh(
@@ -464,6 +577,7 @@ function animateNativeHeroRig(unit,v,dt){
     r.state=next;
   }
   r.mixer.update(THREE.MathUtils.clamp(Number.isFinite(dt)?dt:0,0,.08));
+  updateNativeHeroWeapon(unit,v,r,dt);
   unit.g.position.set(unit.x,0,unit.z);
   unit.g.rotation.x=0;unit.g.rotation.z=0;
   if(speed<.6&&unit.aim>0&&unit.aimT!=null){
