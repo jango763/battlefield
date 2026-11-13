@@ -1,0 +1,47 @@
+name: Inspect lite animation accessor issues
+on:
+  push:
+    branches: [test/hero-native-lite-20261113]
+    paths: [.github/workflows/audit-lite-accessors.yml]
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect clip channels against glTF accessors
+        run: |
+          python3 - <<'PY'
+          import json,struct,pathlib
+          path=pathlib.Path('assets/native-hero-quaternius/hero-three-clips-lite.glb')
+          raw=path.read_bytes();l=struct.unpack_from('<I',raw,12)[0]
+          doc=json.loads(raw[20:20+l])
+          summary={'clip_names':[],'missing':[],'null_accessor':[],'issues':[],'sparse_count':0,'channels':0,'accessors':len(doc['accessors'])}
+          for clip in doc['animations']:
+            summary['clip_names'].append(clip['name'])
+            for channel in clip['channels']:
+              sampler=clip['samplers'][channel['sampler']]
+              summary['channels']+=1
+              for kind in ('input','output'):
+                aindex=sampler[kind]
+                if not isinstance(aindex,int) or aindex<0 or aindex>=len(doc['accessors']):
+                  summary['missing'].append({'clip':clip['name'],'sampler':sampler,'kind':kind});continue
+                accessor=doc['accessors'][aindex]
+                if 'bufferView' not in accessor and 'sparse' not in accessor:
+                  summary['null_accessor'].append({'clip':clip['name'],'kind':kind,'index':aindex,'accessor':accessor,'path':channel['target']['path']})
+                if 'sparse' in accessor:summary['sparse_count']+=1
+                if accessor.get('count',0)==0:
+                  summary['issues'].append({'clip':clip['name'],'kind':kind,'index':aindex,'accessor':accessor})
+          print(json.dumps(summary,indent=2))
+          pathlib.Path('assets/native-hero-quaternius/accessor-report.json').write_text(json.dumps(summary,indent=2))
+          PY
+      - name: Persist audit report
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/native-hero-quaternius/accessor-report.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'test(hero): log animation accessor issues'
+            git push origin HEAD:refs/heads/test/hero-native-lite-20261113
+          fi
