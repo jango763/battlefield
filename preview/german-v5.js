@@ -729,7 +729,7 @@ function updateNativeHeroFieldUniform(rig){
     space.updateWorldMatrix(true,true);
     // Cap pivot is the wearer's forehead band, ~0.27m above Mixamo Head joint.
     cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
-    cap.position.y+=.11;
+    cap.position.y+=.19;
     const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
     cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
   }
@@ -746,7 +746,7 @@ function loadNativeHeroM43Cap(rig){
     const cap=gltf.scene;
     cap.name='WW2_M43_Real_Geometry_MIT';
     // Metre-scale model; parent already inherits WW2 soldier scale.
-    cap.scale.setScalar(1.26);
+    cap.scale.setScalar(1.45);
     cap.position.set(0,.205,0);
     cap.rotation.set(0,0,0);
     cap.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
