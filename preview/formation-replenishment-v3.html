@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="ru">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Капрал на линии фронта</title>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
 <style>html,body{height:100%;margin:0;background:#20251d;color:#f5eedc;font:16px Arial,sans-serif}main{max-width:580px;margin:16vh auto;padding:24px;text-align:center}#progress{font-weight:bold;color:#e1bf7a}button{padding:12px 16px;background:#394335;color:#fff;border:1px solid #a49a76;border-radius:5px}a{color:#e1bf7a}</style></head>
 <body><main><h2>Капрал на линии фронта</h2><p>Черепаха · боевой полукруг · восполнение потерь</p><p id="progress">Загрузка игры…</p><p id="error" role="alert"></p><button id="retry" hidden>Повторить загрузку</button><p><a href="../assets/soldiers/CREDITS.md">Авторы моделей</a></p></main>
 <script>
@@ -9,7 +11,7 @@
   retry.onclick=()=>location.reload();
   async function get(url){
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
-    try{const r=await fetch(url,{cache:'force-cache',signal:controller.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.text();}finally{clearTimeout(timer);}
+    try{const r=await fetch(url,{signal:controller.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.text();}finally{clearTimeout(timer);}
   }
   function once(text,old,value){if(text.split(old).length!==2)throw new Error('Исходная версия изменилась');return text.replace(old,()=>value);}
   try{
