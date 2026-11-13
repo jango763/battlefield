@@ -211,6 +211,7 @@ function disposeGermanSoldier(unit){
 }
 function animateGermanSoldier(unit,dt=.016){
   const v=unit.germanPreview;if(!v)return;
+  if(v.nativeRig&&animateNativeHeroRig(unit,v,dt))return;
   v.legacy.visible=false;v.anchor.visible=true;
   // Visual locomotion is independent of combat speed, collision and gameplay.
   // Filter speed so the stride cycle decelerates naturally instead of snapping.
@@ -312,6 +313,385 @@ function animateGermanSoldier(unit,dt=.016){
   v.identity.band.material.color.setHex((hero?unit.side:unit.t)==='red'?0x9e4a44:0x4d7391);
   v.anchor.updateWorldMatrix(true,true);
 }
+// Native rig diagnostic: Quaternius mesh + its OWN skeleton + animation library.
+// No retargeting and no changes to the army or gameplay. Only the HERO.
+// Assets from https://github.com/Seyamalam/blood-league-kickoff/ (CC0
+// Quaternius, see docs/ASSET_CREDITS.md in upstream), pinned to source commit.
+// Keep every fallback on the same exact test build and use the stripped
+// assets. Derive the commit from the immutable GitHack preview URL.
+const NATIVE_HERO_REF=location.pathname.split('/').filter(Boolean)[2]||'main';
+const NATIVE_HERO_ASSET_ROOTS=[
+  new URL('../assets/native-hero-quaternius/',location.href).href,
+  'https://raw.githubusercontent.com/jango763/battlefield/'+NATIVE_HERO_REF+'/assets/native-hero-quaternius/',
+  'https://cdn.jsdelivr.net/gh/jango763/battlefield@'+NATIVE_HERO_REF+'/assets/native-hero-quaternius/'
+];
+function nativeHeroLabel(msg){
+  let node=document.getElementById('native-hero-rig-label');
+  if(!node){
+    node=document.createElement('div');node.id='native-hero-rig-label';
+    node.style.cssText='position:fixed;z-index:1000;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 118px);max-width:390px;min-height:44px;padding:10px 12px;color:white;background:#6d280bfa;border:2px solid #ffd45b;border-radius:8px;box-shadow:0 2px 14px #000c;font:700 15px/1.3 Arial;pointer-events:none';
+    document.body.appendChild(node);
+  }
+  if(/^НОВЫЙ СКЕЛЕТ v17: АКТИВЕН/.test(msg)&&!new URLSearchParams(location.search).has('rigdebug')){node.remove();return;}
+  node.textContent=msg;
+  node.style.background=/^НОВЫЙ СКЕЛЕТ v17: АКТИВЕН/.test(msg)?'#16582efa':/^СТАРЫЙ СКЕЛЕТ/.test(msg)?'#314255f5':'#6d280bfa';
+}
+// Hero-only native Quaternius rifle hold. This applies AFTER the native
+// animation mixer, so the accepted walk/run/leg clips stay unchanged.
+// Right hand controls the stock/trigger, left palm supports the fore-end.
+function makeNativeHeroAssaultRifle(){
+  const root=new THREE.Group();
+  root.name='NativeHeroTwoHandRifle';
+  const steel=new THREE.MeshLambertMaterial({color:0x313733}),
+    dark=new THREE.MeshLambertMaterial({color:0x212623}),
+    wood=new THREE.MeshLambertMaterial({color:0x6a4730}),
+    edge=new THREE.MeshLambertMaterial({color:0x464c44}),
+    flashMat=new THREE.MeshBasicMaterial({color:0xffe09b});
+  const cube=(mat,x,y,z,px,py,pz,group=root)=>{
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(x,y,z),mat);
+    mesh.position.set(px,py,pz);mesh.castShadow=true;group.add(mesh);return mesh;
+  };
+  // STG-44-inspired field rifle, recognizable side profile, one rigid object.
+  // +Z is forward. Stock remains against the right upper torso.
+  cube(wood,.115,.135,.36,0,-.017,-.32);
+  cube(wood,.19,.18,.11,0,-.08,-.49);
+  cube(steel,.13,.12,.38,0,.006,-.055);
+  cube(edge,.11,.10,.29,0,.025,.18);
+  cube(wood,.14,.105,.29,0,-.033,.31);
+  cube(dark,.045,.11,.13,0,-.112,-.12); // pistol grip
+  cube(steel,.095,.18,.095,0,-.156,.025).rotation.x=-.17; // magazine
+  cube(edge,.047,.038,.11,0,.097,-.15);
+  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.022,.026,.45,9),steel);
+  barrel.rotation.x=Math.PI/2;barrel.position.set(0,.022,.57);barrel.castShadow=true;root.add(barrel);
+  cube(dark,.055,.043,.065,0,.045,.84);
+  cube(dark,.021,.075,.017,0,.101,.48);
+  // Grip positions are wrist attachment points in rifle-local coordinates,
+  // never applied as world or gameplay positions.
+  const trigger=new THREE.Object3D();
+  trigger.position.set(0,-.105,-.16);root.add(trigger);
+  const support=new THREE.Object3D();
+  support.position.set(0,-.10,.35);root.add(support);
+  const muzzleFlash=new THREE.Mesh(new THREE.SphereGeometry(.072,7,5),flashMat);
+  muzzleFlash.position.set(0,.022,.89);muzzleFlash.scale.set(.7,.7,1.8);
+  muzzleFlash.visible=false;root.add(muzzleFlash);
+  return{root,trigger,support,muzzleFlash};
+}
+function initNativeHeroWeapon(v,rig){
+  const boneMap=new Map();
+  rig.model.traverse(n=>{if(n.isBone)boneMap.set(n.name,n);});
+  const names=['upperarm_r','lowerarm_r','hand_r','upperarm_l','lowerarm_l','hand_l'];
+  if(names.some(name=>!boneMap.has(name)))throw new Error('Нет костей хвата оружия: '+names.filter(name=>!boneMap.has(name)).join(','));
+  const hands={
+    right:{upper:boneMap.get('upperarm_r'),elbow:boneMap.get('lowerarm_r'),hand:boneMap.get('hand_r')},
+    left:{upper:boneMap.get('upperarm_l'),elbow:boneMap.get('lowerarm_l'),hand:boneMap.get('hand_l')}
+  };
+  v.anchor.updateWorldMatrix(true,true);
+  const weapon=makeNativeHeroAssaultRifle();
+  rig.visual.add(weapon.root);
+  rig.weapon=weapon;
+  rig.hands=hands;
+  rig.weaponHandQ={};
+  for(const side of ['right','left']){
+    const q=hands[side].hand.getWorldQuaternion(new THREE.Quaternion());
+    const inv=rig.visual.getWorldQuaternion(new THREE.Quaternion()).invert();
+    rig.weaponHandQ[side]=inv.multiply(q);
+  }
+  rig.weaponDiagnostics={ready:false,rightError:null,leftError:null,poseUpdates:0};
+}
+function updateNativeHeroWeapon(unit,v,rig,dt){
+  if(!rig.weapon||!rig.hands)return;
+  const vis=rig.visual,w=rig.weapon;
+  vis.updateWorldMatrix(true,true);
+  const getLocal=b=>vis.worldToLocal(b.getWorldPosition(new THREE.Vector3()));
+  const sr=getLocal(rig.hands.right.upper),sl=getLocal(rig.hands.left.upper);
+  const rightSign=Math.sign(sr.x-sl.x)||-1;
+  const aimed=unit.aim>0;
+  const heading=unit.aimT==null?0:
+    Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
+  // Stable high-ready posture while moving; raised to a proper shoulder line
+  // for aiming. The body and the legs still use the original animation.
+  // The butt starts inside the RIGHT shoulder pocket; the barrel is yawed
+  // inward across the chest rather than sticking out of the sternum.
+  w.root.position.set((sr.x+sl.x)*.5+rightSign*.17,
+    (sr.y+sl.y)*.5-(aimed?.07:.14),
+    (sr.z+sl.z)*.5+.31);
+  w.root.rotation.set(aimed?.02:.065,
+    THREE.MathUtils.clamp(heading,-.55,.55)*(aimed?.4:0)-rightSign*.25,
+    rightSign*.055,'YXZ');
+  // Wrists must approach the correct sides of the narrow rifle stock.
+  w.trigger.position.x=rightSign*.06;
+  w.support.position.x=-rightSign*.08;
+  w.muzzleFlash.visible=unit.kick>0;
+  // First set the weapon placement, then solve both independent arm chains
+  // to its physical grip anchors using the Quaternius shoulder and elbow.
+  vis.updateWorldMatrix(true,true);
+  const targets={
+    right:getLocal(w.trigger),
+    left:getLocal(w.support)
+  };
+  const poles={
+    right:sr.clone().add(new THREE.Vector3(rightSign*.53,-.35,-.16)),
+    left:sl.clone().add(new THREE.Vector3(-rightSign*.53,-.38,-.12))
+  };
+  for(const side of ['right','left']){
+    const a=rig.hands[side];
+    GermanRig.solve(vis,a.upper,a.elbow,a.hand,targets[side],poles[side]);
+    GermanRig.orient(vis,a.hand,rig.weaponHandQ[side]);
+  }
+  vis.updateWorldMatrix(true,true);
+  const rightError=rig.hands.right.hand.getWorldPosition(new THREE.Vector3())
+    .distanceTo(w.trigger.getWorldPosition(new THREE.Vector3()));
+  const leftError=rig.hands.left.hand.getWorldPosition(new THREE.Vector3())
+    .distanceTo(w.support.getWorldPosition(new THREE.Vector3()));
+  rig.weaponDiagnostics={
+    ready:true,rightError,leftError,poseUpdates:(rig.weaponDiagnostics.poseUpdates||0)+1,
+    gaitState:rig.state,aimed,visible:w.root.visible
+  };
+}
+
+/* Corporal's field-grey equipment. Cosmetic-only: original Quaternius
+   skeleton, native walk cycles, assault-rifle hand IK and gameplay intact. */
+function dressNativeHeroFieldUniform(rig){
+  const bones=new Map();
+  rig.model.traverse(n=>{
+    if(n.isBone)bones.set(n.name,n);
+    if(!n.isSkinnedMesh)return;
+    const recolor=original=>{
+      const m=original.clone();
+      if(/MI_Superhero_Male/i.test(m.name)){
+        // Keep vertex-colour detail while toning the combat suit field-grey.
+        m.color.setHex(0x81878a);
+        m.roughness=.96;
+        m.metalness=0;
+      }
+      return m;
+    };
+    n.material=Array.isArray(n.material)?n.material.map(recolor):recolor(n.material);
+    n.castShadow=true;n.receiveShadow=true;
+  });
+  for(const name of ['Head','spine_03','calf_l','calf_r','foot_l','foot_r'])
+    if(!bones.has(name))throw new Error('Не найдена кость формы: '+name);
+  const steel=new THREE.MeshLambertMaterial({color:0x535d5d});
+  const cloth=new THREE.MeshLambertMaterial({color:0x646c68});
+  const leather=new THREE.MeshLambertMaterial({color:0x483c32});
+  const webbing=new THREE.MeshLambertMaterial({color:0x676858});
+  const dark=new THREE.MeshLambertMaterial({color:0x292f31});
+  const add=(group,geo,material,x,y,z)=>{
+    const mesh=new THREE.Mesh(geo,material);
+    mesh.position.set(x,y,z);
+    mesh.castShadow=true;mesh.receiveShadow=true;
+    group.add(mesh);return mesh;
+  };
+  const helmet=new THREE.Group();
+  helmet.name='CorporalFieldHelmet';
+  const shell=add(helmet,new THREE.SphereGeometry(1,20,12),steel,0,.20,0);
+  shell.scale.set(.255,.17,.265);
+  const rim=add(helmet,new THREE.SphereGeometry(1,20,8),steel,0,.072,.015);
+  rim.scale.set(.305,.035,.305);
+  const rear=add(helmet,new THREE.SphereGeometry(1,16,8),steel,0,.058,-.19);
+  rear.scale.set(.25,.03,.14);
+  for(const sign of [-1,1]){
+    const rivet=add(helmet,new THREE.SphereGeometry(.018,8,6),dark,sign*.245,.113,.01);
+    rivet.scale.set(1,.65,1);
+  }
+  const strapPoints=[
+    [-.235,.10,.02],[-.17,-.075,.085],[0,-.12,.155],
+    [.17,-.075,.085],[.235,.10,.02]
+  ].map(p=>new THREE.Vector3(...p));
+  const strap=add(helmet,new THREE.TubeGeometry(
+    new THREE.CatmullRomCurve3(strapPoints),16,.008,5,false),leather,0,0,0);
+  strap.castShadow=false;
+  const gear=new THREE.Group();gear.name='CorporalFieldWebbing';
+  for(const sign of [-1,1]){
+    const sling=add(gear,new THREE.BoxGeometry(.06,.40,.028),webbing,sign*.14,-.13,.19);
+    sling.rotation.z=sign*.38;
+    add(gear,new THREE.BoxGeometry(.15,.17,.10),leather,sign*.16,-.39,.21);
+    add(gear,new THREE.BoxGeometry(.15,.035,.115),webbing,sign*.16,-.32,.21);
+    const epaulette=add(gear,new THREE.BoxGeometry(.22,.038,.14),cloth,sign*.23,.055,.01);
+    epaulette.rotation.z=sign*.1;
+  }
+  add(gear,new THREE.BoxGeometry(.47,.072,.08),leather,0,-.47,.135);
+  add(gear,new THREE.BoxGeometry(.062,.068,.018),steel,0,-.47,.19);
+  add(gear,new THREE.BoxGeometry(.36,.31,.14),cloth,0,-.23,-.19);
+  add(gear,new THREE.BoxGeometry(.38,.045,.15),leather,0,-.15,-.23);
+  const boots={};
+  for(const sign of ['l','r']){
+    const boot=add(rig.visual,new THREE.CylinderGeometry(.11,.128,1,12),dark,0,0,0);
+    boot.name='CorporalFieldBoot-'+sign;
+    boots[sign]=boot;
+  }
+  rig.visual.add(helmet,gear);
+  rig.fieldUniform={bones,helmet,gear,boots};
+  updateNativeHeroFieldUniform(rig);
+}
+function updateNativeHeroFieldUniform(rig){
+  const suit=rig.fieldUniform;if(!suit)return;
+  const vis=rig.visual,bones=suit.bones;
+  vis.updateWorldMatrix(true,true);
+  const position=name=>vis.worldToLocal(bones.get(name).getWorldPosition(new THREE.Vector3()));
+  const rotation=name=>{
+    const worldQ=bones.get(name).getWorldQuaternion(new THREE.Quaternion());
+    return vis.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(worldQ);
+  };
+  suit.helmet.position.copy(position('Head'));
+  suit.helmet.quaternion.copy(rotation('Head'));
+  suit.gear.position.copy(position('spine_03'));
+  suit.gear.quaternion.copy(rotation('spine_03'));
+  for(const side of ['l','r']){
+    const foot=position('foot_'+side),calf=position('calf_'+side);
+    const displacement=calf.sub(foot);
+    const length=displacement.length();
+    const boot=suit.boots[side];
+    if(length<.05){boot.visible=false;continue;}
+    boot.visible=true;
+    boot.position.copy(foot).addScaledVector(displacement,.27);
+    boot.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),displacement.normalize());
+    boot.scale.set(1,length*.38,1);
+  }
+}
+
+function nativeHeroLoad(){
+  const oldMode=new URLSearchParams(location.search).get('rig')==='original';
+  if(oldMode){nativeHeroLabel('СТАРЫЙ СКЕЛЕТ: выбран для сравнения. Новая модель отключена.');return;}
+  if(germanPreview.nativeHeroRequested)return;
+  germanPreview.nativeHeroRequested=true;
+  if(typeof THREE.GLTFLoader!=='function'){nativeHeroLabel('ОШИБКА: нет загрузчика GLTFLoader. Используется старая модель.');return;}
+  nativeHeroLabel('СКЕЛЕТ v17: облегчённые GLB 1,5 МБ — начинаю загрузку.');
+  // Try GitHub raw first, then a pinned jsDelivr mirror. Errors are
+  // visible instead of silently falling back to the unchanged hero.
+  const nativeHeroOrigins={};
+  const loadFile=async(name)=>{
+    let lastError=null;
+    for(let i=0;i<NATIVE_HERO_ASSET_ROOTS.length;i++){
+      const url=NATIVE_HERO_ASSET_ROOTS[i]+name;
+      const loader=new THREE.GLTFLoader();
+      let timer;
+      try{
+        const gltf=await Promise.race([
+          new Promise((resolve,reject)=>loader.load(url,resolve,e=>{
+            if(e&&e.total>0){
+              const percent=Math.min(99,Math.round(e.loaded/e.total*100));
+              nativeHeroLabel('СКЕЛЕТ v17: '+name+' '+percent+'% (источник '+(i+1)+'/3)');
+            }
+          },error=>reject(error||new Error('Ошибка GLB')))),
+          new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Превышено время загрузки: '+name)),18000);})
+        ]);
+        nativeHeroOrigins[name]=(i===0?'LOCAL':i===1?'GitHub Raw':'jsDelivr');
+        return gltf;
+      }catch(e){
+        lastError=e;
+        console.warn('Native GLB origin failed',url,e);
+      }finally{clearTimeout(timer);}
+    }
+    throw new Error(name+': '+(lastError&&lastError.message||'оба источника недоступны'));
+  };
+  Promise.all([loadFile('night-striker-lite.glb'),loadFile('hero-three-clips-lite.glb')]).then(([character,library])=>{
+    const unit=P,v=unit&&unit.germanPreview;
+    if(!v||v.role!=='hero'||v.nativeRig)throw new Error('Нет подготовленного героя');
+    const model=character.scene;
+    const bones=new Set();
+    let meshCount=0;
+    model.traverse(n=>{if(n.isBone)bones.add(n.name);if(n.isSkinnedMesh)meshCount++;});
+    const required=['pelvis','thigh_l','calf_l','foot_l','thigh_r','calf_r','foot_r'];
+    if(meshCount===0||required.some(name=>!bones.has(name)))throw new Error('Не найден полный скелет Quaternius');
+    const clips=new Map((library.animations||[]).map(a=>[a.name,a]));
+    const selected={
+      idle:clips.get('Idle_Loop'),
+      jog:clips.get('Jog_Fwd_Loop'),
+      sprint:clips.get('Sprint_Loop')
+    };
+    if(Object.values(selected).some(clip=>!clip||!clip.tracks.length||!Number.isFinite(clip.duration)||clip.duration<=0)){
+      throw new Error('В библиотеке нет Idle / Jog / Sprint');
+    }
+    model.updateMatrixWorld(true);
+    const box=new THREE.Box3().setFromObject(model);
+    const height=box.max.y-box.min.y;
+    if(!Number.isFinite(height)||height<.2||height>1000)throw new Error('Неверный размер исходной модели');
+    const factor=2.55/height;
+    // Bounds are applied at the SAME visual-anchor height as the old hero.
+    // The original skeleton, its skin weights and relative bone transforms
+    // stay together. Only the whole model gets a single uniform scale.
+    const visual=new THREE.Group();visual.name='QuaterniusHeroRigDiagnostic';
+    model.scale.multiplyScalar(factor);
+    model.position.set(-(box.min.x+box.max.x)*.5*factor,-box.min.y*factor,-(box.min.z+box.max.z)*.5*factor);
+    visual.add(model);
+    // Native clips only: this avoids passing their joint transforms into
+    // the unrelated Panzergrenadier (Mixamo) skeleton entirely.
+    const mixer=new THREE.AnimationMixer(model);
+    const actions={};
+    for(const [key,clip] of Object.entries(selected)){
+      // Game simulation owns locomotion position; a GLB must not drive a root
+      // object across the map. Keep local hip motion for natural foot plants.
+      const safe=clip.clone();
+      safe.tracks=safe.tracks.filter(t=>!/\.scale$/.test(t.name)&&
+        !/(?:^|[./])root(?:\]|\.|_)?(?:position)?\.position$/.test(t.name));
+      if(safe.tracks.length<6)throw new Error('Недостаточно скелетных каналов: '+clip.name);
+      actions[key]=mixer.clipAction(safe);
+    }
+    actions.idle.play();
+    const oldFigureVisible=v.figure.visible;
+    const oldIdentityVisible=v.identity.root.visible;
+    const oldWeaponVisible=v.weapon.root.visible;
+    try{
+      v.anchor.add(visual);
+      v.nativeRig={visual,model,mixer,actions,state:'idle',previous:{oldFigureVisible,oldIdentityVisible,oldWeaponVisible}};
+      // Visual-only replacement; the old rig stays available as an instant
+      // fallback. No army mesh/skeleton or gameplay unit is touched.
+      v.figure.visible=false;
+      v.identity.root.visible=false;
+      v.weapon.root.visible=false;
+      initNativeHeroWeapon(v,v.nativeRig);
+      dressNativeHeroFieldUniform(v.nativeRig);
+      // Green badge plus geometric marker: the native visual swap is
+      // unambiguous, even when the costume looks similar from the RTS camera.
+      const marker=new THREE.Mesh(
+        new THREE.TorusGeometry(.32,.055,6,16),
+        new THREE.MeshBasicMaterial({color:0x00ffbc,depthTest:false})
+      );
+      marker.name='NativeRigDiagnosticMarker';
+      marker.rotation.x=Math.PI/2;
+      marker.position.set(0,2.92,0);
+      marker.renderOrder=120;
+      if(new URLSearchParams(location.search).has('rigdebug'))visual.add(marker);
+      nativeHeroLabel('НОВЫЙ СКЕЛЕТ v17: АКТИВЕН ✓ '+nativeHeroOrigins['night-striker-lite.glb']+' + '+nativeHeroOrigins['hero-three-clips-lite.glb']+'. Полевая форма.');
+      console.info('Quaternius native hero rig ready',{
+        skeletonBones:bones.size,skinnedMeshes:meshCount,clips:Object.keys(actions)
+      });
+    }catch(e){
+      v.figure.visible=oldFigureVisible;v.identity.root.visible=oldIdentityVisible;
+      v.weapon.root.visible=oldWeaponVisible;
+      v.nativeRig=null;
+      v.anchor.remove(visual);
+      throw e;
+    }
+  }).catch(e=>{
+    console.warn('Native hero rig fallback to original:',e);
+    nativeHeroLabel('ОШИБКА СКЕЛЕТА v17: прежний герой. Причина: '+e.message);
+  });
+}
+function animateNativeHeroRig(unit,v,dt){
+  const r=v.nativeRig;
+  if(!r)return false;
+  const speed=Math.max(0,Number.isFinite(unit.sv)?unit.sv:0);
+  const next=speed<.28?'idle':speed<4.2?'jog':'sprint';
+  if(r.state!==next){
+    const old=r.actions[r.state],action=r.actions[next];
+    old.fadeOut(.16);
+    action.reset().fadeIn(.16).play();
+    r.state=next;
+  }
+  r.mixer.update(THREE.MathUtils.clamp(Number.isFinite(dt)?dt:0,0,.08));
+  updateNativeHeroWeapon(unit,v,r,dt);
+  updateNativeHeroFieldUniform(r);
+  unit.g.position.set(unit.x,0,unit.z);
+  unit.g.rotation.x=0;unit.g.rotation.z=0;
+  if(speed<.6&&unit.aim>0&&unit.aimT!=null){
+    const yaw=Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
+    unit.g.rotation.y+=yaw*(1-Math.exp(-Math.max(0,dt)*7));
+  }
+  v.legacy.visible=false;v.anchor.visible=true;
+  return true;
+}
 function loadGermanSoldierPreview(){
   if(typeof THREE.GLTFLoader!=='function'){germanPreviewLabel('Модель недоступна — исходные бойцы');return;}
   try{
@@ -325,6 +705,7 @@ function loadGermanSoldierPreview(){
         germanPreview.template=figure;germanPreview.bounds=bounds;
         const queue=[P,...U,...germanPreview.pending];germanPreview.pending.length=0;
         for(const u of queue)if(u.hp>0)attachGermanSoldier(u);
+        nativeHeroLoad();
         refreshGermanPreviewLabel();
       }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');}
     },e=>{console.error(e);germanPreviewLabel('Ошибка загрузки — исходные бойцы');});
