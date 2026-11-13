@@ -841,12 +841,12 @@ function updateNativeHeroFieldUniform(rig){
     const cap=uniform.cap,head=uniform.headBone,space=rig.visual;
     space.updateWorldMatrix(true,true);
     cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
-    cap.position.y+=.155;
+    cap.position.y+=.177;
     const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
     cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
     // The donor joint is slightly behind the brow; align the woven band with
     // the forehead, not behind the scalp, without altering the head animation.
-    cap.position.add(new THREE.Vector3(-.008,0,.022).applyQuaternion(cap.quaternion));
+    cap.position.add(new THREE.Vector3(-.003,0,.044).applyQuaternion(cap.quaternion));
   }
 }
 
@@ -861,10 +861,17 @@ function loadNativeHeroM43Cap(rig){
     const cap=gltf.scene;
     cap.name='WW2_M43_Real_Geometry_MIT';
     // Metre-scale model; parent already inherits WW2 soldier scale.
-    cap.scale.setScalar(1.30);
+    // Wide enough for the whole scalp; crown rises above the hair instead
+    // of appearing as a thin ring lodged behind the forehead.
+    cap.scale.set(1.35,1.62,1.42);
     cap.position.set(0,.205,0);
     cap.rotation.set(0,0,0);
-    cap.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
+    cap.traverse(n=>{if(n.isMesh){
+      n.castShadow=true;n.receiveShadow=true;
+      n.material=n.material.clone();
+      n.material.color.setHex(0x565d52);
+      n.material.roughness=.97;
+    }});
     // Head bones in the donor GLB inherit a ~1/30 scale: do NOT parent the
     // full-size cap under the bone or it becomes invisible inside the skull.
     rig.visual.add(cap);
