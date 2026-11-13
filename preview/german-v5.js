@@ -724,6 +724,15 @@ function updateNativeHeroFieldUniform(rig){
     binding.target.quaternion.copy(parentQ.multiply(targetQ));
     binding.target.updateWorldMatrix(false,true);
   }
+  if(uniform.cap&&uniform.headBone){
+    const cap=uniform.cap,head=uniform.headBone,space=rig.visual;
+    space.updateWorldMatrix(true,true);
+    // Cap pivot is the wearer's forehead band, ~0.27m above Mixamo Head joint.
+    cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
+    cap.position.y+=.27;
+    const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
+    cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
+  }
 }
 
 
@@ -741,10 +750,13 @@ function loadNativeHeroM43Cap(rig){
     cap.position.set(0,.205,0);
     cap.rotation.set(0,0,0);
     cap.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
-    u.headBone.add(cap);
+    // Head bones in the donor GLB inherit a ~1/30 scale: do NOT parent the
+    // full-size cap under the bone or it becomes invisible inside the skull.
+    rig.visual.add(cap);
     u.cap=cap;
     u.headwear='M43 (MIT source)';
     cap.visible=u.side==='red';
+    updateNativeHeroFieldUniform(rig);
   },undefined,error=>{
     console.warn('M43 headwear not loaded; using uncovered head:',error);
     u.headwearError=String(error&&error.message||error);

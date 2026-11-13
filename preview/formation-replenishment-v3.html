@@ -15,7 +15,7 @@
   try{
     const chunks=new Array(17);let next=0,done=0;
     const worker=async()=>{while(next<17){const i=next++;chunks[i]=await get('parts/german-'+String(i).padStart(3,'0')+'.txt');progress.textContent='Загрузка игры: '+Math.round(++done/18*100)+'%';}};
-    const work=await Promise.all([get('german-v5.js?v=20261113-ready-ww2-m43-1'),...Array.from({length:4},worker)]);
+    const work=await Promise.all([get('german-v5.js?v=20261113-ready-ww2-m43-2'),...Array.from({length:4},worker)]);
     let html=chunks.join('');const start='// === Preview integration: German WW2 Panzergrenadier (red faction) ===',end='// === End of preview integration ===';
     const a=html.indexOf(start),b=html.indexOf(end,a);if(a<0||b<a)throw new Error('Не найдена основа тестовой версии');
     html=html.slice(0,a)+work[0]+html.slice(b+end.length);
