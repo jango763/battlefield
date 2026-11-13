@@ -78,7 +78,7 @@ function tryInstallHeroSource(unit){
   const walk=source.animations.find(a=>/^walk$/i.test(a.name))||source.animations.find(a=>/walk/i.test(a.name));
   if(!idle||!walk)throw new Error('В Soldier.glb нет Idle или Walk');
   const saved=v.rest.map(r=>({bone:r.bone,q:r.bone.quaternion.clone(),p:r.bone.position.clone()}));
-  const options={names,hip:names[v.bones.hips.name],fps:24,preservePosition:true,preseveMatrix:true};
+  const options={names,hip:names[v.bones.hips.name],fps:24,preservePosition:true,preserveMatrix:true};
   try{
     const makeClip=(clip)=>{
       sourceMesh.skeleton.pose();source.scene.updateMatrixWorld(true);
