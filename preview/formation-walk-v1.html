@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Серый наёмник — черепаха v1</title>
+<style>html,body{height:100%;margin:0;background:#20251d;color:#f5eedc;font:16px Arial,sans-serif}main{max-width:580px;margin:16vh auto;padding:24px;text-align:center}#progress{font-weight:bold;color:#e1bf7a}button{padding:12px 16px;background:#394335;color:#fff;border:1px solid #a49a76;border-radius:5px}a{color:#e1bf7a}</style></head>
+<body><main><h2>Серый наёмник</h2><p>Тест строя «черепаха» — три бойца в ряд</p><p id="progress">Загрузка игры…</p><p id="error" role="alert"></p><button id="retry" hidden>Повторить загрузку</button><p><a href="../assets/soldiers/CREDITS.md">Авторы моделей</a></p></main>
+<script>
+(async function(){
+  const progress=document.getElementById('progress'),error=document.getElementById('error'),retry=document.getElementById('retry');
+  retry.onclick=()=>location.reload();
+  async function get(url){
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+    try{const r=await fetch(url,{cache:'force-cache',signal:controller.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.text();}finally{clearTimeout(timer);}
+  }
+  function once(text,old,value){if(text.split(old).length!==2)throw new Error('Исходная версия изменилась');return text.replace(old,()=>value);}
+  try{
+    const chunks=new Array(17);let next=0,done=0;
+    const worker=async()=>{while(next<17){const i=next++;chunks[i]=await get('parts/german-'+String(i).padStart(3,'0')+'.txt');progress.textContent='Загрузка игры: '+Math.round(++done/18*100)+'%';}};
+    const work=await Promise.all([get('german-v3.js?v=20261112-3'),get('formation-walk-v1.js?v=20261113-1'),...Array.from({length:4},worker)]);
+    let html=chunks.join('');const start='// === Preview integration: German WW2 Panzergrenadier (red faction) ===',end='// === End of preview integration ===';
+    const a=html.indexOf(start),b=html.indexOf(end,a);if(a<0||b<a)throw new Error('Не найдена основа тестовой версии');
+    html=html.slice(0,a)+work[0]+html.slice(b+end.length);
+    html=once(html,'if(moving)dust(o,dt);if(m.spr)','if(moving)dust(o,dt);if(o.germanPreview){animateGermanSoldier(o,dt);return}if(m.spr)');
+    html=once(html,'U=U.filter(u=>{if(u.hp>0)return true;','U=U.filter(u=>{if(u.hp>0)return true;disposeGermanSoldier(u);');
+    html=once(html,'dustUpdate(dt);pointsUpdate(dt);fogUpdate(dt);','refreshGermanPreviewLabel();dustUpdate(dt);pointsUpdate(dt);fogUpdate(dt);');
+    html=once(html,'<button type="button" id="german-compare">🇩🇪 Сравнить немца</button>','');
+    html=once(html,"U.push(u);if(t==='red'&&!cmd&&!eng)attachGermanSoldier(u);return u;","U.push(u);attachGermanSoldier(u);return u;");
+    if(html.split('pm.mf.getWorldPosition(mzV);').length!==3)throw new Error('Изменилось крепление прицела');
+    html=html.split('pm.mf.getWorldPosition(mzV);').join('(P.germanPreview?P.germanPreview.weapon.flash:pm.mf).getWorldPosition(mzV);');
+    // Replace only the follower-formation code, never the existing combat rules.
+    const oldGuardStart=html.indexOf('function guardUpdate(){');
+    const oldGuardEnd=html.indexOf('// ── Платформы:',oldGuardStart);
+    if(oldGuardStart<0||oldGuardEnd<0)throw new Error('Не найдена логика построения гвардии');
+    html=html.slice(0,oldGuardStart)+work[1]+'\n'+html.slice(oldGuardEnd);
+    html=once(html,'const g=t||(u.guard&&u.slot?u.slot:goal(u));','const g=u.guard&&u.slot?u.slot:(t||goal(u));');
+    html=once(html,'<title>Серый наёмник: линия фронта</title>','<title>Серый наёмник — черепаха v1</title>');
+    progress.textContent='Запуск…';document.open();document.write(html);document.close();
+  }catch(e){error.textContent='Не удалось загрузить игру: '+(e.name==='AbortError'?'превышено время ожидания':e.message);progress.textContent='Загрузка прервана';retry.hidden=false;}
+})();
+</script></body></html>
