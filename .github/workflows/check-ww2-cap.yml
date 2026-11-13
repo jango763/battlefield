@@ -55,6 +55,16 @@ jobs:
                 out.capMeshCount=0;
                 if(rig.ww2Uniform.cap)rig.ww2Uniform.cap.traverse(n=>{if(n.isMesh)out.capMeshCount++;});
                 out.capParent=rig.ww2Uniform.cap?.parent?.name||'';
+                const cap=rig.ww2Uniform.cap,head=rig.ww2Uniform.headBone;
+                if(cap&&head){
+                  const capBox=new THREE.Box3().setFromObject(cap);
+                  const charBox=new THREE.Box3().setFromObject(rig.ww2Uniform.donor);
+                  out.capWorld={min:capBox.min.toArray(),max:capBox.max.toArray(),center:capBox.getCenter(new THREE.Vector3()).toArray()};
+                  out.donorWorld={min:charBox.min.toArray(),max:charBox.max.toArray()};
+                  out.headWorld=head.getWorldPosition(new THREE.Vector3()).toArray();
+                  out.headWorldQ=head.getWorldQuaternion(new THREE.Quaternion()).toArray();
+                  out.capLocal=cap.position.toArray();
+                }
                 out.headwearError=rig.ww2Uniform.headwearError||null;
                 out.visuals=rig.ww2Uniform.donorMeshes.map(x=>({name:x.mesh.name,material:x.mesh.material.name,type:x.type,visible:x.mesh.visible,verts:x.mesh.geometry.attributes.position?.count}));
                 out.nativeHidden=rig.ww2Uniform.originalMeshes.every(x=>!x.visible);
