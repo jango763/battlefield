@@ -87,6 +87,8 @@ jobs:
                   if(slot>=4&&out.key!=='launcher-prototype')report.failures.push('launcher fallback '+side+' '+slot);
                   if(side==='red'&&!out.capVisible||side==='blue'&&out.capVisible)report.failures.push('incorrect faction headwear');
                   if(out.diag.leftError>.12||out.diag.rightError>.12)report.failures.push('hands not on actual grips '+side+' '+slot);
+                  if(!Number.isFinite(out.diag.visibleLeftError)||out.diag.visibleLeftError>.12||!Number.isFinite(out.diag.visibleRightError)||out.diag.visibleRightError>.12)
+                    report.failures.push('visible uniform hand does not touch gun '+side+' '+slot+' '+JSON.stringify(out.diag));
                 }
               }
               for(const [name,speed,aim] of [['idle',0,0],['jog',3.2,0],['sprint',5.6,0],['aim',0,1]]){
