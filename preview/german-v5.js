@@ -552,12 +552,12 @@ function dressNativeHeroFieldUniform(rig){
   add(gear,new THREE.BoxGeometry(.38,.045,.15),leather,0,-.15,-.23);
   const boots={},shoes={};
   for(const sign of ['l','r']){
-    const boot=add(rig.visual,new THREE.CylinderGeometry(.135,.14,1,12),dark,0,0,0);
+    const boot=add(rig.visual,new THREE.CylinderGeometry(.108,.114,1,12),dark,0,0,0);
     boot.name='CorporalFieldBoot-'+sign;
     boots[sign]=boot;
     const shoe=add(rig.visual,new THREE.SphereGeometry(1,14,10),dark,0,0,0);
     shoe.name='CorporalFieldShoe-'+sign;
-    shoe.scale.set(.195,.14,.32);
+    shoe.scale.set(.145,.11,.25);
     shoes[sign]=shoe;
   }
   // Small collar gives the smooth base model a uniform neckline.
@@ -591,7 +591,7 @@ function updateNativeHeroFieldUniform(rig){
     boot.visible=true;
     boot.position.copy(foot).addScaledVector(displacement,.43);
     boot.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),displacement.normalize());
-    boot.scale.set(1,length*.82,1);
+    boot.scale.set(1,length*.77,1);
     const shoe=suit.shoes[side];
     shoe.visible=true;
     shoe.position.copy(foot).add(new THREE.Vector3(0,-.03,.11));
