@@ -2,10 +2,34 @@
 // Gameplay, damage and input stay in the original game.
 // Model: britdawgmasterfunk, CC BY 4.0; see assets/soldiers/CREDITS.md.
 const creditsLink=document.createElement('a');creditsLink.textContent='Авторы моделей';creditsLink.href='../assets/soldiers/CREDITS.md';creditsLink.target='_blank';creditsLink.rel='noopener';creditsLink.style.cssText='position:fixed;z-index:23;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 113px);font:10px Arial;color:#e7dec8;background:#20251dcc;padding:3px 5px';document.body.appendChild(creditsLink);
-const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null,visualSequence:0};
+const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null,visualSequence:0,clips:[]};
 function germanPreviewLabel(message){const e=document.getElementById('german-preview-status');if(e){e.hidden=!message;if(e.textContent!==message)e.textContent=message;}}
 function soldierRole(unit){return unit.kind==='p'?'hero':unit.cmd?'captain':unit.eng?'engineer':'infantry';}
 function soldierPalette(unit){return unit.kind==='p'?'hero':unit.t==='red'?'grey':'khaki';}
+// Hero-only state controller. The clip mixer is prepared for validated humanoid
+// animations; until compatible source clips are supplied the existing IK pose
+// generator remains the safe fallback. Army units never instantiate this.
+function createHeroMotionController(figure){
+  const weights={idle:1,walk:0,aim:0};
+  return {
+    mixer:new THREE.AnimationMixer(figure),weights,state:'idle',
+    // Aim is an upper-body layer, so walk and aim may coexist.
+    update(dt,speed,aiming){
+      const walkTarget=THREE.MathUtils.clamp(speed/4.5,0,1);
+      const aimTarget=aiming?1:0;
+      const walkEase=1-Math.exp(-dt*(walkTarget>weights.walk?7:10));
+      const aimEase=1-Math.exp(-dt*(aimTarget>weights.aim?9:12));
+      weights.walk+=(walkTarget-weights.walk)*walkEase;
+      weights.aim+=(aimTarget-weights.aim)*aimEase;
+      weights.idle=1-weights.walk;
+      this.state=weights.aim>.55?'aim':weights.walk>.18?'walk':'idle';
+      // Mixer remains action-free until authored clips are retargeted and
+      // checked against this specific skeleton; never mix unverified tracks.
+      this.mixer.update(dt);
+      return weights;
+    }
+  };
+}
 // A shared cloth mask excludes skin, hands and boots. Texture detail remains,
 // while the uniform's hue is controlled separately from leather and equipment.
 function prepareSoldierGeometry(figure){
@@ -196,6 +220,7 @@ function attachGermanSoldier(unit){
     prevHeading:unit.g.rotation.y,turnLean:0,
     targets:{left:new THREE.Vector3(),right:new THREE.Vector3(),rear:new THREE.Vector3(),front:new THREE.Vector3()},
     poles:{left:new THREE.Vector3(.72,1.35,-.12),right:new THREE.Vector3(-.72,1.35,-.12),lKnee:new THREE.Vector3(.18,.6,.7),rKnee:new THREE.Vector3(-.18,.6,.7)}};
+  if(role==='hero')unit.germanPreview.heroMotion=createHeroMotionController(figure);
   legacy.visible=false;anchor.visible=true;
   animateGermanSoldier(unit,0);
   refreshGermanPreviewLabel();
@@ -218,8 +243,14 @@ function animateGermanSoldier(unit,dt=.016){
   const speed=Math.max(0,Number.isFinite(unit.sv)?unit.sv:0);
   const blend=1-Math.exp(-safeDt*10);
   v.gaitSpeed+=(Math.min(6,speed)-v.gaitSpeed)*(1-Math.exp(-safeDt*7));
-  v.walk+=(Math.min(1,speed/4.5)-v.walk)*(1-Math.exp(-safeDt*(speed>.2?8:11)));
-  v.aim+=((unit.aim>0?1:0)-v.aim)*blend;
+  if(v.heroMotion){
+    const weights=v.heroMotion.update(safeDt,speed,unit.aim>0);
+    v.walk=weights.walk;v.aim=weights.aim;
+  }else{
+    // Preserve the army's already-tested movement and aiming transitions.
+    v.walk+=(Math.min(1,speed/4.5)-v.walk)*(1-Math.exp(-safeDt*(speed>.2?8:11)));
+    v.aim+=((unit.aim>0?1:0)-v.aim)*blend;
+  }
   v.idleClock+=safeDt;
   // Walk cadence is linked to actual unit speed; a slightly longer cycle reduces the hurried gait.
   v.phase=(v.phase+safeDt*v.gaitSpeed/3.1*v.cadence*Math.PI*2)%(Math.PI*2);
@@ -323,6 +354,7 @@ function loadGermanSoldierPreview(){
         figure.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
         prepareSoldierGeometry(figure);
         germanPreview.template=figure;germanPreview.bounds=bounds;
+        germanPreview.clips=gltf.animations||[]; // Inspect clips before retargeting; do not auto-play.
         const queue=[P,...U,...germanPreview.pending];germanPreview.pending.length=0;
         for(const u of queue)if(u.hp>0)attachGermanSoldier(u);
         refreshGermanPreviewLabel();
