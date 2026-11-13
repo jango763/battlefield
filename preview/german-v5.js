@@ -24,13 +24,13 @@ function prepareSoldierGeometry(figure){
     g.setAttribute('uniformMask',new THREE.BufferAttribute(mask,1));
   });
 }
-function soldierMaterial(source,palette){
-  const key=source.uuid+':'+palette;if(germanPreview.materials.has(key))return germanPreview.materials.get(key);
+function soldierMaterial(source,palette,customTint){
+  const key=source.uuid+':'+palette+(customTint==null?'':':'+customTint);if(germanPreview.materials.has(key))return germanPreview.materials.get(key);
   const m=source.clone(),cloth=m.name==='Material.003',helmet=/helmet/.test(m.name);
   m.metalness=helmet?.08:0;m.metalnessMap=null;m.roughness=.88;m.aoMapIntensity=.62;
   m.emissive.setHex(0x292b2c);m.emissiveIntensity=.16;
   if(cloth||helmet){
-    const tint=new THREE.Color(palette==='hero'?0x555960:palette==='grey'?0x93979b:0xb4ad85);
+    const tint=new THREE.Color(customTint==null?(palette==='hero'?0x555960:palette==='grey'?0x93979b:0xb4ad85):customTint);
     m.userData.uniformTint=tint.toArray();m.userData.clothMask=cloth;
     m.onBeforeCompile=shader=>{
       shader.uniforms.uniformTint={value:tint};
@@ -613,6 +613,7 @@ function dressNativeHeroFieldUniform(rig){
   try{
     if(!germanPreview.template||!germanPreview.bounds)throw Error('Panzergrenadier donor not loaded');
     const donor=germanSkeletonClone(germanPreview.template);
+    rig.ww2OutfitTemporary=donor;
     donor.name='WW2PanzergrenadierClothing';
     const box=germanPreview.bounds,h=box.max.y-box.min.y;
     if(h<=.1)throw Error('Invalid WW2 donor bounds');
@@ -626,8 +627,8 @@ function dressNativeHeroFieldUniform(rig){
       if(!n.isSkinnedMesh)return;
       const mat=n.material,name=mat&&mat.name||'';
       const type=/helmet|scrim/i.test(name)?'headgear':/ammopouches/i.test(name)?'pouches':'garment';
-      const german=soldierMaterial(mat,'hero');
-      const british=soldierMaterial(mat,'khaki');
+      const german=soldierMaterial(mat,'hero',0x4a5450);
+      const british=soldierMaterial(mat,'khaki',0xa28d69);
       if(type==='pouches'){
         german.color.setHex(0xddd0b9);
         british.color.setHex(0xe3d7b9);
@@ -677,6 +678,7 @@ function dressNativeHeroFieldUniform(rig){
     ww2={donor,bindings,donorMeshes,originalMeshes,side:null,modelType:'existing-panzergrenadier',
       headwear:'none',matchedBones:bindings.length};
     rig.ww2Uniform=ww2;
+    rig.ww2OutfitTemporary=null;
     for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
     updateNativeHeroFieldUniform(rig);
   }catch(error){
@@ -684,6 +686,8 @@ function dressNativeHeroFieldUniform(rig){
     console.warn('WW2 wardrobe fallback (original native skeleton unaffected):',error);
     if(ww2?.donor)rig.visual.remove(ww2.donor);
     if(rig.ww2Uniform)rig.visual.remove(rig.ww2Uniform.donor);
+    if(rig.ww2OutfitTemporary)rig.visual.remove(rig.ww2OutfitTemporary);
+    rig.ww2OutfitTemporary=null;
     rig.ww2Uniform=null;
     rig.model.traverse(n=>{if(n.isSkinnedMesh)n.visible=true;});
     dressNativeHeroPrimitiveUniform(rig);
