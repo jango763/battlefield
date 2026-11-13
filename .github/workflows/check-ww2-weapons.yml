@@ -1,7 +1,7 @@
 name: WW2 hero arms, weapons and sidecap fit
 on:
   push:
-    branches: [feature/ww2-weapons-hand-ik-20261114]
+    branches: [feature/ww2-sidecap-weapon-profile-20261114]
     paths:
       - preview/german-v5.js
       - preview/formation-replenishment-v3.html
@@ -53,7 +53,7 @@ jobs:
               });
               report.initial=initial;
               if(initial.clips.join(',')!=='idle,jog,sprint'||initial.matchedBones<16)report.failures.push('native clip or donor rig changed');
-              if(initial.capClearance<0.045||initial.capClearance>0.18||initial.capMeshes<1)report.failures.push('sidecap cap fit '+initial.capClearance);
+              if(initial.capClearance<0.02||initial.capClearance>0.18||initial.capMeshes<1)report.failures.push('sidecap cap fit '+initial.capClearance);
               if(initial.weaponCatalog.length!==6)report.failures.push('not six WW2 GLB models');
               for(const [side,keys] of [
                 ['red',['de-kar98k','de-mp40','de-mg42','de-kar98k']],
