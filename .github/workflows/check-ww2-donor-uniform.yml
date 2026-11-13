@@ -1,0 +1,119 @@
+name: WW2 garment donor rig browser validation
+on:
+  push:
+    branches: [feature/ww2-donor-uniform-20261113]
+    paths:
+      - preview/german-v5.js
+      - preview/formation-replenishment-v3.html
+      - .github/workflows/check-ww2-donor-uniform.yml
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium automation
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/ww2-playwright playwright@1.58.2
+          /tmp/ww2-playwright/node_modules/.bin/playwright install chromium
+      - name: Browser test native rig, WW2 garments, and faction recolours
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/ww2-server.log 2>&1 &
+          sleep 2
+          node - <<'JS'
+          const {chromium}=require('/tmp/ww2-playwright/node_modules/playwright');
+          const fs=require('fs');
+          (async()=>{
+            let browser;
+            const report={success:false,errors:[],failures:[],states:{},sides:{}};
+            try{
+              browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
+              const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
+              page.on('pageerror',e=>{if(report.errors.length<12)report.errors.push('page: '+e.message)});
+              page.on('console',m=>{if(m.type()==='error'&&report.errors.length<12)report.errors.push('console: '+m.text())});
+              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html',{waitUntil:'domcontentloaded',timeout:55000});
+              await page.waitForFunction(()=>{
+                try{return !!(P&&P.germanPreview&&P.germanPreview.nativeRig&&P.germanPreview.nativeRig.weaponDiagnostics?.poseUpdates>15);}
+                catch(e){return false;}
+              },null,{timeout:95000});
+              const data=await page.evaluate(()=>{
+                const v=P.germanPreview,rig=v.nativeRig,out={};
+                const original={sv:P.sv,aim:P.aim,aimT:P.aimT,side:P.side};
+                out.donorReady=!!rig.ww2Uniform;
+                if(!rig.ww2Uniform)return out;
+                out.model=rig.ww2Uniform.modelType;
+                out.matchedBones=rig.ww2Uniform.matchedBones;
+                out.headwear=rig.ww2Uniform.headwear;
+                out.visuals=rig.ww2Uniform.donorMeshes.map(x=>({name:x.mesh.name,material:x.mesh.material.name,type:x.type,visible:x.mesh.visible,verts:x.mesh.geometry.attributes.position?.count}));
+                out.nativeHidden=rig.ww2Uniform.originalMeshes.every(x=>!x.visible);
+                out.actions=Object.keys(rig.actions);
+                out.sides={};out.states={};
+                try{
+                  for(const side of ['red','blue']){
+                    P.side=side;
+                    for(let i=0;i<5;i++)animateNativeHeroRig(P,v,1/60);
+                    out.sides[side]={active:rig.ww2Uniform.side,
+                      visibleCloth:rig.ww2Uniform.donorMeshes.filter(p=>p.type==='garment'&&p.mesh.visible).length,
+                      visiblePouches:rig.ww2Uniform.donorMeshes.filter(p=>p.type==='pouches'&&p.mesh.visible).length,
+                      visibleHeadwear:rig.ww2Uniform.donorMeshes.filter(p=>p.type==='headgear'&&p.mesh.visible).length,
+                      clothMaterial:rig.ww2Uniform.donorMeshes.find(p=>p.type==='garment')?.mesh.material.name};
+                  }
+                  for(const [name,speed,aim] of [['idle',0,0],['jog',3.6,0],['sprint',5.4,0],['aim',0,1]]){
+                    P.sv=speed;P.aim=aim;P.aimT=P.g.rotation.y;
+                    for(let i=0;i<25;i++)animateNativeHeroRig(P,v,1/60);
+                    out.states[name]={...rig.weaponDiagnostics};
+                  }
+                }finally{P.sv=original.sv;P.aim=original.aim;P.aimT=original.aimT;P.side=original.side;}
+                return out;
+              });
+              Object.assign(report,data);
+              if(!data.donorReady)report.failures.push('ready WW2 donor mesh fallback');
+              else{
+                if(data.matchedBones<16)report.failures.push('bone mapping count');
+                if(data.model!=='existing-panzergrenadier')report.failures.push('donor source');
+                if(data.headwear!=='none')report.failures.push('old helmet visible');
+                if(!data.nativeHidden)report.failures.push('old Quaternius avatar not hidden');
+                if(!data.sides.red?.visibleCloth||!data.sides.blue?.visibleCloth)report.failures.push('clothes invisible');
+                if(data.sides.blue?.visiblePouches!==0||data.sides.blue?.visibleHeadwear!==0)report.failures.push('British kit contamination');
+                if(data.sides.red?.visiblePouches===0||data.sides.red?.visibleHeadwear!==0)report.failures.push('German equipment or helmet');
+                if(data.actions.join(',')!=='idle,jog,sprint')report.failures.push('native clips lost');
+                for(const [name,d] of Object.entries(data.states)){
+                  if(!d.ready||d.rightError>.28||d.leftError>.28)report.failures.push('rifle hands '+name);
+                }
+              }
+              await page.evaluate(()=>{
+                const old=cam.updateMatrixWorld.bind(cam);
+                cam.updateMatrixWorld=function(force){
+                  this.position.set(P.x+2.2,3.6,P.z+5);
+                  this.lookAt(P.x,1.35,P.z);
+                  return old(force);
+                };
+              });
+              for(const side of ['red','blue']){
+                await page.evaluate(side=>{P.side=side;for(let i=0;i<3;i++)animateNativeHeroRig(P,P.germanPreview,1/60);},side);
+                await page.waitForTimeout(500);
+                await page.screenshot({path:'/tmp/ww2-donor-'+side+'.png'});
+              }
+              report.success=report.failures.length===0;
+            }catch(e){report.failures.push('exception: '+e.message)}
+            finally{
+              fs.writeFileSync('/tmp/ww2-donor-report.json',JSON.stringify(report,null,2));
+              console.log(JSON.stringify(report,null,2));
+              if(browser)await browser.close();
+              if(!report.success)process.exitCode=1;
+            }
+          })();
+          JS
+      - name: Upload report and faction screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ww2-donor-browser-qa
+          path: |
+            /tmp/ww2-donor-report.json
+            /tmp/ww2-donor-red.png
+            /tmp/ww2-donor-blue.png
+          if-no-files-found: warn
