@@ -1,0 +1,21 @@
+{
+  "modelLoaded": false,
+  "finalLabel": "ОШИБКА СКЕЛЕТА v17: прежний герой. Причина: hero-three-clips-lite.glb: оба источника недоступны",
+  "logs": [
+    "console: Failed to load resource: the server responded with a status of 404 (File not found)",
+    "network: http://127.0.0.1:8777/sdk.js net::ERR_ABORTED",
+    "console: Failed to load resource: the server responded with a status of 404 ()",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "console: Failed to load resource: the server responded with a status of 404 ()"
+  ],
+  "browser": "Chromium software WebGL",
+  "screen": "mobile 390x844"
+}
