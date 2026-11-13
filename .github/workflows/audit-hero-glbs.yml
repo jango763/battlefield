@@ -1,0 +1,79 @@
+name: Audit native hero GLB compatibility
+on:
+  push:
+    branches:
+      - test/hero-native-selfhosted-assets-20261113
+    paths:
+      - .github/workflows/audit-hero-glbs.yml
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect both GLBs and emit branch report
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, struct, hashlib
+          base=pathlib.Path('assets/native-hero-quaternius')
+          report={}
+          def load(name):
+              path=base/name
+              raw=path.read_bytes()
+              assert raw[:4]==b'glTF' and struct.unpack_from('<I',raw,4)[0]==2
+              assert struct.unpack_from('<I',raw,8)[0]==len(raw)
+              length,typ=struct.unpack_from('<II',raw,12)
+              assert typ==0x4e4f534a
+              doc=json.loads(raw[20:20+length])
+              nodes=doc.get('nodes',[])
+              names=[node.get('name','') for node in nodes]
+              report[name]={
+                'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),
+                'generator':doc.get('asset',{}).get('generator'),
+                'extensionsRequired':doc.get('extensionsRequired',[]),
+                'extensionsUsed':doc.get('extensionsUsed',[]),
+                'skins':len(doc.get('skins',[])),
+                'joints':len(doc.get('skins',[{}])[0].get('joints',[])),
+                'animations':len(doc.get('animations',[])),
+                'skinnedMeshes':sum(1 for n in nodes if 'skin' in n),
+                'images':len(doc.get('images',[])),
+                'meshes':len(doc.get('meshes',[])),
+                'boneNames':sorted(n for n in names if n in {'root','pelvis','thigh_l','calf_l','foot_l','thigh_r','calf_r','foot_r'}),
+                'clipTracks':{
+                  a.get('name'): {
+                    'channels':len(a.get('channels',[])),
+                    'targetNames':sorted(set(names[t.get('target',{}).get('node')] for t in a.get('channels',[]) if isinstance(t.get('target',{}).get('node'),int) and t.get('target',{}).get('node')<len(names)))[:60],
+                    'paths':sorted(set(t.get('target',{}).get('path') for t in a.get('channels',[])))
+                  } for a in doc.get('animations',[]) if a.get('name') in ('Idle_Loop','Jog_Fwd_Loop','Sprint_Loop')
+                }
+              }
+              return doc
+          char=load('night-striker.glb')
+          clips=load('universal-animation-library.glb')
+          charnames=set(n.get('name','') for n in char.get('nodes',[]))
+          clipnodes=set()
+          for a in clips.get('animations',[]):
+              if a.get('name') not in ('Idle_Loop','Jog_Fwd_Loop','Sprint_Loop'): continue
+              for t in a.get('channels',[]):
+                  n=t.get('target',{}).get('node')
+                  if isinstance(n,int):clipnodes.add(clips['nodes'][n].get('name',''))
+          report['clipModelNameOverlap']={
+            'matched':len(clipnodes&charnames),
+            'unmatchedClipNames':sorted(clipnodes-charnames)[:50],
+            'characterNodeCount':len(charnames),
+            'animatedNodeCount':len(clipnodes)
+          }
+          (base/'compatibility-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+          print(json.dumps({k:v for k,v in report.items() if k=='clipModelNameOverlap'},indent=2))
+          PY
+      - name: Commit report to test branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/native-hero-quaternius/compatibility-report.json
+          if ! git diff --cached --quiet; then
+            git commit -m "test(hero): GLB skeleton and animation compatibility audit"
+            git push origin HEAD:refs/heads/test/hero-native-selfhosted-assets-20261113
+          fi
