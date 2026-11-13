@@ -459,12 +459,46 @@ function dressNativeHeroFieldUniform(rig){
     const recolor=original=>{
       const m=original.clone();
       if(/MI_Superhero_Male/i.test(m.name)){
-        // Apply a true dark Feldgrau to the rigged jacket and trousers;
-        // the native skinning, normals, animations and hand IK are untouched.
-        m.color.setHex(0x485153);
+        // Palette follows native vertex skin weights. Bare face/hands retain
+        // a skin tone, while clothing and feet are independently coloured.
+        const geom=n.geometry.clone();
+        const indices=geom.getAttribute('skinIndex');
+        const weights=geom.getAttribute('skinWeight');
+        if(!indices||!weights)throw new Error('Нет skin weights для одежды героя');
+        const skinTone=new Float32Array(indices.count);
+        const bootTone=new Float32Array(indices.count);
+        const read=[indices.getX.bind(indices),indices.getY.bind(indices),indices.getZ.bind(indices),indices.getW.bind(indices)];
+        const weight=[weights.getX.bind(weights),weights.getY.bind(weights),weights.getZ.bind(weights),weights.getW.bind(weights)];
+        for(let i=0;i<indices.count;i++){
+          for(let k=0;k<4;k++){
+            const joint=n.skeleton.bones[Math.round(read[k](i))];
+            if(!joint)continue;
+            const influence=weight[k](i);
+            if(/^(Head$|neck_|hand_|thumb_|index_|middle_|ring_|pinky_)/i.test(joint.name))skinTone[i]+=influence;
+            if(/^(foot_|ball_)/i.test(joint.name))bootTone[i]+=influence;
+          }
+        }
+        geom.setAttribute('heroSkinTone',new THREE.BufferAttribute(skinTone,1));
+        geom.setAttribute('heroBootTone',new THREE.BufferAttribute(bootTone,1));
+        n.geometry=geom;
+        m.color.setHex(0xffffff);
+        m.vertexColors=false;
+        m.map=null;
         m.roughness=1;
         m.metalness=0;
         if(m.emissive)m.emissive.setHex(0x000000);
+        m.onBeforeCompile=shader=>{
+          shader.vertexShader='attribute float heroSkinTone; attribute float heroBootTone; varying float vHeroSkinTone; varying float vHeroBootTone;\n'+shader.vertexShader;
+          shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvHeroSkinTone=heroSkinTone; vHeroBootTone=heroBootTone;');
+          shader.fragmentShader='varying float vHeroSkinTone; varying float vHeroBootTone;\n'+shader.fragmentShader;
+          shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+            vec3 fieldGrey=vec3(.18,.21,.22);
+            vec3 exposedSkin=vec3(.64,.45,.32);
+            vec3 bootLeather=vec3(.045,.05,.052);
+            diffuseColor.rgb=mix(fieldGrey,exposedSkin,smoothstep(.20,.75,vHeroSkinTone));
+            diffuseColor.rgb=mix(diffuseColor.rgb,bootLeather,smoothstep(.16,.70,vHeroBootTone));`);
+        };
+        m.customProgramCacheKey=()=> 'native-hero-field-skin-boots-v2';
       }
       return m;
     };
@@ -516,14 +550,23 @@ function dressNativeHeroFieldUniform(rig){
   add(gear,new THREE.BoxGeometry(.062,.068,.018),steel,0,-.47,.19);
   add(gear,new THREE.BoxGeometry(.36,.31,.14),cloth,0,-.23,-.19);
   add(gear,new THREE.BoxGeometry(.38,.045,.15),leather,0,-.15,-.23);
-  const boots={};
+  const boots={},shoes={};
   for(const sign of ['l','r']){
-    const boot=add(rig.visual,new THREE.CylinderGeometry(.11,.128,1,12),dark,0,0,0);
+    const boot=add(rig.visual,new THREE.CylinderGeometry(.135,.14,1,12),dark,0,0,0);
     boot.name='CorporalFieldBoot-'+sign;
     boots[sign]=boot;
+    const shoe=add(rig.visual,new THREE.SphereGeometry(1,14,10),dark,0,0,0);
+    shoe.name='CorporalFieldShoe-'+sign;
+    shoe.scale.set(.195,.14,.32);
+    shoes[sign]=shoe;
+  }
+  // Small collar gives the smooth base model a uniform neckline.
+  for(const sign of [-1,1]){
+    const lapel=add(gear,new THREE.BoxGeometry(.1,.19,.035),cloth,sign*.085,.075,.16);
+    lapel.rotation.z=-sign*.22;
   }
   rig.visual.add(helmet,gear);
-  rig.fieldUniform={bones,helmet,gear,boots};
+  rig.fieldUniform={bones,helmet,gear,boots,shoes};
   updateNativeHeroFieldUniform(rig);
 }
 function updateNativeHeroFieldUniform(rig){
@@ -544,11 +587,14 @@ function updateNativeHeroFieldUniform(rig){
     const displacement=calf.sub(foot);
     const length=displacement.length();
     const boot=suit.boots[side];
-    if(length<.05){boot.visible=false;continue;}
+    if(length<.05){boot.visible=false;suit.shoes[side].visible=false;continue;}
     boot.visible=true;
-    boot.position.copy(foot).addScaledVector(displacement,.27);
+    boot.position.copy(foot).addScaledVector(displacement,.43);
     boot.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),displacement.normalize());
-    boot.scale.set(1,length*.38,1);
+    boot.scale.set(1,length*.82,1);
+    const shoe=suit.shoes[side];
+    shoe.visible=true;
+    shoe.position.copy(foot).add(new THREE.Vector3(0,-.03,.11));
   }
 }
 
