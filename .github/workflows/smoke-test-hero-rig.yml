@@ -32,7 +32,7 @@ jobs:
             try{
               browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
               const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
-              page.on('console',m=>{if(m.type()==='error')out.logs.push('console: '+m.text().slice(0,240))});
+              page.on('console',m=>{if(m.type()!=='log'&&out.logs.length<35)out.logs.push(m.type()+': '+m.text().slice(0,550))});
               page.on('pageerror',e=>out.logs.push('pageerror: '+e.message.slice(0,240)));
               page.on('requestfailed',r=>out.logs.push('network: '+r.url().slice(0,160)+' '+r.failure()?.errorText));
               await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html',{waitUntil:'domcontentloaded',timeout:55000});
