@@ -1,0 +1,114 @@
+name: Native corporal hero acceptance
+on:
+  push:
+    branches:
+      - feature/native-hero-uniform-integration-20261113
+    paths:
+      - .github/workflows/check-native-hero-uniform.yml
+      - preview/german-v5.js
+      - preview/formation-replenishment-v3.html
+      - assets/native-hero-quaternius/**
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/hero-pw playwright@1.58.2
+          /tmp/hero-pw/node_modules/.bin/playwright install chromium
+      - name: Test original gameplay loader and dressed native hero
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/hero-server.log 2>&1 &
+          sleep 2
+          node - <<'JS'
+          const {chromium}=require('/tmp/hero-pw/node_modules/playwright');
+          const fs=require('fs');
+          (async()=>{
+            const report={success:false,failed:[],errors:[],pose:{}};
+            let browser;
+            try {
+              browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
+              const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
+              page.on('pageerror',e=>{if(report.errors.length<10)report.errors.push(e.message)});
+              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html',{waitUntil:'domcontentloaded',timeout:50000});
+              await page.waitForFunction(()=>{
+                try{
+                  return !!(P&&P.germanPreview&&P.germanPreview.nativeRig&&P.germanPreview.nativeRig.fieldUniform&&P.germanPreview.nativeRig.weaponDiagnostics?.poseUpdates>15);
+                }catch(e){return false}
+              },null,{timeout:80000});
+              const got=await page.evaluate(()=>{
+                const hero=P, v=hero.germanPreview, rig=v.nativeRig, u=rig.fieldUniform;
+                const original={sv:hero.sv,aim:hero.aim,aimT:hero.aimT};
+                const pose={};
+                try{
+                  for(const [key,speed,aim] of [['idle',0,0],['jog',3.6,0],['sprint',5.4,0],['aim',0,1]]){
+                    hero.sv=speed;hero.aim=aim;hero.aimT=hero.g.rotation.y;
+                    for(let i=0;i<24;i++)animateNativeHeroRig(hero,v,1/60);
+                    pose[key]={...rig.weaponDiagnostics,helmetPosition:u.helmet.position.toArray()};
+                  }
+                }finally{hero.sv=original.sv;hero.aim=original.aim;hero.aimT=original.aimT}
+                return{
+                  pose,role:v.role,uniform:!!u,helmet:u.helmet.children.length,
+                  kit:u.gear.children.length,boots:Object.keys(u.boots).length,
+                  oldHidden:!v.figure.visible,
+                  weapon:rig.weapon?.root.name,
+                  actionNames:Object.keys(rig.actions)
+                };
+              });
+              Object.assign(report,got);
+              report.failed=[];
+              if(report.role!=='hero'||!report.uniform||!report.oldHidden)report.failed.push('hero visual replacement');
+              if(report.helmet<2||report.kit<4||report.boots!==2)report.failed.push('costume geometry');
+              if(report.weapon!=='NativeHeroTwoHandRifle')report.failed.push('rifle');
+              if(report.actionNames.join(',')!=='idle,jog,sprint')report.failed.push('native clips');
+              for(const [state,d] of Object.entries(report.pose)){
+                if(!d.ready||!Number.isFinite(d.rightError)||!Number.isFinite(d.leftError)||d.rightError>.28||d.leftError>.28)
+                  report.failed.push(state+' hand grip');
+              }
+              if(report.pose.sprint?.gaitState!=='sprint'||report.pose.aim?.aimed!==true)
+                report.failed.push('locomotion transitions');
+              await page.screenshot({path:'/tmp/native-hero-uniform.png'});
+              // Capture a real browser frame: WebGL's default drawing buffer
+              // cannot be reliably exported via toDataURL after render.
+              await page.evaluate(()=>{
+                const prev=cam.updateMatrixWorld.bind(cam);
+                const oldPosition=cam.position.clone(),oldQuaternion=cam.quaternion.clone();
+                cam.updateMatrixWorld=function(force){
+                  this.position.set(P.x+2.5,3.6,P.z+5.5);
+                  this.lookAt(P.x,1.32,P.z);
+                  return prev(force);
+                };
+                window.__restoreNativeHeroCamera=()=>{
+                  cam.updateMatrixWorld=prev;
+                  cam.position.copy(oldPosition);
+                  cam.quaternion.copy(oldQuaternion);
+                };
+              });
+              await page.waitForTimeout(500);
+              await page.screenshot({path:'/tmp/native-hero-uniform-close.png'});
+              await page.evaluate(()=>window.__restoreNativeHeroCamera?.());
+              report.success=report.failed.length===0;
+            }catch(e){report.failed.push('exception: '+e.message)}
+            finally{
+              if(browser)await browser.close();
+              fs.writeFileSync('/tmp/native-hero-uniform-report.json',JSON.stringify(report,null,2));
+              console.log(JSON.stringify(report,null,2));
+              if(!report.success)process.exitCode=1;
+            }
+          })();
+          JS
+      - name: Upload screenshots and test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-hero-qa
+          path: |
+            /tmp/native-hero-uniform.png
+            /tmp/native-hero-uniform-close.png
+            /tmp/native-hero-uniform-report.json
+          if-no-files-found: warn
