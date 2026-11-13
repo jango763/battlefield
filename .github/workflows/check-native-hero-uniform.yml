@@ -73,20 +73,25 @@ jobs:
               if(report.pose.sprint?.gaitState!=='sprint'||report.pose.aim?.aimed!==true)
                 report.failed.push('locomotion transitions');
               await page.screenshot({path:'/tmp/native-hero-uniform.png'});
-              const closeup=await page.evaluate(()=>{
-                if(typeof cam==='undefined'||typeof scene==='undefined'||typeof R==='undefined')
-                  throw new Error('Camera not found for hero close-up');
-                const saveP=cam.position.clone(),saveQ=cam.quaternion.clone();
-                try{
-                  cam.position.set(P.x+2.2,3.2,P.z+4.2);
-                  cam.lookAt(P.x,1.35,P.z);
-                  R.render(scene,cam);
-                  return R.domElement.toDataURL('image/png');
-                }finally{
-                  cam.position.copy(saveP);cam.quaternion.copy(saveQ);
-                }
+              // Capture a real browser frame: WebGL's default drawing buffer
+              // cannot be reliably exported via toDataURL after render.
+              await page.evaluate(()=>{
+                const prev=cam.updateMatrixWorld.bind(cam);
+                const oldPosition=cam.position.clone(),oldQuaternion=cam.quaternion.clone();
+                cam.updateMatrixWorld=function(force){
+                  this.position.set(P.x+2.5,3.6,P.z+5.5);
+                  this.lookAt(P.x,1.32,P.z);
+                  return prev(force);
+                };
+                window.__restoreNativeHeroCamera=()=>{
+                  cam.updateMatrixWorld=prev;
+                  cam.position.copy(oldPosition);
+                  cam.quaternion.copy(oldQuaternion);
+                };
               });
-              fs.writeFileSync('/tmp/native-hero-uniform-close.png',Buffer.from(closeup.split(',')[1],'base64'));
+              await page.waitForTimeout(500);
+              await page.screenshot({path:'/tmp/native-hero-uniform-close.png'});
+              await page.evaluate(()=>window.__restoreNativeHeroCamera?.());
               report.success=report.failed.length===0;
             }catch(e){report.failed.push('exception: '+e.message)}
             finally{

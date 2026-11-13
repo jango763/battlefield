@@ -459,10 +459,12 @@ function dressNativeHeroFieldUniform(rig){
     const recolor=original=>{
       const m=original.clone();
       if(/MI_Superhero_Male/i.test(m.name)){
-        // Keep vertex-colour detail while toning the combat suit field-grey.
-        m.color.setHex(0x81878a);
-        m.roughness=.96;
+        // Apply a true dark Feldgrau to the rigged jacket and trousers;
+        // the native skinning, normals, animations and hand IK are untouched.
+        m.color.setHex(0x485153);
+        m.roughness=1;
         m.metalness=0;
+        if(m.emissive)m.emissive.setHex(0x000000);
       }
       return m;
     };
@@ -471,8 +473,8 @@ function dressNativeHeroFieldUniform(rig){
   });
   for(const name of ['Head','spine_03','calf_l','calf_r','foot_l','foot_r'])
     if(!bones.has(name))throw new Error('Не найдена кость формы: '+name);
-  const steel=new THREE.MeshLambertMaterial({color:0x535d5d});
-  const cloth=new THREE.MeshLambertMaterial({color:0x646c68});
+  const steel=new THREE.MeshLambertMaterial({color:0x434a4b});
+  const cloth=new THREE.MeshLambertMaterial({color:0x505954});
   const leather=new THREE.MeshLambertMaterial({color:0x483c32});
   const webbing=new THREE.MeshLambertMaterial({color:0x676858});
   const dark=new THREE.MeshLambertMaterial({color:0x292f31});
