@@ -676,11 +676,12 @@ function dressNativeHeroFieldUniform(rig){
       '; donorNames='+JSON.stringify([...garmentBones.keys()].slice(0,24))+
       '; rawDonor='+JSON.stringify([...garmentBones.values()].slice(0,10).map(n=>n.name)));
     ww2={donor,bindings,donorMeshes,originalMeshes,side:null,modelType:'existing-panzergrenadier',
-      headwear:'none',matchedBones:bindings.length};
+      headwear:'none',headBone:garmentBones.get('Head'),matchedBones:bindings.length};
     rig.ww2Uniform=ww2;
     rig.ww2OutfitTemporary=null;
     for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
     updateNativeHeroFieldUniform(rig);
+    loadNativeHeroM43Cap(rig);
   }catch(error){
     rig.ww2UniformError=String(error&&error.stack||error);
     console.warn('WW2 wardrobe fallback (original native skeleton unaffected):',error);
@@ -704,6 +705,7 @@ function updateNativeHeroFieldUniform(rig){
   const side=(P&&P.side)==='red'?'red':'blue';
   if(uniform.side!==side){
     uniform.side=side;
+    if(uniform.cap)uniform.cap.visible=side==='red';
     for(const item of uniform.donorMeshes){
       item.mesh.material=side==='red'?item.german:item.british;
       // Original WWII M42 helmet is deliberately NOT substituted for M43.
@@ -722,6 +724,31 @@ function updateNativeHeroFieldUniform(rig){
     binding.target.quaternion.copy(parentQ.multiply(targetQ));
     binding.target.updateWorldMatrix(false,true);
   }
+}
+
+
+function loadNativeHeroM43Cap(rig){
+  const u=rig.ww2Uniform;
+  if(!u||!u.headBone)return;
+  if(new URLSearchParams(location.search).get('headwear')==='none')return;
+  const url=new URL('../assets/ww2-headwear/m43-field-cap.glb',location.href).href;
+  new THREE.GLTFLoader().load(url,gltf=>{
+    if(!rig.ww2Uniform||rig.ww2Uniform!==u)return;
+    const cap=gltf.scene;
+    cap.name='WW2_M43_Real_Geometry_MIT';
+    // Metre-scale model; parent already inherits WW2 soldier scale.
+    cap.scale.setScalar(1.26);
+    cap.position.set(0,.205,0);
+    cap.rotation.set(0,0,0);
+    cap.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
+    u.headBone.add(cap);
+    u.cap=cap;
+    u.headwear='M43 (MIT source)';
+    cap.visible=u.side==='red';
+  },undefined,error=>{
+    console.warn('M43 headwear not loaded; using uncovered head:',error);
+    u.headwearError=String(error&&error.message||error);
+  });
 }
 
 function nativeHeroLoad(){
