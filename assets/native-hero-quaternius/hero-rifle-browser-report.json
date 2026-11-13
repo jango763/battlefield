@@ -1,0 +1,38 @@
+{
+  "success": true,
+  "label": "НОВЫЙ СКЕЛЕТ v17: АКТИВЕН ✓ LOCAL + LOCAL. Зелёное кольцо над героем.",
+  "metrics": {
+    "ready": true,
+    "rightError": 6.540907156140013e-9,
+    "leftError": 5.963523580330316e-8,
+    "poseUpdates": 17,
+    "gaitState": "idle",
+    "aimed": false,
+    "visible": true
+  },
+  "errors": [
+    "console: Failed to load resource: the server responded with a status of 404 (File not found)",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message",
+    "pageerror: No parent to post message"
+  ],
+  "locomotionClips": [
+    "idle",
+    "jog",
+    "sprint"
+  ],
+  "weaponName": "NativeHeroTwoHandRifle",
+  "elapsedMs": 5764,
+  "clipTrackCounts": {
+    "idle": 129,
+    "jog": 129,
+    "sprint": 129
+  },
+  "armed": true
+}
