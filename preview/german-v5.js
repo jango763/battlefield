@@ -2,7 +2,7 @@
 // Gameplay, damage and input stay in the original game.
 // Model: britdawgmasterfunk, CC BY 4.0; see assets/soldiers/CREDITS.md.
 const creditsLink=document.createElement('a');creditsLink.textContent='Авторы моделей';creditsLink.href='../assets/soldiers/CREDITS.md';creditsLink.target='_blank';creditsLink.rel='noopener';creditsLink.style.cssText='position:fixed;z-index:23;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 113px);font:10px Arial;color:#e7dec8;background:#20251dcc;padding:3px 5px';document.body.appendChild(creditsLink);
-const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null};
+const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null,visualSequence:0};
 function germanPreviewLabel(message){const e=document.getElementById('german-preview-status');if(e){e.hidden=!message;if(e.textContent!==message)e.textContent=message;}}
 function soldierRole(unit){return unit.kind==='p'?'hero':unit.cmd?'captain':unit.eng?'engineer':'infantry';}
 function soldierPalette(unit){return unit.kind==='p'?'hero':unit.t==='red'?'grey':'khaki';}
@@ -188,7 +188,12 @@ function attachGermanSoldier(unit){
   const anchorQ=anchor.getWorldQuaternion(new THREE.Quaternion()).invert();
   const footQ={left:anchorQ.clone().multiply(bones.lFoot.getWorldQuaternion(new THREE.Quaternion())),right:anchorQ.clone().multiply(bones.rFoot.getWorldQuaternion(new THREE.Quaternion()))};
   const headQ=anchorQ.clone().multiply(bones.head.getWorldQuaternion(new THREE.Quaternion())).invert(),chestQ=anchorQ.clone().multiply(bones.chest.getWorldQuaternion(new THREE.Quaternion())).invert();
-  unit.germanPreview={anchor,figure,legacy,bones,rest,feet,footQ,weapon,identity,role,palette,headQ,chestQ,phase:0,walk:0,aim:0,yaw:0,gaitSpeed:0,idleClock:0,
+  // Visual-only stagger. No Math.random(): the game's RNG stays untouched.
+  const visualIndex=++germanPreview.visualSequence;
+  unit.germanPreview={anchor,figure,legacy,bones,rest,feet,footQ,weapon,identity,role,palette,headQ,chestQ,
+    phase:(visualIndex*2.399963229728653)%(Math.PI*2),walk:0,aim:0,yaw:0,gaitSpeed:0,
+    idleClock:visualIndex*.83,cadence:1+.035*Math.sin(visualIndex*2.17),strideScale:1+.035*Math.cos(visualIndex*1.71),
+    prevHeading:unit.g.rotation.y,turnLean:0,
     targets:{left:new THREE.Vector3(),right:new THREE.Vector3(),rear:new THREE.Vector3(),front:new THREE.Vector3()},
     poles:{left:new THREE.Vector3(.72,1.35,-.12),right:new THREE.Vector3(-.72,1.35,-.12),lKnee:new THREE.Vector3(.18,.6,.7),rKnee:new THREE.Vector3(-.18,.6,.7)}};
   legacy.visible=false;anchor.visible=true;
@@ -217,11 +222,16 @@ function animateGermanSoldier(unit,dt=.016){
   v.aim+=((unit.aim>0?1:0)-v.aim)*blend;
   v.idleClock+=safeDt;
   // Walk cadence is linked to actual unit speed; a slightly longer cycle reduces the hurried gait.
-  v.phase=(v.phase+safeDt*v.gaitSpeed/3.1*Math.PI*2)%(Math.PI*2);
+  v.phase=(v.phase+safeDt*v.gaitSpeed/3.1*v.cadence*Math.PI*2)%(Math.PI*2);
   for(const r of v.rest){r.bone.quaternion.copy(r.q);r.bone.position.copy(r.p);}
   unit.g.position.set(unit.x,0,unit.z);unit.g.rotation.x=0;unit.g.rotation.z=0;
   let yaw=unit.aimT==null?0:Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
   if(speed<.6&&unit.aim>0){const turn=yaw*(1-Math.exp(-safeDt*7));unit.g.rotation.y+=turn;yaw-=turn;}
+  // Follow changes in facing with restrained body lean, without steering the unit.
+  const headingChange=Math.atan2(Math.sin(unit.g.rotation.y-v.prevHeading),Math.cos(unit.g.rotation.y-v.prevHeading));
+  v.prevHeading=unit.g.rotation.y;
+  const turnGoal=THREE.MathUtils.clamp(headingChange/Math.max(safeDt,1/120),-2,2)*.017*v.walk;
+  v.turnLean+=(turnGoal-v.turnLean)*(1-Math.exp(-safeDt*8));
   v.yaw+=(THREE.MathUtils.clamp(yaw,-.9,.9)*v.aim-v.yaw)*blend;
   const sway=Math.sin(v.phase)*v.walk;
   const breathing=Math.sin(v.idleClock*1.7)*.008*(1-v.walk);
@@ -230,8 +240,8 @@ function animateGermanSoldier(unit,dt=.016){
   // rigid, synchronized "robot march" silhouette.
   const shoulderCounter=Math.sin(v.phase+.32)*.025*v.walk;
   GermanRig.rotate(v.bones.hips,[.01*v.walk,0,sway*.012]);
-  GermanRig.rotate(v.bones.spine,[.03*v.walk+breathing,v.yaw*.4+shoulderCounter*.55,-sway*.020]);
-  GermanRig.rotate(v.bones.chest,[breathing*.35,v.yaw*.6-shoulderCounter*.8,sway*.014]);
+  GermanRig.rotate(v.bones.spine,[.03*v.walk+breathing,v.yaw*.4+shoulderCounter*.55,-sway*.020+v.turnLean]);
+  GermanRig.rotate(v.bones.chest,[breathing*.35,v.yaw*.6-shoulderCounter*.8,sway*.014+v.turnLean*.35]);
   GermanRig.rotate(v.bones.head,[0,-v.yaw*.12-shoulderCounter*.24,0]);
   // Keep the silhouette upright while gently transferring weight toward
   // the planted leg. Use the rig's actual left/right axes, not an assumed axis.
@@ -241,7 +251,7 @@ function animateGermanSoldier(unit,dt=.016){
   v.anchor.position.y=-.012*v.walk+bob;
   // Feet follow continuous stance/swing arcs in the character's local space.
   // Keep IK targets conservative to avoid snapping the knees on turns.
-  const stride=.26*v.walk,lift=.105*v.walk,stance=.60;
+  const stride=.26*v.walk*v.strideScale,lift=.105*v.walk,stance=.60;
   for(const [side,offset] of [['left',0],['right',.5]]){
     const phase=((v.phase/(Math.PI*2)+offset)%1+1)%1;
     const t=v.targets[side],f=v.feet[side];
