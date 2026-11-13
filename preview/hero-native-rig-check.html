@@ -1,0 +1,106 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Проверка скелета героя</title><style>
+*{box-sizing:border-box}body{margin:0;color:#f3eddc;background:#20271e;font:15px/1.4 system-ui,-apple-system,Arial}main{max-width:820px;margin:auto;padding:12px}h1{font-size:21px}#stage{height:min(65vh,580px);min-height:330px;position:relative;border:1px solid #64735c;border-radius:9px;overflow:hidden}canvas{display:block}#status{position:absolute;top:10px;left:10px;right:10px;max-width:550px;background:#722927ef;border:1px solid #d9bd90;padding:9px;border-radius:6px;font-weight:600}#status.ok{background:#195b36ec}button{background:#343d32;color:white;padding:10px 13px;margin:9px 5px 4px 0;border:1px solid #9bab8e;border-radius:7px;font-weight:600}button.active{background:#dece9d;color:#17231b}button:disabled{opacity:.4}pre{white-space:pre-wrap;background:#161f18;border:1px solid #5d7158;padding:10px;border-radius:7px;max-height:210px;overflow:auto}a{color:#e5cb87}
+</style></head><body><main>
+<h1>Проверка готового скелета и анимаций героя</h1>
+<div id="stage"><div id="status">Запускаю отдельный просмотрщик…</div></div>
+<div><button data-clip="Idle_Loop" disabled>Стоит</button><button data-clip="Jog_Fwd_Loop" disabled>Бег / шаг</button><button data-clip="Sprint_Loop" disabled>Быстрый бег</button><button id="bones" disabled>Показать кости</button></div>
+<pre id="info">Этот тест НЕ использует игровой скелет и НЕ изменяет игру.</pre>
+<p>Временная модель Quaternius — проверяем движения с её собственным скелетом. <a href="../index.html">Основная игра</a>.</p>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+(function(){
+'use strict';
+const stage=document.getElementById('stage'),status=document.getElementById('status'),info=document.getElementById('info');
+const buttons=[...document.querySelectorAll('[data-clip]')],boneButton=document.getElementById('bones');
+const setStatus=(s,ok=false)=>{status.textContent=s;status.className=ok?'ok':'';};
+if(!window.THREE||!THREE.GLTFLoader){setStatus('Ошибка: нет Three.js или GLTFLoader.');return;}
+let renderer,scene,camera,mixer,model,helper,active='',actions={},clock;
+try{
+ renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'low-power'});
+ renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+ renderer.outputEncoding=THREE.sRGBEncoding;
+ stage.insertBefore(renderer.domElement,status);
+ scene=new THREE.Scene();scene.background=new THREE.Color(0x383f33);
+ scene.add(new THREE.HemisphereLight(0xe9e9d3,0x505243,1.45));
+ const sun=new THREE.DirectionalLight(0xffead1,1.25);sun.position.set(2,5,4);scene.add(sun);
+ const floor=new THREE.Mesh(new THREE.CircleGeometry(2,48),new THREE.MeshLambertMaterial({color:0x6a765c}));
+ floor.rotation.x=-Math.PI/2;floor.position.y=-.035;scene.add(floor);
+ camera=new THREE.PerspectiveCamera(42,1,.05,50);
+ camera.position.set(2.1,1.65,3.1);camera.lookAt(0,.91,0);
+ clock=new THREE.Clock();
+}catch(e){setStatus('Нет WebGL: '+e.message);return;}
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+resize();window.addEventListener('resize',resize);
+const rootURLs=[
+'https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/aa02a4e6d8337a0604d2da131bcbbeb1f01badf0/public/assets/vendor/quaternius/',
+'https://cdn.jsdelivr.net/gh/Seyamalam/blood-league-kickoff@aa02a4e6d8337a0604d2da131bcbbeb1f01badf0/public/assets/vendor/quaternius/'
+];
+function glb(url){return new Promise((resolve,reject)=>{
+ let finished=false;
+ const timeout=setTimeout(()=>{if(!finished){finished=true;reject(new Error('Время загрузки истекло'));}},30000);
+ new THREE.GLTFLoader().load(url,data=>{if(finished)return;finished=true;clearTimeout(timeout);resolve(data);},
+ ev=>{if(!finished&&ev.total>0)setStatus('Загрузка: '+Math.floor(ev.loaded*100/ev.total)+'%');},
+ err=>{if(finished)return;finished=true;clearTimeout(timeout);reject(err||new Error('Ошибка GLB'));});
+});}
+async function asset(name){
+ let last=null;
+ for(let i=0;i<rootURLs.length;i++){
+  try{setStatus('Проверка '+name+', источник '+(i+1)+' из 2…');return await glb(rootURLs[i]+name);}
+  catch(e){last=e;console.warn('GLB source failed',name,i,e);}
+ }
+ throw new Error(name+': оба адреса не сработали; '+(last&&last.message||'неизвестная ошибка'));
+}
+function play(name){
+ if(!actions[name])return;
+ if(active===name)return;
+ if(actions[active])actions[active].fadeOut(.17);
+ actions[name].reset().fadeIn(.17).play();active=name;
+ buttons.forEach(b=>b.classList.toggle('active',b.dataset.clip===name));
+ setStatus('НОВЫЙ СКЕЛЕТ АКТИВЕН — '+name,true);
+}
+buttons.forEach(b=>b.addEventListener('click',()=>play(b.dataset.clip)));
+boneButton.addEventListener('click',()=>{if(!helper)return;helper.visible=!helper.visible;boneButton.textContent=helper.visible?'Скрыть кости':'Показать кости';boneButton.classList.toggle('active',helper.visible);});
+(function frame(){requestAnimationFrame(frame);const dt=Math.min(clock.getDelta(),.08);if(mixer)mixer.update(dt);renderer.render(scene,camera);})();
+Promise.all([asset('night-striker.glb'),asset('universal-animation-library.glb')]).then(([c,a])=>{
+ const rig=c.scene,bones=new Set(),meshes=[];
+ rig.traverse(o=>{if(o.isBone)bones.add(o.name);if(o.isSkinnedMesh)meshes.push(o);});
+ for(const joint of ['pelvis','thigh_l','calf_l','foot_l','thigh_r','calf_r','foot_r']){
+  if(!bones.has(joint))throw new Error('Не найдена кость: '+joint);
+ }
+ if(!meshes.length)throw new Error('Нет SkinnedMesh');
+ const clips=new Map(a.animations.map(x=>[x.name,x]));
+ for(const key of ['Idle_Loop','Jog_Fwd_Loop','Sprint_Loop']){
+  const clip=clips.get(key);
+  if(!clip||clip.tracks.length<6)throw new Error('Отсутствует клип: '+key);
+ }
+ rig.updateMatrixWorld(true);
+ const box=new THREE.Box3().setFromObject(rig),height=box.max.y-box.min.y;
+ if(!Number.isFinite(height)||height<.25)throw new Error('Неверная высота рига');
+ const scale=1.85/height;
+ rig.scale.multiplyScalar(scale);
+ rig.position.set(-.5*(box.min.x+box.max.x)*scale,-box.min.y*scale,-.5*(box.min.z+box.max.z)*scale);
+ scene.add(rig);model=rig;
+ mixer=new THREE.AnimationMixer(model);
+ for(const key of ['Idle_Loop','Jog_Fwd_Loop','Sprint_Loop']){
+  const clip=clips.get(key).clone();
+  clip.tracks=clip.tracks.filter(track=>!/\.scale$/.test(track.name));
+  actions[key]=mixer.clipAction(clip);
+ }
+ helper=new THREE.SkeletonHelper(model);helper.visible=false;
+ helper.material.depthTest=false;helper.material.color.setHex(0x00eaa1);helper.renderOrder=10;
+ scene.add(helper);
+ boneButton.disabled=false;buttons.forEach(b=>b.disabled=false);
+ info.textContent='УСПЕХ: файлы загружены\nКостей: '+bones.size+'\nSkinnedMesh: '+meshes.length+
+ '\nКлипов в библиотеке: '+clips.size+'\nТестовые клипы: Idle_Loop / Jog_Fwd_Loop / Sprint_Loop'+
+ '\nВысота рига: '+height.toFixed(3)+'\n\nНажми «Показать кости», чтобы видеть суставы.';
+ play('Jog_Fwd_Loop');
+}).catch(e=>{
+ console.error(e);
+ setStatus('НЕ УДАЛОСЬ ЗАГРУЗИТЬ СКЕЛЕТ: '+e.message);
+ info.textContent='Новый скелет не работает даже отдельно от игры.\nПричина: '+e.message+'\nНужен скриншот этой ошибки.';
+});
+})();
+</script></body></html>
