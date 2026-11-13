@@ -3,8 +3,8 @@
   "label": "НОВЫЙ СКЕЛЕТ v17: АКТИВЕН ✓ LOCAL + LOCAL. Зелёное кольцо над героем.",
   "metrics": {
     "ready": true,
-    "rightError": 2.389589880148806e-8,
-    "leftError": 4.2583385931793395e-8,
+    "rightError": 9.914853556204197e-9,
+    "leftError": 3.994053845794174e-8,
     "poseUpdates": 17,
     "gaitState": "idle",
     "aimed": false,
@@ -28,12 +28,12 @@
     "sprint"
   ],
   "weaponName": "NativeHeroTwoHandRifle",
-  "elapsedMs": 5910,
+  "elapsedMs": 8848,
   "poseStates": {
     "jog": {
       "ready": true,
-      "rightError": 1.7357958527895946e-8,
-      "leftError": 1.6863521321369042e-8,
+      "rightError": 1.656722090359185e-8,
+      "leftError": 1.583911986734665e-8,
       "poseUpdates": 42,
       "gaitState": "jog",
       "aimed": false,
@@ -41,8 +41,8 @@
     },
     "sprint": {
       "ready": true,
-      "rightError": 1.777224656336853e-8,
-      "leftError": 3.85634325990117e-9,
+      "rightError": 1.550215907833455e-8,
+      "leftError": 7.212625545899097e-9,
       "poseUpdates": 67,
       "gaitState": "sprint",
       "aimed": false,
@@ -50,8 +50,8 @@
     },
     "aim": {
       "ready": true,
-      "rightError": 8.141073857675527e-9,
-      "leftError": 1.8191494318746223e-8,
+      "rightError": 1.0714167574224018e-8,
+      "leftError": 1.7575963644997262e-8,
       "poseUpdates": 92,
       "gaitState": "idle",
       "aimed": true,
