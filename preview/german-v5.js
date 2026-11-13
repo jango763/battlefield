@@ -670,7 +670,10 @@ function dressNativeHeroFieldUniform(rig){
         targetRest:target.getWorldQuaternion(new THREE.Quaternion())
       });
     }
-    if(bindings.length<16)throw Error('Too few compatible WW2 outfit joints: '+bindings.length);
+    if(bindings.length<16)throw Error('Too few compatible WW2 outfit joints: '+bindings.length+
+      '; nativeNames='+JSON.stringify([...nativeBones.keys()].slice(0,24))+
+      '; donorNames='+JSON.stringify([...garmentBones.keys()].slice(0,24))+
+      '; rawDonor='+JSON.stringify([...garmentBones.values()].slice(0,10).map(n=>n.name)));
     ww2={donor,bindings,donorMeshes,originalMeshes,side:null,modelType:'existing-panzergrenadier',
       headwear:'none',matchedBones:bindings.length};
     rig.ww2Uniform=ww2;
