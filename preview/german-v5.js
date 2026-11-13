@@ -216,8 +216,8 @@ function animateGermanSoldier(unit,dt=.016){
   v.walk+=(Math.min(1,speed/4.5)-v.walk)*(1-Math.exp(-safeDt*(speed>.2?8:11)));
   v.aim+=((unit.aim>0?1:0)-v.aim)*blend;
   v.idleClock+=safeDt;
-  // One full gait cycle per ~2.85 game units, not 1.7 (previous rapid march).
-  v.phase=(v.phase+safeDt*v.gaitSpeed/2.85*Math.PI*2)%(Math.PI*2);
+  // Walk cadence is linked to actual unit speed; a slightly longer cycle reduces the hurried gait.
+  v.phase=(v.phase+safeDt*v.gaitSpeed/3.1*Math.PI*2)%(Math.PI*2);
   for(const r of v.rest){r.bone.quaternion.copy(r.q);r.bone.position.copy(r.p);}
   unit.g.position.set(unit.x,0,unit.z);unit.g.rotation.x=0;unit.g.rotation.z=0;
   let yaw=unit.aimT==null?0:Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
@@ -226,7 +226,7 @@ function animateGermanSoldier(unit,dt=.016){
   const sway=Math.sin(v.phase)*v.walk;
   const breathing=Math.sin(v.idleClock*1.7)*.008*(1-v.walk);
   GermanRig.rotate(v.bones.hips,[.018*v.walk,0,sway*.018]);
-  GermanRig.rotate(v.bones.spine,[.045*v.walk+breathing,v.yaw*.4,-sway*.022]);
+  GermanRig.rotate(v.bones.spine,[.03*v.walk+breathing,v.yaw*.4,-sway*.022]);
   GermanRig.rotate(v.bones.chest,[breathing*.35,v.yaw*.6,sway*.014]);
   GermanRig.rotate(v.bones.head,[0,-v.yaw*.12,0]);
   // Keep the pelvis stable: excessive vertical oscillation makes figures bounce.
@@ -235,7 +235,7 @@ function animateGermanSoldier(unit,dt=.016){
   // SAFE GAIT v5: targets stay in local body coordinates; v4 world-pinned
   // contacts stretched and twisted the legs on turns and changes of speed.
   // Smooth easing and conservative displacement keep both knees within reach.
-  const stride=.20*v.walk,lift=.065*v.walk,stance=.63;
+  const stride=.26*v.walk,lift=.105*v.walk,stance=.60;
   for(const [side,offset] of [['left',0],['right',.5]]){
     const phase=((v.phase/(Math.PI*2)+offset)%1+1)%1;
     const t=v.targets[side],f=v.feet[side];
