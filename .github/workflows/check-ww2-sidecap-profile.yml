@@ -1,0 +1,140 @@
+name: WW2 boat-cap and readable weapon silhouette acceptance
+on:
+  push:
+    branches: [feature/ww2-sidecap-weapon-profile-20261114]
+    paths:
+      - preview/german-v5.js
+      - preview/formation-replenishment-v3.html
+      - .github/workflows/check-ww2-sidecap-profile.yml
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mobile Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/ww2-playwright playwright@1.58.2
+          /tmp/ww2-playwright/node_modules/.bin/playwright install chromium
+      - name: Validate each side, grips, animations, weapon slots and WW2 cap
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/ww2-server.log 2>&1 &
+          sleep 2
+          node - <<'JS'
+          const {chromium}=require('/tmp/ww2-playwright/node_modules/playwright'),fs=require('fs');
+          (async()=>{
+            const report={success:false,failures:[],errors:[],factions:{},poses:{},sampleShots:[]};
+            let browser;
+            try{
+              browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
+              const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
+              page.on('pageerror',e=>{if(report.errors.length<20)report.errors.push('page '+e.message)});
+              page.on('console',m=>{if(m.type()==='error'&&report.errors.length<20)report.errors.push('console '+m.text())});
+              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html',{waitUntil:'domcontentloaded',timeout:45000});
+              await page.waitForFunction(()=>{
+                try{return !!(P?.germanPreview?.nativeRig?.weapon?.ww2Manifest);}
+                catch(e){return false}
+              },null,{timeout:100000});
+              await page.waitForFunction(()=>{
+                try{return !!P.germanPreview.nativeRig?.ww2Uniform?.cap;}
+                catch(e){return false}
+              },null,{timeout:40000});
+              const initial=await page.evaluate(()=>{
+                const r=P.germanPreview.nativeRig,u=r.ww2Uniform;
+                const bb=new THREE.Box3().setFromObject(u.cap);
+                return {clips:Object.keys(r.actions),matchedBones:u.matchedBones,
+                  capMeshes:(()=>{let n=0;u.cap.traverse(x=>{if(x.isMesh)n++});return n;})(),
+                  capClearance:bb.min.y-u.headBone.getWorldPosition(new THREE.Vector3()).y,
+                  capMaxY:bb.max.y,headY:u.headBone.getWorldPosition(new THREE.Vector3()).y,
+                  modelVisible:!!r.model.visible,weaponCatalog:Object.keys(r.weapon.ww2Manifest.weapons)};
+              });
+              report.initial=initial;
+              if(initial.clips.join(',')!=='idle,jog,sprint'||initial.matchedBones<16)report.failures.push('native clip or donor rig changed');
+              if(initial.capClearance<0.02||initial.capClearance>0.18||initial.capMeshes<1)report.failures.push('sidecap cap fit '+initial.capClearance);
+              if(initial.weaponCatalog.length!==6)report.failures.push('not six WW2 GLB models');
+              for(const [side,keys] of [
+                ['red',['de-kar98k','de-mp40','de-mg42','de-kar98k']],
+                ['blue',['uk-lee-enfield','uk-sten','uk-bren','uk-lee-enfield']]
+              ]){
+                report.factions[side]=[];
+                for(let slot=0;slot<6;slot++){
+                  await page.evaluate(([s,slot])=>{
+                    P.side=s;P.wpn=slot;P.sv=0;P.aim=0;P.aimT=P.g.rotation.y;
+                    animateNativeHeroRig(P,P.germanPreview,1/60);
+                  },[side,slot]);
+                  if(slot<4)await page.waitForFunction(([s,slot,key])=>{
+                    try{
+                      P.side=s;P.wpn=slot;
+                      animateNativeHeroRig(P,P.germanPreview,1/60);
+                      return P.germanPreview.nativeRig.weapon.activeModelId===key;
+                    }catch(e){return false}
+                  },[side,slot,keys[slot]],{timeout:80000});
+                  const out=await page.evaluate(()=>{
+                    const r=P.germanPreview.nativeRig,w=r.weapon,u=r.ww2Uniform;
+                    for(let i=0;i<12;i++)animateNativeHeroRig(P,P.germanPreview,1/60);
+                    return {slot:P.wpn,side:P.side,key:w.activeModelId,diag:{...r.weaponDiagnostics},
+                      capVisible:u.cap?.visible,oldGunVisible:w.fallback.visible,
+                      source:!!w.ww2Manifest,
+                      trigger:w.trigger.position.toArray(),
+                      support:w.support.position.toArray()};
+                  });
+                  report.factions[side].push(out);
+                  if(slot<4&&out.key!==keys[slot])report.failures.push('incorrect model '+side+' '+slot+': '+out.key);
+                  if(slot<4&&out.oldGunVisible)report.failures.push('obsolete test gun visible '+side+' '+slot);
+                  if(slot>=4&&out.key!=='launcher-prototype')report.failures.push('launcher fallback '+side+' '+slot);
+                  if(side==='red'&&!out.capVisible||side==='blue'&&out.capVisible)report.failures.push('incorrect faction headwear');
+                  if(out.diag.leftError>.12||out.diag.rightError>.12)report.failures.push('hands not on actual grips '+side+' '+slot);
+                  if(!Number.isFinite(out.diag.visibleLeftError)||out.diag.visibleLeftError>.12||!Number.isFinite(out.diag.visibleRightError)||out.diag.visibleRightError>.12)
+                    report.failures.push('visible uniform hand does not touch gun '+side+' '+slot+' '+JSON.stringify(out.diag));
+                }
+              }
+              for(const [name,speed,aim] of [['idle',0,0],['jog',3.2,0],['sprint',5.6,0],['aim',0,1]]){
+                const pose=await page.evaluate(([name,speed,aim])=>{
+                  P.side='red';P.wpn=1;P.sv=speed;P.aim=aim;P.aimT=P.g.rotation.y;
+                  for(let i=0;i<40;i++)animateNativeHeroRig(P,P.germanPreview,1/60);
+                  const d=P.germanPreview.nativeRig.weaponDiagnostics;
+                  return {...d};
+                },[name,speed,aim]);
+                report.poses[name]=pose;
+                if(pose.leftError>.12||pose.rightError>.12||pose.weaponId!=='de-mp40')report.failures.push('movement IK '+name);
+              }
+              await page.evaluate(()=>{
+                P.sv=0;P.aim=0;
+                const old=cam.updateMatrixWorld.bind(cam);
+                cam.updateMatrixWorld=function(force){
+                  this.position.set(P.x+2.2,3.6,P.z+5);
+                  this.lookAt(P.x,1.35,P.z);
+                  return old(force);
+                };
+              });
+              for(const [side,slot,tag] of [['red',1,'de-mp40'],['blue',1,'uk-sten'],['red',2,'de-mg42']]){
+                await page.evaluate(([side,slot])=>{
+                  P.side=side;P.wpn=slot;P.sv=0;P.aim=0;
+                  for(let i=0;i<3;i++)animateNativeHeroRig(P,P.germanPreview,1/60);
+                },[side,slot]);
+                await page.waitForTimeout(500);
+                await page.screenshot({path:'/tmp/ww2-weapon-'+tag+'.png'});
+                report.sampleShots.push(tag);
+              }
+              report.success=report.failures.length===0;
+            }catch(e){report.failures.push('exception: '+e.stack)}
+            finally{
+              fs.writeFileSync('/tmp/ww2-weapons-report.json',JSON.stringify(report,null,2));
+              console.log(JSON.stringify(report,null,2));
+              if(browser)await browser.close();
+              if(!report.success)process.exitCode=1;
+            }
+          })();
+          JS
+      - name: Archive render evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ww2-sidecap-weapon-qa
+          path: |
+            /tmp/ww2-weapons-report.json
+            /tmp/ww2-weapon-*.png
+          if-no-files-found: warn
