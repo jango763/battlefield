@@ -14,13 +14,13 @@
 <body>
   <main>
     <h1>Серый наёмник</h1>
-    <p>Открываем обновлённую версию с новой пехотой…</p>
-    <p><a href="./preview/german-v2.html">Запустить игру</a></p>
+    <p>Запускаем утверждённую сборку: черепаха, боевой полукруг и восполнение потерь…</p>
+    <p><a href="./preview/formation-replenishment-v3.html">Запустить игру</a></p>
   </main>
   <script>
-    // The tested infantry build includes the original gameplay and controls.
-    // The previous index.html is preserved in backup-main-before-v2-2026-11-12.
-    const next = new URL('./preview/german-v2.html', document.baseURI);
+    // The approved v3 retains combat rules, magnet recruitment, controls and the visual infantry model.
+    // The previous home-page entry is preserved on backup-before-formation-v3-2026-11-13.
+    const next = new URL('./preview/formation-replenishment-v3.html', document.baseURI);
     next.search = location.search;
     next.hash = location.hash;
     location.replace(next.href);
