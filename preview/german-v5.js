@@ -541,8 +541,13 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
     const localQ=w.support.getWorldQuaternion(new THREE.Quaternion()).invert();
     w.supportPalm.quaternion.copy(localQ.multiply(
       rig.hands.left.hand.getWorldQuaternion(new THREE.Quaternion())));
-    // Position the sculpted palm ahead of the WW2 sleeve's oversized cuff.
-    w.supportPalm.position.set(0,-.035,.115);
+    // The frozen source hand is accurate sculpted geometry, but the reference
+    // skeletal pose is an open grip. Adjust its palm *orientation* relative
+    // to the magazine sleeve; never deform a finger by guesswork.
+    const pose=window.__supportPalmPose||{x:0,y:0,z:0};
+    w.supportPalm.quaternion.multiply(new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(pose.x||0,pose.y||0,pose.z||0,'XYZ')));
+    w.supportPalm.position.set(0,-.028,.10);
     w.supportPalm.visible=(unit.wpn|0)===1;
   }
   vis.updateWorldMatrix(true,true);
@@ -727,20 +732,6 @@ function createNativeSupportPalm(rig){
   const inverse=handBone.matrixWorld.clone().invert();
   const positions=[],vertex=new THREE.Vector3();
   const isLeftHand=name=>/^(?:hand_l|(?:thumb|index|middle|ring|pinky)_(?:0?[1-3])_l)$/i.test(name);
-  // Pose ONLY the native hand fingers into a natural grip for the baked
-  // support mesh. Restore every bone immediately after extraction; the
-  // accepted locomotion, original native skeleton and rifle IK never change.
-  const posed=[];
-  const curlAxis=new THREE.Vector3(1,0,0),curlQ=new THREE.Quaternion();
-  rig.model.traverse(bone=>{
-    if(!bone.isBone)return;
-    const m=bone.name.match(/^(thumb|index|middle|ring|pinky)_0?([1-3])_l$/i);
-    if(!m)return;
-    posed.push({bone,q:bone.quaternion.clone()});
-    const angle=m[1]==='thumb'?(m[2]==='1'?.28:.45):m[2]==='1'?.52:.84;
-    bone.quaternion.multiply(curlQ.setFromAxisAngle(curlAxis,-angle));
-  });
-  rig.model.updateWorldMatrix(true,true);
   for(const mesh of rig.ww2Uniform.originalMeshes){
     const geom=mesh.geometry,idx=geom.getAttribute('skinIndex'),
       weights=geom.getAttribute('skinWeight'),base=geom.getAttribute('position');
@@ -767,9 +758,6 @@ function createNativeSupportPalm(rig){
       }
     }
   }
-  for(const p of posed)p.bone.quaternion.copy(p.q);
-  rig.model.updateWorldMatrix(true,true);
-  for(const source of rig.ww2Uniform.originalMeshes)source.skeleton?.update();
   if(positions.length<450)throw Error('Native glove mesh missing or not baked');
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
