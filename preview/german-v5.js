@@ -1505,10 +1505,15 @@ function createNativeHeroBritishBeret(rig){
   // Close-fitting band, low sloping felt crown with asymmetry to the wearer's right.
   // Sized to the actual 65-bone hero's head, not the WW2 donor's helmet
   // bounding box; the earlier test exaggerated the beret by ~60 percent.
-  add(new THREE.CylinderGeometry(.146,.151,.036,20),brim,[0,.009,0]);
-  add(new THREE.SphereGeometry(1,20,12),felt,[.032,.065,-.002],[.190,.075,.173]);
-  add(new THREE.SphereGeometry(1,16,9),felt,[-.048,.053,.002],[.139,.052,.155]);
-  add(new THREE.BoxGeometry(.039,.052,.011),badge,[-.083,.061,.151]);
+  const bandMesh=add(new THREE.CylinderGeometry(.146,.151,.036,20),brim,[0,.009,0]);
+  bandMesh.name='BritishBeret_Headband';
+  // ONE continuous felt crown. Previously two intersecting sphere meshes
+  // rendered as two stacked red berets on the same head on iPhone.
+  const crown=add(new THREE.SphereGeometry(1,28,16),felt,[.021,.057,-.002],[.184,.071,.168]);
+  crown.name='BritishBeret_SingleFeltCrown';
+  crown.rotation.z=-.08;
+  const insignia=add(new THREE.BoxGeometry(.029,.038,.009),badge,[-.083,.060,.151]);
+  insignia.name='BritishBeret_CapBadge';
   rig.visual.add(beret);
   u.beret=beret;
   u.headwear='British maroon beret';
