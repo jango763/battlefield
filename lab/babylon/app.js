@@ -58,6 +58,36 @@ async function start(){
  state.targetNames=modelTargets.map(n=>n.name).slice(0,25);
  state.sourceNames=all.flatMap(g=>g.targetedAnimations.map(a=>a.target?.name)).filter(Boolean).slice(0,25);
  state.groups=all.map(g=>g.name);state.mappedTracks=counts;
+ // Weapon lab: attach an existing WW2 GLB to the animated right-hand node.
+ // Attachment is intentionally provisional: two-hand IK is a separate validation step.
+ let weaponContainer=null,weaponRoot=null;
+ const weaponSelect=document.querySelector('#weapon');
+ const findHand=()=>modelTargets.find(n=>/^(?:mixamorig[:_])?righthand$/i.test(n.name))||
+  modelTargets.find(n=>/hand[_ .-]?r(?:ight)?$/i.test(n.name));
+ async function equipWeapon(id){
+  if(weaponRoot){weaponRoot.dispose(false,false);weaponRoot=null;}
+  if(weaponContainer){weaponContainer.dispose();weaponContainer=null;}
+  state.weapon=id;state.weaponError=null;
+  try{
+   const url=new URL('../../assets/ww2-weapons/'+id+'.glb',import.meta.url);
+   weaponContainer=await B.SceneLoader.LoadAssetContainerAsync('',url.href,scene);
+   weaponContainer.addAllToScene();
+   const hand=findHand();
+   if(!hand)throw Error('Правая кисть не найдена: '+modelTargets.map(n=>n.name).filter(n=>/hand/i.test(n)).join(', '));
+   weaponRoot=new B.TransformNode('weaponGrip',scene);
+   weaponRoot.parent=hand;
+   // Temporary first-pass grip: original GLB trigger is at local origin.
+   weaponRoot.position.set(0,0,0);
+   weaponRoot.rotationQuaternion=null;
+   weaponRoot.rotation.set(0,Math.PI/2,0);
+   for(const mesh of weaponContainer.meshes.filter(m=>!m.parent))mesh.parent=weaponRoot;
+   for(const node of weaponContainer.transformNodes.filter(n=>!n.parent))node.parent=weaponRoot;
+   state.weaponAttached=true;
+  }catch(e){state.weaponAttached=false;state.weaponError=String(e);console.error('Weapon load',e);}
+  select(state.animation);
+ }
+ weaponSelect.addEventListener('change',()=>equipWeapon(weaponSelect.value));
+ state.equipWeapon=equipWeapon;
  function select(mode){
   state.animation=mode;
   for(const group of Object.values(remapped))group.stop();
@@ -66,7 +96,7 @@ async function start(){
   log('Babylon.js | meshes: '+state.meshes+' | skeletons: '+state.skeletons+' | tracks: '+JSON.stringify(counts)+'\nAnimation: '+mode+' | '+(remapped[mode]?'active':'НЕ ПРИВЯЗАНА — требуется адаптация')+'\nSource groups: '+state.groups.join(', '));
  }
  for(const btn of document.querySelectorAll('[data-clip]'))btn.addEventListener('click',()=>select(btn.dataset.clip));
- select('idle');state.ready=true;state.scene=scene;state.engineInstance=engine;
+ select('idle');await equipWeapon(weaponSelect.value);state.ready=true;state.scene=scene;state.engineInstance=engine;
  engine.runRenderLoop(()=>{scene.render();state.fps=Math.round(engine.getFps());});
  window.addEventListener('resize',()=>engine.resize());
 }
