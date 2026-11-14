@@ -61,6 +61,22 @@ if(process.argv.includes('--browser')){
         assert(early.width>=device.viewport.width-2&&early.height>=device.viewport.height-2,
           'Startup hero mask does not fully cover viewport: '+JSON.stringify(early));
         assert(early.isOpaque,'Provisional hero is visible behind transparent mask');
+        // Check the exact window the user complained about: Panzergrenadier
+        // donor has already appeared, but Quaternius is still loading.
+        await page.waitForFunction(()=>{
+          try{return typeof P!=='undefined'&&!!P.germanPreview&&
+            !P.germanPreview.nativeRig}
+          catch(e){return false}
+        },null,{timeout:30000});
+        const middle=await page.evaluate(()=>{
+          const cover=document.getElementById('hero-startup-cover');
+          return {phase:window.__heroStartupGate?.phase,provisionalModel:!!P.germanPreview?.figure,
+            covered:!!cover&&getComputedStyle(cover).opacity==='1'&&
+              getComputedStyle(cover).pointerEvents!=='none'};
+        });
+        assert.equal(middle.phase,'loading','Started final display too early');
+        assert(middle.provisionalModel&&middle.covered,
+          'Panzergrenadier flashed before approved native rig: '+JSON.stringify(middle));
         await page.waitForFunction(()=>window.__heroStartupGate?.phase==='native'||
           window.__heroStartupGate?.phase==='fallback',null,{timeout:120000});
         await page.waitForTimeout(270);
@@ -88,6 +104,33 @@ if(process.argv.includes('--browser')){
         await page.screenshot({path:'/tmp/startup-'+device.name+'-native.png'});
         console.log('HERO_STARTUP_BROWSER_PASS',device.name,JSON.stringify({early,ready}));
         await context.close();
+      }
+      // German faction must receive the agreed Feldgrau headwear and Kar98k
+      // before any intermediate soldier can be exposed.
+      {
+        const page=await browser.newPage({viewport:{width:1000,height:720}});
+        const errors=[];
+        page.on('pageerror',e=>{if(!/No parent to post message/.test(e.message))errors.push(e.message)});
+        await page.goto(
+          'http://127.0.0.1:8777/preview/formation-replenishment-v3.html?inspect=german',
+          {waitUntil:'domcontentloaded',timeout:45000});
+        await page.waitForFunction(()=>window.__heroStartupGate?.phase==='native'||
+          window.__heroStartupGate?.phase==='fallback',null,{timeout:120000});
+        const german=await page.evaluate(()=>({
+          phase:window.__heroStartupGate.phase,
+          cover:!!document.getElementById('hero-startup-cover'),
+          side:P.side,
+          gun:P.germanPreview?.nativeRig?.weapon?.activeModelId,
+          hat:P.germanPreview?.nativeRig?.ww2Uniform?.headwear
+        }));
+        assert.equal(german.phase,'native','German hero startup fell back: '+JSON.stringify(german));
+        assert.equal(german.side,'red');
+        assert.equal(german.gun,'de-kar98k');
+        assert(!german.cover||german.phase==='native');
+        assert(german.hat&&german.hat!=='none','German headwear incomplete: '+JSON.stringify(german));
+        assert.equal(errors.length,0,'German hero startup JS errors');
+        console.log('HERO_STARTUP_GERMAN_PASS',JSON.stringify(german));
+        await page.close();
       }
       // Forced early failure: show stable original hero, never accept a late
       // async native rig and never leave the user on a permanent blank screen.
