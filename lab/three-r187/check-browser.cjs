@@ -48,6 +48,10 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
    assert(data.report.dual.donorBones>=50,'missing actual WW2 Mixamo skeleton');
    assert(data.report.dual.matchedBones>=48,'bind-name map incomplete');
    assert(data.report.single.sourceBones>=60,'baseline source skeleton missing');
+   assert(data.report.single.left.wristToGrip<.07&&data.report.single.right.wristToGrip<.07,
+     'first visible native skeleton not posed before ready: '+JSON.stringify(data.report.single));
+   assert(data.report.dual.left.wristToGrip<.12&&data.report.dual.right.wristToGrip<.12,
+     'first visible costume skeleton not posed before ready: '+JSON.stringify(data.report.dual));
    for(const side of ['left','right']){
      const one=data.report.single[side],two=data.report.dual[side];
      for(const item of [one,two]){
@@ -58,7 +62,17 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
    }
    console.log('R187_STARTUP_PASS',viewport.name,JSON.stringify(data.report));
    await page.screenshot({path:'/tmp/r187-'+viewport.name+'-uk-idle.png'});
-   await page.evaluate(()=>window.__rigLab.setState({side:'red',weapon:'smg',animation:'jog'}));
+   await page.evaluate(()=>window.__rigLab.setState({
+     side:'blue',weapon:'smg',animation:'idle',retarget:'project',aim:true
+   }));
+   await page.locator('#handsCam').click();
+   await page.waitForTimeout(550);
+   let closeup=await page.evaluate(()=>window.__rigLab.getReport());
+   assert(closeup.dual.left.wristToGrip<.16&&closeup.dual.right.wristToGrip<.16,
+     'aiming costume wrists detached '+JSON.stringify(closeup.dual));
+   await page.screenshot({path:'/tmp/r187-'+viewport.name+'-uk-aim-hands-close.png'});
+   await page.locator('#resetCam').click();
+   await page.evaluate(()=>window.__rigLab.setState({side:'red',weapon:'smg',animation:'jog',aim:false}));
    await page.waitForTimeout(800);
    data=await page.evaluate(()=>window.__rigLab.getReport());
    assert.equal(data.loadedWeapon,'de-mp40');
