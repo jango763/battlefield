@@ -63,6 +63,17 @@ if(process.argv.includes('--browser')){
             const type=skin.name.replace('MusterSkinned_','');
             influences[type]=attr.count;
           }
+          // Source WWII gaiter straps must belong to calves, never torso kit.
+          for(const side of ['l','r']){
+            const gaiter=s.skinnedMeshes.find(m=>
+              m.name==='MusterSkinned_legwear-strap-'+side);
+            if(!gaiter)throw Error('Muster gaiter part missing: '+side);
+            const indices=gaiter.geometry.getAttribute('skinIndex');
+            const weights=gaiter.geometry.getAttribute('skinWeight');
+            const intended=r.names.indexOf('calf_'+side);
+            if(indices.getX(0)!==intended||weights.getX(0)<.99)
+              throw Error('Gaiter not bound to calf_'+side);
+          }
           return{
             ready:s.ready,error:s.error,parts:r.parts,vertices:r.vertices,
             triangles:r.triangles,boneNames:r.names,skinMeshes:s.skinnedMeshes.length,
