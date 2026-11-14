@@ -1105,7 +1105,7 @@ function loadNativeHeroSideCap(rig){
   // ?pilotka=classic retains the old source mesh for A/B inspection.
   if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
     const cap=new THREE.Group();
-    cap.name='GermanPilotka_HeadTracked_V17';
+    cap.name='GermanPilotka_HeadTracked_V18';
     cap.userData.proceduralPilotka=true;
     // Narrow cloth Schiffchen silhouette, not an inflated beret.
     // Five cross-sections follow the scalp, with a pointed folded crest.
@@ -1140,12 +1140,12 @@ function loadNativeHeroSideCap(rig){
     const stations=[
       // Lift only the crown and shoulder panels above the hair volume.
       // The face band and side widths remain exactly as in approved V16.
-      {z:-.194,w:.054,b:.180,s:.255,t:.267},
-      {z:-.134,w:.112,b:.166,s:.266,t:.307},
-      {z:-.062,w:.141,b:.162,s:.269,t:.329},
-      {z:.062,w:.141,b:.162,s:.269,t:.329},
-      {z:.134,w:.112,b:.166,s:.266,t:.307},
-      {z:.194,w:.054,b:.180,s:.255,t:.267}
+      {z:-.194,w:.054,b:.180,s:.251,t:.260},
+      {z:-.134,w:.112,b:.166,s:.258,t:.292},
+      {z:-.062,w:.141,b:.162,s:.261,t:.313},
+      {z:.062,w:.141,b:.162,s:.261,t:.313},
+      {z:.134,w:.112,b:.166,s:.258,t:.292},
+      {z:.194,w:.054,b:.180,s:.251,t:.260}
     ];
     // Bring the German sidecap 15% closer to the temples. Leave its
     // front-to-back length and height untouched to keep the scalp covered.
@@ -1197,7 +1197,7 @@ function loadNativeHeroSideCap(rig){
       cap.add(new THREE.Mesh(geo,sideCloth));
     }
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German head-following Schiffchen V17';
+    u.cap=cap;u.headwear='German head-following Schiffchen V18';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
