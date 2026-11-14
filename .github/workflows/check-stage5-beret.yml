@@ -6,6 +6,8 @@ on:
       - 'preview/german-v5.js'
       - 'preview/formation-replenishment-v3.html'
       - 'tools/infantry-v2/test-stage5-beret.cjs'
+      - 'tools/infantry-v2/test-stage4-british-hero.cjs'
+      - 'tools/infantry-v2/test-stage2-startup.cjs'
       - '.github/workflows/check-stage5-beret.yml'
   workflow_dispatch:
 permissions:
