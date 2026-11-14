@@ -60,7 +60,8 @@ async function start(){
  state.groups=all.map(g=>g.name);state.mappedTracks=counts;
  function select(mode){
   state.animation=mode;
-  for(const group of Object.values(remapped))group.stop();\n  if(remapped[mode])remapped[mode].start(true,1,remapped[mode].from,remapped[mode].to,false);
+  for(const group of Object.values(remapped))group.stop();
+  if(remapped[mode])remapped[mode].start(true,1,remapped[mode].from,remapped[mode].to,false);
   for(const btn of document.querySelectorAll('[data-clip]'))btn.setAttribute('aria-pressed',String(btn.dataset.clip===mode));
   log('Babylon.js | meshes: '+state.meshes+' | skeletons: '+state.skeletons+' | tracks: '+JSON.stringify(counts)+'\nAnimation: '+mode+' | '+(remapped[mode]?'active':'НЕ ПРИВЯЗАНА — требуется адаптация')+'\nSource groups: '+state.groups.join(', '));
  }
