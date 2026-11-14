@@ -51,11 +51,18 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
        sameSkeleton:p.skinMeshes.length>0 && p.skinMeshes.every(m=>
          m.isSkinnedMesh && m.skeleton===p.oneRigRig &&
          m.skeleton.bones.every(b=>source.has(b))),
-       weaponReady:!!p.weapon
+       weaponReady:!!p.weapon,
+       sceneBones:(()=>{let n=0;p.native.traverse(x=>{if(x.isBone)n++});return n})(),
+       uniqueSkinBones:new Set(p.skinMeshes.flatMap(m=>m.skeleton.bones)).size,
+       sharedBoneReferences:p.skinMeshes.every(m=>m.skeleton.bones.length===p.skinMeshes[0].skeleton.bones.length
+         && m.skeleton.bones.every((b,i)=>b===p.skinMeshes[0].skeleton.bones[i])),
+       skins:p.skinMeshes.map(m=>({name:m.name,bones:m.skeleton.bones.length,
+         first:m.skeleton.bones[0]?.name,root:m.skeleton.bones[0]?.parent?.name}))
      };
    });
    assert(!one.error,'one-rig panel missing: '+one.error);
    assert(!one.hasDonor,'Mixamo donor rig still drives clothes');
+   console.log('ONE_RIG_BONE_DIAGNOSTIC',config.name,JSON.stringify(one));
    assert(one.sameSkeleton,'costume must be bound to one original WW2 armature');
    assert.equal(one.clothingMeshes,2,'missing visible Panzergrenadier skinned meshes');
    assert(one.stats?.remappedBoneEntries>=35,'too few native bone remappings');
