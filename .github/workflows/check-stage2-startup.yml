@@ -1,0 +1,36 @@
+name: Stage 2 stable first-frame hero QA
+on:
+  push:
+    branches: [feature/roadmap-15-stages-20261114]
+    paths:
+      - 'preview/german-v5.js'
+      - 'preview/formation-replenishment-v3.html'
+      - 'tools/infantry-v2/test-stage2-startup.cjs'
+      - '.github/workflows/check-stage2-startup.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  first-frame:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JavaScript and startup fallback guards
+        run: node tools/infantry-v2/test-stage2-startup.cjs
+      - name: Prepare Chromium for browser regression
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage2-qa playwright@1.58.2
+          /tmp/stage2-qa/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify the first visible hero pose and existing controls on desktop/mobile
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/stage2-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-stage2-startup.cjs --browser
+      - name: Save visual verification screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage2-first-frame-screenshots
+          path: /tmp/stage2-*.png
+          if-no-files-found: warn
