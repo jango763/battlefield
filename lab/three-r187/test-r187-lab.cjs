@@ -45,7 +45,13 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
     'not measuring actual skinned left glove vertices');
    assert(startup.report?.dual?.right?.sampledVisibleVertices>30,
     'not measuring actual skinned right glove vertices');
-   console.log('R187 LAB STARTUP PASS',config.name,JSON.stringify(startup.report));
+   // Initial metrics may be sampled before the first IK pose; inspect a settled frame.
+   await page.waitForTimeout(1200);
+   const settled=await page.evaluate(()=>window.__rigLab.stats);
+   console.log('R187 LAB SETTLED IDLE',config.name,JSON.stringify(settled));
+   assert(Number.isFinite(settled?.dual?.left?.closestVertexToGrip));
+   assert(Number.isFinite(settled?.dual?.right?.closestVertexToGrip));
+   console.log('R187 LAB STARTUP PASS',config.name,JSON.stringify(settled));
    await page.screenshot({path:'/tmp/r187-lab-'+config.name+'-blue-idle.png'});
    await page.locator('#focusDual').click();
    await page.waitForTimeout(160);
@@ -56,9 +62,11 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
    await page.locator('#resetCam').click();
    const checks=[
      {side:'blue',weapon:'smg',animation:'jog',retarget:'project',snap:'blue-jog'},
-     {side:'blue',weapon:'rifle',animation:'idle',retarget:'rotation',snap:'blue-rifle'},
+     {side:'blue',weapon:'rifle',animation:'idle',retarget:'rotation',snap:'blue-rifle-rotation'},
+     {side:'blue',weapon:'rifle',animation:'idle',retarget:'project',snap:'blue-rifle-project'},
      {side:'red',weapon:'smg',animation:'idle',retarget:'project',snap:'red-idle'},
-     {side:'red',weapon:'mg',animation:'sprint',retarget:'rotation',snap:'red-mg'}
+     {side:'red',weapon:'mg',animation:'sprint',retarget:'rotation',snap:'red-mg-rotation'},
+     {side:'red',weapon:'mg',animation:'sprint',retarget:'project',snap:'red-mg-project'}
    ];
    for(const x of checks){
      await page.evaluate(async x=>window.__rigLab.setState(x),x);
@@ -75,6 +83,14 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
        'left glove surface missing '+JSON.stringify(stat));
      assert(Number.isFinite(stat.dual.right.surfaceToGrip),
        'right glove surface missing '+JSON.stringify(stat));
+     // A passing loader is not a passing grip: validate visible skinned mesh surface.
+     if(x.retarget==='project'){
+       for(const hand of ['left','right']){
+         const distance=stat.dual[hand].closestVertexToGrip;
+         assert(Number.isFinite(distance)&&distance<0.25,
+           'visible '+hand+' hand misses '+x.snap+' grip by '+distance+' scene units');
+       }
+     }
      await page.screenshot({path:'/tmp/r187-lab-'+config.name+'-'+x.snap+'.png'});
      console.log('R187 LAB VARIANT PASS',config.name,x.snap,
        JSON.stringify({weapon:stat.loadedWeapon,
