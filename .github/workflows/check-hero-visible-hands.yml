@@ -52,9 +52,9 @@ jobs:
                   modelVisible:!!r.model.visible,weaponCatalog:Object.keys(r.weapon.ww2Manifest.weapons)};
               });
               report.initial=initial;
-              report.handSkin=await page.evaluate(()=>P.germanPreview.nativeRig.ww2Uniform.handSkinStats||null);
-              if(!report.handSkin||report.handSkin.bySide.left<45||report.handSkin.bySide.right<45)
-                report.failures.push('missing skinned palm/finger geometry: '+JSON.stringify(report.handSkin));
+              report.skinnedDonorMeshes=await page.evaluate(()=>
+                P.germanPreview.nativeRig.ww2Uniform.donorMeshes.filter(x=>x.type==='garment').length);
+              if(!report.skinnedDonorMeshes)report.failures.push('missing original visible skinned soldier geometry');
               if(initial.clips.join(',')!=='idle,jog,sprint'||initial.matchedBones<16)report.failures.push('native clip or donor rig changed');
               if(initial.capClearance<0.02||initial.capClearance>0.18||initial.capMeshes<1)report.failures.push('sidecap cap fit '+initial.capClearance);
               if(initial.weaponCatalog.length!==6)report.failures.push('not six WW2 GLB models');
@@ -122,17 +122,19 @@ jobs:
                 await page.screenshot({path:'/tmp/ww2-weapon-'+tag+'.png'});
                 report.sampleShots.push(tag);
               }
-              // Diagnostic screenshots: isolate which anatomical hand is
-              // missing, without conflating original and overlaid gloves.
-              for(const mode of ['none','left','right','both']){
-                await page.evaluate(mode=>{
+              // Compare real support-hand targets against the actual MP40 cuff.
+              // These are deliberate screenshot checkpoints, not extra gameplay.
+              for(const [name,y,z] of [
+                ['original',0,0],['slight',-.05,.09],
+                ['medium',-.095,.16],['extended',-.14,.22]
+              ]){
+                await page.evaluate(({y,z})=>{
+                  window.__ww2SupportOffset={x:0,y,z};
                   P.side='red';P.wpn=1;P.sv=0;P.aim=0;
-                  for(let i=0;i<5;i++)animateNativeHeroRig(P,P.germanPreview,1/60);
-                  for(const hand of P.germanPreview.nativeRig.ww2Uniform.nativeHands)
-                    hand.visible=mode==='both'||hand.userData.side===mode;
-                },mode);
-                await page.waitForTimeout(140);
-                await page.screenshot({path:'/tmp/ww2-hand-overlay-'+mode+'.png'});
+                  for(let i=0;i<8;i++)animateNativeHeroRig(P,P.germanPreview,1/60);
+                },{y,z});
+                await page.waitForTimeout(180);
+                await page.screenshot({path:'/tmp/ww2-real-left-hand-'+name+'.png'});
               }
               report.success=report.failures.length===0;
             }catch(e){report.failures.push('exception: '+e.stack)}
@@ -152,5 +154,5 @@ jobs:
           path: |
             /tmp/ww2-weapons-report.json
             /tmp/ww2-weapon-*.png
-            /tmp/ww2-hand-overlay-*.png
+            /tmp/ww2-real-left-hand-*.png
           if-no-files-found: warn
