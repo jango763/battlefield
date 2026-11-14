@@ -48,7 +48,7 @@ function installWehrmachtVisualIdentity(rig){
   const kit={type,parts:[],meshNames:[],meshes:0,lowDetail:true};
   const donor=u.donor,visual=rig.visual;
   const boneMap=new Map();
-  donor.traverse(n=>{if(n.isBone)boneMap.set(n.name.replace(/_\d+$/,''),n);});
+  donor.traverse(n=>{if(n.isBone)boneMap.set(n.name.replace(/_\d+$/,'').replace(/^mixamorig[:_]?/i,''),n);});
   visual.updateWorldMatrix(true,true);
   const chest=boneMap.get('Spine2'),hip=boneMap.get('Hips');
   if(!chest||!hip)throw new Error('WW2 identity needs animated Spine2 and Hips bones');
