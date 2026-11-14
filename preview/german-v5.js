@@ -950,11 +950,11 @@ function updateNativeHeroFieldUniform(rig){
       const nativeQ=rig.hands[side].hand.getWorldQuaternion(new THREE.Quaternion());
       handLocalQ[side]=invSpaceQ.clone().multiply(nativeQ)
         .multiply(uniform.donorHandBindOffsets[side]);
-      // Transient diagnostics only; will be replaced by the accepted fixed
-      // wrist offset before publishing. Does not change the gun grip targets.
-      const test=window.__ww2WristProbe?.[side];
-      if(test)handLocalQ[side].multiply(new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(test[0]||0,test[1]||0,test[2]||0,'XYZ')));
+      // Keep the grip point fixed and turn the *costume wrist* inward around
+      // its local roll axis. A nine-pose close-up comparison found the old
+      // exposed palm orientation had been visibly twisted outwards.
+      handLocalQ[side].multiply(new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0,0,1),-.85));
     }
     const local=bone=>vis.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
     const right=local(arms.right.upper),left=local(arms.left.upper);
@@ -1024,7 +1024,7 @@ function createNativeHeroBritishBeret(rig){
   if(!u?.headBone||u.beret)return;
   const beret=new THREE.Group();
   beret.name='WW2_British_Maroon_Beret';
-  const felt=new THREE.MeshLambertMaterial({color:0x902c3a,side:THREE.DoubleSide});
+  const felt=new THREE.MeshLambertMaterial({color:0x801a2d,side:THREE.DoubleSide});
   const brim=new THREE.MeshLambertMaterial({color:0x3d2428});
   const badge=new THREE.MeshLambertMaterial({color:0xc4b58c});
   const add=(geo,mat,pos,scale)=>{
