@@ -1100,14 +1100,29 @@ function loadNativeHeroSideCap(rig){
     const sideCloth=new THREE.MeshLambertMaterial({color:0x435049,side:THREE.DoubleSide});
     const edge=new THREE.MeshLambertMaterial({color:0x36433e,side:THREE.DoubleSide});
     const seam=new THREE.MeshLambertMaterial({color:0x6b766d,side:THREE.DoubleSide});
-    // Continuous opaque cloth liner prevents the bald head mesh from
-    // showing through gaps between the folded top and the side panels.
-    // The structural Schiffchen folds remain above this underlayer.
-    const liner=new THREE.Mesh(new THREE.SphereGeometry(1,28,18),cloth);
-    liner.name='Pilotka_Opaque_Crown';
-    liner.scale.set(.150,.056,.196);
-    liner.position.set(0,.231,-.006);
-    liner.castShadow=true;liner.receiveShadow=true;cap.add(liner);
+    // A thin inner liner stays beneath the folded cap, not a rounded beret.
+    const liner=new THREE.Mesh(new THREE.SphereGeometry(1,22,14),cloth);
+    liner.name='Pilotka_Interior_Liner';
+    liner.scale.set(.138,.038,.176);liner.position.set(0,.219,-.006);
+    liner.castShadow=true;cap.add(liner);
+    // The front-facing fabric strip blocks bald scalp triangles in the cap
+    // opening. A 2D curved panel fixes the gap without inflating the crown.
+    const facing=[];
+    const steps=28;
+    for(let i=0;i<steps;i++){
+      const theta0=-1.32+(2.64*i/steps),theta1=-1.32+(2.64*(i+1)/steps);
+      const point=(a,y)=>[.164*Math.sin(a),y,.221*Math.cos(a)+.003];
+      const v0=point(theta0,.157),v1=point(theta1,.157),
+        w0=point(theta0,.244),w1=point(theta1,.244);
+      facing.push(...v0,...v1,...w1,...v0,...w1,...w0);
+    }
+    const frontGeo=new THREE.BufferGeometry();
+    frontGeo.setAttribute('position',new THREE.Float32BufferAttribute(facing,3));
+    frontGeo.computeVertexNormals();
+    const frontBand=new THREE.Mesh(frontGeo,sideCloth);
+    frontBand.name='Pilotka_ForeheadFacing';
+    frontBand.castShadow=true;frontBand.receiveShadow=true;
+    cap.add(frontBand);
     const stations=[
       {z:-.194,w:.054,b:.180,s:.250,t:.258},
       {z:-.134,w:.112,b:.166,s:.256,t:.296},
