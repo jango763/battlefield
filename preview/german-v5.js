@@ -1520,6 +1520,9 @@ function loadNativeHeroSideCap(rig){
   // Never allocate an invisible UK beret for every German army soldier.
   if(!rig.armyUnit||rig.armyUnit.t==='blue'&&rig.armyHeadwearChoice==='beret')
     createNativeHeroBritishBeret(rig);
+  // British regulars use their independent helmet GLB; the captain's beret
+  // occupies the head slot. Never allocate a hidden German Schiffchen here.
+  if(rig.armyUnit?.t==='blue')return;
   // The imported Soviet sidecap is shallow and sits across the forehead on
   // this head rig; simply rescaling it never covered the rear scalp. Use a
   // close-fitting, head-tracked geometry for the German pilotka by default.
