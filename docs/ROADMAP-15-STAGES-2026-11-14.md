@@ -60,3 +60,11 @@
 - QA: [GitHub Actions run 43628430094](https://github.com/jango763/battlefield/actions/runs/43628430094) — проходит в desktop/mobile Chromium; скриншоты из прогона просмотрены, размер улучшился. Это не приёмка пользователем и не реальный iPhone Safari.
 - Известный предел прежней модели: в длительном беге ошибка захвата кисти около 0.177 м, отдельный пункт 8 — **не считать решённым**.
 - Этап 5 целиком остаётся открытым: согласовать британский берет визуально и закончить немецкую тёмно-оливковую вязаную шапку с подворотом. Не переносить непроверенное в `main`.
+
+## British beret visual iteration (2026-11-14)
+- User screenshot showed an oversized rigid-looking overhang and too-high exposed forehead. No approval for merging stage 5 into main yet.
+- New preview: `airborne-soft-fitted-v5`, branch `feature/stage5-beret-fit-20261114`.
+- Adjustments: narrower single-piece felt crown (local width 0.313 vs earlier ~0.380), less lateral projection, higher dome to clear scalp after earlier v4 clipping, close-fit band and head-delta animation.
+- Chromium desktop/mobile: [run 43629296614](https://github.com/jango763/battlefield/actions/runs/43629296614) passed. Screenshot artifact: [stage5 beret inspection](https://github.com/jango763/battlefield/actions/runs/43629296614/artifacts/14126489386).
+- Remaining: the British tunic appears too pale/near-white in actual screenshot; grip error under jogging is ~0.177 m and needs separate arm/weapon IK work in stage 8. Real iPhone Safari not yet validated.
+- Status: awaiting visual approval, `main` unchanged. Do not mark whole stage 5 complete: German knitted cap also remains.
