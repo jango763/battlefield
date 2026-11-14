@@ -15,7 +15,7 @@ for(const required of [
   'BritishBeretCloseFitBand',
   'BritishBeretSubtleFeltFold',
   'BritishBeretSmallInsignia',
-  "beret.userData.profile='airborne-soft-slouch-v3'",
+  "beret.userData.profile='airborne-soft-fitted-v4'",
   'beret.userData.bindHeadLocalQ=headLocal.clone()',
   "beret.position.y+=.184",
   'beret.quaternion.copy(headLocal)',
@@ -23,7 +23,7 @@ for(const required of [
 ])assert(source.includes(required),'beret redesign missing '+required);
 assert(!source.includes("add(new THREE.SphereGeometry(1,20,12),felt"),
   'old giant cartoon crown still present');
-assert(wrapper.includes('stage5-beret-r2'),'game cache still selects outdated beret');
+assert(wrapper.includes('stage5-beret-r4'),'game cache still selects outdated beret');
 console.log('STAGE 5 STATIC PASS: low crown, head-bone delta and no old double-sphere');
 
 if(process.argv.includes('--browser')){
@@ -100,7 +100,7 @@ if(process.argv.includes('--browser')){
         });
         console.log('STAGE 5 GEOMETRY + MOTION DIAGNOSTICS',device.name,JSON.stringify(data));
         assert.equal(data.headwearName,'WW2_British_Maroon_Beret');
-        assert.equal(data.profile,'airborne-soft-slouch-v3');
+        assert.equal(data.profile,'airborne-soft-fitted-v4');
         assert(data.headwearVisible&&data.britishHeroRestoresBeret&&data.germanHeroHidesBeret);
         for(const piece of ['BritishBeretOnePieceFeltCrown','BritishBeretCloseFitBand',
           'BritishBeretSmallInsignia','BritishBeretSubtleFeltFold'])
@@ -108,7 +108,7 @@ if(process.argv.includes('--browser')){
         assert.equal(data.oldMeshes,0,'cartoon-sphere geometry persisted');
         assert(data.geometryBounds[0]<.45&&data.geometryBounds[0]>.25,
           'beret crown too wide '+data.geometryBounds[0]);
-        assert(data.geometryBounds[1]<.19&&data.geometryBounds[1]>.04,
+        assert(data.geometryBounds[1]<.12&&data.geometryBounds[1]>.04,
           'beret crown too high '+data.geometryBounds[1]);
         assert(data.boneDeltaApplied&&data.beretFaceDoesNotTwist&&data.updatedAfterRun,
           'head-bone orientation is wrong '+JSON.stringify(data));
