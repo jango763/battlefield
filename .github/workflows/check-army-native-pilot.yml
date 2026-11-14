@@ -1,7 +1,7 @@
 name: Army native animation pilot (one German infantryman)
 on:
   push:
-    branches: [feature/headwear-staged-hero-armies-20261114]
+    branches: [feature/infantry-weapon-grip-v1-20261114]
     paths:
       - preview/german-v5.js
       - preview/formation-replenishment-v3.html
@@ -168,6 +168,47 @@ jobs:
                 await page.waitForTimeout(700);
                 await page.screenshot({path:'/tmp/army-native-'+name+'.png'});
               }
+              // Isolated weapon checks using the same WW2 skinned soldier
+              // (the gameplay unit itself is not recreated or changed in git).
+              result.weaponGrip={};
+              for(const [role,key] of [['rf','de-kar98k'],['smg','de-mp40'],['mg','de-mg42']]){
+                await page.evaluate(type=>{
+                  const u=germanPreview.armyPilotUnit;
+                  delete u.sv;
+                  u.type=type;u.aim=1;u.aimT=u.g.rotation.y;
+                  for(let i=0;i<16;i++)animateGermanSoldier(u,1/60);
+                },role);
+                await page.waitForFunction(key=>{
+                  try{return germanPreview.armyPilotUnit.germanPreview.nativeRig.weapon.activeModelId===key;}catch(e){return false}
+                },key,{timeout:45000});
+                const check=await page.evaluate(()=>{
+                  const u=germanPreview.armyPilotUnit,r=u.germanPreview.nativeRig;
+                  for(let i=0;i<22;i++)animateGermanSoldier(u,1/60);
+                  return {
+                    id:r.weapon.activeModelId,
+                    pose:r.weaponDiagnostics?.armyFingerPose,
+                    fingerCount:r.ww2Uniform?.donorFingers?.length,
+                    duplicatePalm:!!r.weapon.supportPalm?.visible,
+                    targetRight:r.weaponDiagnostics?.rightError,
+                    targetLeft:r.weaponDiagnostics?.leftError,
+                    visibleRight:r.weaponDiagnostics?.visibleRightError,
+                    visibleLeft:r.weaponDiagnostics?.visibleLeftError
+                  };
+                });
+                result.weaponGrip[role]=check;
+                if(check.id!==key||check.pose!==(role==='rf'?'rifle':role)||
+                  check.fingerCount<24||check.duplicatePalm||
+                  !Number.isFinite(check.visibleRight)||check.visibleRight>.12||
+                  !Number.isFinite(check.visibleLeft)||check.visibleLeft>.12)
+                  result.errors.push('unacceptable grip '+role+' '+JSON.stringify(check));
+                await page.evaluate(()=>{
+                  const u=germanPreview.armyPilotUnit;
+                  window.__qaCamOffset=[2.25,2.42,2.55];
+                  u.aim=1;u.kick=0;
+                });
+                await page.waitForTimeout(350);
+                await page.screenshot({path:'/tmp/army-grip-'+role+'.png'});
+              }
               result.success=result.errors.length===0;
             }catch(e){result.errors.push('exception '+e.stack)}
             finally{
@@ -192,4 +233,7 @@ jobs:
             /tmp/army-native-left.png
             /tmp/army-native-idle.png
             /tmp/army-native-running.png
+            /tmp/army-grip-rf.png
+            /tmp/army-grip-smg.png
+            /tmp/army-grip-mg.png
           if-no-files-found: warn
