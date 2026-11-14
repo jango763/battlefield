@@ -987,13 +987,13 @@ function updateNativeHeroFieldUniform(rig){
       // Preserve the index finger near the trigger; close the other German
       // gripping fingers around the pistol grip instead of displaying a claw.
       const germanTrigger=uniform.side==='red'&&entry.hand==='right';
-      const adjusted=germanTrigger&&entry.digit!=='Index'?angle*1.24:angle;
+      const adjusted=germanTrigger?(entry.digit==='Index'?angle*1.40:angle*1.24):angle;
       entry.bone.quaternion.multiply(grasp.setFromAxisAngle(axis,adjusted));
       // The donor thumb points sideways in the mobile close-up. Fold its base
       // towards the palm rather than twisting the whole wrist again.
       if(germanTrigger&&entry.digit==='Thumb'&&entry.segment===1){
         entry.bone.quaternion.multiply(
-          grasp.setFromAxisAngle(new THREE.Vector3(0,0,1),-.42));
+          grasp.setFromAxisAngle(new THREE.Vector3(0,0,1),-.85));
       }
       entry.bone.updateWorldMatrix(false,true);
     }
@@ -1010,6 +1010,10 @@ function updateNativeHeroFieldUniform(rig){
     cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
     const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
     cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
+    // The donor Mixamo head-bone axes include a large bind rotation; applying
+    // it directly to a native-Y-up procedural hat tips the whole pilotka
+    // sideways. The hero visual group already follows body heading.
+    if(cap.userData.proceduralPilotka)cap.quaternion.identity();
     // Source geometry already includes its scalp/ridge height.
     // Donor head pivot is much lower than the visible hairline. Raise the
     // sidecap from eyebrow level onto the crown.
