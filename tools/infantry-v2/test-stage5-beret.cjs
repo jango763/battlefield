@@ -98,6 +98,7 @@ if(process.argv.includes('--browser')){
           values.noHelmetOverlap=uniform.donorMeshes.every(m=>m.type!=='headgear'||!m.mesh.visible);
           return values;
         });
+        console.log('STAGE 5 GEOMETRY + MOTION DIAGNOSTICS',device.name,JSON.stringify(data));
         assert.equal(data.headwearName,'WW2_British_Maroon_Beret');
         assert.equal(data.profile,'airborne-soft-slouch-v2');
         assert(data.headwearVisible&&data.britishHeroRestoresBeret&&data.germanHeroHidesBeret);
