@@ -888,7 +888,7 @@ function updateNativeHeroFieldUniform(rig){
     // Source geometry already includes its scalp/ridge height.
     // Donor head pivot is much lower than the visible hairline. Raise the
     // sidecap from eyebrow level onto the crown.
-    cap.position.y+=.190;
+    cap.position.y+=.115;
     cap.position.add(new THREE.Vector3(0,0,.028).applyQuaternion(cap.quaternion));
   }
 }
