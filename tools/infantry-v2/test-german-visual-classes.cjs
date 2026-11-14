@@ -91,7 +91,10 @@ if(process.argv.includes('--browser')){
               headwear:r.armyHeadwearChoice||uniform.headwear,
               capName:uniform.cap?.name||null,
               officerInsignia:(uniform.cap?.children||[]).filter(x=>
-                x.name?.startsWith('OfficerCap')).length,
+                x.name?.startsWith('OfficerCap')&&
+                !['OfficerCapShortCurvedVisor','OfficerCapVisorSeam'].includes(x.name)).length,
+              officerVisor:(uniform.cap?.children||[]).filter(x=>
+                x.name==='OfficerCapShortCurvedVisor').length,
               weapon:r.weapon?.activeModelId,
               tint,skinnedClothing:uniform.donorMeshes.filter(x=>x.type==='garment'&&x.mesh.isSkinnedMesh).length,
               nativeSkeleton:r.model?.children?.length>0,
@@ -125,6 +128,8 @@ if(process.argv.includes('--browser')){
           'Officer may not use the unfitted, scalp-clipping M43 GLB');
         assert.equal(captain.officerInsignia,2,
           'German captain lacks separate metallic insignia');
+        assert.equal(captain.officerVisor,1,
+          'German captain lacks curved visor');
         assert(new Set(result.soldiers.map(x=>JSON.stringify(x.tint))).size>=5,
           'All German uniforms have the same color');
         assert(new Set(result.soldiers.map(x=>x.headwear)).size>=3,
