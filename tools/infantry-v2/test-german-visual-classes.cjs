@@ -89,6 +89,9 @@ if(process.argv.includes('--browser')){
               class:r.ww2VisualClass,kitType:kit.type,meshes:kit.meshes,
               meshNames:kit.meshNames,visibleMeshCount,
               headwear:r.armyHeadwearChoice||uniform.headwear,
+              capName:uniform.cap?.name||null,
+              officerInsignia:(uniform.cap?.children||[]).filter(x=>
+                x.name?.startsWith('OfficerCap')).length,
               weapon:r.weapon?.activeModelId,
               tint,skinnedClothing:uniform.donorMeshes.filter(x=>x.type==='garment'&&x.mesh.isSkinnedMesh).length,
               nativeSkeleton:r.model?.children?.length>0,
@@ -116,6 +119,12 @@ if(process.argv.includes('--browser')){
           'Accessory gear or skeleton missing: '+JSON.stringify(result));
         assert(result.hero.meshes>=5&&result.hero.skinnedClothing>0,
           'Hero is still an undifferentiated regular infantryman');
+        const captain=result.soldiers.find(x=>x.class==='captain');
+        assert.equal(captain.headwear,'officer-cap');
+        assert.equal(captain.capName,'GermanOfficerFieldSidecap_HeadTracked',
+          'Officer may not use the unfitted, scalp-clipping M43 GLB');
+        assert.equal(captain.officerInsignia,2,
+          'German captain lacks separate metallic insignia');
         assert(new Set(result.soldiers.map(x=>JSON.stringify(x.tint))).size>=5,
           'All German uniforms have the same color');
         assert(new Set(result.soldiers.map(x=>x.headwear)).size>=3,
