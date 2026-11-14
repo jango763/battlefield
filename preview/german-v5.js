@@ -1532,7 +1532,14 @@ function createNativeHeroBritishKnitCap(rig){
     for(let i=0;i<segments;i++){
       const a=2*Math.PI*i/segments;
       const c=Math.cos(a),t=Math.sin(a);
-      vertices.push(ring.x+ring.r*c,ring.y,ring.r*t*.95);
+      // A smooth, forward-only cloth bulge covers the actual forehead skin.
+      // Side views showed the cap shell was 3-6 cm INSIDE the skinned face,
+      // so bald forehead rendered through the front of the wool cap.
+      // Adjust the existing one-piece mesh rather than layering another hat.
+      const browCover=[.010,.020,.028,.040,.065,.065,.030][k];
+      const forward=Math.max(0,t);
+      vertices.push(ring.x+ring.r*c,ring.y,
+        ring.r*t*.95+browCover*forward*forward);
       if(k>0){
         const p=(k-1)*segments+i,pn=(k-1)*segments+(i+1)%segments;
         const n=k*segments+i,nn=k*segments+(i+1)%segments;
