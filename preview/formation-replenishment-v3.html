@@ -34,14 +34,21 @@
     // Optional German close-up, activated only by ?inspect=german.
     // The RTS camera and faction selection remain unchanged in normal play.
     html=once(html,'pm.band.material.color.setHex(HX.blue);',
-      "pm.band.material.color.setHex(HX.blue);if(['german','squad'].includes(new URLSearchParams(location.search).get('inspect'))){P.side='red';pm.band.material.color.setHex(HX.red);}");
+      "pm.band.material.color.setHex(HX.blue);if(['german','squad','wehrmacht'].includes(new URLSearchParams(location.search).get('inspect'))){P.side='red';pm.band.material.color.setHex(HX.red);}");
     html=once(html,'cam.lookAt(camP.x,0,camP.z);',
       "cam.lookAt(camP.x,0,camP.z);if(new URLSearchParams(location.search).get('inspect')==='german'&&P.germanPreview?.nativeRig){const a=P.g.rotation.y;cam.position.set(P.x+Math.sin(a)*3.8+Math.cos(a)*.65,2.95,P.z+Math.cos(a)*3.8-Math.sin(a)*.65);cam.lookAt(P.x,2.0,P.z);}"
       +"if(new URLSearchParams(location.search).get('inspect')==='squad'&&new URLSearchParams(location.search).get('armyRig')==='squad'&&germanPreview.armyNativeTemplate){"
       +"if(!window.__squadReview){window.__squadReview=[];for(let i=0;i<4;i++){const u=mk('red',false,false);u.type=i===1?'smg':i===2?'mg':'rf';u.x=P.x+(i-1.5)*1.8;u.z=P.z+4;u.g.position.set(u.x,0,u.z);u.guard=true;u.slot={x:u.x,z:u.z};window.__squadReview.push(u);}}"
-      +"cam.position.set(P.x,4.2,P.z-8.0);cam.lookAt(P.x,1.45,P.z+4);}");
+      +"cam.position.set(P.x,4.2,P.z-8.0);cam.lookAt(P.x,1.45,P.z+4);}"
+      +"if(new URLSearchParams(location.search).get('inspect')==='wehrmacht'&&germanPreview.armyNativeTemplate){"
+      +"if(!window.__wehrmachtReview){window.__wehrmachtReview=[];for(let i=0;i<12;i++){const u=mk('red',i===10,i===11);u.type=i%4===1?'smg':i%4===2?'mg':'rf';u.x=P.x+(i%4-1.5)*2.25;u.z=P.z+3.6+Math.floor(i/4)*2.4;u.g.position.set(u.x,0,u.z);u.guard=true;u.slot={x:u.x,z:u.z};window.__wehrmachtReview.push(u);}}"
+      +"cam.position.set(P.x,8.6,P.z-15.5);cam.lookAt(P.x,1.7,P.z+6);}");
     html=once(html,'const PTS=[];',
       "const PTS=[];if(new URLSearchParams(location.search).get('inspect')==='squad'){const lab=document.createElement('div');lab.textContent='ТЕСТ ОТРЯДА · 4 НЕМЦА · НОВЫЙ ХВАТ';lab.style.cssText='position:fixed;left:8px;top:calc(env(safe-area-inset-top,0px) + 116px);z-index:990;padding:6px 9px;color:#fff;background:#26372fee;border:1px solid #aaa;border-radius:6px;font:700 12px Arial;pointer-events:none';document.body.appendChild(lab);}");
+    // Wehrmacht rollout inspection: 12 spawned combatants including officer
+    // and engineer, while normal faction selection / HUD stay unchanged.
+    html=once(html,'const PTS=[];',
+      "const PTS=[];if(new URLSearchParams(location.search).get('inspect')==='wehrmacht'){const lab=document.createElement('div');lab.textContent='ВЕРМАХТ · 12 БОЙЦОВ · ОБЩАЯ СИСТЕМА';lab.style.cssText='position:fixed;left:8px;top:calc(env(safe-area-inset-top,0px) + 116px);z-index:990;padding:6px 9px;color:#fff;background:#26372fee;border:1px solid #aaa;border-radius:6px;font:700 12px Arial;pointer-events:none';document.body.appendChild(lab);}");
     // Visible build check for the close-up only; standard RTS HUD unchanged.
     html=once(html,'const PTS=[];',
       "const PTS=[];if(new URLSearchParams(location.search).get('inspect')==='german'){const lab=document.createElement('div');lab.textContent='НЕМЕЦ · ПИЛОТКА V19';lab.style.cssText='position:fixed;right:9px;top:calc(env(safe-area-inset-top,0px) + 120px);z-index:990;padding:5px 8px;color:#fff;background:#253b32dc;border:1px solid #c1c3ad;border-radius:5px;font:700 12px Arial;pointer-events:none';document.body.appendChild(lab);}");
