@@ -6,6 +6,7 @@ on:
       - preview/german-v5.js
       - preview/formation-replenishment-v3.html
       - tools/infantry-v2/test-hero-headwear.cjs
+      - tools/infantry-v2/test-british-pilot.cjs
       - .github/workflows/check-hero-headwear.yml
   workflow_dispatch:
 permissions:
