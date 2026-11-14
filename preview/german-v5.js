@@ -1483,7 +1483,7 @@ function updateNativeHeroFieldUniform(rig){
     // German sidecap placement above remains at its established height.
     // The earlier 0.235 / 0.046 offsets made the beret float above the
     // forehead in portrait Safari screenshots. Seat the band on the crown.
-    beret.position.y+=.205;
+    beret.position.y+=.193;
     beret.position.add(new THREE.Vector3(0,0,.029).applyQuaternion(beret.quaternion));
   }
 }
@@ -1517,10 +1517,10 @@ function createNativeHeroBritishBeret(rig){
     {r:.121,y:.011,x:0,z:0},
     {r:.133,y:.031,x:.003,z:0},
     {r:.153,y:.060,x:.011,z:-.002},
-    {r:.155,y:.093,x:.024,z:-.003},
-    {r:.123,y:.128,x:.039,z:-.003},
-    {r:.080,y:.148,x:.050,z:-.003},
-    {r:.030,y:.153,x:.055,z:-.002}
+    {r:.155,y:.091,x:.032,z:-.003},
+    {r:.123,y:.125,x:.051,z:-.003},
+    {r:.080,y:.146,x:.064,z:-.003},
+    {r:.030,y:.151,x:.071,z:-.002}
   ];
   const vertices=[],faces=[];
   for(let k=0;k<sections.length;k++){
@@ -1528,7 +1528,7 @@ function createNativeHeroBritishBeret(rig){
     for(let i=0;i<segments;i++){
       const a=i*Math.PI*2/segments,c=Math.cos(a),t=Math.sin(a);
       // Subtle hanging soft-cloth edge on the displaced side only.
-      const drape=k>2?Math.max(0,c)*.014*((k-2)/4):0;
+      const drape=k>2?Math.max(0,c)*.022*((k-2)/4):0;
       vertices.push(ring.x+ring.r*c,ring.y-drape,ring.z+ring.r*t*.96);
       if(k>0){
         const prev=(k-1)*segments+i,prevNext=(k-1)*segments+(i+1)%segments;
@@ -1539,7 +1539,7 @@ function createNativeHeroBritishBeret(rig){
   }
   // Close the final ring: otherwise a top hole can expose bald scalp.
   const apex=vertices.length/3;
-  vertices.push(.056,.154,-.002);
+  vertices.push(.072,.152,-.002);
   for(let i=0;i<segments;i++)
     faces.push((sections.length-1)*segments+i,apex,
       (sections.length-1)*segments+(i+1)%segments);
