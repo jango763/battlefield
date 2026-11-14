@@ -1,0 +1,37 @@
+name: Hero headwear single active mesh QA
+on:
+  push:
+    branches: [fix/hero-single-headwear-20261114]
+    paths:
+      - preview/german-v5.js
+      - preview/formation-replenishment-v3.html
+      - tools/infantry-v2/test-hero-headwear.cjs
+      - .github/workflows/check-hero-headwear.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hero-headwear:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: JavaScript syntax and headwear lifecycle
+        run: |
+          node --check preview/german-v5.js
+          node --check tools/infantry-v2/test-hero-headwear.cjs
+          node tools/infantry-v2/test-hero-headwear.cjs
+      - name: Install Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/british-pilot playwright@1.58.2
+          /tmp/british-pilot/node_modules/.bin/playwright install chromium
+      - name: Test repeated German-British headwear changes on running hero
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/headwear-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-hero-headwear.cjs --browser
+      - name: Test British army pilots remain valid
+        shell: bash
+        run: |
+          node tools/infantry-v2/test-british-pilot.cjs --browser
