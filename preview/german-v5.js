@@ -1617,11 +1617,17 @@ function updateNativeHeroFieldUniform(rig){
     space.updateWorldMatrix(true,true);
     beret.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
     const inv=space.getWorldQuaternion(new THREE.Quaternion()).invert();
-    beret.quaternion.copy(inv.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
-    // Raise the BRITISH beret to the hairline: it must never hide the eyes.
-    // German sidecap placement above remains at its established height.
-    beret.position.y+=.235;
-    beret.position.add(new THREE.Vector3(0,0,.046).applyQuaternion(beret.quaternion));
+    const headLocal=inv.multiply(head.getWorldQuaternion(new THREE.Quaternion())).normalize();
+    // Head-delta attachment compensates for the Mixamo head bind rotation.
+    // Preserve our upright custom mesh, but let it turn with idle/jog/sprint.
+    if(!beret.userData.bindHeadLocalQ)
+      beret.userData.bindHeadLocalQ=headLocal.clone();
+    beret.quaternion.copy(headLocal)
+      .multiply(beret.userData.bindHeadLocalQ.clone().invert()).normalize();
+    // Keep the rolled band above the eyebrows, not floating over the crown.
+    // A small forward offset makes the badge readable in a front close-up.
+    beret.position.y+=.205;
+    beret.position.add(new THREE.Vector3(0,0,.021).applyQuaternion(beret.quaternion));
   }
   updateNativeGermanHeroIdentity(rig);
   updateNativeBritishHeroIdentity(rig);
@@ -1635,26 +1641,91 @@ function createNativeHeroBritishBeret(rig){
   if(!u?.headBone||u.beret)return;
   const beret=new THREE.Group();
   beret.name='WW2_British_Maroon_Beret';
-  const felt=new THREE.MeshLambertMaterial({color:0x801a2d,side:THREE.DoubleSide});
-  const brim=new THREE.MeshLambertMaterial({color:0x3d2428});
-  const badge=new THREE.MeshLambertMaterial({color:0xc4b58c});
-  const add=(geo,mat,pos,scale)=>{
-    const m=new THREE.Mesh(geo,mat);
-    m.position.set(...pos);if(scale)m.scale.set(...scale);
-    m.castShadow=true;m.receiveShadow=true;beret.add(m);return m;
-  };
-  // Close-fitting band, low sloping felt crown with asymmetry to the wearer's right.
-  // Sized to the actual 65-bone hero's head, not the WW2 donor's helmet
-  // bounding box; the earlier test exaggerated the beret by ~60 percent.
-  add(new THREE.CylinderGeometry(.146,.151,.036,20),brim,[0,.009,0]);
-  add(new THREE.SphereGeometry(1,20,12),felt,[.032,.065,-.002],[.190,.075,.173]);
-  add(new THREE.SphereGeometry(1,16,9),felt,[-.048,.053,.002],[.139,.052,.155]);
-  add(new THREE.BoxGeometry(.039,.052,.011),badge,[-.083,.061,.151]);
+  beret.userData.profile='airborne-soft-slouch-v2';
+  // A real cloth beret is ONE low continuous felt crown, not two oversized
+  // spheres stacked onto a cylinder (the old "mushroom/pot" silhouette).
+  // 48 radial samples retain a smooth profile on mobile Three.js r128.
+  const felt=new THREE.MeshLambertMaterial({
+    color:0x742338,roughness:1,side:THREE.DoubleSide
+  });
+  const band=new THREE.MeshLambertMaterial({color:0x392126,roughness:1});
+  const seam=new THREE.MeshLambertMaterial({color:0x57202d,roughness:1});
+  const badge=new THREE.MeshLambertMaterial({color:0xb6aa8a,roughness:1});
+  const N=48;
+  // The crown is deliberately low and grows to the soldier's RIGHT:
+  // a close-fitting band, rounded cloth expansion, then a soft flat top.
+  // Y drops on the right edge to suggest a natural wool slouch.
+  const rings=[
+    {r:.148,y:.010,shift:0,drop:0},
+    {r:.157,y:.029,shift:.004,drop:0},
+    {r:.174,y:.054,shift:.021,drop:.008},
+    {r:.189,y:.077,shift:.038,drop:.021},
+    {r:.171,y:.091,shift:.045,drop:.010},
+    {r:.111,y:.099,shift:.040,drop:0},
+    {r:.039,y:.100,shift:.034,drop:0}
+  ];
+  const positions=[],indices=[];
+  for(let k=0;k<rings.length;k++){
+    const ring=rings[k];
+    for(let i=0;i<N;i++){
+      const t=2*Math.PI*i/N,c=Math.cos(t),s=Math.sin(t);
+      // Slightly flatten the front/back, but no jagged low-poly facets.
+      const radius=ring.r*(1+.014*Math.sin(3*t+.3));
+      positions.push(
+        ring.shift+radius*c,
+        ring.y-ring.drop*Math.pow(Math.max(0,c),2)+.002*Math.sin(2*t+.5),
+        radius*.92*s
+      );
+      if(k>0){
+        const lower=(k-1)*N+i,next=(i+1)%N;
+        const upper=k*N+i;
+        indices.push(lower,(k-1)*N+next,k*N+next,lower,k*N+next,upper);
+      }
+    }
+  }
+  // Close the shallow crown smoothly; don't leave a visible central hole.
+  const top=positions.length/3;
+  positions.push(.034,.102,0);
+  for(let i=0;i<N;i++)indices.push((rings.length-1)*N+i,
+    (rings.length-1)*N+(i+1)%N,top);
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  const crown=new THREE.Mesh(geo,felt);
+  crown.name='BritishBeretOnePieceFeltCrown';
+  crown.castShadow=true;crown.receiveShadow=true;
+  beret.add(crown);
+  // Thin rolled leather-like wool band (no tall cylindrical bucket brim).
+  const bandMesh=new THREE.Mesh(
+    new THREE.TorusGeometry(.150,.010,7,48),band);
+  bandMesh.name='BritishBeretCloseFitBand';
+  bandMesh.rotation.x=Math.PI/2;
+  bandMesh.position.y=.012;
+  bandMesh.scale.z=.92;
+  bandMesh.castShadow=true;
+  beret.add(bandMesh);
+  // A small muted insignia on the LEFT front, not a large metal plaque.
+  const insignia=new THREE.Mesh(new THREE.BoxGeometry(.022,.033,.007),badge);
+  insignia.name='BritishBeretSmallInsignia';
+  insignia.position.set(-.096,.038,.124);
+  insignia.rotation.z=-.14;
+  insignia.castShadow=true;
+  beret.add(insignia);
+  const fold=new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(.151,.048,-.079),
+      new THREE.Vector3(.176,.057,-.013),
+      new THREE.Vector3(.165,.060,.062)
+    ]),16,.0026,5,false),seam);
+  fold.name='BritishBeretSubtleFeltFold';
+  beret.add(fold);
+  // The Mixamo donor head bone has a rotated bind basis. Remember the
+  // first local head orientation and follow only animation DELTAS, so
+  // the beret remains Y-up without spinning or turning into a vertical plate.
+  beret.userData.bindHeadLocalQ=null;
   rig.visual.add(beret);
   u.beret=beret;
-  // The original hero-only logic referenced P.side here; when a RED army
-  // infantryman used the same headwear constructor with a BLUE hero,
-  // both the red beret and German sidecap rendered on his head.
   const ownerSide=(rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P&&P.side);
   beret.visible=ownerSide==='blue';
 }
