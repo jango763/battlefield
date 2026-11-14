@@ -1195,6 +1195,94 @@ function updateNativeGermanHeroIdentity(rig){
   identity.root.quaternion.copy(inv.multiply(
     identity.chest.getWorldQuaternion(new THREE.Quaternion()))).normalize();
 }
+
+ // British PLAYER-only field outfit: warm sand cloth, Pattern 1937-inspired
+ // canvas straps, symmetrical ammunition pouches and a compact rear pack.
+ // Uses its own prop group on an existing chest bone; no skeleton/IK edits.
+ // All gameplay and German army objects stay on their previous paths.
+function installNativeBritishHeroIdentity(rig){
+  if(rig.armyUnit||rig.britishHeroIdentity)return;
+  let chest=null;
+  rig.model.traverse(node=>{
+    if(node.isBone&&node.name==='spine_03')chest=node;
+  });
+  if(!chest)throw new Error('British hero chest bone missing');
+  const root=new THREE.Group();
+  root.name='BritishHeroDistinctiveWebbing';
+  root.userData.role='british-player-hero';
+  const khaki=new THREE.MeshLambertMaterial({color:0xb3a17e});
+  const lightWebbing=new THREE.MeshLambertMaterial({color:0xc1b28b});
+  const edge=new THREE.MeshLambertMaterial({color:0x8e805f});
+  const darkCanvas=new THREE.MeshLambertMaterial({color:0x746e56});
+  const leather=new THREE.MeshLambertMaterial({color:0x594536});
+  const brass=new THREE.MeshLambertMaterial({color:0x9e9271});
+  const add=(name,geometry,material,x,y,z)=>{
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.name=name;
+    mesh.position.set(x,y,z);
+    mesh.castShadow=true;
+    mesh.receiveShadow=true;
+    root.add(mesh);
+    return mesh;
+  };
+  const bag=(name,pos,size,material)=>{
+    const shell=add(name,new THREE.SphereGeometry(1,18,12),material,...pos);
+    shell.scale.set(...size);
+    return shell;
+  };
+  // Rounded pack and rolled waterproof groundsheet read differently from
+  // the German hero's vertical leather map case and horizontal bedroll.
+  bag('BritishHeroCanvasPack',[0,-.19,-.285],[.21,.29,.12],khaki);
+  bag('BritishHeroPackFlap',[0,-.04,-.39],[.215,.075,.02],darkCanvas);
+  const groundsheet=add('BritishHeroRolledGroundsheet',
+    new THREE.CylinderGeometry(.065,.067,.47,16),edge,0,-.46,-.29);
+  groundsheet.rotation.z=Math.PI/2;
+  for(const x of [-.135,.135]){
+    add('BritishHeroPackTie',new THREE.BoxGeometry(.028,.15,.023),
+      leather,x,-.46,-.29);
+  }
+  // P37-style webbing: broad pale straps follow the chest but terminate
+  // above the belt, clear of wrist/weapon IK and the upper-arm bones.
+  for(const sign of [-1,1]){
+    const x=sign*.185;
+    const sling=add('BritishHeroWebbingStrap',
+      new THREE.BoxGeometry(.058,.37,.025),lightWebbing,x,-.13,.178);
+    sling.rotation.z=-sign*.25;
+    bag('BritishHeroAmmoPouch',[sign*.205,-.405,.207],
+      [.119,.129,.077],khaki);
+    add('BritishHeroPouchFlap',new THREE.BoxGeometry(.18,.046,.035),
+      edge,sign*.205,-.328,.267);
+    add('BritishHeroPouchTab',new THREE.BoxGeometry(.025,.051,.015),
+      brass,sign*.205,-.39,.285);
+    add('BritishHeroRankTab',new THREE.BoxGeometry(.126,.027,.15),
+      darkCanvas,sign*.228,.105,.025);
+    add('BritishHeroRankTrim',new THREE.BoxGeometry(.09,.012,.023),
+      lightWebbing,sign*.228,.127,.097);
+  }
+  // Small canvas canteen on left back: separate silhouette, not a giant
+  // futuristic backpack. No objects are attached to the hands or rifle.
+  bag('BritishHeroCanteen',[-.225,-.465,-.165],
+    [.10,.15,.076],darkCanvas);
+  add('BritishHeroCanteenCap',new THREE.CylinderGeometry(.035,.039,.043,10),
+    brass,-.225,-.31,-.165);
+  rig.visual.add(root);
+  rig.britishHeroIdentity={root,chest};
+  updateNativeBritishHeroIdentity(rig);
+}
+function updateNativeBritishHeroIdentity(rig){
+  const identity=rig.britishHeroIdentity;
+  if(!identity)return;
+  identity.root.visible=!rig.armyUnit&&!!P&&P.side==='blue';
+  if(!identity.root.visible)return;
+  const visual=rig.visual;
+  visual.updateWorldMatrix(true,true);
+  identity.root.position.copy(
+    visual.worldToLocal(identity.chest.getWorldPosition(new THREE.Vector3())));
+  const inv=visual.getWorldQuaternion(new THREE.Quaternion()).invert();
+  identity.root.quaternion.copy(inv.multiply(
+    identity.chest.getWorldQuaternion(new THREE.Quaternion()))).normalize();
+}
+
 function dressNativeHeroFieldUniform(rig){
   if(new URLSearchParams(location.search).get('uniform')==='prototype'){
     dressNativeHeroPrimitiveUniform(rig);
@@ -1219,7 +1307,7 @@ function dressNativeHeroFieldUniform(rig){
       const mat=n.material,name=mat&&mat.name||'';
       const type=/helmet|scrim/i.test(name)?'headgear':/ammopouches/i.test(name)?'pouches':'garment';
       const german=soldierMaterial(mat,'hero',rig.armyUnit?0x4a5450:0x485349);
-      const british=soldierMaterial(mat,'khaki',0xa28d69);
+      const british=soldierMaterial(mat,'khaki',rig.armyUnit?0xa28d69:0xb5a17d);
       if(type==='pouches'){
         german.color.setHex(0xddd0b9);
         british.color.setHex(0xe3d7b9);
@@ -1363,6 +1451,7 @@ function updateNativeHeroFieldUniform(rig){
   if(!uniform){
     updateNativeHeroPrimitiveUniform(rig);
     updateNativeGermanHeroIdentity(rig);
+    updateNativeBritishHeroIdentity(rig);
     return;
   }
   const side=(rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P&&P.side)==='red'?'red':'blue';
@@ -1535,6 +1624,7 @@ function updateNativeHeroFieldUniform(rig){
     beret.position.add(new THREE.Vector3(0,0,.046).applyQuaternion(beret.quaternion));
   }
   updateNativeGermanHeroIdentity(rig);
+  updateNativeBritishHeroIdentity(rig);
 }
 
 
@@ -1843,6 +1933,7 @@ function nativeHeroLoad(){
       initNativeHeroWeapon(v,v.nativeRig);
       dressNativeHeroFieldUniform(v.nativeRig);
       installNativeGermanHeroIdentity(v.nativeRig);
+      installNativeBritishHeroIdentity(v.nativeRig);
       // Green badge plus geometric marker: the native visual swap is
       // unambiguous, even when the costume looks similar from the RTS camera.
       const marker=new THREE.Mesh(
