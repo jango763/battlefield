@@ -700,6 +700,68 @@ function updateNativeHeroPrimitiveUniform(rig){
 // the previous hard-edged procedural boxes. The native Quaternius clip mixer
 // and rifle IK remain untouched; a separate outfit skeleton only follows pose.
 // This is intentionally a preview until visual acceptance on mobile Safari.
+
+// Restore actual skinned hands from the Quaternius avatar (never procedural
+// cylinders): the Panzergrenadier overlay has independent hand geometry and
+// its wrist may visually disappear even when the Mixamo IK target is correct.
+// Only triangles with dominant palm/finger skin weights are retained.
+function addNativeHeroVisibleHands(rig){
+  const results=[],stats={triangles:0,meshes:0,bySide:{left:0,right:0}};
+  const isHandName=name=>/^(?:hand_[lr]|(?:thumb|index|middle|ring|pinky)_(?:0?[1-3])_[lr])$/i.test(name);
+  for(const src of rig.ww2Uniform.originalMeshes){
+    const g=src.geometry, indices=g.getAttribute('skinIndex'), weights=g.getAttribute('skinWeight');
+    if(!indices||!weights||!src.skeleton?.bones)continue;
+    const scoreL=new Float32Array(indices.count),scoreR=new Float32Array(indices.count);
+    for(let i=0;i<indices.count;i++){
+      for(let k=0;k<4;k++){
+        const index=k===0?indices.getX(i):k===1?indices.getY(i):k===2?indices.getZ(i):indices.getW(i);
+        const weight=k===0?weights.getX(i):k===1?weights.getY(i):k===2?weights.getZ(i):weights.getW(i);
+        const bone=src.skeleton.bones[index],name=bone&&bone.name;
+        if(!name||!isHandName(name))continue;
+        if(name.endsWith('_l'))scoreL[i]+=weight;
+        else if(name.endsWith('_r'))scoreR[i]+=weight;
+      }
+    }
+    const ix=g.index?.array || Uint32Array.from({length:indices.count},(_,i)=>i);
+    const accepted=[],count={left:0,right:0};
+    for(let k=0;k+2<ix.length;k+=3){
+      const a=ix[k],b=ix[k+1],c=ix[k+2];
+      const include=(v)=>Math.min(v[a],v[b],v[c])>.22&&Math.max(v[a],v[b],v[c])>.58;
+      const left=include(scoreL),right=include(scoreR);
+      if(left||right){
+        accepted.push(a,b,c);
+        if(left)count.left++;
+        if(right)count.right++;
+      }
+    }
+    if(accepted.length===0)continue;
+    const handGeom=g.clone();handGeom.setIndex(accepted);
+    handGeom.clearGroups();handGeom.computeBoundingSphere();
+    const mat=new THREE.MeshStandardMaterial({
+      name:'NativeHeroExposedHands',color:0xcda489,skinning:true,side:THREE.DoubleSide,
+      metalness:0,roughness:.92
+    });
+    const overlay=new THREE.SkinnedMesh(handGeom,mat);
+    overlay.name='NativeHeroExposedHands';
+    overlay.position.copy(src.position);
+    overlay.quaternion.copy(src.quaternion);
+    overlay.scale.copy(src.scale);
+    overlay.bindMode=src.bindMode;
+    overlay.bind(src.skeleton,src.bindMatrix.clone());
+    overlay.bindMatrixInverse.copy(src.bindMatrixInverse);
+    overlay.frustumCulled=false;overlay.castShadow=true;overlay.receiveShadow=true;
+    src.parent.add(overlay);
+    results.push(overlay);
+    stats.triangles+=accepted.length/3;stats.meshes++;
+    stats.bySide.left+=count.left;stats.bySide.right+=count.right;
+  }
+  rig.ww2Uniform.nativeHands=results;
+  rig.ww2Uniform.handSkinStats=stats;
+  if(stats.bySide.left<45||stats.bySide.right<45)
+    console.warn('Native hand mesh extraction insufficient:',stats);
+  return stats;
+}
+
 function dressNativeHeroFieldUniform(rig){
   if(new URLSearchParams(location.search).get('uniform')==='prototype'){
     dressNativeHeroPrimitiveUniform(rig);
@@ -787,6 +849,7 @@ function dressNativeHeroFieldUniform(rig){
     rig.ww2Uniform=ww2;
     rig.ww2OutfitTemporary=null;
     for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
+    addNativeHeroVisibleHands(rig);
     updateNativeHeroFieldUniform(rig);
     loadNativeHeroSideCap(rig);
   }catch(error){
@@ -796,6 +859,9 @@ function dressNativeHeroFieldUniform(rig){
     if(rig.ww2Uniform)rig.visual.remove(rig.ww2Uniform.donor);
     if(rig.ww2OutfitTemporary)rig.visual.remove(rig.ww2OutfitTemporary);
     rig.ww2OutfitTemporary=null;
+    for(const hand of (rig.ww2Uniform?.nativeHands||[])){
+      hand.parent?.remove(hand);hand.geometry.dispose();hand.material.dispose();
+    }
     rig.ww2Uniform=null;
     rig.model.traverse(n=>{if(n.isSkinnedMesh)n.visible=true;});
     dressNativeHeroPrimitiveUniform(rig);
