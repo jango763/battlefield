@@ -154,6 +154,28 @@ if(process.argv.includes('--browser')){
             await page.screenshot({path:'/tmp/stage6-grip-'+device.name+'-'+cfg.label+'.png'});
             console.log('STAGE 6 GRIP PROBE',device.name,cfg.label,JSON.stringify(grip));
           }
+          // The earlier visual set showed the hand buried in the cuff for
+          // near grips. Compare wrist orientations at a middle fore-end point.
+          for(const pose of [
+            {label:'X0',left:{x:0},right:{x:0}},
+            {label:'Xp08',left:{x:.8},right:{x:.8}},
+            {label:'Xm08',left:{x:-.8},right:{x:-.8}},
+            {label:'Yp08',left:{y:.8},right:{y:.8}},
+            {label:'Ym08',left:{y:-.8},right:{y:-.8}},
+            {label:'Zp08',left:{z:.8},right:{z:.8}},
+            {label:'Zm08',left:{z:-.8},right:{z:-.8}},
+            {label:'Xmixed',left:{x:.8},right:{x:-.8}}
+          ]){
+            await page.evaluate(pose=>{
+              window.__stage6GripProbe={dy:.07,dz:.16};
+              window.__stage6WristProbe={left:pose.left,right:pose.right};
+              P.sv=0;P.aim=0;P.wpn=1;
+              for(let j=0;j<35;j++)animateGermanSoldier(P,1/60);
+            },pose);
+            await page.waitForTimeout(250);
+            await page.screenshot({path:'/tmp/stage6-wrist-'+device.name+'-'+pose.label+'.png'});
+            console.log('STAGE 6 WRIST PROBE',device.name,pose.label);
+          }
         }
         console.log('STAGE 6 BROWSER PASS',device.name,JSON.stringify(stats));
         await page.close();
