@@ -57,6 +57,8 @@ function releaseNativeArmyVisual(unit,v){
   }
   rig.visual.removeFromParent();
   rig.ww2Uniform=null;
+  // Pending asynchronous GLB loads must not reattach models to a dead unit.
+  rig.weapon=null;
   v.nativeRig=null;
   v.figure.visible=rig.previous.oldFigureVisible;
   v.weapon.root.visible=rig.previous.oldWeaponVisible;
@@ -511,7 +513,16 @@ function attachNativeArmyM43FieldCap(rig){
     rig.visual.add(cap);
     const uniform=rig.ww2Uniform,previous=uniform.cap;
     uniform.cap=cap;
-    if(previous){rig.visual.remove(previous);}
+    if(previous){
+      rig.visual.remove(previous);
+      // The default V19 cap is per-soldier procedurally generated.
+      // Free it when the licensed M43 replaces it.
+      if(previous.userData.proceduralPilotka){
+        previous.traverse(n=>{
+          if(n.isMesh){n.geometry?.dispose();n.material?.dispose();}
+        });
+      }
+    }
     uniform.headwear='Army German M43 (MIT GLB)';
     uniform.side=null; // ensure faction visibility/materials get refreshed
     updateNativeHeroFieldUniform(rig);
@@ -1445,7 +1456,8 @@ function loadNativeHeroSideCap(rig){
   const u=rig.ww2Uniform;
   if(!u||!u.headBone)return;
   if(new URLSearchParams(location.search).get('headwear')==='none')return;
-  createNativeHeroBritishBeret(rig);
+  // Never allocate an invisible UK beret for every German army soldier.
+  if(!rig.armyUnit||rig.armyUnit.t==='blue')createNativeHeroBritishBeret(rig);
   // The imported Soviet sidecap is shallow and sits across the forehead on
   // this head rig; simply rescaling it never covered the rear scalp. Use a
   // close-fitting, head-tracked geometry for the German pilotka by default.
