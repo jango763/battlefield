@@ -1018,8 +1018,9 @@ function updateNativeHeroFieldUniform(rig){
     // Donor head pivot is much lower than the visible hairline. Raise the
     // sidecap from eyebrow level onto the crown.
     if(cap.userData.proceduralPilotka){
-      // New cap geometry has its own calibrated head-local vertical extent.
-      // Keep it centered over the head rather than pushing it onto the face.
+      // Calibrated against the front hairline in the latest mobile render:
+      // lower the level cap band 4 cm to cover the exposed forehead wedge.
+      cap.position.y-=.04;
       cap.position.add(new THREE.Vector3(0,0,.01).applyQuaternion(cap.quaternion));
     }else{
       // Legacy A/B mode only; do not double-raise the new cloth shell.
