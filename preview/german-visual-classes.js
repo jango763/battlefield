@@ -146,3 +146,113 @@ function updateWehrmachtVisualIdentity(rig,side){
   // Hide German-only webbing when player switches to the British faction.
   for(const g of kit.parts)g.visible=side==='red';
 }
+
+/** Isolated staging-only outfit viewer, not a second gameplay system.
+ * Reparents the REAL animated skinned character rather than rendering
+ * mockups. Without it, houses and trees conceal the models on iPhone.
+ */
+const germanRoleGallery={
+  ready:false,scene:null,stage:null,camera:null,selected:0,
+  selectedVisual:null,selectedParent:null,selectedLocal:null,
+  cast:null,buttons:[],label:null
+};
+function germanRoleGallerySelect(index){
+  const g=germanRoleGallery;
+  if(!g.ready||!g.cast[index]?.germanPreview?.nativeRig)return false;
+  if(g.selectedVisual){
+    const model=g.selectedVisual;
+    if(g.selectedParent){
+      g.selectedParent.add(model);
+      if(g.selectedLocal){
+        model.position.copy(g.selectedLocal.position);
+        model.quaternion.copy(g.selectedLocal.quaternion);
+        model.scale.copy(g.selectedLocal.scale);
+      }
+    }
+  }
+  g.selected=index;
+  const unit=g.cast[index],rig=unit.germanPreview.nativeRig;
+  const model=rig.visual;
+  g.selectedParent=model.parent;
+  g.selectedLocal={
+    position:model.position.clone(),quaternion:model.quaternion.clone(),scale:model.scale.clone()
+  };
+  g.stage.add(model);
+  model.position.set(0,0,0);
+  model.quaternion.identity();
+  model.scale.set(1,1,1);
+  g.stage.rotation.y=0;
+  g.selectedVisual=model;
+  for(let i=0;i<g.buttons.length;i++)
+    g.buttons[i].style.background=i===index?'#6b7650':'#283a30';
+  if(g.label)g.label.textContent='ВЕРМАХТ · '+[
+    'ГЕРОЙ · ПИЛОТКА','СТРЕЛОК · KAR98K','АВТОМАТЧИК · MP40',
+    'ПУЛЕМЁТЧИК · MG42','ИНЖЕНЕР · ИНСТРУМЕНТЫ','КАПИТАН · ОФИЦЕР'
+  ][index]+' · ОРИГИНАЛЬНЫЙ АНИМИРОВАННЫЙ СКЕЛЕТ';
+  return true;
+}
+function germanRoleGalleryTick(){
+  if(new URLSearchParams(location.search).get('inspect')!=='classes')return;
+  const g=germanRoleGallery;
+  if(g.ready)return;
+  const units=window.__classReview;
+  if(!units||units.length!==5||!P?.germanPreview?.nativeRig ||
+      units.some(u=>!u.germanPreview?.nativeRig?.ww2Uniform?.visualIdentityKit))return;
+  g.cast=[P,...units];
+  g.scene=new THREE.Scene();
+  g.scene.background=new THREE.Color(0x777d73);
+  g.scene.add(new THREE.HemisphereLight(0xf5f3e8,0x474d45,2.0));
+  const light=new THREE.DirectionalLight(0xffecd4,1.9);
+  light.position.set(2.5,6,4.5);
+  g.scene.add(light);
+  g.stage=new THREE.Group();
+  g.stage.name='RealWehrmachtAnimatedCharacterPreview';
+  g.scene.add(g.stage);
+  const ground=new THREE.Mesh(
+    new THREE.CylinderGeometry(.85,.85,.09,24),
+    new THREE.MeshLambertMaterial({color:0x5a6155})
+  );
+  ground.position.y=-.09;g.scene.add(ground);
+  g.camera=new THREE.PerspectiveCamera(33,1,.1,50);
+  const panel=document.createElement('div');
+  panel.id='german-role-gallery';
+  panel.style.cssText='position:fixed;top:calc(env(safe-area-inset-top,0px) + 117px);left:8px;right:8px;max-width:640px;z-index:995;pointer-events:auto';
+  const label=document.createElement('div');
+  label.id='german-role-gallery-title';
+  label.style.cssText='padding:7px 8px;font:700 11px Arial;color:#fff;background:#243a30e9;border:1px solid #aaa;border-radius:5px';
+  panel.appendChild(label);g.label=label;
+  const line=document.createElement('div');
+  line.style.cssText='display:flex;flex-wrap:wrap;gap:4px;margin-top:4px';
+  for(const [i,name] of ['Герой','Стрелок','Автоматчик','Пулемётчик','Инженер','Капитан'].entries()){
+    const btn=document.createElement('button');btn.type='button';
+    btn.dataset.classIndex=String(i);btn.textContent=name;
+    btn.style.cssText='flex:1 0 30%;min-width:0;padding:7px 3px;color:white;border:1px solid #a6ae99;border-radius:4px;background:#283a30;font:700 11px Arial';
+    btn.addEventListener('click',()=>germanRoleGallerySelect(i));
+    line.appendChild(btn);g.buttons.push(btn);
+  }
+  panel.appendChild(line);
+  const turn=document.createElement('button');
+  turn.id='german-role-turn';
+  turn.textContent='Повернуть бойца';
+  turn.type='button';
+  turn.style.cssText='display:block;margin-top:4px;width:100%;padding:6px 8px;color:#fff;background:#354438;border:1px solid #9da88e;border-radius:4px;font:700 11px Arial';
+  turn.addEventListener('click',()=>g.stage.rotation.y+=Math.PI/4);
+  panel.appendChild(turn);
+  document.body.appendChild(panel);
+  g.ready=true;
+  germanRoleGallerySelect(0);
+  window.__germanRoleGallery=g;
+}
+function germanRoleGalleryDraw(){
+  if(new URLSearchParams(location.search).get('inspect')!=='classes')return false;
+  const g=germanRoleGallery;
+  if(!g.ready)return false;
+  const c=g.camera;
+  c.aspect=R.domElement.clientWidth/Math.max(1,R.domElement.clientHeight);
+  c.updateProjectionMatrix();
+  // Keep helmet below title/buttons in iPhone portrait and boots in frame.
+  c.position.set(0,3.10,5.8);
+  c.lookAt(0,1.90,0);
+  R.render(g.scene,c);
+  return true;
+}
