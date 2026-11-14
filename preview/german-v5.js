@@ -1504,27 +1504,46 @@ function createNativeHeroBritishBeret(rig){
     m.position.set(...pos);if(scale)m.scale.set(...scale);
     m.castShadow=true;m.receiveShadow=true;beret.add(m);return m;
   };
-  // Scale measured against the hero's head. The earlier flat 0.184-radius
-  // ellipsoid read as an oversized red pill in portrait Safari.
-  const bandMesh=add(new THREE.CylinderGeometry(.130,.135,.027,28),brim,[0,.008,0]);
+  // One cap band and ONE continuous felt shell. The previous ellipsoid
+  // stayed a symmetric pink pill even after shrinking it on iPhone.
+  const bandMesh=add(new THREE.CylinderGeometry(.120,.124,.021,32),brim,[0,.008,0]);
   bandMesh.name='BritishBeret_Headband';
-  // A single asymmetric cloth crown. Slightly drape the top to one side
-  // without adding a second intersecting felt mesh.
-  const crownShape=new THREE.SphereGeometry(1,32,18);
-  const positions=crownShape.getAttribute('position');
-  for(let i=0;i<positions.count;i++){
-    const x=positions.getX(i),y=positions.getY(i),z=positions.getZ(i);
-    const top=Math.max(0,y),drape=top*top;
-    positions.setXYZ(i,
-      x*.153+drape*.011,
-      y*.053-Math.max(0,x)*top*.012,
-      z*.149);
+  // Tailored radial profile: narrow fitted rim, lightly puffed crown and a
+  // side-draped, lower edge. No intersecting spheres or stacked hats.
+  const crownShape=new THREE.BufferGeometry(),segments=36;
+  const sections=[
+    {r:.119,y:.011,x:0,z:0},
+    {r:.134,y:.022,x:.003,z:-.002},
+    {r:.139,y:.037,x:.010,z:-.003},
+    {r:.128,y:.052,x:.022,z:-.004},
+    {r:.091,y:.059,x:.032,z:-.004},
+    {r:.043,y:.057,x:.040,z:-.004}
+  ];
+  const vertices=[],faces=[];
+  for(let k=0;k<sections.length;k++){
+    const ring=sections[k];
+    for(let i=0;i<segments;i++){
+      const a=i*Math.PI*2/segments,c=Math.cos(a),t=Math.sin(a);
+      const drape=k>1?Math.max(0,c)*.014*(k/(sections.length-1)):0;
+      vertices.push(ring.x+ring.r*c,ring.y-drape,ring.z+ring.r*t*.96);
+      if(k>0){
+        const prev=(k-1)*segments+i,prevNext=(k-1)*segments+(i+1)%segments;
+        const here=k*segments+i,next=k*segments+(i+1)%segments;
+        faces.push(prev,here,prevNext,prevNext,here,next);
+      }
+    }
   }
+  const apex=vertices.length/3;
+  vertices.push(.044,.056,-.004);
+  for(let i=0;i<segments;i++)
+    faces.push((sections.length-1)*segments+i,apex,
+      (sections.length-1)*segments+(i+1)%segments);
+  crownShape.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+  crownShape.setIndex(faces);
   crownShape.computeVertexNormals();
-  const crown=add(crownShape,felt,[.012,.048,-.004]);
+  const crown=add(crownShape,felt,[0,0,0]);
   crown.name='BritishBeret_SingleFeltCrown';
-  crown.rotation.z=-.15;
-  const insignia=add(new THREE.BoxGeometry(.026,.033,.009),badge,[-.071,.051,.135]);
+  const insignia=add(new THREE.BoxGeometry(.024,.030,.008),badge,[-.068,.039,.119]);
   insignia.name='BritishBeret_CapBadge';
   rig.visual.add(beret);
   u.beret=beret;
