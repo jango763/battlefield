@@ -1450,6 +1450,13 @@ function updateNativeHeroFieldUniform(rig){
         :(side==='right'?-.12:.18); // British mirrored natural wrists; no -0.85 rad double twist
       handLocalQ[side].multiply(new THREE.Quaternion().setFromAxisAngle(
         new THREE.Vector3(0,0,1),roll));
+      // Strictly diagnostic: visual comparison of anatomical wrist axes in
+      // the hands inspection view, never active during normal RTS play.
+      const handProbe=uniform.side==='blue'&&!rig.armyUnit&&
+        new URLSearchParams(location.search).get('inspect')==='hands'
+        ?window.__stage6WristProbe?.[side]:null;
+      if(handProbe)handLocalQ[side].multiply(new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(handProbe.x||0,handProbe.y||0,handProbe.z||0,'XYZ')));
     }
     const local=bone=>vis.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
     const right=local(arms.right.upper),left=local(arms.left.upper);
