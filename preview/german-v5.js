@@ -529,6 +529,13 @@ function selectNativeHeroWW2Weapon(unit,rig){
     // pistol grip. Adjust only its visual IK contact, never weapon gameplay.
     if(side==='red'&&key==='de-mp40')w.trigger.position.add(new THREE.Vector3(0,.058,-.016));
     w.support.position.copy(vec(info.support)).addScaledVector(new THREE.Vector3().fromArray(info.supportPalm),.014);
+    if(rig.armyUnit&&key==='de-mg42'){
+      // The MG42 fore-end support in the original asset is beyond reach of
+      // this soldier's sleeve in the aimed pose (12.8 cm visual wrist error).
+      // Bring the LEFT contact 9 cm back along the real barrel/receiver;
+      // weapon model and all combat parameters are unchanged.
+      w.support.position.z-=.09;
+    }
     if(key==='de-mp40'||key==='uk-sten'){
       // The WW2 donor sleeve ends at a different bind-pose wrist length.
       // Shift the support contact on the real fore-end to reveal the LEFT
@@ -999,6 +1006,9 @@ function dressNativeHeroFieldUniform(rig){
 // Three phalanx bends per digit (base / middle / tip), anatomically restrained.
 // Using unit.type ensures rifle, SMG and MG soldiers do not share one fist.
 function nativeInfantryGripPreset(unit){
+  // Cache profiles: the whole squad reuses these immutable arrays instead
+  // of allocating 30+ small objects at 60 frames/s on iPhone Safari.
+  if(!nativeInfantryGripPreset.cache){
   const rifle={
     name:'rifle',
     right:{
@@ -1032,7 +1042,10 @@ function nativeInfantryGripPreset(unit){
       Middle:[.52,.62,.46],Ring:[.49,.59,.43],Pinky:[.45,.54,.39]
     }
   };
-  return unit.type==='mg'?mg:unit.type==='smg'?smg:rifle;
+  nativeInfantryGripPreset.cache={rifle,smg,mg};
+  }
+  const p=nativeInfantryGripPreset.cache;
+  return unit.type==='mg'?p.mg:unit.type==='smg'?p.smg:p.rifle;
 }
 function updateNativeHeroFieldUniform(rig){
   const uniform=rig.ww2Uniform;
