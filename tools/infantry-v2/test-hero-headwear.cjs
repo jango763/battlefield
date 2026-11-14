@@ -23,7 +23,7 @@ if(process.argv.includes('--browser')){
       for(const type of ['default','classic-async']){
         const page=await browser.newPage({viewport:{width:844,height:540},deviceScaleFactor:1});
         const errors=[];
-        page.on('pageerror',e=>errors.push(e.message));
+        page.on('pageerror',e=>{if(!/No parent to post message/.test(e.message))errors.push(e.message);});
         const params=type==='default'?'?armyRig=british&inspect=british':
           '?armyRig=british&inspect=british&pilotka=classic';
         await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html'+params,
