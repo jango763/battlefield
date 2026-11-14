@@ -1004,8 +1004,10 @@ function updateNativeHeroFieldUniform(rig){
     beret.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
     const inv=space.getWorldQuaternion(new THREE.Quaternion()).invert();
     beret.quaternion.copy(inv.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
-    beret.position.y+=.135;
-    beret.position.add(new THREE.Vector3(0,0,.048).applyQuaternion(beret.quaternion));
+    // Raise the BRITISH beret to the hairline: it must never hide the eyes.
+    // German sidecap placement above remains at its established height.
+    beret.position.y+=.235;
+    beret.position.add(new THREE.Vector3(0,0,.046).applyQuaternion(beret.quaternion));
   }
 }
 
@@ -1026,10 +1028,12 @@ function createNativeHeroBritishBeret(rig){
     m.castShadow=true;m.receiveShadow=true;beret.add(m);return m;
   };
   // Close-fitting band, low sloping felt crown with asymmetry to the wearer's right.
-  add(new THREE.CylinderGeometry(.207,.213,.052,20),brim,[0,.012,0]);
-  add(new THREE.SphereGeometry(1,20,12),felt,[.045,.096,-.005],[.264,.115,.241]);
-  add(new THREE.SphereGeometry(1,16,9),felt,[-.07,.071,.003],[.18,.073,.213]);
-  add(new THREE.BoxGeometry(.054,.078,.017),badge,[-.115,.085,.210]);
+  // Sized to the actual 65-bone hero's head, not the WW2 donor's helmet
+  // bounding box; the earlier test exaggerated the beret by ~60 percent.
+  add(new THREE.CylinderGeometry(.146,.151,.036,20),brim,[0,.009,0]);
+  add(new THREE.SphereGeometry(1,20,12),felt,[.032,.065,-.002],[.190,.075,.173]);
+  add(new THREE.SphereGeometry(1,16,9),felt,[-.048,.053,.002],[.139,.052,.155]);
+  add(new THREE.BoxGeometry(.039,.052,.011),badge,[-.083,.061,.151]);
   rig.visual.add(beret);
   u.beret=beret;
   beret.visible=(P&&P.side)!=='red';
