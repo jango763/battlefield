@@ -47,6 +47,13 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
     'not measuring actual skinned right glove vertices');
    console.log('R187 LAB STARTUP PASS',config.name,JSON.stringify(startup.report));
    await page.screenshot({path:'/tmp/r187-lab-'+config.name+'-blue-idle.png'});
+   await page.locator('#focusDual').click();
+   await page.waitForTimeout(160);
+   await page.screenshot({path:'/tmp/r187-lab-'+config.name+'-glove-closeup.png'});
+   await page.locator('#focusSingle').click();
+   await page.waitForTimeout(160);
+   await page.screenshot({path:'/tmp/r187-lab-'+config.name+'-native-closeup.png'});
+   await page.locator('#resetCam').click();
    const checks=[
      {side:'blue',weapon:'smg',animation:'jog',retarget:'project',snap:'blue-jog'},
      {side:'blue',weapon:'rifle',animation:'idle',retarget:'rotation',snap:'blue-rifle'},
