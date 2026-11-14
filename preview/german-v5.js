@@ -1100,9 +1100,14 @@ function loadNativeHeroSideCap(rig){
     const sideCloth=new THREE.MeshLambertMaterial({color:0x435049,side:THREE.DoubleSide});
     const edge=new THREE.MeshLambertMaterial({color:0x36433e,side:THREE.DoubleSide});
     const seam=new THREE.MeshLambertMaterial({color:0x6b766d,side:THREE.DoubleSide});
-    const liner=new THREE.Mesh(new THREE.SphereGeometry(1,20,12),cloth);
-    liner.scale.set(.138,.037,.176);liner.position.set(0,.219,-.006);
-    liner.castShadow=true;cap.add(liner);
+    // Continuous opaque cloth liner prevents the bald head mesh from
+    // showing through gaps between the folded top and the side panels.
+    // The structural Schiffchen folds remain above this underlayer.
+    const liner=new THREE.Mesh(new THREE.SphereGeometry(1,28,18),cloth);
+    liner.name='Pilotka_Opaque_Crown';
+    liner.scale.set(.173,.094,.203);
+    liner.position.set(0,.225,-.006);
+    liner.castShadow=true;liner.receiveShadow=true;cap.add(liner);
     const stations=[
       {z:-.194,w:.054,b:.180,s:.250,t:.258},
       {z:-.134,w:.112,b:.166,s:.256,t:.296},
