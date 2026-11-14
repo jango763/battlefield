@@ -756,6 +756,13 @@ function createNativeSupportPalm(rig){
   if(positions.length<450)throw Error('Native glove mesh missing or not baked');
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  // The original GLB pose can include the actor's world translation inside
+  // the baked skin-matrix output. Rebase to the palm's actual mesh bounds,
+  // or the hand ends up ~12 world units away despite a correct IK target.
+  g.computeBoundingBox();
+  const palmCenter=g.boundingBox.getCenter(new THREE.Vector3());
+  g.translate(-palmCenter.x,-palmCenter.y,-palmCenter.z);
+  g.computeBoundingBox();
   g.computeVertexNormals();
   const skin=new THREE.MeshStandardMaterial({
     name:'QuaterniusRealSupportPalm',color:0x987254,
@@ -763,7 +770,7 @@ function createNativeSupportPalm(rig){
   });
   const mesh=new THREE.Mesh(g,skin);
   mesh.name='NativeQuaterniusSupportPalm';
-  mesh.scale.setScalar(.86);
+  mesh.scale.setScalar(.75);
   mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;
   rig.weapon.support.add(mesh);
   rig.weapon.supportPalm=mesh;
