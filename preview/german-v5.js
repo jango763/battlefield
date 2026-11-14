@@ -500,12 +500,17 @@ function installNativeArmyPilot(unit,v){
   // Keep German unit identities stable through combat, LOD and recruitment.
   // Officers, engineers and ordinary infantry remain visibly distinguishable.
   const number=v.armyVisualIndex||0;
+  const visualRole=wehrmachtVisualClass(unit);
+  // Role-based headwear, no longer a pseudo-random clone of the hero.
   const headwear=unit.t==='blue'
     ?(v.role==='captain'?'knit':'brodie')
-    :v.role==='captain'?'m43':v.role==='engineer'?'helmet':
-      ['sidecap','m43','helmet','sidecap'][number%4];
+    :visualRole==='captain'?'m43':
+     visualRole==='engineer'?'helmet':
+     visualRole==='submachinegunner'?'sidecap':
+     visualRole==='machinegunner'?'helmet':
+     ['helmet','sidecap','helmet','m43'][number%4];
   const rig={visual,model,mixer,actions,state:'idle',previous,
-    armyUnit:unit,armyHeadwearChoice:headwear,
+    armyUnit:unit,ww2VisualClass:visualRole,armyHeadwearChoice:headwear,
     armyPhaseSeed:((v.phase||0)/(Math.PI*2))%1,
     armyVisualIndex:number,armyRole:v.role};
   v.anchor.add(visual);
@@ -1229,12 +1234,14 @@ function dressNativeHeroFieldUniform(rig){
     donor.position.set(-(box.min.x+box.max.x)*scale*.5,-box.min.y*scale,-(box.min.z+box.max.z)*scale*.5);
     rig.visual.add(donor);
     const originalMeshes=[],donorMeshes=[];
+    const visualRole=rig.armyUnit?wehrmachtVisualClass(rig.armyUnit):'hero';
+    rig.ww2VisualClass=visualRole;
     rig.model.traverse(n=>{if(n.isSkinnedMesh)originalMeshes.push(n);});
     donor.traverse(n=>{
       if(!n.isSkinnedMesh)return;
       const mat=n.material,name=mat&&mat.name||'';
       const type=/helmet|scrim/i.test(name)?'headgear':/ammopouches/i.test(name)?'pouches':'garment';
-      const german=soldierMaterial(mat,'hero',0x4a5450);
+      const german=soldierMaterial(mat,'hero',wehrmachtVisualTint(visualRole));
       const british=soldierMaterial(mat,'khaki',0xa28d69);
       if(type==='pouches'){
         german.color.setHex(0xddd0b9);
@@ -1313,6 +1320,7 @@ function dressNativeHeroFieldUniform(rig){
     if(!rig.armyUnit){
       try{createNativeSupportPalm(rig);}catch(error){console.warn('Support palm fallback:',error);}
     }
+    installWehrmachtVisualIdentity(rig);
     updateNativeHeroFieldUniform(rig);
     loadNativeHeroSideCap(rig);
   }catch(error){
@@ -1394,10 +1402,13 @@ function updateNativeHeroFieldUniform(rig){
     for(const item of uniform.donorMeshes){
       item.mesh.material=side==='red'?item.german:item.british;
       // Original WWII M42 helmet is deliberately NOT substituted for M43.
-      item.mesh.visible=item.type==='garment'||(item.type==='pouches'&&side==='red')||
+      const fieldPouches=rig.ww2VisualClass==='hero'||rig.ww2VisualClass==='rifleman';
+      item.mesh.visible=item.type==='garment'||
+        (item.type==='pouches'&&side==='red'&&fieldPouches)||
         (armyHelmet&&item.type==='headgear'&&/helmet/i.test(item.mesh.material?.name||''));
     }
   }
+  updateWehrmachtVisualIdentity(rig,side);
   // Re-target the already tested Quaternius anatomical pose to the secondary
   // clothing skin, without modifying a single native bone / clip / rifle IK.
   rig.model.updateWorldMatrix(true,true);
@@ -1416,8 +1427,16 @@ function updateNativeHeroFieldUniform(rig){
   if(uniform.headBone&&uniform.headRestScale){
     uniform.headBone.scale.copy(uniform.headRestScale);
     if(side==='red'){
-      uniform.headBone.scale.x*=.965;
-      uniform.headBone.scale.z*=.98;
+      // A small anatomical silhouette range, without changing the
+      // approved hero face or any animation/weapon geometry.
+      const faces={
+        hero:[.965,.98],rifleman:[.975,1.015],
+        submachinegunner:[.955,.99],machinegunner:[1.008,1.027],
+        engineer:[.99,1.012],captain:[.972,.987]
+      };
+      const facial=faces[rig.ww2VisualClass]||faces.rifleman;
+      uniform.headBone.scale.x*=facial[0];
+      uniform.headBone.scale.z*=facial[1];
     }
     uniform.headBone.updateWorldMatrix(false,true);
   }
