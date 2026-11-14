@@ -1107,22 +1107,44 @@ function loadNativeHeroSideCap(rig){
     // Unmarked WWII M34-inspired wool Schiffchen: continuous curved fabric,
     // low folded side wall, no rigid polygonal roof or pointed helmet apex.
     const cap=new THREE.Group();
-    cap.name='GermanM34SoftCap_V20';
+    cap.name='GermanM34SoftCap_V21';
     cap.userData.proceduralPilotka=true;
     const wool=new THREE.MeshStandardMaterial({
-      color:0x4e5b52,roughness:1,metalness:0,side:THREE.DoubleSide
+      color:0x48574d,roughness:1,metalness:0,side:THREE.DoubleSide
     });
     const turnup=new THREE.MeshStandardMaterial({
-      color:0x435047,roughness:1,metalness:0,side:THREE.DoubleSide
+      color:0x404d43,roughness:1,metalness:0,side:THREE.DoubleSide
     });
     const rimMat=new THREE.MeshStandardMaterial({
-      color:0x39463e,roughness:1,metalness:0
+      color:0x38453c,roughness:1,metalness:0
     });
+    // Small deterministic heather pattern to keep the field-grey cloth
+    // matte and fibrous on mobile screens, without additional asset requests.
+    const size=64,data=new Uint8Array(size*size*4);
+    let seed=17331;
+    for(let i=0;i<size*size;i++){
+      seed=(1664525*seed+1013904223)>>>0;
+      const n=225+(seed%25);
+      data[i*4]=n;data[i*4+1]=n;data[i*4+2]=n;data[i*4+3]=255;
+    }
+    const woolTexture=new THREE.DataTexture(data,size,size,THREE.RGBAFormat);
+    woolTexture.wrapS=woolTexture.wrapT=THREE.RepeatWrapping;
+    woolTexture.magFilter=THREE.LinearFilter;
+    woolTexture.minFilter=THREE.LinearMipmapLinearFilter;
+    woolTexture.generateMipmaps=true;woolTexture.needsUpdate=true;
+    wool.map=woolTexture;turnup.map=woolTexture;
     const makeSurface=(name,positions,indices,material)=>{
       const geometry=new THREE.BufferGeometry();
       geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
       geometry.setIndex(indices);
       geometry.computeVertexNormals();
+      const uv=[];
+      if(name==='M34_RoundedWoolCrown'){
+        for(let i=0;i<=40;i++)for(let j=0;j<=18;j++)uv.push(j/18*3.5,i/40*3.5);
+      }else{
+        for(let row=0;row<3;row++)for(let j=0;j<=64;j++)uv.push(j/64*4,row/2*1.2);
+      }
+      geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
       const mesh=new THREE.Mesh(geometry,material);
       mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true;
       cap.add(mesh);return mesh;
@@ -1135,11 +1157,11 @@ function loadNativeHeroSideCap(rig){
       for(let j=0;j<=ringCount;j++){
         const a=j/ringCount*Math.PI*2,front=Math.cos(a);
         const xBase=Math.sin(a),zBase=front;
-        const xRadius=[.136,.133,.124][row];
+        const xRadius=[.125,.123,.116][row];
         const zRadius=[.207,.203,.191][row];
         const bottom=.167+.010*Math.max(0,front);
-        const top=.220+.003*Math.sin(2*a)+.004*Math.max(0,-front);
-        const fold=.252-.013*Math.abs(front)+.003*Math.sin(3*a);
+        const top=.218+.003*Math.sin(2*a)+.004*Math.max(0,-front);
+        const fold=.247-.010*Math.abs(front)+.003*Math.sin(3*a);
         positions.push(xBase*xRadius,[bottom,top,fold][row],zBase*zRadius);
       }
     }
@@ -1153,14 +1175,15 @@ function loadNativeHeroSideCap(rig){
     const roofPositions=[],roofIndices=[];
     const longitudinal=40,across=18;
     const crownHeight=(u,v)=>{
-      const side=.252-.013*Math.abs(v);
-      const center=.298-.030*v*v+.003*v;
-      return side+(center-side)*Math.pow(Math.max(0,1-u*u),.75)
-        +.0015*Math.sin(u*4+v*5)*(1-Math.abs(u))*(1-Math.abs(v));
+      const side=.247-.010*Math.abs(v);
+      const center=.288-.025*v*v+.003*v;
+      // Soft flatter wool crown, with minute irregular fabric dents.
+      return side+(center-side)*Math.pow(Math.max(0,1-u*u),.56)
+        +.0028*Math.sin(u*2.6+v*5)*(1-Math.abs(u))*(1-Math.abs(v));
     };
     for(let i=0;i<=longitudinal;i++){
       const v=-.999+1.998*i/longitudinal;
-      const half=.124*Math.sqrt(Math.max(.001,1-v*v));
+      const half=.116*Math.sqrt(Math.max(.001,1-v*v));
       for(let j=0;j<=across;j++){
         const u=-1+2*j/across;
         roofPositions.push(half*u,crownHeight(u,v),v*.191);
@@ -1175,8 +1198,8 @@ function loadNativeHeroSideCap(rig){
     // Keep its upper surface beneath the visible rounded crown.
     const liner=new THREE.Mesh(new THREE.SphereGeometry(1,24,14),wool);
     liner.name='M34_InnerCloth';
-    liner.position.set(0,.226,-.005);
-    liner.scale.set(.118,.054,.170);
+    liner.position.set(0,.225,-.005);
+    liner.scale.set(.112,.050,.172);
     liner.castShadow=true;cap.add(liner);
     // A subtle raised fold instead of the earlier twin geometric ridges.
     const seamPoints=[];
@@ -1192,13 +1215,13 @@ function loadNativeHeroSideCap(rig){
     for(let j=0;j<=ringCount;j++){
       const a=j/ringCount*Math.PI*2;
       rimPts.push(new THREE.Vector3(
-        .133*Math.sin(a),.220+.003*Math.sin(2*a)+.004*Math.max(0,-Math.cos(a)),
+        .123*Math.sin(a),.218+.003*Math.sin(2*a)+.004*Math.max(0,-Math.cos(a)),
         .203*Math.cos(a)));
     }
     cap.add(new THREE.Mesh(new THREE.TubeGeometry(
       new THREE.CatmullRomCurve3(rimPts,true),64,.0012,5,true),rimMat));
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German M34-inspired soft wool Schiffchen V20';
+    u.cap=cap;u.headwear='German M34-inspired soft wool Schiffchen V21';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
