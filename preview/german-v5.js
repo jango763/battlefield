@@ -211,6 +211,19 @@ function disposeGermanSoldier(unit){
 }
 function animateGermanSoldier(unit,dt=.016){
   const v=unit.germanPreview;if(!v)return;
+  // The first army migration is an opt-in, one-soldier pilot. Not a wholesale
+  // swap: combat, pathfinding and every ordinary army visual stay unchanged.
+  if(!v.nativeRig&&germanPreview.armyNativeTemplate
+    &&new URLSearchParams(location.search).get('armyRig')==='pilot'
+    &&unit.kind!=='p'&&unit.t==='red'&&v.role==='infantry'
+    &&!germanPreview.armyPilotInstalled){
+    try{installNativeArmyPilot(unit,v);}
+    catch(error){
+      germanPreview.armyPilotError=String(error?.stack||error);
+      germanPreview.armyPilotInstalled=false;
+      console.warn('Army pilot visual fallback: old animation retained',error);
+    }
+  }
   if(v.nativeRig&&animateNativeHeroRig(unit,v,dt))return;
   v.legacy.visible=false;v.anchor.visible=true;
   // Visual locomotion is independent of combat speed, collision and gameplay.
@@ -313,6 +326,60 @@ function animateGermanSoldier(unit,dt=.016){
   v.identity.band.material.color.setHex((hero?unit.side:unit.t)==='red'?0x9e4a44:0x4d7391);
   v.anchor.updateWorldMatrix(true,true);
 }
+// First army checkpoint: migrate ONE infantryman's visual rig only, opt-in.
+// No changes to army HP, orders, AI targets, weapons damage or unit position.
+function installNativeArmyPilot(unit,v){
+  if(!germanPreview.armyNativeTemplate||!germanPreview.armyNativeClips)return false;
+  if(v.nativeRig||germanPreview.armyPilotInstalled)return false;
+  const model=germanSkeletonClone(germanPreview.armyNativeTemplate);
+  model.updateWorldMatrix(true,true);
+  const box=new THREE.Box3().setFromObject(model);
+  const size=box.getSize(new THREE.Vector3()),factor=2.55/size.y;
+  if(!Number.isFinite(factor)||factor<=0||factor>1000)throw Error('Army pilot model bounds invalid');
+  const visual=new THREE.Group();visual.name='ArmyNativeRigPilot';
+  model.scale.multiplyScalar(factor);
+  model.position.set(-(box.min.x+box.max.x)*.5*factor,-box.min.y*factor,
+    -(box.min.z+box.max.z)*.5*factor);
+  visual.add(model);
+  const mixer=new THREE.AnimationMixer(model),actions={};
+  for(const [name,clip] of Object.entries(germanPreview.armyNativeClips)){
+    const safe=clip.clone();
+    safe.tracks=safe.tracks.filter(t=>!/\.scale$/.test(t.name)&&
+      !/(?:^|[./])root(?:\]|\.|_)?(?:position)?\.position$/.test(t.name));
+    actions[name]=mixer.clipAction(safe);
+  }
+  actions.idle.play();
+  const previous={
+    oldFigureVisible:v.figure.visible,oldWeaponVisible:v.weapon.root.visible,
+    oldIdentityVisible:v.identity.root.visible
+  };
+  const rig={visual,model,mixer,actions,state:'idle',previous,armyUnit:unit};
+  v.anchor.add(visual);
+  try{
+    // Reuse the hero's already implemented 2-hand grip and WW2 outfit
+    // retargeter, not the legacy soldier bone animation.
+    initNativeHeroWeapon(v,rig);
+    dressNativeHeroFieldUniform(rig);
+    v.nativeRig=rig;
+    v.figure.visible=false;
+    v.weapon.root.visible=false;
+    v.identity.root.visible=false;
+    germanPreview.armyPilotInstalled=true;
+    germanPreview.armyPilotUnit=unit;
+    germanPreview.armyPilotStats={role:v.role,faction:unit.t,
+      clips:Object.keys(actions),bones:(()=>{
+        let n=0;model.traverse(x=>{if(x.isBone)n++});return n;
+      })()};
+    return true;
+  }catch(error){
+    v.nativeRig=null;
+    v.anchor.remove(visual);
+    v.figure.visible=previous.oldFigureVisible;
+    v.weapon.root.visible=previous.oldWeaponVisible;
+    v.identity.root.visible=previous.oldIdentityVisible;
+    throw error;
+  }
+}
 // Native rig diagnostic: Quaternius mesh + its OWN skeleton + animation library.
 // No retargeting and no changes to the army or gameplay. Only the HERO.
 // Assets from https://github.com/Seyamalam/blood-league-kickoff/ (CC0
@@ -408,9 +475,13 @@ function initNativeHeroWW2WeaponCatalog(rig){
     w.ww2Manifest=manifest;
   }).catch(error=>{w.ww2CatalogError=String(error);console.warn('WW2 catalog fallback:',error);});
 }
+function nativeArmyWeaponSlot(unit){
+  return unit.type==='smg'?1:unit.type==='mg'?2:0;
+}
 function selectNativeHeroWW2Weapon(unit,rig){
   const w=rig.weapon;
-  const side=unit.side==='red'?'red':'blue',slot=Math.max(0,Math.min(5,unit.wpn|0));
+  const side=(unit.kind==='p'?unit.side:unit.t)==='red'?'red':'blue';
+  const slot=unit.kind==='p'?Math.max(0,Math.min(5,unit.wpn|0)):nativeArmyWeaponSlot(unit);
   const ids=side==='red'?['de-kar98k','de-mp40','de-mg42','de-kar98k']:
     ['uk-lee-enfield','uk-sten','uk-bren','uk-lee-enfield'];
   const key=slot>=4?null:ids[slot],catalog=w.ww2Manifest,info=key?catalog?.weapons?.[key]:null;
@@ -558,7 +629,7 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
     w.supportPalm.quaternion.multiply(new THREE.Quaternion().setFromEuler(
       new THREE.Euler(pose.x||0,pose.y||0,pose.z||0,'XYZ')));
     w.supportPalm.position.set(0,-.028,.10);
-    w.supportPalm.visible=(unit.wpn|0)===1;
+    w.supportPalm.visible=(unit.kind==='p'?(unit.wpn|0):nativeArmyWeaponSlot(unit))===1;
   }
   vis.updateWorldMatrix(true,true);
   const rightError=rig.hands.right.hand.getWorldPosition(new THREE.Vector3())
@@ -914,7 +985,7 @@ function updateNativeHeroFieldUniform(rig){
     updateNativeHeroPrimitiveUniform(rig);
     return;
   }
-  const side=(P&&P.side)==='red'?'red':'blue';
+  const side=(rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P&&P.side)==='red'?'red':'blue';
   if(uniform.side!==side){
     uniform.side=side;
     if(uniform.cap)uniform.cap.visible=side==='red';
@@ -1317,6 +1388,13 @@ function nativeHeroLoad(){
     };
     if(Object.values(selected).some(clip=>!clip||!clip.tracks.length||!Number.isFinite(clip.duration)||clip.duration<=0)){
       throw new Error('В библиотеке нет Idle / Jog / Sprint');
+    }
+    // Snapshot the UNMODIFIED hero asset before it is dressed or animated.
+    // One test soldier can clone this character with independent skeleton
+    // and mixer while sharing the read-only source animation clips.
+    if(new URLSearchParams(location.search).get('armyRig')==='pilot'){
+      germanPreview.armyNativeTemplate=germanSkeletonClone(model);
+      germanPreview.armyNativeClips=selected;
     }
     model.updateMatrixWorld(true);
     const box=new THREE.Box3().setFromObject(model);
