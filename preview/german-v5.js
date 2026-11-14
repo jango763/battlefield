@@ -1104,137 +1104,101 @@ function loadNativeHeroSideCap(rig){
   // close-fitting, head-tracked geometry for the German pilotka by default.
   // ?pilotka=classic retains the old source mesh for A/B inspection.
   if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
+    // Unmarked WWII M34-inspired wool Schiffchen: continuous curved fabric,
+    // low folded side wall, no rigid polygonal roof or pointed helmet apex.
     const cap=new THREE.Group();
-    cap.name='GermanPilotka_HeadTracked_V19_SoftCloth';
+    cap.name='GermanM34SoftCap_V20';
     cap.userData.proceduralPilotka=true;
-    // Narrow cloth Schiffchen silhouette, not an inflated beret.
-    // Five cross-sections follow the scalp, with a pointed folded crest.
-    const cloth=new THREE.MeshLambertMaterial({color:0x4a5751,side:THREE.DoubleSide});
-    const sideCloth=new THREE.MeshLambertMaterial({color:0x435049,side:THREE.DoubleSide});
-    const edge=new THREE.MeshLambertMaterial({color:0x36433e,side:THREE.DoubleSide});
-    const seam=new THREE.MeshLambertMaterial({color:0x4e5a53,side:THREE.DoubleSide});
-    // Share vertices between adjacent polygons before computing normals.
-    // The older triangles used duplicate vertices, giving a rigid low-poly
-    // look even though the material itself used smooth shading.
-    const smoothSurface=(coords)=>{
-      const geo=new THREE.BufferGeometry(),points=[],faces=[],lookup=new Map();
-      for(let i=0;i<coords.length;i+=3){
-        const x=coords[i],y=coords[i+1],z=coords[i+2];
-        const key=[x,y,z].map(v=>Math.round(v*1e6)).join(',');
-        let id=lookup.get(key);
-        if(id===undefined){
-          id=points.length/3;lookup.set(key,id);
-          points.push(x,y,z);
-        }
-        faces.push(id);
-      }
-      geo.setAttribute('position',new THREE.Float32BufferAttribute(points,3));
-      geo.setIndex(faces);
-      geo.computeVertexNormals();
-      return geo;
+    const wool=new THREE.MeshStandardMaterial({
+      color:0x4e5b52,roughness:1,metalness:0,side:THREE.DoubleSide
+    });
+    const turnup=new THREE.MeshStandardMaterial({
+      color:0x435047,roughness:1,metalness:0,side:THREE.DoubleSide
+    });
+    const rimMat=new THREE.MeshStandardMaterial({
+      color:0x39463e,roughness:1,metalness:0
+    });
+    const makeSurface=(name,positions,indices,material)=>{
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      const mesh=new THREE.Mesh(geometry,material);
+      mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true;
+      cap.add(mesh);return mesh;
     };
-    // A thin inner liner stays beneath the folded cap, not a rounded beret.
-    const liner=new THREE.Mesh(new THREE.SphereGeometry(1,22,14),cloth);
-    liner.name='Pilotka_Interior_Liner';
-    liner.scale.set(.138,.038,.176);liner.position.set(0,.219,-.006);
+    // Soft folded cuff: oval perimeter and a shallow curved flap, both
+    // continuously connected around the forehead, ears and nape.
+    const ringCount=64;
+    const positions=[],indices=[];
+    for(let row=0;row<3;row++){
+      for(let j=0;j<=ringCount;j++){
+        const a=j/ringCount*Math.PI*2,front=Math.cos(a);
+        const xBase=Math.sin(a),zBase=front;
+        const xRadius=[.136,.133,.124][row];
+        const zRadius=[.207,.203,.191][row];
+        const bottom=.167+.010*Math.max(0,front);
+        const top=.220+.003*Math.sin(2*a)+.004*Math.max(0,-front);
+        const fold=.252-.013*Math.abs(front)+.003*Math.sin(3*a);
+        positions.push(xBase*xRadius,[bottom,top,fold][row],zBase*zRadius);
+      }
+    }
+    for(let row=0;row<2;row++)for(let j=0;j<ringCount;j++){
+      const a=row*(ringCount+1)+j,b=a+ringCount+1;
+      indices.push(a,b,a+1,b,b+1,a+1);
+    }
+    makeSurface('M34_SoftTurnup',positions,indices,turnup);
+    // Crown is a shallow, rounded fabric sheet (not a symmetric triangular
+    // roof). Cross-sections taper naturally towards the two ends.
+    const roofPositions=[],roofIndices=[];
+    const longitudinal=40,across=18;
+    const crownHeight=(u,v)=>{
+      const side=.252-.013*Math.abs(v);
+      const center=.298-.030*v*v+.003*v;
+      return side+(center-side)*Math.pow(Math.max(0,1-u*u),.75)
+        +.0015*Math.sin(u*4+v*5)*(1-Math.abs(u))*(1-Math.abs(v));
+    };
+    for(let i=0;i<=longitudinal;i++){
+      const v=-.999+1.998*i/longitudinal;
+      const half=.124*Math.sqrt(Math.max(.001,1-v*v));
+      for(let j=0;j<=across;j++){
+        const u=-1+2*j/across;
+        roofPositions.push(half*u,crownHeight(u,v),v*.191);
+      }
+    }
+    for(let i=0;i<longitudinal;i++)for(let j=0;j<across;j++){
+      const a=i*(across+1)+j,b=a+across+1;
+      roofIndices.push(a,b,a+1,b,b+1,a+1);
+    }
+    makeSurface('M34_RoundedWoolCrown',roofPositions,roofIndices,wool);
+    // Opaque interior cloth blocks occasional scalp pixels as the head tilts.
+    // Keep its upper surface beneath the visible rounded crown.
+    const liner=new THREE.Mesh(new THREE.SphereGeometry(1,24,14),wool);
+    liner.name='M34_InnerCloth';
+    liner.position.set(0,.226,-.005);
+    liner.scale.set(.118,.054,.170);
     liner.castShadow=true;cap.add(liner);
-    // The front-facing fabric strip blocks bald scalp triangles in the cap
-    // opening. A 2D curved panel fixes the gap without inflating the crown.
-    const facing=[];
-    const steps=28;
-    for(let i=0;i<steps;i++){
-      const theta0=-1.32+(2.64*i/steps),theta1=-1.32+(2.64*(i+1)/steps);
-      // Fold follows the actual cap nose, not a tall outward cylinder.
-      const point=(a,y)=>[.129*Math.sin(a),y,(.200-(y-.190)*.20)*Math.cos(a)+.003];
-      const v0=point(theta0,.185),v1=point(theta1,.185),
-        w0=point(theta0,.250),w1=point(theta1,.250);
-      facing.push(...v0,...v1,...w1,...v0,...w1,...w0);
+    // A subtle raised fold instead of the earlier twin geometric ridges.
+    const seamPoints=[];
+    for(let j=0;j<=24;j++){
+      const v=-.92+1.84*j/24;
+      const u=-.78,half=.124*Math.sqrt(1-v*v);
+      seamPoints.push(new THREE.Vector3(half*u,crownHeight(u,v)+.0015,v*.191));
     }
-    const frontGeo=smoothSurface(facing);
-    const frontBand=new THREE.Mesh(frontGeo,sideCloth);
-    frontBand.name='Pilotka_ForeheadFacing';
-    frontBand.castShadow=true;frontBand.receiveShadow=true;
-    cap.add(frontBand);
-    const stations=[
-      // Lift only the crown and shoulder panels above the hair volume.
-      // The face band and side widths remain exactly as in approved V16.
-      {z:-.194,w:.054,b:.180,s:.251,t:.260},
-      {z:-.134,w:.112,b:.166,s:.258,t:.292},
-      {z:-.062,w:.141,b:.162,s:.261,t:.313},
-      {z:.062,w:.141,b:.162,s:.261,t:.313},
-      {z:.134,w:.112,b:.166,s:.258,t:.292},
-      {z:.194,w:.054,b:.180,s:.251,t:.260}
-    ];
-    // Bring the German sidecap 15% closer to the temples. Leave its
-    // front-to-back length and height untouched to keep the scalp covered.
-    for(const section of stations)section.w*=.89;
-    liner.scale.x*=.89;
-    // Catmull-Rom interpolated fabric panels soften the sharp hard-surface
-    // profile at the original six section boundaries. Keep those original
-    // stations as anchors so the validated head fit does not drift.
-    const profile=[];
-    const curveValue=(key,i,t)=>{
-      const a=stations[Math.max(0,i-1)][key];
-      const b=stations[i][key],c=stations[i+1][key];
-      const d=stations[Math.min(stations.length-1,i+2)][key];
-      const t2=t*t,t3=t2*t;
-      return .5*((2*b)+(-a+c)*t+(2*a-5*b+4*c-d)*t2+
-        (-a+3*b-3*c+d)*t3);
-    };
-    for(let i=0;i<stations.length-1;i++){
-      for(let j=0;j<4;j++){
-        const t=j/4;
-        const v={z:THREE.MathUtils.lerp(stations[i].z,stations[i+1].z,t)};
-        for(const key of ['w','b','s','t'])v[key]=curveValue(key,i,t);
-        profile.push(v);
-      }
+    const seamCurve=new THREE.CatmullRomCurve3(seamPoints);
+    cap.add(new THREE.Mesh(new THREE.TubeGeometry(seamCurve,28,.0011,5,false),rimMat));
+    // Folded cuff seam follows the upper edge without making a thick brim.
+    const rimPts=[];
+    for(let j=0;j<=ringCount;j++){
+      const a=j/ringCount*Math.PI*2;
+      rimPts.push(new THREE.Vector3(
+        .133*Math.sin(a),.220+.003*Math.sin(2*a)+.004*Math.max(0,-Math.cos(a)),
+        .203*Math.cos(a)));
     }
-    profile.push(stations[stations.length-1]);
-    const bands={side:[],roof:[],top:[]};
-    const quad=(into,p,q,r,t)=>into.push(...p,...q,...r,...p,...r,...t);
-    for(let i=0;i<profile.length-1;i++){
-      const a=profile[i],b=profile[i+1];
-      for(const sign of [-1,1]){
-        const pt=(v,x,y)=>[sign*x,y,v.z];
-        // Folded wall and inward sloping upper flap
-        quad(bands.side,pt(a,a.w,a.b),pt(b,b.w,b.b),
-          pt(b,b.w*.79,b.s),pt(a,a.w*.79,a.s));
-        quad(bands.roof,pt(a,a.w*.79,a.s),pt(b,b.w*.79,b.s),
-          pt(b,.017,b.t),pt(a,.017,a.t));
-      }
-      quad(bands.top,[-.017,a.t,a.z],[-.017,b.t,b.z],
-        [.017,b.t,b.z],[.017,a.t,a.z]);
-    }
-    for(const [name,coords,material] of [
-      ['side',bands.side,sideCloth],
-      ['roof',bands.roof,cloth],
-      ['top',bands.top,cloth]
-    ]){
-      const geo=smoothSurface(coords);
-      const piece=new THREE.Mesh(geo,material);
-      piece.name='Pilotka_'+name;piece.castShadow=true;piece.receiveShadow=true;
-      cap.add(piece);
-    }
-    for(const sign of [-1,1]){
-      const fold=new THREE.CatmullRomCurve3(stations.map(v=>
-        new THREE.Vector3(sign*.018,v.t+.003,v.z)));
-      cap.add(new THREE.Mesh(new THREE.TubeGeometry(fold,32,.0012,5,false),seam));
-      const rim=new THREE.CatmullRomCurve3(stations.map(v=>
-        new THREE.Vector3(sign*v.w,v.b+.003,v.z)));
-      cap.add(new THREE.Mesh(new THREE.TubeGeometry(rim,32,.0019,5,false),edge));
-    }
-    // Tapered front/back cloth corners (the sidecap has no visor).
-    for(const idx of [0,stations.length-1]){
-      const v=stations[idx],tri=[
-        -v.w,v.b,v.z, v.w,v.b,v.z, 0,v.t,v.z
-      ];
-      const geo=new THREE.BufferGeometry();
-      geo.setAttribute('position',new THREE.Float32BufferAttribute(tri,3));
-      geo.computeVertexNormals();
-      cap.add(new THREE.Mesh(geo,sideCloth));
-    }
+    cap.add(new THREE.Mesh(new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3(rimPts,true),64,.0012,5,true),rimMat));
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German head-following Schiffchen V19';
+    u.cap=cap;u.headwear='German M34-inspired soft wool Schiffchen V20';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
