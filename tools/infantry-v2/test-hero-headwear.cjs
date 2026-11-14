@@ -82,6 +82,25 @@ if(process.argv.includes('--browser')){
             };
           });
           console.log('KNIT_FIT_DIAG',JSON.stringify(fit));
+          // Capture the actual rendered hero head for independent visual
+          // inspection before asking the iPhone player to test another build.
+          const screen=await page.evaluate(()=>{
+            const r=P.germanPreview.nativeRig;
+            const p=r.ww2Uniform.headBone.getWorldPosition(new THREE.Vector3()).clone();
+            const canvas=document.querySelector('canvas');
+            const bounds=canvas.getBoundingClientRect();
+            p.project(cam);
+            return{
+              x:bounds.x+(p.x+1)*bounds.width/2,
+              y:bounds.y+(1-p.y)*bounds.height/2
+            };
+          });
+          const x=Math.max(0,Math.min(844-250,Math.round(screen.x-125)));
+          const y=Math.max(0,Math.min(540-240,Math.round(screen.y-112)));
+          const jpg=await page.screenshot({clip:{x,y,width:250,height:240},
+            type:'jpeg',quality:72});
+          console.log('KNIT_HEAD_CROP_BASE64',jpg.toString('base64'));
+          console.log('KNIT_HEAD_SCREEN',JSON.stringify(screen));
         }
         const data=await page.evaluate(async type=>{
           const rig=P.germanPreview.nativeRig,uniform=rig.ww2Uniform;
