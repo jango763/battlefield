@@ -61,7 +61,8 @@ async function start(){
  // Torso-mounted weapon: independent of the swinging right wrist.
  // Two-handed pose is an experimental procedural aim constraint.
  let weaponContainer=null,weaponRoot=null,grip=null,weaponGeneration=0;
- const weaponSelect=document.querySelector('#weapon');\n weaponSelect.value='de-mp40';
+ const weaponSelect=document.querySelector('#weapon');
+ weaponSelect.value='de-mp40';
  const findPart=(...names)=>modelTargets.find(n=>names.some(x=>norm(n.name)===norm(x)));
  const chest=findPart('spine_03','spine_02','spine2','chest','upperchest','spine1');
  const rightHand=findPart('hand_r','righthand','RightHand');
@@ -117,7 +118,9 @@ async function start(){
   const trigger=weaponRoot.getAbsolutePosition();
   const support=toVec(weaponRoot.metadata?.support||[0,0,.25]);
   const supportWorld=B.Vector3.TransformCoordinates(support,weaponRoot.getWorldMatrix());
-  solveArm(rightUpper,rightLower,rightHand,trigger);\n  solveArm(leftUpper,leftLower,leftHand,supportWorld);\n  state.gripDistances={
+  solveArm(rightUpper,rightLower,rightHand,trigger);
+  solveArm(leftUpper,leftLower,leftHand,supportWorld);
+  state.gripDistances={
    right:rightHand?Number(B.Vector3.Distance(positionOf(rightHand),trigger).toFixed(3)):null,
    left:leftHand?Number(B.Vector3.Distance(positionOf(leftHand),supportWorld).toFixed(3)):null
   };
