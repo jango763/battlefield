@@ -28,6 +28,16 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
       report:window.__rigLab.getReport?.(),
       canvas:document.querySelectorAll('#viewport canvas').length
    }));
+   // The first report can precede the first animated pose; never judge contact from it.
+   await page.waitForTimeout(1200);
+   data.report=await page.evaluate(()=>window.__rigLab.getReport());
+   console.log('R187_SETTLED_IDLE',viewport.name,JSON.stringify(data.report));
+   const assertSkinContact=(measure,side,caseName)=>{
+     assert(Number.isFinite(measure.closestVertexToGrip),'missing skin contact '+caseName+' '+side);
+     assert(measure.closestVertexToGrip<0.25,
+       'visible hand geometry too far from grip '+caseName+' '+side+
+       ' distance='+measure.closestVertexToGrip);
+   };
    if(data.error)throw Error('r187 startup failed: '+data.error);
    assert(data.ready,'r187 models did not initialize');
    assert(data.canvas>=1,'r187 viewport never rendered');
@@ -54,6 +64,8 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
    assert.equal(data.loadedWeapon,'de-mp40');
    assert.equal(data.faction,'red');
    assert.equal(data.animation,'jog');
+   console.log('R187_GERMAN_JOG_REPORT',viewport.name,JSON.stringify(data));
+   for(const side of ['left','right'])assertSkinContact(data.dual[side],side,'German MP40 jog');
    console.log('R187_GERMAN_JOG_PASS',viewport.name,JSON.stringify(data.dual));
    await page.screenshot({path:'/tmp/r187-'+viewport.name+'-de-jog.png'});
    await page.evaluate(()=>window.__rigLab.setState({side:'blue',weapon:'rifle',animation:'idle',retarget:'rotation'}));
@@ -61,7 +73,13 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
    data=await page.evaluate(()=>window.__rigLab.getReport());
    assert.equal(data.loadedWeapon,'uk-lee-enfield','UK rifle GLB did not load');
    assert.equal(data.retarget,'rotation');
-   console.log('R187_UK_RIFLE_PASS',viewport.name,JSON.stringify(data.dual));
+   console.log('R187_UK_RIFLE_ROTATION_CONTROL',viewport.name,JSON.stringify(data));
+   await page.evaluate(()=>window.__rigLab.setState({retarget:'project'}));
+   await page.waitForTimeout(800);
+   const projected=await page.evaluate(()=>window.__rigLab.getReport());
+   console.log('R187_UK_RIFLE_PROJECTED',viewport.name,JSON.stringify(projected));
+   for(const side of ['left','right'])assertSkinContact(projected.dual[side],side,'British rifle idle IK');
+   console.log('R187_UK_RIFLE_PASS',viewport.name,JSON.stringify(projected.dual));
    await page.screenshot({path:'/tmp/r187-'+viewport.name+'-uk-rifle.png'});
    assert.equal(errors.length,0,'JS runtime failures: '+errors.join('; '));
    await page.close();
