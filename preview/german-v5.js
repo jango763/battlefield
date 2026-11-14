@@ -50,11 +50,11 @@ function releaseNativeArmyVisual(unit,v){
   });
   // Per-unit caps contain unique cloth geometry/materials. Shared WW2 weapon
   // meshes and wardrobe textures must NEVER be disposed by one dying unit.
-  for(const object of [rig.ww2Uniform?.cap,rig.ww2Uniform?.beret]){
+  for(const object of [rig.ww2Uniform?.cap,rig.ww2Uniform?.knitCap]){
     if(!object)continue;
     object.traverse(n=>{
       if(!n.isMesh)return;
-      if(n.geometry&&object===rig.ww2Uniform?.beret)n.geometry.dispose();
+      if(n.geometry&&object===rig.ww2Uniform?.knitCap)n.geometry.dispose();
       if(n.geometry&&object===rig.ww2Uniform?.cap&&
         object.name!=='ArmyM43_MIT_GLB'&&
         object.name!=='BritishFieldDishHelmet_PreviewGLB')n.geometry.dispose();
@@ -431,7 +431,7 @@ function installNativeArmyPilot(unit,v){
   // Officers, engineers and ordinary infantry remain visibly distinguishable.
   const number=v.armyVisualIndex||0;
   const headwear=unit.t==='blue'
-    ?(v.role==='captain'?'beret':'brodie')
+    ?(v.role==='captain'?'knit':'brodie')
     :v.role==='captain'?'m43':v.role==='engineer'?'helmet':
       ['sidecap','m43','helmet','sidecap'][number%4];
   const rig={visual,model,mixer,actions,state:'idle',previous,
@@ -479,7 +479,7 @@ function installNativeArmyPilot(unit,v){
    different authored mesh, not the rejected procedural M34 experiments. */
 // British infantry field helmet: licensed low-poly steel dish silhouette.
  // Prototype GLB is hotlinked (not redistributed); final local asset and fit
- // acceptance remain separate release gates. The UK officer keeps his beret.
+ // acceptance remain separate release gates. The UK officer uses a dark-olive knitted field cap.
 function attachNativeArmyBritishBrodie(rig){
   if(!rig?.ww2Uniform||rig.armyHeadwearChoice!=='brodie')return;
   if(!germanPreview.britishBrodieSourcePromise){
@@ -1320,7 +1320,7 @@ function updateNativeHeroFieldUniform(rig){
   if(uniform.side!==side){
     uniform.side=side;
     if(uniform.cap)uniform.cap.visible=(side==='red'&&!armyHelmet)||britishHelmet;
-    if(uniform.beret)uniform.beret.visible=side==='blue';
+    if(uniform.knitCap)uniform.knitCap.visible=side==='blue';
     for(const item of uniform.donorMeshes){
       item.mesh.material=side==='red'?item.german:item.british;
       // Original WWII M42 helmet is deliberately NOT substituted for M43.
@@ -1435,7 +1435,7 @@ function updateNativeHeroFieldUniform(rig){
   // The approved model retains its existing head follow; helmet uses the
   // original skinned WW2 donor helmet and never overlaps the pilotka.
   if(uniform.cap)uniform.cap.visible=(side==='red'&&!armyHelmet)||britishHelmet;
-  if(uniform.beret)uniform.beret.visible=side==='blue';
+  if(uniform.knitCap)uniform.knitCap.visible=side==='blue';
   if(uniform.cap&&uniform.headBone){
     const cap=uniform.cap,head=uniform.headBone,space=rig.visual;
     space.updateWorldMatrix(true,true);
@@ -1473,93 +1473,92 @@ function updateNativeHeroFieldUniform(rig){
       cap.position.add(new THREE.Vector3(0,0,forward).applyQuaternion(cap.quaternion));
     }
   }
-  if(uniform.beret&&uniform.headBone){
-    const beret=uniform.beret,head=uniform.headBone,space=rig.visual;
+  if(uniform.knitCap&&uniform.headBone){
+    const cap=uniform.knitCap,head=uniform.headBone,space=rig.visual;
     space.updateWorldMatrix(true,true);
-    beret.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
+    cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
     const inv=space.getWorldQuaternion(new THREE.Quaternion()).invert();
-    beret.quaternion.copy(inv.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
-    // Raise the BRITISH beret to the hairline: it must never hide the eyes.
-    // German sidecap placement above remains at its established height.
-    // The earlier 0.235 / 0.046 offsets made the beret float above the
-    // forehead in portrait Safari screenshots. Seat the band on the crown.
-    beret.position.y+=.193;
-    beret.position.add(new THREE.Vector3(0,0,.029).applyQuaternion(beret.quaternion));
+    cap.quaternion.copy(inv.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
+    // Sit below the former beret band and cover upper ears and scalp.
+    // Follow the animated head bone without changing the native skeleton.
+    cap.position.y+=.178;
+    cap.position.add(new THREE.Vector3(0,0,.016).applyQuaternion(cap.quaternion));
   }
 }
 
 
-// The British faction wears a soft maroon airborne-style beret, not the
-// German field-grey sidecap. All geometry is lightweight and head-following.
-function createNativeHeroBritishBeret(rig){
+// A single dark-olive knitted cap for the blue hero and UK officer.
+// Lightweight mesh, short folded cuff, visible knit ribs; no pompom.
+function createNativeHeroBritishKnitCap(rig){
   const u=rig.ww2Uniform;
-  if(!u?.headBone||u.beret)return;
-  const beret=new THREE.Group();
-  beret.name='WW2_British_Maroon_Beret';
-  const felt=new THREE.MeshLambertMaterial({color:0x742b37,side:THREE.DoubleSide});
-  const brim=new THREE.MeshLambertMaterial({color:0x382329});
-  const badge=new THREE.MeshLambertMaterial({color:0xc4b58c});
-  const add=(geo,mat,pos,scale)=>{
+  if(!u?.headBone||u.knitCap)return;
+  const knitCap=new THREE.Group();
+  knitCap.name='WW2_British_DarkOlive_KnitCap';
+  const wool=new THREE.MeshLambertMaterial({color:0x39432d,side:THREE.DoubleSide});
+  const cuffWool=new THREE.MeshLambertMaterial({color:0x303b27,side:THREE.DoubleSide});
+  const ribWool=new THREE.LineBasicMaterial({color:0x1f2a1c,transparent:true,opacity:.45});
+  const add=(geo,mat,name,pos)=>{
     const m=new THREE.Mesh(geo,mat);
-    m.position.set(...pos);if(scale)m.scale.set(...scale);
-    m.castShadow=true;m.receiveShadow=true;beret.add(m);return m;
+    m.name=name;
+    if(pos)m.position.set(...pos);
+    m.castShadow=true;m.receiveShadow=true;
+    knitCap.add(m);return m;
   };
-  // A single, CLOSED felt crown over the entire scalp, with one narrow
-  // headband. The last radial profile was only 5.9 cm tall, allowing the
-  // upper scalp to protrude through the middle (iPhone side-view repro).
-  const bandMesh=add(new THREE.CylinderGeometry(.121,.124,.020,36),brim,[0,.008,0]);
-  bandMesh.name='BritishBeret_Headband';
-  // The crown rises above the scalp (15.0 cm at the centre) and drapes
-  // slightly to the wearer's right; its lower edge joins the headband.
-  // No second dome, empty centre, or visible geometry behind the scalp.
-  const crownShape=new THREE.BufferGeometry(),segments=48;
+  // Rounded knitted crown closes the scalp, with a fitted unbroken outline.
+  // The front and sides descend over the upper ears; the apex stays soft.
+  const segments=40;
   const sections=[
-    {r:.121,y:.011,x:0,z:0},
-    {r:.133,y:.031,x:.003,z:0},
-    {r:.153,y:.060,x:.011,z:-.002},
-    {r:.155,y:.091,x:.032,z:-.003},
-    {r:.123,y:.125,x:.051,z:-.003},
-    {r:.080,y:.146,x:.064,z:-.003},
-    {r:.030,y:.151,x:.071,z:-.002}
+    {r:.130,y:-.043,x:0},
+    {r:.135,y:-.024,x:0},
+    {r:.140,y:.018,x:.001},
+    {r:.139,y:.063,x:.004},
+    {r:.125,y:.112,x:.006},
+    {r:.092,y:.152,x:.007},
+    {r:.047,y:.178,x:.008}
   ];
-  const vertices=[],faces=[];
+  const vertices=[],triangles=[];
   for(let k=0;k<sections.length;k++){
     const ring=sections[k];
     for(let i=0;i<segments;i++){
-      const a=i*Math.PI*2/segments,c=Math.cos(a),t=Math.sin(a);
-      // Subtle hanging soft-cloth edge on the displaced side only.
-      const drape=k>2?Math.max(0,c)*.022*((k-2)/4):0;
-      vertices.push(ring.x+ring.r*c,ring.y-drape,ring.z+ring.r*t*.96);
+      const a=2*Math.PI*i/segments;
+      const c=Math.cos(a),t=Math.sin(a);
+      vertices.push(ring.x+ring.r*c,ring.y,ring.r*t*.95);
       if(k>0){
-        const prev=(k-1)*segments+i,prevNext=(k-1)*segments+(i+1)%segments;
-        const here=k*segments+i,next=k*segments+(i+1)%segments;
-        faces.push(prev,here,prevNext,prevNext,here,next);
+        const p=(k-1)*segments+i,pn=(k-1)*segments+(i+1)%segments;
+        const n=k*segments+i,nn=k*segments+(i+1)%segments;
+        triangles.push(p,n,pn,pn,n,nn);
       }
     }
   }
-  // Close the final ring: otherwise a top hole can expose bald scalp.
-  const apex=vertices.length/3;
-  vertices.push(.072,.152,-.002);
+  const apex=vertices.length/3;vertices.push(.008,.187,0);
   for(let i=0;i<segments;i++)
-    faces.push((sections.length-1)*segments+i,apex,
+    triangles.push((sections.length-1)*segments+i,apex,
       (sections.length-1)*segments+(i+1)%segments);
-  crownShape.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
-  crownShape.setIndex(faces);
-  crownShape.computeVertexNormals();
-  const crown=add(crownShape,felt,[0,0,0]);
-  crown.name='BritishBeret_SingleFeltCrown';
-  const insignia=add(new THREE.BoxGeometry(.024,.030,.008),badge,[-.070,.038,.118]);
-  insignia.name='BritishBeret_CapBadge';
-  rig.visual.add(beret);
-  u.beret=beret;
-  u.headwear='British maroon beret';
-  // The original hero-only logic referenced P.side here; when a RED army
-  // infantryman used the same headwear constructor with a BLUE hero,
-  // both the red beret and German sidecap rendered on his head.
-  const ownerSide=(rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P&&P.side);
-  beret.visible=ownerSide==='blue';
+  const crownGeo=new THREE.BufferGeometry();
+  crownGeo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+  crownGeo.setIndex(triangles);
+  crownGeo.computeVertexNormals();
+  add(crownGeo,wool,'BritishKnitCap_ClosedCrown');
+  // Simple folded cuff: not a second hat, just a short ribbed wool band.
+  add(new THREE.CylinderGeometry(.138,.135,.052,40,1,true),
+    cuffWool,'BritishKnitCap_FoldedCuff',[0,-.017,0]);
+  const ribVertices=[];
+  for(let i=0;i<40;i++){
+    const a=i*Math.PI*2/40;
+    const c=Math.cos(a),t=Math.sin(a);
+    ribVertices.push(c*.1385,-.042,t*.1385*.95,c*.1385,.008,t*.1385*.95);
+  }
+  const ribGeo=new THREE.BufferGeometry();
+  ribGeo.setAttribute('position',new THREE.Float32BufferAttribute(ribVertices,3));
+  const ribs=new THREE.LineSegments(ribGeo,ribWool);
+  ribs.name='BritishKnitCap_CuffRibs';knitCap.add(ribs);
+  rig.visual.add(knitCap);
+  u.knitCap=knitCap;
+  u.headwear='British dark olive knitted cap';
+  const ownerSide=rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P?.side;
+  knitCap.visible=ownerSide==='blue';
 }
-// Only the hero's own cap/beret objects are disposable here. Army GLB
+// Only the hero's own cap/knit-cap objects are disposable here. Army GLB
 // headwear (including shared source meshes) is managed by the army rig.
 function discardNativeHeroHeadwear(rig,property){
   const uniform=rig.ww2Uniform,group=uniform?.[property];
@@ -1584,17 +1583,16 @@ function loadNativeHeroSideCap(rig){
     u.heroHeadwearInitialized=true;
     if(u.heroHeadwearFaction!==side){
       discardNativeHeroHeadwear(rig,'cap');
-      discardNativeHeroHeadwear(rig,'beret');
+      discardNativeHeroHeadwear(rig,'knitCap');
       u.heroHeadwearFaction=side;
       u.headwear='none';
     }
   }
   if(new URLSearchParams(location.search).get('headwear')==='none')return;
   if(side==='blue'){
-    // Only the hero and a designated British officer wear maroon berets.
-    // Ordinary British soldiers wait for their own helmet GLB.
-    if(!rig.armyUnit||rig.armyHeadwearChoice==='beret')
-      createNativeHeroBritishBeret(rig);
+    // Hero and British officer get wool caps; regular British infantry keep helmets.
+    if(!rig.armyUnit||rig.armyHeadwearChoice==='knit')
+      createNativeHeroBritishKnitCap(rig);
     return;
   }
   if(!rig.armyUnit&&u.cap)return; // idempotent: never duplicate the hero cap
