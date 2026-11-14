@@ -65,7 +65,8 @@ if(process.argv.includes('--browser')){
             }
           });
           const crown=hat.getObjectByName('BritishBeretOnePieceFeltCrown');
-          const box=new THREE.Box3().setFromObject(crown);
+          crown.geometry.computeBoundingBox();
+          const box=crown.geometry.boundingBox;
           values.geometryBounds=box.getSize(new THREE.Vector3()).toArray();
           const anchor=hat.getWorldPosition(new THREE.Vector3());
           const x=P.x,z=P.z;
