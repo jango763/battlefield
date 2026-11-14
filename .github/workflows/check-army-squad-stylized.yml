@@ -1,7 +1,7 @@
 name: Four-man German squad native animation QA
 on:
   push:
-    branches: [feature/army-four-squad-stylized-20261114]
+    branches: [feature/army-four-squad-grip-v2-20261114]
     paths:
       - preview/german-v5.js
       - preview/formation-replenishment-v3.html
@@ -154,7 +154,12 @@ jobs:
                     maxGrip=Math.max(maxGrip,d?.rightError??Infinity,d?.leftError??Infinity);
                     maxCostumeGrip=Math.max(maxCostumeGrip,d?.visibleRightError??Infinity,d?.visibleLeftError??Infinity);
                     const rig=u.germanPreview.nativeRig,arms=rig.ww2Uniform.donorHands;
-                    const metrics={unit:i,variant:rig.armyHeadwearChoice};
+                    const metrics={unit:i,variant:rig.armyHeadwearChoice,
+                      fingerPose:rig.weaponDiagnostics?.armyFingerPose,
+                      fingers:rig.ww2Uniform?.donorFingers?.length,
+                      extraPalm:!!rig.weapon.supportPalm?.visible,
+                      weapon:rig.weapon?.activeModelId,
+                      expectedPose:u.type==='mg'?'mg':u.type==='smg'?'smg':'rifle'};
                     for(const side of ['right','left']){
                       const arm=arms[side];
                       const a=arm.upper.getWorldPosition(new THREE.Vector3());
@@ -167,6 +172,9 @@ jobs:
                       metrics[side]={error:c.distanceTo(t),distance,reach,
                         shortBy:Math.max(0,distance-reach)};
                     }
+                    if(metrics.fingers<24||metrics.extraPalm||
+                      metrics.fingerPose!==metrics.expectedPose)
+                      result.errors.push('invalid squad hand pose '+JSON.stringify(metrics));
                     details.push(metrics);
                   }
                   return {states:units.map(u=>u.germanPreview.nativeRig.state),
