@@ -747,10 +747,14 @@ function selectNativeHeroWW2Weapon(unit,rig){
     w.support.position.copy(vec(info.support)).addScaledVector(new THREE.Vector3().fromArray(info.supportPalm),.014);
     // MG42 original forward contact was beyond reach in the aimed pose.
     if(rig.armyUnit&&key==='de-mg42')w.support.position.z-=.09;
-    if(key==='de-mp40'||key==='uk-sten'){
-      // The WW2 donor sleeve ends at a different bind-pose wrist length.
-      // Shift the support contact on the real fore-end to reveal the LEFT
-      // palm outside the cuff, instead of covering it with a fake fist.
+    if(key==='uk-sten'&&!rig.armyUnit){
+      // The old +8 cm forward/+5.5 cm upward wrist target put the British
+      // support palm next to the muzzle and above the barrel. It looked like
+      // a second detached hand. Support the STEN from BELOW, nearer its
+      // receiver/fore-end and clear of the muzzle. Visual IK only.
+      w.support.position.add(new THREE.Vector3(0,-.055,-.16));
+    }else if(key==='de-mp40'||key==='uk-sten'){
+      // Preserve approved German and regular-army contacts unchanged.
       const testOffset=window.__ww2SupportOffset||{x:0,y:.055,z:.08};
       w.support.position.add(new THREE.Vector3(testOffset.x||0,testOffset.y||0,testOffset.z||0));
     }
