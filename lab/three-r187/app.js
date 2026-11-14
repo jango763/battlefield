@@ -178,6 +178,12 @@ function setupWorld(){
  $('resetCam').onclick=()=>{
   camera.position.set(0,2.7,8.6);controls.target.set(0,1.36,0);controls.update();
  };
+ $('handsCam').onclick=()=>{
+  // Zoom onto the actual donor wrists and weapon while keeping OrbitControls.
+  camera.position.set(2.15,2.15,2.9);
+  controls.target.set(1.65,1.73,0);
+  controls.update();
+ };
  let sizeW=0,sizeH=0;
  const resize=()=>{
   const rect=viewport.getBoundingClientRect();
@@ -480,6 +486,10 @@ function controls(){
   state.markers=!state.markers;
   $('markers').setAttribute('aria-pressed',String(state.markers));
  };
+ $('aim').onclick=()=>{
+  state.aim=!state.aim;
+  $('aim').setAttribute('aria-pressed',String(state.aim));
+ };
 }
 async function main(){
  if(!document.createElement('canvas').getContext('webgl2'))
@@ -496,6 +506,9 @@ async function main(){
   makePanel(1.65,character.scene,donor,animations.animations,'blue')
  ];
  state.ready=true;await refreshWeapon();
+ // Compute the very first actual IK/glove pose BEFORE reporting ready.
+ // Otherwise first-frame metrics measured unpositioned wrists (~2m error).
+ for(const panel of panels)setRigPose(panel,0);
  window.__rigLab.scene=world.scene;window.__rigLab.panels=panels;
  window.__rigLab.getReport=()=>state.stats;
  window.__rigLab.setState=async args=>{
