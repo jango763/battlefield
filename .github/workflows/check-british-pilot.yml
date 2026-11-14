@@ -1,0 +1,40 @@
+name: British 4 soldier native rig pilot QA
+on:
+  push:
+    branches: [feature/british-army-pilot-after-wehrmacht-20261114]
+    paths:
+      - preview/german-v5.js
+      - preview/formation-replenishment-v3.html
+      - tools/infantry-v2/test-british-pilot.cjs
+      - .github/workflows/check-british-pilot.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static parsing and British role/weapon gates
+        run: |
+          node --check preview/german-v5.js
+          node --check tools/infantry-v2/test-british-pilot.cjs
+          node tools/infantry-v2/test-british-pilot.cjs
+      - name: Install browser
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/british-pilot playwright@1.58.2
+          /tmp/british-pilot/node_modules/.bin/playwright install chromium
+      - name: Run British 4 soldier animation, gear and weapons QA
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 > /tmp/british-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-british-pilot.cjs --browser
+      - name: Save British test screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: british-four-soldier-pilot
+          path: /tmp/british-four-pilot.png
+          if-no-files-found: ignore
