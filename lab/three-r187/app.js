@@ -183,6 +183,15 @@ function setupWorld(){
  controls.target.set(0,1.36,0);
  controls.enableDamping=true;controls.minDistance=4;
  controls.maxDistance=15;controls.maxPolarAngle=Math.PI/2-.06;
+ const focus=x=>{
+  // Close-up only changes inspection camera, never pose or gameplay.
+  const mobile=viewport.clientWidth<720;
+  camera.position.set(x,2.12,mobile?4.45:3.15);
+  controls.target.set(x,1.91,0);
+  controls.update();
+ };
+ $('focusDual').onclick=()=>focus(1.65);
+ $('focusSingle').onclick=()=>focus(-1.65);
  $('resetCam').onclick=()=>{
   camera.position.set(0,2.7,8.6);controls.target.set(0,1.36,0);controls.update();
  };
