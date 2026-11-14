@@ -1481,8 +1481,10 @@ function updateNativeHeroFieldUniform(rig){
     cap.quaternion.copy(inv.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
     // Seat the wool cuff low enough to cover upper ears and scalp.
     // Follow the animated head bone without changing the native skeleton.
-    cap.position.y+=.178;
-    cap.position.add(new THREE.Vector3(0,0,.016).applyQuaternion(cap.quaternion));
+    // Lower the cuff ~3.5 cm from the loose, helmet-like test fit.
+    // Make the position relative to the animated head's own orientation.
+    cap.position.y+=.143;
+    cap.position.add(new THREE.Vector3(0,0,.023).applyQuaternion(cap.quaternion));
   }
 }
 
@@ -1496,7 +1498,7 @@ function createNativeHeroBritishKnitCap(rig){
   knitCap.name='WW2_British_DarkOlive_KnitCap';
   const wool=new THREE.MeshLambertMaterial({color:0x39432d,side:THREE.DoubleSide});
   const cuffWool=new THREE.MeshLambertMaterial({color:0x303b27,side:THREE.DoubleSide});
-  const ribWool=new THREE.LineBasicMaterial({color:0x1f2a1c,transparent:true,opacity:.45});
+  const ribWool=new THREE.LineBasicMaterial({color:0x182317,transparent:true,opacity:.60});
   const add=(geo,mat,name,pos)=>{
     const m=new THREE.Mesh(geo,mat);
     m.name=name;
@@ -1507,14 +1509,16 @@ function createNativeHeroBritishKnitCap(rig){
   // Rounded knitted crown closes the scalp, with a fitted unbroken outline.
   // The front and sides descend over the upper ears; the apex stays soft.
   const segments=40;
+  // Tighter silhouette: earlier 28 cm by 23 cm dome looked like a soft
+  // combat helmet with a green horseshoe above the forehead on iPhone.
   const sections=[
-    {r:.130,y:-.043,x:0},
-    {r:.135,y:-.024,x:0},
-    {r:.140,y:.018,x:.001},
-    {r:.139,y:.063,x:.004},
-    {r:.125,y:.112,x:.006},
-    {r:.092,y:.152,x:.007},
-    {r:.047,y:.178,x:.008}
+    {r:.117,y:-.052,x:0},
+    {r:.124,y:-.035,x:0},
+    {r:.129,y:-.005,x:0},
+    {r:.129,y:.028,x:.001},
+    {r:.118,y:.069,x:.003},
+    {r:.091,y:.108,x:.004},
+    {r:.047,y:.137,x:.004}
   ];
   const vertices=[],triangles=[];
   for(let k=0;k<sections.length;k++){
@@ -1530,7 +1534,7 @@ function createNativeHeroBritishKnitCap(rig){
       }
     }
   }
-  const apex=vertices.length/3;vertices.push(.008,.187,0);
+  const apex=vertices.length/3;vertices.push(.004,.145,0);
   for(let i=0;i<segments;i++)
     triangles.push((sections.length-1)*segments+i,apex,
       (sections.length-1)*segments+(i+1)%segments);
@@ -1540,13 +1544,13 @@ function createNativeHeroBritishKnitCap(rig){
   crownGeo.computeVertexNormals();
   add(crownGeo,wool,'BritishKnitCap_ClosedCrown');
   // Simple folded cuff: not a second hat, just a short ribbed wool band.
-  add(new THREE.CylinderGeometry(.138,.135,.052,40,1,true),
-    cuffWool,'BritishKnitCap_FoldedCuff',[0,-.017,0]);
+  add(new THREE.CylinderGeometry(.129,.127,.056,40,1,true),
+    cuffWool,'BritishKnitCap_FoldedCuff',[0,-.025,0]);
   const ribVertices=[];
   for(let i=0;i<40;i++){
     const a=i*Math.PI*2/40;
     const c=Math.cos(a),t=Math.sin(a);
-    ribVertices.push(c*.1385,-.042,t*.1385*.95,c*.1385,.008,t*.1385*.95);
+    ribVertices.push(c*.1295,-.051,t*.1295*.95,c*.1295,.003,t*.1295*.95);
   }
   const ribGeo=new THREE.BufferGeometry();
   ribGeo.setAttribute('position',new THREE.Float32BufferAttribute(ribVertices,3));
