@@ -57,6 +57,16 @@ if(process.argv.includes('--browser')){
         assert.deepEqual(stats.models.map(x=>x.role).sort(),['bren','leader','rifleman']);
         assert(stats.models.every(x=>x.height>1.2&&x.height<2.5&&x.materials>20),'Invalid model dimensions');
         assert.equal(stats.errors.length,0,'GLB load errors');
+        // Verify actual role switching, not just successful file downloads.
+        for(const [id,role] of [[1,'leader'],[2,'bren'],[0,'rifleman']]){
+          await page.locator('button[data-muster-role="'+id+'"]').click();
+          await page.waitForFunction(role=>{
+            return musterBritishPreview.selected===
+              ({rifleman:0,leader:1,bren:2})[role]&&
+              musterBritishPreview.models.filter(m=>m.object.visible).length===1&&
+              musterBritishPreview.models.find(m=>m.object.visible)?.role===role;
+          },role,{timeout:15000});
+        }
         assert(!errors.length,'Uncaught browser errors: '+JSON.stringify(errors));
         const screenshot=await page.screenshot({
           path:'/tmp/muster-gallery-'+device.name+'.png',
