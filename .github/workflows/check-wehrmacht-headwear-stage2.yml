@@ -7,6 +7,7 @@ on:
       - preview/german-visual-classes.js
       - preview/formation-replenishment-v3.html
       - tools/infantry-v2/test-wehrmacht-headwear-stage2.cjs
+      - tools/infantry-v2/test-german-visual-classes.cjs
       - .github/workflows/check-wehrmacht-headwear-stage2.yml
   workflow_dispatch:
 permissions:
