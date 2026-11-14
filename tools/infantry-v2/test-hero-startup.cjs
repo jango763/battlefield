@@ -157,6 +157,47 @@ if(process.argv.includes('--browser')){
       assert(!errors.length,'JS errors on fallback: '+errors.join(';'));
       console.log('HERO_STARTUP_FALLBACK_PASS',JSON.stringify(safe));
       await fallback.close();
+      // Simulate another difficult case: the native soldier loads, but
+      // the historical rifle GLB cannot be delivered. Manual timeout
+      // fallback must restore the FULL donor figure and freeze all later swaps.
+      {
+        const context=await browser.newContext({viewport:{width:600,height:700}});
+        const page=await context.newPage();
+        const errors=[];
+        page.on('pageerror',e=>{if(!/No parent to post message/.test(e.message))errors.push(e.message)});
+        await page.route('**/assets/ww2-weapons/*.glb',route=>route.abort());
+        await page.goto(
+          'http://127.0.0.1:8777/preview/formation-replenishment-v3.html?startupTimeoutMs=20000',
+          {waitUntil:'domcontentloaded',timeout:45000});
+        await page.waitForFunction(()=>{
+          try{return window.__heroStartupGate?.phase==='loading'&&
+            !!P.germanPreview?.nativeRig?.ww2Uniform&&
+            P.germanPreview?.nativeRig?.weapon?.activeModelId==='fallback';}
+          catch(e){return false;}
+        },null,{timeout:60000});
+        const before=await page.evaluate(()=>({
+          phase:window.__heroStartupGate.phase,
+          donorVisible:P.germanPreview.figure.visible,
+          nativeRig:!!P.germanPreview.nativeRig
+        }));
+        assert.equal(before.phase,'loading');
+        assert(!before.donorVisible&&before.nativeRig,
+          'Native rig did not become the provisional model before fallback');
+        await page.evaluate(()=>window.__heroStartupGate.fallback('test lost weapon'));
+        await page.waitForTimeout(500);
+        const after=await page.evaluate(()=>({
+          phase:window.__heroStartupGate.phase,
+          donorVisible:P.germanPreview.figure.visible,
+          nativeRig:!!P.germanPreview.nativeRig,
+          mask:!!document.getElementById('hero-startup-cover')
+        }));
+        assert.deepEqual(after,{phase:'fallback',donorVisible:true,
+          nativeRig:false,mask:false},
+          'Partially loaded native hero was not fully rolled back');
+        assert(!errors.length,'Uncaught error during partial load fallback: '+errors.join(';'));
+        console.log('HERO_STARTUP_PARTIAL_NATIVE_ROLLBACK_PASS',JSON.stringify({before,after}));
+        await context.close();
+      }
     }finally{await browser.close()}
   })().catch(e=>{console.error('HERO_STARTUP_BROWSER_FAIL',e.stack||e);process.exitCode=1});
 }
