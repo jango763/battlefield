@@ -886,7 +886,7 @@ function dressNativeHeroFieldUniform(rig){
       if(match)donorFingers.push({bone,name,hand:match[1].toLowerCase(),digit:match[2],segment:Number(match[3])});
     }
     ww2={donor,bindings,donorMeshes,originalMeshes,side:null,modelType:'existing-panzergrenadier',
-      headwear:'none',headBone:garmentBones.get('Head'),donorHands,donorFingers,
+      headwear:'none',headBone:garmentBones.get('Head'),headRestScale:garmentBones.get('Head').scale.clone(),donorHands,donorFingers,
       donorHandBindOffsets,matchedBones:bindings.length};
     rig.ww2Uniform=ww2;
     rig.ww2OutfitTemporary=null;
@@ -936,6 +936,17 @@ function updateNativeHeroFieldUniform(rig){
     binding.target.parent.getWorldQuaternion(parentQ).invert();
     binding.target.quaternion.copy(parentQ.multiply(targetQ));
     binding.target.updateWorldMatrix(false,true);
+  }
+  // German-only visual fit: narrow the skinned facial/head volume 3.5%
+  // horizontally (and depth 2%). No changes to face height, gameplay
+  // collision, native motion rig, or the British character.
+  if(uniform.headBone&&uniform.headRestScale){
+    uniform.headBone.scale.copy(uniform.headRestScale);
+    if(side==='red'){
+      uniform.headBone.scale.x*=.965;
+      uniform.headBone.scale.z*=.98;
+    }
+    uniform.headBone.updateWorldMatrix(false,true);
   }
   // The WW2 uniform is SKINNED TO A SEPARATE MIXAMO SKELETON.
   // Matching rotations alone cannot place its wrists on the rifle: the two
@@ -1081,7 +1092,7 @@ function loadNativeHeroSideCap(rig){
   // ?pilotka=classic retains the old source mesh for A/B inspection.
   if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
     const cap=new THREE.Group();
-    cap.name='GermanPilotka_Schiffchen_V8';
+    cap.name='GermanPilotka_Schiffchen_V9';
     cap.userData.proceduralPilotka=true;
     // Narrow cloth Schiffchen silhouette, not an inflated beret.
     // Five cross-sections follow the scalp, with a pointed folded crest.
@@ -1100,6 +1111,10 @@ function loadNativeHeroSideCap(rig){
       {z:.134,w:.112,b:.166,s:.256,t:.296},
       {z:.194,w:.054,b:.180,s:.250,t:.258}
     ];
+    // 5% extra breadth along the rim; crest stays low and boat-shaped.
+    // Radius changes affect this German cap only.
+    for(const section of stations)section.w*=1.05;
+    liner.scale.x*=1.05;
     const bands={side:[],roof:[],top:[]};
     const quad=(into,p,q,r,t)=>into.push(...p,...q,...r,...p,...r,...t);
     for(let i=0;i<stations.length-1;i++){
@@ -1146,7 +1161,7 @@ function loadNativeHeroSideCap(rig){
       cap.add(new THREE.Mesh(geo,sideCloth));
     }
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German fitted Schiffchen V8';
+    u.cap=cap;u.headwear='German fitted Schiffchen V9';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
