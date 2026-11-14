@@ -28,6 +28,20 @@ Baseline: `main`, last approved hero/cap close-up V19. **Do not overwrite it unt
 - [ ] D3. Verify UI faction switch, all roles, running, firing, projectiles, no clipping or weapon-hand mismatch; 30+ FPS on representative iPhone.
 - [ ] D4. Final cross-faction release regression on iPhone Safari and desktop: 3–4 person squads, all four headgear categories, smoke/fire effects, memory and user acceptance, then merge branch to main.
 
+## Visual direction: stylized realism, not a Company of Heroes replica
+
+Target: recognizable WWII equipment, believable human silhouettes, smooth locomotion and convincing two-handed weapon grip, readable at RTS camera distance, practical on iPhone Safari. No requirement to reproduce CoH3 photorealism or exact animation.
+
+### Staged infantry appearance pilot — tested 2026-11-14
+
+- Test build: commit `bec0864f289791ca21a963e6a93ecd59c088b011`.
+- Preview: `?inspect=army&armyRig=pilot&armyHeadwear=helmet` (only on the feature branch/immutable GitHack build).
+- Mobile Chromium workflow `43583737960` passed: independent 65-bone native rig, 52 WW2 uniform joints, licensed donor's single skinned German helmet, no overlapping pilotka/beret, unchanged unit coordinates and two-handed grip target errors under 0.12.
+- Native hero's `Sprint_Loop` over-extends the infantry stride. Ordinary soldiers now smoothly blend at most 24% sprint into grounded `Jog_Fwd_Loop` at high speeds. The hero's animation behavior is unchanged.
+- Army-only gentle weapon sway follows the grip assembly and is disabled during aiming.
+- CI captured four camera directions and controlled idle/running mobile screenshots. The screenshots still show imperfect trigger-hand finger shape and relatively wide idle stance; **B4 is not visually approved yet**.
+- Performance on real iPhone Safari, multi-unit FPS and memory, genuine historical helmet variants, British army and the original creator's new cap asset remain unverified. **Do not mass-deploy**.
+
 ## Release gates
 
 At **every** checkpoint: GitHub feature branch → JS syntax → head-bone / weapon IK / unit logic assertions → mobile browser screenshots → live user inspection → only then merge into `main`. Never claim a visual pass solely from a green CI test. The original unit simulation, economics, movement orders and controls must remain intact. Do not substitute procedural hats when real sourced GLBs are requested.
