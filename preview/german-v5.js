@@ -1092,7 +1092,7 @@ function loadNativeHeroSideCap(rig){
   // ?pilotka=classic retains the old source mesh for A/B inspection.
   if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
     const cap=new THREE.Group();
-    cap.name='GermanPilotka_Schiffchen_V9';
+    cap.name='GermanPilotka_Schiffchen_V11';
     cap.userData.proceduralPilotka=true;
     // Narrow cloth Schiffchen silhouette, not an inflated beret.
     // Five cross-sections follow the scalp, with a pointed folded crest.
@@ -1105,8 +1105,8 @@ function loadNativeHeroSideCap(rig){
     // The structural Schiffchen folds remain above this underlayer.
     const liner=new THREE.Mesh(new THREE.SphereGeometry(1,28,18),cloth);
     liner.name='Pilotka_Opaque_Crown';
-    liner.scale.set(.173,.094,.203);
-    liner.position.set(0,.225,-.006);
+    liner.scale.set(.150,.056,.196);
+    liner.position.set(0,.231,-.006);
     liner.castShadow=true;liner.receiveShadow=true;cap.add(liner);
     const stations=[
       {z:-.194,w:.054,b:.180,s:.250,t:.258},
@@ -1166,7 +1166,7 @@ function loadNativeHeroSideCap(rig){
       cap.add(new THREE.Mesh(geo,sideCloth));
     }
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German fitted Schiffchen V9';
+    u.cap=cap;u.headwear='German fitted Schiffchen V11';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
