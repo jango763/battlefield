@@ -1626,7 +1626,7 @@ function updateNativeHeroFieldUniform(rig){
       .multiply(beret.userData.bindHeadLocalQ.clone().invert()).normalize();
     // Keep the rolled band above the eyebrows, not floating over the crown.
     // A small forward offset makes the badge readable in a front close-up.
-    beret.position.y+=.163;
+    beret.position.y+=.172;
     beret.position.add(new THREE.Vector3(0,0,.056).applyQuaternion(beret.quaternion));
   }
   updateNativeGermanHeroIdentity(rig);
@@ -1641,7 +1641,7 @@ function createNativeHeroBritishBeret(rig){
   if(!u?.headBone||u.beret)return;
   const beret=new THREE.Group();
   beret.name='WW2_British_Maroon_Beret';
-  beret.userData.profile='airborne-soft-fitted-v4';
+  beret.userData.profile='airborne-soft-fitted-v5';
   // Keep the silhouette close to human head dimensions rather than a disc.
   beret.scale.set(.86,.91,.86);
   // A real cloth beret is ONE low continuous felt crown, not two oversized
@@ -1659,12 +1659,12 @@ function createNativeHeroBritishBeret(rig){
   // Y drops on the right edge to suggest a natural wool slouch.
   const rings=[
     {r:.137,y:.006,shift:0,drop:0},
-    {r:.144,y:.022,shift:0,drop:0},
-    {r:.150,y:.041,shift:.005,drop:.003},
-    {r:.156,y:.058,shift:.012,drop:.012},
-    {r:.139,y:.075,shift:.014,drop:.007},
-    {r:.093,y:.086,shift:.012,drop:0},
-    {r:.026,y:.090,shift:.009,drop:0}
+    {r:.144,y:.025,shift:0,drop:0},
+    {r:.150,y:.057,shift:.005,drop:.003},
+    {r:.156,y:.087,shift:.012,drop:.012},
+    {r:.139,y:.118,shift:.014,drop:.007},
+    {r:.093,y:.142,shift:.012,drop:0},
+    {r:.026,y:.150,shift:.009,drop:0}
   ];
   const positions=[],indices=[];
   for(let k=0;k<rings.length;k++){
@@ -1687,7 +1687,7 @@ function createNativeHeroBritishBeret(rig){
   }
   // Close the shallow crown smoothly; don't leave a visible central hole.
   const top=positions.length/3;
-  positions.push(.009,.093,0);
+  positions.push(.009,.152,0);
   for(let i=0;i<N;i++)indices.push((rings.length-1)*N+i,
     (rings.length-1)*N+(i+1)%N,top);
   const geo=new THREE.BufferGeometry();
