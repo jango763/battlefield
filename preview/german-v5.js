@@ -1715,7 +1715,15 @@ function loadNativeHeroSideCap(rig){
       createNativeHeroBritishKnitCap(rig);
     return;
   }
-  if(!rig.armyUnit&&u.cap)return; // idempotent: never duplicate the hero cap
+  // Helmet classes use the donor's already animated M42 steel helmet.
+  // Do not allocate a second invisible pilotka behind it: it wasted memory
+  // on every rifleman/engineer/MG and could reappear after role changes.
+  if(rig.armyUnit&&rig.armyHeadwearChoice==='helmet'){
+    u.headwear='German M42 steel helmet';
+    u.cap=null;
+    return;
+  }
+  if(u.cap)return; // exactly one active cloth cap per soldier
   // The imported Soviet sidecap is shallow and sits across the forehead on
   // this head rig; simply rescaling it never covered the rear scalp. Use a
   // close-fitting, head-tracked geometry for the German pilotka by default.
@@ -1872,6 +1880,38 @@ function loadNativeHeroSideCap(rig){
       stripe.name='OfficerCapInsigniaBacking';
       stripe.position.set(0,.190,.211);
       cap.add(stripe);
+      // Small curved visor distinguishes the officer's M43-style field cap
+      // from the hero's plain Schiffchen. Its front edge stays ABOVE the
+      // donor eyebrows; no oversized cylinder or hovering separate ring.
+      const visorVertices=[],visorFaces=[],brimSegments=16;
+      for(let i=0;i<=brimSegments;i++){
+        const x=-.129+.258*i/brimSegments;
+        const edgeFactor=1-(x/.129)*(x/.129);
+        visorVertices.push(x,.163,.168,
+          x,.154-.004*edgeFactor,.229+.056*Math.max(0,edgeFactor));
+        if(i>0){
+          const k=i*2,p=(i-1)*2;
+          visorFaces.push(p,k,p+1,p+1,k,k+1);
+        }
+      }
+      const brimGeometry=new THREE.BufferGeometry();
+      brimGeometry.setAttribute('position',new THREE.Float32BufferAttribute(visorVertices,3));
+      brimGeometry.setIndex(visorFaces);
+      brimGeometry.computeVertexNormals();
+      const brim=new THREE.Mesh(brimGeometry,new THREE.MeshLambertMaterial({
+        color:0x38443c,side:THREE.DoubleSide
+      }));
+      brim.name='OfficerCapShortCurvedVisor';brim.castShadow=true;
+      cap.add(brim);
+      const brimSeam=new THREE.Mesh(
+        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(
+          Array.from({length:17},(_,i)=>{
+            const x=-.129+.258*i/16,e=Math.max(0,1-(x/.129)**2);
+            return new THREE.Vector3(x,.156-.004*e,.229+.056*e);
+          })),32,.0017,4,false),
+        edge
+      );
+      brimSeam.name='OfficerCapVisorSeam';cap.add(brimSeam);
       cap.name='GermanOfficerFieldSidecap_HeadTracked';
       cap.userData.headwearSource='approved-native-officer-sidecap';
       u.headwear='German officer field sidecap with insignia';
