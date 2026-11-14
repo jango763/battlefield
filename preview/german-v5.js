@@ -595,10 +595,19 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
   w.root.rotation.set(aimed?-.04:sprint?.08:-.095,
     THREE.MathUtils.clamp(heading,-.7,.7)*(aimed?.75:0)-sign*(aimed?.47:1.10),
     sign*(aimed?.018:.015),'YXZ');
+  // Subtle marching rhythm for the first army pilot only: the gun and both
+  // IK hands move as ONE assembly, avoiding independent robotic hand swings.
+  // Aim/firing pose is untouched; the game still owns all movement/combat.
+  const infantryCarry=rig.armyUnit&&!aimed?THREE.MathUtils.clamp(speed/4.2,0,1):0;
+  if(infantryCarry){
+    rig.armyGaitClock=(rig.armyGaitClock||0)+Math.min(Math.max(dt||0,0),.06)*(sprint?10:7);
+    w.root.rotation.x+=Math.sin(rig.armyGaitClock*2)*.009*infantryCarry;
+    w.root.rotation.z+=Math.sin(rig.armyGaitClock)*.012*infantryCarry;
+  }
   const center=new THREE.Vector3().addVectors(sr,sl).multiplyScalar(.5);
   const desiredTrigger=new THREE.Vector3(
     center.x+sign*.17,
-    center.y-(aimed?.135:.20),
+    center.y-(aimed?.135:.20)+(infantryCarry?Math.sin(rig.armyGaitClock*2)*.009*infantryCarry:0),
     center.z+(aimed?.31:.29)
   );
   // The physical trigger hand grip is the weapon's placement pivot.
@@ -986,6 +995,14 @@ function updateNativeHeroFieldUniform(rig){
     return;
   }
   const side=(rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P&&P.side)==='red'?'red':'blue';
+  // The first infantry pilot can preview real skinned helmet geometry from
+  // the existing licensed WWII uniform donor. The hero keeps his approved
+  // headwear, and regular soldiers are unchanged unless armyRig=pilot.
+  const headwearMode=rig.armyUnit&&side==='red'
+    ?(new URLSearchParams(location.search).get('armyHeadwear')||'cap')
+    :'cap';
+  const soldierHelmet=headwearMode==='helmet'||headwearMode==='helmet-net';
+  const soldierNet=headwearMode==='helmet-net';
   if(uniform.side!==side){
     uniform.side=side;
     if(uniform.cap)uniform.cap.visible=side==='red';
@@ -995,6 +1012,28 @@ function updateNativeHeroFieldUniform(rig){
       // Original WWII M42 helmet is deliberately NOT substituted for M43.
       item.mesh.visible=item.type==='garment'||(item.type==='pouches'&&side==='red');
     }
+  }
+  // Army-only helmet variants use the donor's existing SKINNED headwear,
+  // which already follows its Head bone through the costume retarget.
+  // Do not stack the procedural pilotka or British beret on top.
+  if(rig.armyUnit){
+    let visibleHelmet=0,availableHelmet=0;
+    for(const item of uniform.donorMeshes){
+      if(item.type!=='headgear')continue;
+      const materialName=String(item.mesh.material?.name||'');
+      const originalName=String(item.mesh.name||'');
+      const scrim=/scrim|net|camo/i.test(materialName+' '+originalName);
+      const isHelmet=/helmet/i.test(materialName+' '+originalName);
+      if(isHelmet)availableHelmet++;
+      item.mesh.visible=soldierHelmet&&(isHelmet||soldierNet&&scrim);
+      if(item.mesh.visible)visibleHelmet++;
+    }
+    if(uniform.cap)uniform.cap.visible=!soldierHelmet&&side==='red';
+    if(uniform.beret)uniform.beret.visible=false;
+    uniform.armyHeadwearMode=visibleHelmet>0?headwearMode:'cap';
+    uniform.armyHeadwearMeshes=visibleHelmet;
+    uniform.armyHelmetAvailable=availableHelmet;
+    if(soldierHelmet&&visibleHelmet===0&&uniform.cap)uniform.cap.visible=true;
   }
   // Re-target the already tested Quaternius anatomical pose to the secondary
   // clothing skin, without modifying a single native bone / clip / rifle IK.
