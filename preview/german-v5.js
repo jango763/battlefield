@@ -512,11 +512,11 @@ function installNativeArmyPilot(unit,v){
   // Role-based headwear, no longer a pseudo-random clone of the hero.
   const headwear=unit.t==='blue'
     ?(v.role==='captain'?'knit':'brodie')
-    :visualRole==='captain'?'m43':
+    :visualRole==='captain'?'officer-cap':
      visualRole==='engineer'?'helmet':
      visualRole==='submachinegunner'?'sidecap':
      visualRole==='machinegunner'?'helmet':
-     ['helmet','sidecap','helmet','m43'][number%4];
+     ['helmet','sidecap','helmet','sidecap'][number%4];
   const rig={visual,model,mixer,actions,state:'idle',previous,
     armyUnit:unit,ww2VisualClass:visualRole,armyHeadwearChoice:headwear,
     armyPhaseSeed:((v.phase||0)/(Math.PI*2))%1,
@@ -1850,8 +1850,34 @@ function loadNativeHeroSideCap(rig){
       geo.computeVertexNormals();
       cap.add(new THREE.Mesh(geo,sideCloth));
     }
+    if(rig.armyUnit&&rig.armyHeadwearChoice==='officer-cap'){
+      // The imported M43 GLB left a ring floating over a bare scalp on the
+      // real animated officer. Until that asset is rig-fitted, use the
+      // approved close-fitting sidecap silhouette with a small officer badge.
+      // This is a visual-only distinction; no animation or game code changes.
+      cloth.color.setHex(0x505d52);
+      sideCloth.color.setHex(0x465248);
+      const badge=new THREE.Mesh(
+        new THREE.OctahedronGeometry(.022,0),
+        new THREE.MeshLambertMaterial({color:0xa79e75,roughness:.8})
+      );
+      badge.name='OfficerCapClothInsignia';
+      badge.position.set(0,.217,.216);
+      badge.scale.set(.8,1.2,.6);
+      cap.add(badge);
+      const stripe=new THREE.Mesh(
+        new THREE.BoxGeometry(.090,.012,.008),
+        new THREE.MeshLambertMaterial({color:0x858667})
+      );
+      stripe.name='OfficerCapInsigniaBacking';
+      stripe.position.set(0,.190,.211);
+      cap.add(stripe);
+      cap.name='GermanOfficerFieldSidecap_HeadTracked';
+      cap.userData.headwearSource='approved-native-officer-sidecap';
+      u.headwear='German officer field sidecap with insignia';
+    }
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German head-following Schiffchen V19';
+    u.cap=cap;if(!u.headwear||u.headwear==='none')u.headwear='German head-following Schiffchen V19';
     cap.visible=u.side==='red'&&rig.armyHeadwearChoice!=='helmet';
     updateNativeHeroFieldUniform(rig);
     return;
