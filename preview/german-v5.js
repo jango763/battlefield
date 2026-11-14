@@ -4,6 +4,67 @@
 const creditsLink=document.createElement('a');creditsLink.textContent='Авторы моделей';creditsLink.href='../assets/soldiers/CREDITS.md';creditsLink.target='_blank';creditsLink.rel='noopener';creditsLink.style.cssText='position:fixed;z-index:23;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 113px);font:10px Arial;color:#e7dec8;background:#20251dcc;padding:3px 5px';document.body.appendChild(creditsLink);
 const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null,visualSequence:0};
 function germanPreviewLabel(message){const e=document.getElementById('german-preview-status');if(e){e.hidden=!message;if(e.textContent!==message)e.textContent=message;}}
+// Wehrmacht-wide visual rollout. Only the German visual tier changes; the
+// original unit simulation, weapon damage, movement and AI are untouched.
+// Fallback controls: ?armyRig=off, ?armyRig=pilot, ?armyRig=squad.
+const wehrmachtRollout=(()=>{
+  const params=new URLSearchParams(location.search);
+  const mode=params.get('armyRig')||'wehrmacht';
+  const mobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent||'')||
+    (navigator.maxTouchPoints>1&&Math.min(screen.width,screen.height)<900);
+  const defaultLimit=mobile?12:28;
+  const requested=Number(params.get('armyLimit'));
+  const max=mode==='off'?0:mode==='pilot'?1:mode==='squad'?4:
+    Number.isFinite(requested)&&requested>0?
+      Math.min(mobile?16:48,Math.max(1,Math.floor(requested))):defaultLimit;
+  const enterRange=mobile?52:84,exitRange=mobile?72:110;
+  return Object.freeze({mode,mobile,max,enterRange,exitRange});
+})();
+germanPreview.armyRollout=wehrmachtRollout;
+function wehrmachtArmyDistance(unit){
+  return Math.hypot((unit.x||0)-(P?.x||0),(unit.z||0)-(P?.z||0));
+}
+function wehrmachtArmyEligible(unit,v){
+  return unit.kind!=='p'&&unit.t==='red'&&
+    (v.role==='infantry'||v.role==='captain'||v.role==='engineer');
+}
+function wehrmachtArmyCanInstall(unit,v){
+  if(!wehrmachtArmyEligible(unit,v)||wehrmachtRollout.max===0)return false;
+  if((germanPreview.armyNativeInstalled||0)>=wehrmachtRollout.max)return false;
+  return wehrmachtRollout.mode==='pilot'||wehrmachtRollout.mode==='squad'||
+    wehrmachtArmyDistance(unit)<wehrmachtRollout.enterRange;
+}
+function releaseNativeArmyVisual(unit,v){
+  const rig=v?.nativeRig;
+  if(!rig?.armyUnit)return false;
+  rig.mixer.stopAllAction();
+  rig.mixer.uncacheRoot(rig.model);
+  rig.model.traverse(n=>{
+    if(n.isSkinnedMesh&&n.skeleton?.boneTexture)n.skeleton.boneTexture.dispose();
+  });
+  // Per-unit caps contain unique cloth geometry/materials. Shared WW2 weapon
+  // meshes and wardrobe textures must NEVER be disposed by one dying unit.
+  for(const object of [rig.ww2Uniform?.cap,rig.ww2Uniform?.beret]){
+    if(!object)continue;
+    object.traverse(n=>{
+      if(!n.isMesh)return;
+      if(n.geometry&&object===rig.ww2Uniform?.beret)n.geometry.dispose();
+      if(n.geometry&&object===rig.ww2Uniform?.cap&&
+        n.name!=='ArmyM43_MIT_GLB'&&object.name!=='ArmyM43_MIT_GLB')n.geometry.dispose();
+      const mats=Array.isArray(n.material)?n.material:[n.material];
+      for(const mat of mats)mat?.dispose();
+    });
+  }
+  rig.visual.removeFromParent();
+  rig.ww2Uniform=null;
+  v.nativeRig=null;
+  v.figure.visible=rig.previous.oldFigureVisible;
+  v.weapon.root.visible=rig.previous.oldWeaponVisible;
+  v.identity.root.visible=rig.previous.oldIdentityVisible;
+  germanPreview.armyActiveUnits?.delete(unit);
+  germanPreview.armyNativeInstalled=Math.max(0,(germanPreview.armyNativeInstalled||1)-1);
+  return true;
+}
 function soldierRole(unit){return unit.kind==='p'?'hero':unit.cmd?'captain':unit.eng?'engineer':'infantry';}
 function soldierPalette(unit){return unit.kind==='p'?'hero':unit.t==='red'?'grey':'khaki';}
 // A shared cloth mask excludes skin, hands and boots. Texture detail remains,
@@ -191,6 +252,7 @@ function attachGermanSoldier(unit){
   // Visual-only stagger. No Math.random(): the game's RNG stays untouched.
   const visualIndex=++germanPreview.visualSequence;
   unit.germanPreview={anchor,figure,legacy,bones,rest,feet,footQ,weapon,identity,role,palette,headQ,chestQ,
+    armyVisualIndex:visualIndex,
     phase:(visualIndex*2.399963229728653)%(Math.PI*2),walk:0,aim:0,yaw:0,gaitSpeed:0,
     idleClock:visualIndex*.83,cadence:1+.035*Math.sin(visualIndex*2.17),strideScale:1+.035*Math.cos(visualIndex*1.71),
     prevHeading:unit.g.rotation.y,turnLean:0,
@@ -205,24 +267,26 @@ function refreshGermanPreviewLabel(){
 }
 function disposeGermanSoldier(unit){
   const v=unit.germanPreview;if(!v)return;
+  releaseNativeArmyVisual(unit,v);
   const materials=new Set();for(const group of [v.weapon.root,v.identity.root])group.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material)materials.add(n.material);});
   for(const m of materials)m.dispose();
   v.figure.traverse(n=>{if(n.skeleton&&n.skeleton.boneTexture)n.skeleton.boneTexture.dispose();});
 }
 function animateGermanSoldier(unit,dt=.016){
   const v=unit.germanPreview;if(!v)return;
-  // Opt-in rollout: one infantryman (?armyRig=pilot) or a four-man German
-  // squad (?armyRig=squad). Never change unit AI, orders, damage or economy.
-  const mode=new URLSearchParams(location.search).get('armyRig');
-  const limit=mode==='squad'?4:mode==='pilot'?1:0;
-  if(limit&&!v.nativeRig&&!v.armyNativeFailed&&germanPreview.armyNativeTemplate
-    &&unit.kind!=='p'&&unit.t==='red'&&v.role==='infantry'
-    &&(germanPreview.armyNativeInstalled||0)<limit){
+  // Every German soldier may use the accepted native skeleton and wardrobe.
+  // Safari/desktop proximity LOD bounds the number of simultaneously active
+  // heavy skeletons. Distant Germans retain the prior German visual model.
+  if(v.nativeRig?.armyUnit&&wehrmachtRollout.mode==='wehrmacht'&&
+     wehrmachtArmyDistance(unit)>wehrmachtRollout.exitRange)
+    releaseNativeArmyVisual(unit,v);
+  if(!v.nativeRig&&!v.armyNativeFailed&&germanPreview.armyNativeTemplate&&
+     wehrmachtArmyCanInstall(unit,v)){
     try{installNativeArmyPilot(unit,v);}
     catch(error){
       v.armyNativeFailed=true;
       germanPreview.armyPilotError=String(error?.stack||error);
-      console.warn('Army pilot visual fallback: old animation retained',error);
+      console.warn('Wehrmacht native visual fallback:',error);
     }
   }
   if(v.nativeRig&&animateNativeHeroRig(unit,v,dt))return;
@@ -331,9 +395,7 @@ function animateGermanSoldier(unit,dt=.016){
 // No changes to army HP, orders, AI targets, weapons damage or unit position.
 function installNativeArmyPilot(unit,v){
   if(!germanPreview.armyNativeTemplate||!germanPreview.armyNativeClips)return false;
-  const mode=new URLSearchParams(location.search).get('armyRig');
-  const limit=mode==='squad'?4:mode==='pilot'?1:0;
-  if(v.nativeRig||(germanPreview.armyNativeInstalled||0)>=limit)return false;
+  if(!wehrmachtArmyCanInstall(unit,v)||v.nativeRig)return false;
   const model=germanSkeletonClone(germanPreview.armyNativeTemplate);
   model.updateWorldMatrix(true,true);
   const box=new THREE.Box3().setFromObject(model);
@@ -356,12 +418,15 @@ function installNativeArmyPilot(unit,v){
     oldFigureVisible:v.figure.visible,oldWeaponVisible:v.weapon.root.visible,
     oldIdentityVisible:v.identity.root.visible
   };
-  const number=germanPreview.armyNativeInstalled||0;
-  const headwear=['sidecap','m43','helmet','sidecap'][number%4];
+  // Keep German unit identities stable through combat, LOD and recruitment.
+  // Officers, engineers and ordinary infantry remain visibly distinguishable.
+  const number=v.armyVisualIndex||0;
+  const headwear=v.role==='captain'?'m43':v.role==='engineer'?'helmet':
+    ['sidecap','m43','helmet','sidecap'][number%4];
   const rig={visual,model,mixer,actions,state:'idle',previous,
     armyUnit:unit,armyHeadwearChoice:headwear,
     armyPhaseSeed:((v.phase||0)/(Math.PI*2))%1,
-    armyVisualIndex:number};
+    armyVisualIndex:number,armyRole:v.role};
   v.anchor.add(visual);
   try{
     // Reuse the hero's already implemented 2-hand grip and WW2 outfit
@@ -376,8 +441,12 @@ function installNativeArmyPilot(unit,v){
     germanPreview.armyNativeInstalled=(germanPreview.armyNativeInstalled||0)+1;
     germanPreview.armyPilotInstalled=true;
     if(!germanPreview.armyPilotUnit)germanPreview.armyPilotUnit=unit;
-    if(!germanPreview.armySquad)germanPreview.armySquad=[];
-    germanPreview.armySquad.push(unit);
+    if(!germanPreview.armyActiveUnits)germanPreview.armyActiveUnits=new Set();
+    germanPreview.armyActiveUnits.add(unit);
+    if(wehrmachtRollout.mode==='pilot'||wehrmachtRollout.mode==='squad'){
+      if(!germanPreview.armySquad)germanPreview.armySquad=[];
+      germanPreview.armySquad.push(unit);
+    }
     germanPreview.armyPilotStats={role:v.role,faction:unit.t,
       clips:Object.keys(actions),bones:(()=>{
         let n=0;model.traverse(x=>{if(x.isBone)n++});return n;
@@ -1599,7 +1668,7 @@ function nativeHeroLoad(){
     // Snapshot the UNMODIFIED hero asset before it is dressed or animated.
     // One test soldier can clone this character with independent skeleton
     // and mixer while sharing the read-only source animation clips.
-    if(['pilot','squad'].includes(new URLSearchParams(location.search).get('armyRig'))){
+    if(wehrmachtRollout.max>0){
       germanPreview.armyNativeTemplate=germanSkeletonClone(model);
       germanPreview.armyNativeClips=selected;
     }
