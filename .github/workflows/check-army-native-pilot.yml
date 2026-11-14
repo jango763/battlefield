@@ -45,7 +45,7 @@ jobs:
                   result.warnings.push('network '+m.text());
                 else if(m.type()==='error')result.errors.push('console '+m.text());
               });
-              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html?armyRig=pilot',
+              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html?armyRig=pilot&armyHeadwear=helmet',
                 {waitUntil:'domcontentloaded',timeout:45000});
               await page.waitForFunction(()=>{
                 try{return !!P?.germanPreview?.nativeRig&&!!germanPreview?.armyNativeTemplate;}catch(e){return false}
@@ -80,6 +80,9 @@ jobs:
                   uniformBones:r.ww2Uniform?.matchedBones||0,
                   headwear:!!r.ww2Uniform?.cap,
                   germanCapVisible:!!r.ww2Uniform?.cap?.visible,
+                  headwearMode:r.ww2Uniform?.armyHeadwearMode,
+                  helmetMeshes:r.ww2Uniform?.armyHeadwearMeshes,
+                  availableHelmets:r.ww2Uniform?.armyHelmetAvailable,
                   britishBeretVisible:!!r.ww2Uniform?.beret?.visible,
                   heroState:P.germanPreview.nativeRig.state,
                   autoPilotCount:U.filter(x=>x.germanPreview?.nativeRig&&x.kind!=='p').length};
@@ -87,8 +90,9 @@ jobs:
               if(!result.pilot.separateModel||!result.pilot.separateBones||result.pilot.boneCount<30)
                 result.errors.push('native soldier skeleton is shared with hero or incomplete');
               if(result.pilot.clips.join(',')!=='idle,jog,sprint')result.errors.push('native clips mismatch');
-              if(result.pilot.britishBeretVisible||!result.pilot.germanCapVisible)
-                result.errors.push('German soldier wears British headgear or no German sidecap');
+              if(result.pilot.britishBeretVisible||result.pilot.germanCapVisible||
+                result.pilot.headwearMode!=='helmet'||result.pilot.helmetMeshes<1)
+                result.errors.push('German helmet not visible, cap/beret overlap, or helmet asset unavailable');
               if(result.pilot.uniformBones<16||!result.pilot.headwear)
                 result.errors.push('soldier WW2 outfit or cap retarget unavailable');
               if(result.pilot.autoPilotCount!==1)result.errors.push('not a one soldier rollout');
@@ -105,7 +109,7 @@ jobs:
                     grip:rig.weaponDiagnostics?.rightError,
                     gripLeft:rig.weaponDiagnostics?.leftError,
                     uniformGrip:rig.weaponDiagnostics?.visibleRightError,
-                    headwearVisible:rig.ww2Uniform?.cap?.visible};
+                    headwearVisible:(rig.ww2Uniform?.armyHeadwearMeshes||0)>0};
                 },[speed,aim]);
                 result.states[label]=check;
                 if(check.state!==(speed<.28?'idle':speed<4.2?'jog':'sprint')||
@@ -118,16 +122,27 @@ jobs:
                 const u=germanPreview.armyPilotUnit;
                 u.x=P.x+2;u.z=P.z+2;u.g.position.set(u.x,0,u.z);
                 u.sv=0;u.aim=0;
-                u.g.rotation.y=0; // face the inspection camera for front view
+                u.g.rotation.y=0;
                 for(let i=0;i<8;i++)animateGermanSoldier(u,1/60);
+                window.__qaCamOffset=[0,3.1,5.8];
                 const old=cam.updateMatrixWorld.bind(cam);
                 cam.updateMatrixWorld=function(force){
-                  this.position.set(u.x+2.7,3.75,u.z+5);
-                  this.lookAt(u.x,1.50,u.z);
+                  const o=window.__qaCamOffset;
+                  this.position.set(u.x+o[0],o[1],u.z+o[2]);
+                  this.lookAt(u.x,1.60,u.z);
                   return old(force);
                 };
               });
-              await page.waitForTimeout(600);
+              for(const [name,offset] of [
+                ['front',[0,3.1,5.8]],
+                ['right',[5.8,3.1,0]],
+                ['back',[0,3.1,-5.8]],
+                ['left',[-5.8,3.1,0]]
+              ]){
+                await page.evaluate(o=>{window.__qaCamOffset=o;},offset);
+                await page.waitForTimeout(260);
+                await page.screenshot({path:'/tmp/army-native-'+name+'.png'});
+              }
               await page.screenshot({path:'/tmp/army-native-first-soldier.png'});
               result.success=result.errors.length===0;
             }catch(e){result.errors.push('exception '+e.stack)}
@@ -147,4 +162,8 @@ jobs:
           path: |
             /tmp/army-native-pilot.json
             /tmp/army-native-first-soldier.png
+            /tmp/army-native-front.png
+            /tmp/army-native-right.png
+            /tmp/army-native-back.png
+            /tmp/army-native-left.png
           if-no-files-found: warn
