@@ -35,8 +35,14 @@ if(process.argv.includes('--browser')){
           null,{timeout:120000});
         const data=await page.evaluate(async type=>{
           const rig=P.germanPreview.nativeRig,uniform=rig.ww2Uniform;
-          const countCrown=()=>rig.visual.children.filter(n=>n.name==='WW2_British_Maroon_Beret')
-            .flatMap(n=>n.children.filter(ch=>ch.name==='BritishBeret_SingleFeltCrown')).length;
+          const crowns=()=>rig.visual.children.filter(n=>n.name==='WW2_British_Maroon_Beret')
+            .flatMap(n=>n.children.filter(ch=>ch.name==='BritishBeret_SingleFeltCrown'));
+          const countCrown=()=>crowns().length;
+          const crownWidth=()=>{
+            if(!crowns().length)return 0;
+            const mesh=crowns()[0];mesh.geometry.computeBoundingBox();
+            return mesh.geometry.boundingBox.getSize(new THREE.Vector3()).x*mesh.scale.x;
+          };
           const diagnostic=[];
           for(const side of ['red','blue','red','blue','red','blue']){
             P.side=side;
@@ -50,7 +56,7 @@ if(process.argv.includes('--browser')){
               visibleHats:hatsVisible.map(n=>n.name),
               donorHelmetVisible:uniform.donorMeshes.filter(n=>n.type==='headgear'&&n.mesh.visible).length,
               fallbackHelmetVisible:!!rig.fieldUniform?.helmet?.visible,
-              faction:uniform.heroHeadwearFaction,crownCount:countCrown()
+              faction:uniform.heroHeadwearFaction,crownCount:countCrown(),crownWidth:crownWidth()
             });
           }
           // A previously pending classic GLB request must not reappear over a
@@ -64,7 +70,7 @@ if(process.argv.includes('--browser')){
             diagnostic.push({side:'blue-after-delay',hats:hats.map(n=>n.name),
               visibleHats:hats.filter(n=>n.visible).map(n=>n.name),
               donorHelmetVisible:uniform.donorMeshes.filter(n=>n.type==='headgear'&&n.mesh.visible).length,
-              cap:!!uniform.cap,beret:!!uniform.beret,faction:uniform.heroHeadwearFaction,crownCount:countCrown()});
+              cap:!!uniform.cap,beret:!!uniform.beret,faction:uniform.heroHeadwearFaction,crownCount:countCrown(),crownWidth:crownWidth()});
           }
           return diagnostic;
         },type);
@@ -78,6 +84,7 @@ if(process.argv.includes('--browser')){
             assert.equal(p.beret,true,'British hero lacks beret: '+JSON.stringify(p));
             assert.equal(p.hats.length,1,'British hero contains extra hats: '+JSON.stringify(p));
             assert.equal(p.crownCount,1,'British beret has more than one felt crown: '+JSON.stringify(p));
+            assert(p.crownWidth>0.27&&p.crownWidth<0.34,'Beret width outside human head fit: '+JSON.stringify(p));
             assert.equal(p.visibleHats.length,1,'British hero has multiple visible hats');
           }else{
             assert.equal(p.beret,false,'German hero contains British beret: '+JSON.stringify(p));
