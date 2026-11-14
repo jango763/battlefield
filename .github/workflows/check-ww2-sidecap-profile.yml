@@ -1,7 +1,7 @@
 name: WW2 boat-cap and readable weapon silhouette acceptance
 on:
   push:
-    branches: [feature/ww2-sidecap-weapon-profile-20261114]
+    branches: [feature/german-pilotka-v19-smooth-mesh-20261114]
     paths:
       - preview/german-v5.js
       - preview/formation-replenishment-v3.html
@@ -55,6 +55,45 @@ jobs:
               if(initial.clips.join(',')!=='idle,jog,sprint'||initial.matchedBones<16)report.failures.push('native clip or donor rig changed');
               if(initial.capClearance<0.02||initial.capClearance>0.18||initial.capMeshes<1)report.failures.push('sidecap cap fit '+initial.capClearance);
               if(initial.weaponCatalog.length!==6)report.failures.push('not six WW2 GLB models');
+              report.softCap=await page.evaluate(()=>{
+                const cap=P.germanPreview.nativeRig.ww2Uniform.cap;
+                const names=['Pilotka_side','Pilotka_roof','Pilotka_top'];
+                return names.map(name=>{
+                  let found=null;
+                  cap.traverse(n=>{if(n.name===name)found=n;});
+                  return {name,indexed:!!found?.geometry?.index,
+                    vertices:found?.geometry?.attributes?.position?.count||0,
+                    triangles:(found?.geometry?.index?.count||0)/3};
+                });
+              });
+              if(report.softCap.some(p=>!p.indexed||p.vertices<20||p.triangles<30))
+                report.failures.push('soft pilotka panels lack indexed smooth shading '+JSON.stringify(report.softCap));
+              // Explicitly rotate the donor source head bone and verify that
+              // the hat follows the relative animation rather than freezing.
+              report.headFollow=await page.evaluate(()=>{
+                const r=P.germanPreview.nativeRig,u=r.ww2Uniform;
+                P.side='red';P.sv=0;P.aim=0;
+                animateNativeHeroRig(P,P.germanPreview,1/60);
+                const binding=u.bindings.find(x=>x.target===u.headBone);
+                if(!binding)return {error:'missing head binding'};
+                const source=binding.source,sourceRest=source.quaternion.clone();
+                const capBefore=u.cap.quaternion.clone();
+                const visualInv=r.visual.getWorldQuaternion(new THREE.Quaternion()).invert();
+                const headBefore=visualInv.clone().multiply(u.headBone.getWorldQuaternion(new THREE.Quaternion()));
+                source.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),.30));
+                updateNativeHeroFieldUniform(r);
+                const capDelta=capBefore.angleTo(u.cap.quaternion);
+                const headAfter=visualInv.clone().multiply(u.headBone.getWorldQuaternion(new THREE.Quaternion()));
+                const headDelta=headBefore.angleTo(headAfter);
+                source.quaternion.copy(sourceRest);
+                updateNativeHeroFieldUniform(r);
+                return {capDelta,headDelta,restored:u.cap.quaternion.angleTo(capBefore)};
+              });
+              if(report.headFollow.error||
+                report.headFollow.capDelta<.10||
+                Math.abs(report.headFollow.headDelta-report.headFollow.capDelta)>.06||
+                report.headFollow.restored>.04)
+                report.failures.push('German cap does not follow calibrated head rotation '+JSON.stringify(report.headFollow));
               for(const [side,keys] of [
                 ['red',['de-kar98k','de-mp40','de-mg42','de-kar98k']],
                 ['blue',['uk-lee-enfield','uk-sten','uk-bren','uk-lee-enfield']]
@@ -119,6 +158,28 @@ jobs:
                 await page.screenshot({path:'/tmp/ww2-weapon-'+tag+'.png'});
                 report.sampleShots.push(tag);
               }
+
+              // Evidence for the specific reported defects in mobile close-up
+              // at rest, in sprint, and in an aiming stance.
+              await page.evaluate(()=>{
+                scene.background=new THREE.Color(0xa6aaa6);
+                for(const node of scene.children)
+                  if(node!==P.g&&!node.isLight)node.visible=false;
+                const old=cam.updateMatrixWorld.bind(cam);
+                cam.updateMatrixWorld=function(force){
+                  this.position.set(P.x+2.4,3.45,P.z+5.0);
+                  this.lookAt(P.x,1.50,P.z);
+                  return old(force);
+                };
+              });
+              for(const [name,speed,aim] of [['rest',0,0],['run',5.6,0],['fire',0,1]]){
+                await page.evaluate(([speed,aim])=>{
+                  P.side='red';P.wpn=1;P.sv=speed;P.aim=aim;P.aimT=P.g.rotation.y;
+                  for(let i=0;i<36;i++)animateNativeHeroRig(P,P.germanPreview,1/60);
+                },[speed,aim]);
+                await page.waitForTimeout(200);
+                await page.screenshot({path:'/tmp/ww2-v19-'+name+'.png'});
+              }
               report.success=report.failures.length===0;
             }catch(e){report.failures.push('exception: '+e.stack)}
             finally{
@@ -137,4 +198,5 @@ jobs:
           path: |
             /tmp/ww2-weapons-report.json
             /tmp/ww2-weapon-*.png
+            /tmp/ww2-v19-*.png
           if-no-files-found: warn
