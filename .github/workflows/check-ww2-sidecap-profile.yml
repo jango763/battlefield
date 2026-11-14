@@ -1,7 +1,7 @@
 name: WW2 boat-cap and readable weapon silhouette acceptance
 on:
   push:
-    branches: [feature/ww2-sidecap-weapon-profile-20261114]
+    branches: [feature/ww2-sidecap-weapon-profile-20261114, feature/german-pilotka-geometry-v4-20261114]
     paths:
       - preview/german-v5.js
       - preview/formation-replenishment-v3.html
