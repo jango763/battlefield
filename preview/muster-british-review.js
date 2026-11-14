@@ -94,8 +94,10 @@ function musterBritishPreviewDraw(){
   const camera=musterBritishPreview.camera;
   camera.aspect=R.domElement.clientWidth/Math.max(1,R.domElement.clientHeight);
   camera.updateProjectionMatrix();
-  camera.position.set(0,2.0,-4.1);
-  camera.lookAt(0,1.0,0);
+  // Move the helmet below the three-option selector on narrow iPhone
+  // screens while keeping the boots inside the frame.
+  camera.position.set(0,2.2,-4.65);
+  camera.lookAt(0,1.28,0);
   const clear=R.autoClear;
   R.autoClear=false;
   R.clearDepth();
