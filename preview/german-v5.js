@@ -454,6 +454,9 @@ function selectNativeHeroWW2Weapon(unit,rig){
   const vec=(data)=>new THREE.Vector3().fromArray(data).multiplyScalar(WW2_WEAPON_GAME_SCALE);
   if(active){
     w.trigger.position.copy(vec(info.trigger)).addScaledVector(new THREE.Vector3().fromArray(info.triggerPalm),.013);
+    // MP40 photographed on iPhone: visible trigger hand floated below the
+    // pistol grip. Adjust only its visual IK contact, never weapon gameplay.
+    if(side==='red'&&key==='de-mp40')w.trigger.position.add(new THREE.Vector3(0,.058,-.016));
     w.support.position.copy(vec(info.support)).addScaledVector(new THREE.Vector3().fromArray(info.supportPalm),.014);
     if(key==='de-mp40'||key==='uk-sten'){
       // The WW2 donor sleeve ends at a different bind-pose wrist length.
@@ -883,7 +886,7 @@ function dressNativeHeroFieldUniform(rig){
       if(match)donorFingers.push({bone,name,hand:match[1].toLowerCase(),digit:match[2],segment:Number(match[3])});
     }
     ww2={donor,bindings,donorMeshes,originalMeshes,side:null,modelType:'existing-panzergrenadier',
-      headwear:'none',headBone:garmentBones.get('Head'),donorHands,donorFingers,
+      headwear:'none',headBone:garmentBones.get('Head'),headRestScale:garmentBones.get('Head').scale.clone(),donorHands,donorFingers,
       donorHandBindOffsets,matchedBones:bindings.length};
     rig.ww2Uniform=ww2;
     rig.ww2OutfitTemporary=null;
@@ -933,6 +936,17 @@ function updateNativeHeroFieldUniform(rig){
     binding.target.parent.getWorldQuaternion(parentQ).invert();
     binding.target.quaternion.copy(parentQ.multiply(targetQ));
     binding.target.updateWorldMatrix(false,true);
+  }
+  // German-only visual fit: narrow the skinned facial/head volume 3.5%
+  // horizontally (and depth 2%). No changes to face height, gameplay
+  // collision, native motion rig, or the British character.
+  if(uniform.headBone&&uniform.headRestScale){
+    uniform.headBone.scale.copy(uniform.headRestScale);
+    if(side==='red'){
+      uniform.headBone.scale.x*=.965;
+      uniform.headBone.scale.z*=.98;
+    }
+    uniform.headBone.updateWorldMatrix(false,true);
   }
   // The WW2 uniform is SKINNED TO A SEPARATE MIXAMO SKELETON.
   // Matching rotations alone cannot place its wrists on the rifle: the two
@@ -984,13 +998,13 @@ function updateNativeHeroFieldUniform(rig){
       // Preserve the index finger near the trigger; close the other German
       // gripping fingers around the pistol grip instead of displaying a claw.
       const germanTrigger=uniform.side==='red'&&entry.hand==='right';
-      const adjusted=germanTrigger&&entry.digit!=='Index'?angle*1.24:angle;
+      const adjusted=germanTrigger?(entry.digit==='Index'?angle*1.40:angle*1.24):angle;
       entry.bone.quaternion.multiply(grasp.setFromAxisAngle(axis,adjusted));
       // The donor thumb points sideways in the mobile close-up. Fold its base
       // towards the palm rather than twisting the whole wrist again.
       if(germanTrigger&&entry.digit==='Thumb'&&entry.segment===1){
         entry.bone.quaternion.multiply(
-          grasp.setFromAxisAngle(new THREE.Vector3(0,0,1),-.42));
+          grasp.setFromAxisAngle(new THREE.Vector3(0,0,1),-.85));
       }
       entry.bone.updateWorldMatrix(false,true);
     }
@@ -1007,16 +1021,25 @@ function updateNativeHeroFieldUniform(rig){
     cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
     const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
     cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
+    // The donor Mixamo head-bone axes include a large bind rotation; applying
+    // it directly to a native-Y-up procedural hat tips the whole pilotka
+    // sideways. The hero visual group already follows body heading.
+    if(cap.userData.proceduralPilotka)cap.quaternion.identity();
     // Source geometry already includes its scalp/ridge height.
     // Donor head pivot is much lower than the visible hairline. Raise the
     // sidecap from eyebrow level onto the crown.
-    cap.position.y+=.145;
-    // Counter the earlier over-forward 0.185 m setting: it left the back of
-    // the shaved scalp fully exposed and pushed the cloth over the eyebrows.
-    // The extended GLB shell now overlaps the rear of the crown.
-    const fit=Number(new URLSearchParams(location.search).get('capforward'));
-    const forward=Number.isFinite(fit)&&fit>=0?THREE.MathUtils.clamp(fit,0,.20):.055;
-    cap.position.add(new THREE.Vector3(0,0,forward).applyQuaternion(cap.quaternion));
+    if(cap.userData.proceduralPilotka){
+      // Preserve upper-crown clearance: lowering the entire hat caused
+      // the bare scalp to cut through its roof in the v7 render.
+      // V8 keeps the crown up and extends only the cloth side panels down.
+      cap.position.add(new THREE.Vector3(0,0,.01).applyQuaternion(cap.quaternion));
+    }else{
+      // Legacy A/B mode only; do not double-raise the new cloth shell.
+      cap.position.y+=.145;
+      const fit=Number(new URLSearchParams(location.search).get('capforward'));
+      const forward=Number.isFinite(fit)&&fit>=0?THREE.MathUtils.clamp(fit,0,.20):.055;
+      cap.position.add(new THREE.Vector3(0,0,forward).applyQuaternion(cap.quaternion));
+    }
   }
   if(uniform.beret&&uniform.headBone){
     const beret=uniform.beret,head=uniform.headBone,space=rig.visual;
@@ -1063,6 +1086,106 @@ function loadNativeHeroSideCap(rig){
   if(!u||!u.headBone)return;
   if(new URLSearchParams(location.search).get('headwear')==='none')return;
   createNativeHeroBritishBeret(rig);
+  // The imported Soviet sidecap is shallow and sits across the forehead on
+  // this head rig; simply rescaling it never covered the rear scalp. Use a
+  // close-fitting, head-tracked geometry for the German pilotka by default.
+  // ?pilotka=classic retains the old source mesh for A/B inspection.
+  if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
+    const cap=new THREE.Group();
+    cap.name='GermanPilotka_Schiffchen_V11';
+    cap.userData.proceduralPilotka=true;
+    // Narrow cloth Schiffchen silhouette, not an inflated beret.
+    // Five cross-sections follow the scalp, with a pointed folded crest.
+    const cloth=new THREE.MeshLambertMaterial({color:0x4a5751,side:THREE.DoubleSide});
+    const sideCloth=new THREE.MeshLambertMaterial({color:0x435049,side:THREE.DoubleSide});
+    const edge=new THREE.MeshLambertMaterial({color:0x36433e,side:THREE.DoubleSide});
+    const seam=new THREE.MeshLambertMaterial({color:0x6b766d,side:THREE.DoubleSide});
+    // A thin inner liner stays beneath the folded cap, not a rounded beret.
+    const liner=new THREE.Mesh(new THREE.SphereGeometry(1,22,14),cloth);
+    liner.name='Pilotka_Interior_Liner';
+    liner.scale.set(.138,.038,.176);liner.position.set(0,.219,-.006);
+    liner.castShadow=true;cap.add(liner);
+    // The front-facing fabric strip blocks bald scalp triangles in the cap
+    // opening. A 2D curved panel fixes the gap without inflating the crown.
+    const facing=[];
+    const steps=28;
+    for(let i=0;i<steps;i++){
+      const theta0=-1.32+(2.64*i/steps),theta1=-1.32+(2.64*(i+1)/steps);
+      const point=(a,y)=>[.164*Math.sin(a),y,.221*Math.cos(a)+.003];
+      const v0=point(theta0,.157),v1=point(theta1,.157),
+        w0=point(theta0,.244),w1=point(theta1,.244);
+      facing.push(...v0,...v1,...w1,...v0,...w1,...w0);
+    }
+    const frontGeo=new THREE.BufferGeometry();
+    frontGeo.setAttribute('position',new THREE.Float32BufferAttribute(facing,3));
+    frontGeo.computeVertexNormals();
+    const frontBand=new THREE.Mesh(frontGeo,sideCloth);
+    frontBand.name='Pilotka_ForeheadFacing';
+    frontBand.castShadow=true;frontBand.receiveShadow=true;
+    cap.add(frontBand);
+    const stations=[
+      {z:-.194,w:.054,b:.180,s:.250,t:.258},
+      {z:-.134,w:.112,b:.166,s:.256,t:.296},
+      {z:-.062,w:.141,b:.162,s:.260,t:.317},
+      {z:.062,w:.141,b:.162,s:.260,t:.317},
+      {z:.134,w:.112,b:.166,s:.256,t:.296},
+      {z:.194,w:.054,b:.180,s:.250,t:.258}
+    ];
+    // 5% extra breadth along the rim; crest stays low and boat-shaped.
+    // Radius changes affect this German cap only.
+    for(const section of stations)section.w*=1.05;
+    liner.scale.x*=1.05;
+    const bands={side:[],roof:[],top:[]};
+    const quad=(into,p,q,r,t)=>into.push(...p,...q,...r,...p,...r,...t);
+    for(let i=0;i<stations.length-1;i++){
+      const a=stations[i],b=stations[i+1];
+      for(const sign of [-1,1]){
+        const pt=(v,x,y)=>[sign*x,y,v.z];
+        // Folded wall and inward sloping upper flap
+        quad(bands.side,pt(a,a.w,a.b),pt(b,b.w,b.b),
+          pt(b,b.w*.79,b.s),pt(a,a.w*.79,a.s));
+        quad(bands.roof,pt(a,a.w*.79,a.s),pt(b,b.w*.79,b.s),
+          pt(b,.017,b.t),pt(a,.017,a.t));
+      }
+      quad(bands.top,[-.017,a.t,a.z],[-.017,b.t,b.z],
+        [.017,b.t,b.z],[.017,a.t,a.z]);
+    }
+    for(const [name,coords,material] of [
+      ['side',bands.side,sideCloth],
+      ['roof',bands.roof,cloth],
+      ['top',bands.top,cloth]
+    ]){
+      const geo=new THREE.BufferGeometry();
+      geo.setAttribute('position',new THREE.Float32BufferAttribute(coords,3));
+      geo.computeVertexNormals();
+      const piece=new THREE.Mesh(geo,material);
+      piece.name='Pilotka_'+name;piece.castShadow=true;piece.receiveShadow=true;
+      cap.add(piece);
+    }
+    for(const sign of [-1,1]){
+      const fold=new THREE.CatmullRomCurve3(stations.map(v=>
+        new THREE.Vector3(sign*.018,v.t+.003,v.z)));
+      cap.add(new THREE.Mesh(new THREE.TubeGeometry(fold,32,.0035,5,false),seam));
+      const rim=new THREE.CatmullRomCurve3(stations.map(v=>
+        new THREE.Vector3(sign*v.w,v.b+.003,v.z)));
+      cap.add(new THREE.Mesh(new THREE.TubeGeometry(rim,32,.0045,5,false),edge));
+    }
+    // Tapered front/back cloth corners (the sidecap has no visor).
+    for(const idx of [0,stations.length-1]){
+      const v=stations[idx],tri=[
+        -v.w,v.b,v.z, v.w,v.b,v.z, 0,v.t,v.z
+      ];
+      const geo=new THREE.BufferGeometry();
+      geo.setAttribute('position',new THREE.Float32BufferAttribute(tri,3));
+      geo.computeVertexNormals();
+      cap.add(new THREE.Mesh(geo,sideCloth));
+    }
+    rig.visual.add(cap);
+    u.cap=cap;u.headwear='German fitted Schiffchen V11';
+    cap.visible=u.side==='red';
+    updateNativeHeroFieldUniform(rig);
+    return;
+  }
   const url=new URL('../assets/ww2-headwear/field-grey-sidecap.glb',location.href).href;
   new THREE.GLTFLoader().load(url,gltf=>{
     if(rig.ww2Uniform!==u)return;
