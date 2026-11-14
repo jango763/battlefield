@@ -1,0 +1,39 @@
+name: Verify original Muster models in Battlefield
+on:
+  push:
+    branches: [feature/muster-british-field-test-20261114]
+    paths:
+      - preview/formation-replenishment-v3.html
+      - preview/muster-british-review.js
+      - tools/infantry-v2/test-muster-gallery.cjs
+      - assets/muster-british/**
+      - .github/workflows/check-muster-gallery.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test loader and original GLB manifests
+        run: |
+          node --check preview/muster-british-review.js
+          node tools/infantry-v2/test-muster-gallery.cjs
+      - name: Install real browser for gameplay integration
+        run: |
+          npm install --prefix /tmp/muster-gallery-qa --no-audit --no-fund playwright@1.58.2
+          /tmp/muster-gallery-qa/node_modules/.bin/playwright install chromium
+      - name: Verify originals load in real game and mobile viewport
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/muster-gallery-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-muster-gallery.cjs --browser
+      - name: Retain visual screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: muster-3-original-british-battlefield-qa
+          path: /tmp/muster-gallery-*.png
+          if-no-files-found: ignore
