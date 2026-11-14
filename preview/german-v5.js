@@ -1504,27 +1504,31 @@ function createNativeHeroBritishBeret(rig){
     m.position.set(...pos);if(scale)m.scale.set(...scale);
     m.castShadow=true;m.receiveShadow=true;beret.add(m);return m;
   };
-  // One cap band and ONE continuous felt shell. The previous ellipsoid
-  // stayed a symmetric pink pill even after shrinking it on iPhone.
-  const bandMesh=add(new THREE.CylinderGeometry(.120,.124,.021,32),brim,[0,.008,0]);
+  // A single, CLOSED felt crown over the entire scalp, with one narrow
+  // headband. The last radial profile was only 5.9 cm tall, allowing the
+  // upper scalp to protrude through the middle (iPhone side-view repro).
+  const bandMesh=add(new THREE.CylinderGeometry(.121,.124,.020,36),brim,[0,.008,0]);
   bandMesh.name='BritishBeret_Headband';
-  // Tailored radial profile: narrow fitted rim, lightly puffed crown and a
-  // side-draped, lower edge. No intersecting spheres or stacked hats.
-  const crownShape=new THREE.BufferGeometry(),segments=36;
+  // The crown rises above the scalp (15.0 cm at the centre) and drapes
+  // slightly to the wearer's right; its lower edge joins the headband.
+  // No second dome, empty centre, or visible geometry behind the scalp.
+  const crownShape=new THREE.BufferGeometry(),segments=48;
   const sections=[
-    {r:.119,y:.011,x:0,z:0},
-    {r:.134,y:.022,x:.003,z:-.002},
-    {r:.139,y:.037,x:.010,z:-.003},
-    {r:.128,y:.052,x:.022,z:-.004},
-    {r:.091,y:.059,x:.032,z:-.004},
-    {r:.043,y:.057,x:.040,z:-.004}
+    {r:.121,y:.011,x:0,z:0},
+    {r:.133,y:.031,x:.003,z:0},
+    {r:.153,y:.060,x:.011,z:-.002},
+    {r:.155,y:.093,x:.024,z:-.003},
+    {r:.123,y:.128,x:.039,z:-.003},
+    {r:.080,y:.148,x:.050,z:-.003},
+    {r:.030,y:.153,x:.055,z:-.002}
   ];
   const vertices=[],faces=[];
   for(let k=0;k<sections.length;k++){
     const ring=sections[k];
     for(let i=0;i<segments;i++){
       const a=i*Math.PI*2/segments,c=Math.cos(a),t=Math.sin(a);
-      const drape=k>1?Math.max(0,c)*.014*(k/(sections.length-1)):0;
+      // Subtle hanging soft-cloth edge on the displaced side only.
+      const drape=k>2?Math.max(0,c)*.014*((k-2)/4):0;
       vertices.push(ring.x+ring.r*c,ring.y-drape,ring.z+ring.r*t*.96);
       if(k>0){
         const prev=(k-1)*segments+i,prevNext=(k-1)*segments+(i+1)%segments;
@@ -1533,8 +1537,9 @@ function createNativeHeroBritishBeret(rig){
       }
     }
   }
+  // Close the final ring: otherwise a top hole can expose bald scalp.
   const apex=vertices.length/3;
-  vertices.push(.044,.056,-.004);
+  vertices.push(.056,.154,-.002);
   for(let i=0;i<segments;i++)
     faces.push((sections.length-1)*segments+i,apex,
       (sections.length-1)*segments+(i+1)%segments);
@@ -1543,7 +1548,7 @@ function createNativeHeroBritishBeret(rig){
   crownShape.computeVertexNormals();
   const crown=add(crownShape,felt,[0,0,0]);
   crown.name='BritishBeret_SingleFeltCrown';
-  const insignia=add(new THREE.BoxGeometry(.024,.030,.008),badge,[-.068,.039,.119]);
+  const insignia=add(new THREE.BoxGeometry(.024,.030,.008),badge,[-.070,.038,.118]);
   insignia.name='BritishBeret_CapBadge';
   rig.visual.add(beret);
   u.beret=beret;
