@@ -3,6 +3,37 @@
 // Model: britdawgmasterfunk, CC BY 4.0; see assets/soldiers/CREDITS.md.
 const creditsLink=document.createElement('a');creditsLink.textContent='Авторы моделей';creditsLink.href='../assets/soldiers/CREDITS.md';creditsLink.target='_blank';creditsLink.rel='noopener';creditsLink.style.cssText='position:fixed;z-index:23;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 113px);font:10px Arial;color:#e7dec8;background:#20251dcc;padding:3px 5px';document.body.appendChild(creditsLink);
 const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null,visualSequence:0};
+
+// The page loader already covered HTML assembly. Keep the first rendered
+// game frame behind a short startup gate until the approved hero rig is posed.
+// This prevents a visible original -> donor -> native animation/model swap.
+// There is NO persistent "loading new hero" badge above gameplay controls.
+const heroStartupGate=(()=>{
+  const oldMode=new URLSearchParams(location.search).get('rig')==='original';
+  if(oldMode)return {pending:()=>false,finish:()=>false};
+  const cover=document.createElement('div');
+  cover.id='hero-startup-gate';
+  cover.setAttribute('role','status');
+  cover.setAttribute('aria-live','polite');
+  cover.style.cssText='position:fixed;inset:0;z-index:99998;background:#20251d;color:#f5eedc;display:flex;align-items:center;justify-content:center;text-align:center;font:700 16px Arial,sans-serif;pointer-events:auto';
+  cover.textContent='Подготовка боя…';
+  document.body.appendChild(cover);
+  let ready=false;
+  let timer;
+  const finish=(reason)=>{
+    if(ready)return false;
+    ready=true;
+    clearTimeout(timer);
+    germanPreview.startupHeroReady=reason;
+    cover.remove();
+    return true;
+  };
+  // Never trap a player behind loading when mobile GLB sources are unavailable.
+  // If the deadline expires, keep the stable existing rig; suppress late swaps.
+  timer=setTimeout(()=>finish('timeout-fallback'),10000);
+  return {pending:()=>!ready,finish};
+})();
+
 function germanPreviewLabel(message){const e=document.getElementById('german-preview-status');if(e){e.hidden=!message;if(e.textContent!==message)e.textContent=message;}}
 // Wehrmacht-wide visual rollout. Only the German visual tier changes; the
 // original unit simulation, weapon damage, movement and AI are untouched.
@@ -1081,6 +1112,89 @@ function createNativeSupportPalm(rig){
   return mesh;
 }
 
+
+// German PLAYER ONLY: recognisable field kit and a muted olive tunic. Army
+// infantry/engineers/officers keep their own silhouettes and materials.
+// The attachment follows the animated native chest bone: no second mixer,
+// no pose changes, no replacement of weapons or gameplay hitboxes.
+function installNativeGermanHeroIdentity(rig){
+  if(rig.armyUnit||rig.germanHeroIdentity)return;
+  let chest=null;
+  rig.model.traverse(node=>{if(node.isBone&&node.name==='spine_03')chest=node;});
+  if(!chest)throw new Error('German hero chest bone missing');
+  const root=new THREE.Group();
+  root.name='GermanHeroDistinctiveFieldKit';
+  root.userData.role='german-player-hero';
+  const canvas=new THREE.MeshLambertMaterial({color:0x525c4e});
+  const canvasDark=new THREE.MeshLambertMaterial({color:0x404b41});
+  const leather=new THREE.MeshLambertMaterial({color:0x493a2e});
+  const webbing=new THREE.MeshLambertMaterial({color:0x827d62});
+  const trim=new THREE.MeshLambertMaterial({color:0xaaa68a});
+  const metal=new THREE.MeshLambertMaterial({color:0x6e716c});
+  const add=(name,geometry,material,x,y,z)=>{
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.name=name;
+    mesh.position.set(x,y,z);
+    mesh.castShadow=true;mesh.receiveShadow=true;
+    root.add(mesh);
+    return mesh;
+  };
+  const ellipsoid=(name,material,pos,scale)=>{
+    const mesh=add(name,new THREE.SphereGeometry(1,18,12),material,...pos);
+    mesh.scale.set(...scale);
+    return mesh;
+  };
+  // Soft canvas field pack and bedroll: a readable back silhouette without
+  // large rectangular props or anything attached to a moving weapon hand.
+  ellipsoid('HeroPersonalHaversack',canvas,[0,-.22,-.27],[.235,.29,.13]);
+  ellipsoid('HeroHaversackFlap',canvasDark,[0,-.08,-.39],[.22,.095,.038]);
+  const bedroll=add('HeroBedroll',
+    new THREE.CylinderGeometry(.072,.072,.43,14),canvas,.0,.10,-.29);
+  bedroll.rotation.z=Math.PI/2;
+  for(const x of [-.15,.15]){
+    add('HeroPackBuckle',new THREE.BoxGeometry(.034,.055,.015),metal,x,-.06,-.44);
+    add('HeroBedrollTie',new THREE.BoxGeometry(.022,.145,.026),leather,x,.10,-.29);
+  }
+  // Distinct shoulder tabs with restrained trim, not an oversized costume
+  // badge. Army soldiers do not receive these hero-only markers.
+  for(const x of [-.205,.205]){
+    const board=add('HeroShoulderBoard',
+      new THREE.BoxGeometry(.15,.035,.22),canvasDark,x,.10,.035);
+    board.rotation.z=Math.sign(x)*.08;
+    add('HeroShoulderTrim',
+      new THREE.BoxGeometry(.105,.013,.024),trim,x,.123,.13);
+  }
+  // Diagonal map-case sling, small leather case and flap: silhouette visible
+  // at RTS distance while the firing hand and rifle remain unobstructed.
+  const sling=new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-.20,.065,.165),
+    new THREE.Vector3(-.095,-.13,.225),
+    new THREE.Vector3(.085,-.35,.21),
+    new THREE.Vector3(.245,-.54,.135)
+  ]);
+  add('HeroMapCaseSling',new THREE.TubeGeometry(sling,18,.019,7,false),
+    webbing,0,0,0);
+  ellipsoid('HeroMapCase',leather,[.255,-.575,.105],[.128,.164,.071]);
+  ellipsoid('HeroMapCaseFlap',canvasDark,[.255,-.48,.17],[.118,.038,.016]);
+  add('HeroMapCaseClasp',new THREE.BoxGeometry(.027,.046,.01),
+    metal,.255,-.52,.187);
+  rig.visual.add(root);
+  rig.germanHeroIdentity={root,chest};
+  updateNativeGermanHeroIdentity(rig);
+}
+function updateNativeGermanHeroIdentity(rig){
+  const identity=rig.germanHeroIdentity;
+  if(!identity)return;
+  identity.root.visible=!rig.armyUnit&&!!P&&P.side==='red';
+  if(!identity.root.visible)return;
+  const visual=rig.visual;
+  visual.updateWorldMatrix(true,true);
+  identity.root.position.copy(visual.worldToLocal(
+    identity.chest.getWorldPosition(new THREE.Vector3())));
+  const inv=visual.getWorldQuaternion(new THREE.Quaternion()).invert();
+  identity.root.quaternion.copy(inv.multiply(
+    identity.chest.getWorldQuaternion(new THREE.Quaternion()))).normalize();
+}
 function dressNativeHeroFieldUniform(rig){
   if(new URLSearchParams(location.search).get('uniform')==='prototype'){
     dressNativeHeroPrimitiveUniform(rig);
@@ -1104,7 +1218,7 @@ function dressNativeHeroFieldUniform(rig){
       if(!n.isSkinnedMesh)return;
       const mat=n.material,name=mat&&mat.name||'';
       const type=/helmet|scrim/i.test(name)?'headgear':/ammopouches/i.test(name)?'pouches':'garment';
-      const german=soldierMaterial(mat,'hero',0x4a5450);
+      const german=soldierMaterial(mat,'hero',rig.armyUnit?0x4a5450:0x485349);
       const british=soldierMaterial(mat,'khaki',0xa28d69);
       if(type==='pouches'){
         german.color.setHex(0xddd0b9);
@@ -1248,6 +1362,7 @@ function updateNativeHeroFieldUniform(rig){
   const uniform=rig.ww2Uniform;
   if(!uniform){
     updateNativeHeroPrimitiveUniform(rig);
+    updateNativeGermanHeroIdentity(rig);
     return;
   }
   const side=(rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P&&P.side)==='red'?'red':'blue';
@@ -1419,6 +1534,7 @@ function updateNativeHeroFieldUniform(rig){
     beret.position.y+=.235;
     beret.position.add(new THREE.Vector3(0,0,.046).applyQuaternion(beret.quaternion));
   }
+  updateNativeGermanHeroIdentity(rig);
 }
 
 
@@ -1626,10 +1742,10 @@ function loadNativeHeroSideCap(rig){
 
 function nativeHeroLoad(){
   const oldMode=new URLSearchParams(location.search).get('rig')==='original';
-  if(oldMode){nativeHeroLabel('СТАРЫЙ СКЕЛЕТ: выбран для сравнения. Новая модель отключена.');return;}
+  if(oldMode){nativeHeroLabel('СТАРЫЙ СКЕЛЕТ: выбран для сравнения. Новая модель отключена.');heroStartupGate.finish('original');return;}
   if(germanPreview.nativeHeroRequested)return;
   germanPreview.nativeHeroRequested=true;
-  if(typeof THREE.GLTFLoader!=='function'){nativeHeroLabel('ОШИБКА: нет загрузчика GLTFLoader. Используется старая модель.');return;}
+  if(typeof THREE.GLTFLoader!=='function'){nativeHeroLabel('ОШИБКА: нет загрузчика GLTFLoader. Используется старая модель.');heroStartupGate.finish('no-loader-fallback');return;}
   nativeHeroLabel('СКЕЛЕТ v17: облегчённые GLB 1,5 МБ — начинаю загрузку.');
   // Try GitHub raw first, then a pinned jsDelivr mirror. Errors are
   // visible instead of silently falling back to the unchanged hero.
@@ -1660,6 +1776,9 @@ function nativeHeroLoad(){
     throw new Error(name+': '+(lastError&&lastError.message||'оба источника недоступны'));
   };
   Promise.all([loadFile('night-striker-lite.glb'),loadFile('hero-three-clips-lite.glb')]).then(([character,library])=>{
+    // A network timeout may have exposed the fallback. Never replace it
+    // several seconds into a live battle, creating another visible pop.
+    if(!heroStartupGate.pending())return;
     const unit=P,v=unit&&unit.germanPreview;
     if(!v||v.role!=='hero'||v.nativeRig)throw new Error('Нет подготовленного героя');
     const model=character.scene;
@@ -1723,6 +1842,7 @@ function nativeHeroLoad(){
       v.weapon.root.visible=false;
       initNativeHeroWeapon(v,v.nativeRig);
       dressNativeHeroFieldUniform(v.nativeRig);
+      installNativeGermanHeroIdentity(v.nativeRig);
       // Green badge plus geometric marker: the native visual swap is
       // unambiguous, even when the costume looks similar from the RTS camera.
       const marker=new THREE.Mesh(
@@ -1734,7 +1854,11 @@ function nativeHeroLoad(){
       marker.position.set(0,2.92,0);
       marker.renderOrder=120;
       if(new URLSearchParams(location.search).has('rigdebug'))visual.add(marker);
+      // Apply the correct animation and equipment BEFORE the first visible
+      // render; do not show idle first and cross-fade to the real state later.
+      animateNativeHeroRig(unit,v,0);
       nativeHeroLabel('НОВЫЙ СКЕЛЕТ v17: АКТИВЕН ✓ '+nativeHeroOrigins['night-striker-lite.glb']+' + '+nativeHeroOrigins['hero-three-clips-lite.glb']+'. Полевая форма.');
+      heroStartupGate.finish('native');
       console.info('Quaternius native hero rig ready',{
         skeletonBones:bones.size,skinnedMeshes:meshCount,clips:Object.keys(actions)
       });
@@ -1748,6 +1872,7 @@ function nativeHeroLoad(){
   }).catch(e=>{
     console.warn('Native hero rig fallback to original:',e);
     nativeHeroLabel('ОШИБКА СКЕЛЕТА v17: прежний герой. Причина: '+e.message);
+    heroStartupGate.finish('load-fallback');
   });
 }
 function animateNativeHeroRig(unit,v,dt){
@@ -1775,7 +1900,7 @@ function animateNativeHeroRig(unit,v,dt){
   return true;
 }
 function loadGermanSoldierPreview(){
-  if(typeof THREE.GLTFLoader!=='function'){germanPreviewLabel('Модель недоступна — исходные бойцы');return;}
+  if(typeof THREE.GLTFLoader!=='function'){germanPreviewLabel('Модель недоступна — исходные бойцы');heroStartupGate.finish('no-loader-fallback');return;}
   try{
     const base64=document.getElementById('preview-german-glb').textContent.trim(),bytes=Uint8Array.from(atob(base64),c=>c.charCodeAt(0));
     new THREE.GLTFLoader().parse(bytes.buffer,'',gltf=>{
@@ -1786,11 +1911,13 @@ function loadGermanSoldierPreview(){
         prepareSoldierGeometry(figure);
         germanPreview.template=figure;germanPreview.bounds=bounds;
         const queue=[P,...U,...germanPreview.pending];germanPreview.pending.length=0;
-        for(const u of queue)if(u.hp>0)attachGermanSoldier(u);
+        // Once the first-frame deadline has expired, preserve the fallback
+        // hero instead of showing a delayed donor model swap during combat.
+        for(const u of queue)if(u.hp>0&&(u!==P||heroStartupGate.pending()))attachGermanSoldier(u);
         nativeHeroLoad();
         refreshGermanPreviewLabel();
-      }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');}
-    },e=>{console.error(e);germanPreviewLabel('Ошибка загрузки — исходные бойцы');});
-  }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');}
+      }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');heroStartupGate.finish('parse-fallback');}
+    },e=>{console.error(e);germanPreviewLabel('Ошибка загрузки — исходные бойцы');heroStartupGate.finish('model-fallback');});
+  }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');heroStartupGate.finish('model-fallback');}
 }
 setTimeout(loadGermanSoldierPreview,200);
