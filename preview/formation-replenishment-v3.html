@@ -44,13 +44,10 @@
       +"const soldier=germanPreview.armyPilotUnit;if(soldier?.hp>0&&soldier.germanPreview?.nativeRig){"
       +"const a=soldier.g.rotation.y;cam.position.set(soldier.x-Math.sin(a)*3.9+Math.cos(a)*.7,3.05,soldier.z-Math.cos(a)*3.9-Math.sin(a)*.7);"
       +"cam.lookAt(soldier.x,1.78,soldier.z);}}");
-    // Test-only soldier preview label; never shown in the normal RTS.
-    if(new URLSearchParams(location.search).get('inspect')==='army'){
-      const label=document.createElement('div');
-      label.textContent='ТЕСТ ПЕХОТЫ · КАСКА + НОВЫЙ БЕГ';
-      label.style.cssText='position:fixed;right:8px;top:calc(env(safe-area-inset-top,0px) + 115px);z-index:990;padding:6px 9px;color:#fff;background:#26372fe8;border:1px solid #aaa;border-radius:6px;font:700 12px Arial;pointer-events:none';
-      document.body.appendChild(label);
-    }
+    // Label must be injected into the game document, not the transient
+    // loading screen (which document.write replaces at launch).
+    html=once(html,'const PTS=[];',
+      "const PTS=[];if(new URLSearchParams(location.search).get('inspect')==='army'){const label=document.createElement('div');label.textContent='ТЕСТ ПЕХОТЫ · КАСКА + НОВЫЙ БЕГ';label.style.cssText='position:fixed;right:8px;top:calc(env(safe-area-inset-top,0px) + 115px);z-index:990;padding:6px 9px;color:#fff;background:#26372fe8;border:1px solid #aaa;border-radius:6px;font:700 12px Arial;pointer-events:none';document.body.appendChild(label);}");
     // Visible build check for the close-up only; standard RTS HUD unchanged.
     html=once(html,'const PTS=[];',
       "const PTS=[];if(new URLSearchParams(location.search).get('inspect')==='german'){const lab=document.createElement('div');lab.textContent='НЕМЕЦ · ПИЛОТКА V19';lab.style.cssText='position:fixed;right:9px;top:calc(env(safe-area-inset-top,0px) + 120px);z-index:990;padding:5px 8px;color:#fff;background:#253b32dc;border:1px solid #c1c3ad;border-radius:5px;font:700 12px Arial;pointer-events:none';document.body.appendChild(lab);}");
