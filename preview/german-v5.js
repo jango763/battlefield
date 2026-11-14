@@ -1105,14 +1105,34 @@ function loadNativeHeroSideCap(rig){
   // ?pilotka=classic retains the old source mesh for A/B inspection.
   if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
     const cap=new THREE.Group();
-    cap.name='GermanPilotka_HeadTracked_V18';
+    cap.name='GermanPilotka_HeadTracked_V19_SoftCloth';
     cap.userData.proceduralPilotka=true;
     // Narrow cloth Schiffchen silhouette, not an inflated beret.
     // Five cross-sections follow the scalp, with a pointed folded crest.
     const cloth=new THREE.MeshLambertMaterial({color:0x4a5751,side:THREE.DoubleSide});
     const sideCloth=new THREE.MeshLambertMaterial({color:0x435049,side:THREE.DoubleSide});
     const edge=new THREE.MeshLambertMaterial({color:0x36433e,side:THREE.DoubleSide});
-    const seam=new THREE.MeshLambertMaterial({color:0x526058,side:THREE.DoubleSide});
+    const seam=new THREE.MeshLambertMaterial({color:0x4e5a53,side:THREE.DoubleSide});
+    // Share vertices between adjacent polygons before computing normals.
+    // The older triangles used duplicate vertices, giving a rigid low-poly
+    // look even though the material itself used smooth shading.
+    const smoothSurface=(coords)=>{
+      const geo=new THREE.BufferGeometry(),points=[],faces=[],lookup=new Map();
+      for(let i=0;i<coords.length;i+=3){
+        const x=coords[i],y=coords[i+1],z=coords[i+2];
+        const key=[x,y,z].map(v=>Math.round(v*1e6)).join(',');
+        let id=lookup.get(key);
+        if(id===undefined){
+          id=points.length/3;lookup.set(key,id);
+          points.push(x,y,z);
+        }
+        faces.push(id);
+      }
+      geo.setAttribute('position',new THREE.Float32BufferAttribute(points,3));
+      geo.setIndex(faces);
+      geo.computeVertexNormals();
+      return geo;
+    };
     // A thin inner liner stays beneath the folded cap, not a rounded beret.
     const liner=new THREE.Mesh(new THREE.SphereGeometry(1,22,14),cloth);
     liner.name='Pilotka_Interior_Liner';
@@ -1130,9 +1150,7 @@ function loadNativeHeroSideCap(rig){
         w0=point(theta0,.250),w1=point(theta1,.250);
       facing.push(...v0,...v1,...w1,...v0,...w1,...w0);
     }
-    const frontGeo=new THREE.BufferGeometry();
-    frontGeo.setAttribute('position',new THREE.Float32BufferAttribute(facing,3));
-    frontGeo.computeVertexNormals();
+    const frontGeo=smoothSurface(facing);
     const frontBand=new THREE.Mesh(frontGeo,sideCloth);
     frontBand.name='Pilotka_ForeheadFacing';
     frontBand.castShadow=true;frontBand.receiveShadow=true;
@@ -1151,10 +1169,31 @@ function loadNativeHeroSideCap(rig){
     // front-to-back length and height untouched to keep the scalp covered.
     for(const section of stations)section.w*=.89;
     liner.scale.x*=.89;
+    // Catmull-Rom interpolated fabric panels soften the sharp hard-surface
+    // profile at the original six section boundaries. Keep those original
+    // stations as anchors so the validated head fit does not drift.
+    const profile=[];
+    const curveValue=(key,i,t)=>{
+      const a=stations[Math.max(0,i-1)][key];
+      const b=stations[i][key],c=stations[i+1][key];
+      const d=stations[Math.min(stations.length-1,i+2)][key];
+      const t2=t*t,t3=t2*t;
+      return .5*((2*b)+(-a+c)*t+(2*a-5*b+4*c-d)*t2+
+        (-a+3*b-3*c+d)*t3);
+    };
+    for(let i=0;i<stations.length-1;i++){
+      for(let j=0;j<4;j++){
+        const t=j/4;
+        const v={z:THREE.MathUtils.lerp(stations[i].z,stations[i+1].z,t)};
+        for(const key of ['w','b','s','t'])v[key]=curveValue(key,i,t);
+        profile.push(v);
+      }
+    }
+    profile.push(stations[stations.length-1]);
     const bands={side:[],roof:[],top:[]};
     const quad=(into,p,q,r,t)=>into.push(...p,...q,...r,...p,...r,...t);
-    for(let i=0;i<stations.length-1;i++){
-      const a=stations[i],b=stations[i+1];
+    for(let i=0;i<profile.length-1;i++){
+      const a=profile[i],b=profile[i+1];
       for(const sign of [-1,1]){
         const pt=(v,x,y)=>[sign*x,y,v.z];
         // Folded wall and inward sloping upper flap
@@ -1171,9 +1210,7 @@ function loadNativeHeroSideCap(rig){
       ['roof',bands.roof,cloth],
       ['top',bands.top,cloth]
     ]){
-      const geo=new THREE.BufferGeometry();
-      geo.setAttribute('position',new THREE.Float32BufferAttribute(coords,3));
-      geo.computeVertexNormals();
+      const geo=smoothSurface(coords);
       const piece=new THREE.Mesh(geo,material);
       piece.name='Pilotka_'+name;piece.castShadow=true;piece.receiveShadow=true;
       cap.add(piece);
@@ -1181,10 +1218,10 @@ function loadNativeHeroSideCap(rig){
     for(const sign of [-1,1]){
       const fold=new THREE.CatmullRomCurve3(stations.map(v=>
         new THREE.Vector3(sign*.018,v.t+.003,v.z)));
-      cap.add(new THREE.Mesh(new THREE.TubeGeometry(fold,32,.0018,5,false),seam));
+      cap.add(new THREE.Mesh(new THREE.TubeGeometry(fold,32,.0012,5,false),seam));
       const rim=new THREE.CatmullRomCurve3(stations.map(v=>
         new THREE.Vector3(sign*v.w,v.b+.003,v.z)));
-      cap.add(new THREE.Mesh(new THREE.TubeGeometry(rim,32,.0026,5,false),edge));
+      cap.add(new THREE.Mesh(new THREE.TubeGeometry(rim,32,.0019,5,false),edge));
     }
     // Tapered front/back cloth corners (the sidecap has no visor).
     for(const idx of [0,stations.length-1]){
@@ -1197,7 +1234,7 @@ function loadNativeHeroSideCap(rig){
       cap.add(new THREE.Mesh(geo,sideCloth));
     }
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German head-following Schiffchen V18';
+    u.cap=cap;u.headwear='German head-following Schiffchen V19';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
