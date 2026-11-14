@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { clone as cloneSkinned, retargetClip } from 'three/addons/utils/SkeletonUtils.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // Non-production lab: use actual assets/weapon pivot coordinates and the same
@@ -300,7 +300,7 @@ function makePanel(x,character,costume,library,side){
 
 /**
  * Actual ONE-skeleton route: retain the authored Panzergrenadier skin/bind,
- * bake only Quaternius animation rotations into it, remove the source rig.
+ * bake rest-space corrected Quaternius bone rotations into it; remove source rig.
  */
 function makeSingleRigPanel(x,character,costume,library,side){
  const anchor=new THREE.Group();anchor.name='OneWW2Skeleton';anchor.position.x=x;
@@ -324,19 +324,73 @@ function makeSingleRigPanel(x,character,costume,library,side){
   if(v&&sourceMap.has(v)){namesMap[bone.name]=v;mapped++;}
  }
  if(mapped<48)throw Error('Insufficient mapped bone names: '+mapped);
- const mixer=new THREE.AnimationMixer(donor),actions={};
- const clips={idle:'Idle_Loop',jog:'Jog_Fwd_Loop',sprint:'Sprint_Loop'};
- for(const [mode,label] of Object.entries(clips)){
-  const clip=library.find(c=>c.name===label);
-  if(!clip)throw Error('Missing source clip '+label);
-  const baked=retargetClip(target,sourceMesh,clip,{
-   names:namesMap,fps:30,hip:'pelvis',preserveBoneMatrix:true,
-   preserveBonePositions:true,useTargetMatrix:false
-  });
-  if(!baked?.tracks?.length)throw Error('Empty retargeted '+label);
-  baked.tracks=baked.tracks.filter(t=>!/\.scale$/.test(t.name));
-  actions[mode]=mixer.clipAction(baked);
+ // Create baked rotation-only action clips from the *verified* old dual-rig
+ // rest-space mapping. No target hip translations or exported bone scales.
+ const bindings=[];
+ for(const bone of targetRig.bones){
+  const k=bone.name.replace(/_\d+$/,'').replace(/^mixamorig[:_]?/i,'');
+  const sourceName=matched[k],sourceBone=sourceMap.get(sourceName);
+  if(!sourceBone)continue;
+  bindings.push({target:bone,source:sourceBone,
+   restSourceInv:sourceBone.getWorldQuaternion(Q()).invert(),
+   restTarget:bone.getWorldQuaternion(Q())});
  }
+ const boneDepth=b=>{let depth=0;while(b.parent?.isBone){depth++;b=b.parent;}return depth;};
+ bindings.sort((a,b)=>boneDepth(a.target)-boneDepth(b.target));
+ const originalPose=targetRig.bones.map(b=>({
+  bone:b,position:b.position.clone(),rotation:b.quaternion.clone(),scale:b.scale.clone()
+ }));
+ const restore=()=>{
+  for(const x of originalPose){
+   x.bone.position.copy(x.position);
+   x.bone.quaternion.copy(x.rotation);
+   x.bone.scale.copy(x.scale);
+  }
+  donor.updateWorldMatrix(true,true);
+ };
+ const sourceMixer=new THREE.AnimationMixer(src),mixer=new THREE.AnimationMixer(donor),actions={};
+ const clips={idle:'Idle_Loop',jog:'Jog_Fwd_Loop',sprint:'Sprint_Loop'};
+ const fps=30;
+ for(const [mode,label] of Object.entries(clips)){
+  const raw=library.find(c=>c.name===label);
+  if(!raw)throw Error('Missing source clip '+label);
+  const filtered=raw.clone();
+  filtered.tracks=filtered.tracks.filter(t=>!/\.scale$/.test(t.name) &&
+   !/(?:^|[./])root(?:\]|\.|_)?(?:position)?\.position$/.test(t.name));
+  sourceMixer.stopAllAction();
+  const sourceAction=sourceMixer.clipAction(filtered);
+  sourceAction.reset().play();
+  const duration=Math.min(raw.duration,6);
+  if(!Number.isFinite(duration)||duration<=0)throw Error('Invalid clip '+label);
+  const frames=Math.max(2,Math.ceil(duration*fps)+1);
+  const times=[],rawData=bindings.map(()=>[]);
+  const sourceQ=Q(),worldTargetQ=Q(),parentQ=Q();
+  for(let frame=0;frame<frames;frame++){
+   const t=duration*frame/(frames-1);
+   times.push(t);
+   sourceMixer.setTime(t);
+   src.updateWorldMatrix(true,true);
+   restore();
+   for(let k=0;k<bindings.length;k++){
+    const item=bindings[k];
+    item.source.getWorldQuaternion(sourceQ);
+    worldTargetQ.copy(sourceQ).multiply(item.restSourceInv).multiply(item.restTarget);
+    item.target.parent.getWorldQuaternion(parentQ).invert();
+    item.target.quaternion.copy(parentQ.multiply(worldTargetQ)).normalize();
+    item.target.updateWorldMatrix(false,true);
+    rawData[k].push(item.target.quaternion.x,item.target.quaternion.y,
+      item.target.quaternion.z,item.target.quaternion.w);
+   }
+  }
+  restore();
+  const tracks=bindings.map((item,k)=>new THREE.QuaternionKeyframeTrack(
+    item.target.name+'.quaternion',times,rawData[k]));
+  if(tracks.length<48)throw Error('Insufficient quaternion tracks '+label);
+  const baked=new THREE.AnimationClip('WW2_'+label,duration,tracks);
+  actions[mode]=mixer.clipAction(baked);
+  sourceMixer.stopAllAction();
+ }
+ restore();
  anchor.remove(src); // temporary source was used only for baking clips
  actions.idle.play();
  const hands={
