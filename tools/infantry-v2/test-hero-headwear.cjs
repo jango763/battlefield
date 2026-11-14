@@ -53,6 +53,28 @@ if(process.argv.includes('--browser')){
                 const box=new THREE.Box3().setFromObject(cap);
                 return{min:box.min.toArray(),max:box.max.toArray()};
               })(),
+              scalpBounds:u.donorMeshes.filter(x=>x.type==='garment').map(item=>{
+                const m=item.mesh,g=m.geometry;
+                const skin=g.getAttribute('skinIndex'),weights=g.getAttribute('skinWeight');
+                const position=g.getAttribute('position');
+                let n=0;const min=new THREE.Vector3(1e9,1e9,1e9),max=new THREE.Vector3(-1e9,-1e9,-1e9);
+                if(!skin||!weights||typeof m.boneTransform!=='function')return{error:'no skinning'};
+                m.updateWorldMatrix(true,false);
+                for(let i=0;i<position.count;i+=Math.max(1,Math.floor(position.count/18000))){
+                  let headWeight=0;
+                  for(let k=0;k<4;k++){
+                    const idx=skin[['getX','getY','getZ','getW'][k]](i);
+                    const name=m.skeleton.bones[Math.round(idx)]?.name||'';
+                    if(/Head|Neck/i.test(name))headWeight+=weights[['getX','getY','getZ','getW'][k]](i);
+                  }
+                  if(headWeight<.8)continue;
+                  const p=new THREE.Vector3().fromBufferAttribute(position,i);
+                  m.boneTransform(i,p);
+                  m.localToWorld(p);r.visual.worldToLocal(p);
+                  min.min(p);max.max(p);n++;
+                }
+                return{n,min:min.toArray(),max:max.toArray()};
+              }),
               donorMeshes:u.donorMeshes.map(x=>({
                 name:x.mesh.name,material:x.mesh.material.name,type:x.type,
                 visible:x.mesh.visible
