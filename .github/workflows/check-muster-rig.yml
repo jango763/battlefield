@@ -1,0 +1,40 @@
+name: Muster UK rifleman experimental skinning rig QA
+on:
+  push:
+    branches: [feature/muster-rifleman-skinning-pilot-20261114]
+    paths:
+      - preview/muster-rifleman-rig.js
+      - preview/formation-replenishment-v3.html
+      - tools/infantry-v2/test-muster-rig.cjs
+      - .github/workflows/check-muster-rig.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  skin-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 23
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate skinning algorithm and loading syntax
+        run: |
+          node --check preview/muster-rifleman-rig.js
+          node --check tools/infantry-v2/test-muster-rig.cjs
+          node tools/infantry-v2/test-muster-rig.cjs
+      - name: Install Chromium browser for rendering tests
+        run: |
+          npm install --prefix /tmp/muster-rig-qa --no-audit --no-fund playwright@1.58.2
+          /tmp/muster-rig-qa/node_modules/.bin/playwright install chromium
+      - name: Test independent original geometry skinned to Quaternius joints
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 > /tmp/muster-rig-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-muster-rig.cjs --browser
+      - name: Preserve screenshot evidence for desktop and iPhone viewport
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: muster-original-rifleman-skinning-qa
+          path: /tmp/muster-rig-*.png
+          if-no-files-found: ignore
