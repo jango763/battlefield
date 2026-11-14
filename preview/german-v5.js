@@ -1076,46 +1076,72 @@ function loadNativeHeroSideCap(rig){
   // ?pilotka=classic retains the old source mesh for A/B inspection.
   if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
     const cap=new THREE.Group();
-    cap.name='GermanPilotka_FullCrown_V4';
+    cap.name='GermanPilotka_Schiffchen_V5';
     cap.userData.proceduralPilotka=true;
-    const felt=new THREE.MeshLambertMaterial({color:0x4d5a52,side:THREE.DoubleSide});
-    const edge=new THREE.MeshLambertMaterial({color:0x35433e,side:THREE.DoubleSide});
-    const seam=new THREE.MeshLambertMaterial({color:0x6c7770,side:THREE.DoubleSide});
-    const patch=(material,center,radii)=>{
-      const part=new THREE.Mesh(new THREE.SphereGeometry(1,24,14),material);
-      part.position.set(...center);part.scale.set(...radii);
-      part.castShadow=true;part.receiveShadow=true;cap.add(part);
-      return part;
-    };
-    // Low oval cloth band wraps the forehead AND the back of the scalp.
-    // Offsets are in the calibrated WW2 donor head-bone frame.
-    patch(edge,[0,.192,-.012],[.184,.034,.224]);
-    patch(felt,[0,.256,-.014],[.178,.084,.215]);
-    // Twin upper folds make this read as a soft Schiffchen sidecap rather
-    // than a rounded steel helmet. Each is a lightweight smooth cloth seam.
-    for(const x of [-.065,.065]){
-      const curve=new THREE.CatmullRomCurve3([
-        new THREE.Vector3(x*.8,.278,-.185),
-        new THREE.Vector3(x,.322,-.10),
-        new THREE.Vector3(x,.337,-.01),
-        new THREE.Vector3(x,.322,.10),
-        new THREE.Vector3(x*.8,.278,.172)
-      ]);
-      const fold=new THREE.Mesh(new THREE.TubeGeometry(curve,24,.006,6,false),seam);
-      fold.castShadow=true;cap.add(fold);
+    // Narrow cloth Schiffchen silhouette, not an inflated beret.
+    // Five cross-sections follow the scalp, with a pointed folded crest.
+    const cloth=new THREE.MeshLambertMaterial({color:0x4a5751,side:THREE.DoubleSide});
+    const sideCloth=new THREE.MeshLambertMaterial({color:0x435049,side:THREE.DoubleSide});
+    const edge=new THREE.MeshLambertMaterial({color:0x36433e,side:THREE.DoubleSide});
+    const seam=new THREE.MeshLambertMaterial({color:0x6b766d,side:THREE.DoubleSide});
+    const liner=new THREE.Mesh(new THREE.SphereGeometry(1,20,12),cloth);
+    liner.scale.set(.138,.037,.176);liner.position.set(0,.219,-.006);
+    liner.castShadow=true;cap.add(liner);
+    const stations=[
+      {z:-.194,w:.054,b:.224,s:.250,t:.258},
+      {z:-.134,w:.112,b:.211,s:.256,t:.296},
+      {z:-.062,w:.141,b:.207,s:.260,t:.317},
+      {z:.062,w:.141,b:.207,s:.260,t:.317},
+      {z:.134,w:.112,b:.211,s:.256,t:.296},
+      {z:.194,w:.054,b:.224,s:.250,t:.258}
+    ];
+    const bands={side:[],roof:[],top:[]};
+    const quad=(into,p,q,r,t)=>into.push(...p,...q,...r,...p,...r,...t);
+    for(let i=0;i<stations.length-1;i++){
+      const a=stations[i],b=stations[i+1];
+      for(const sign of [-1,1]){
+        const pt=(v,x,y)=>[sign*x,y,v.z];
+        // Folded wall and inward sloping upper flap
+        quad(bands.side,pt(a,a.w,a.b),pt(b,b.w,b.b),
+          pt(b,b.w*.79,b.s),pt(a,a.w*.79,a.s));
+        quad(bands.roof,pt(a,a.w*.79,a.s),pt(b,b.w*.79,b.s),
+          pt(b,.017,b.t),pt(a,.017,a.t));
+      }
+      quad(bands.top,[-.017,a.t,a.z],[-.017,b.t,b.z],
+        [.017,b.t,b.z],[.017,a.t,a.z]);
     }
-    // Fine lower seam emphasizes the cap's flexible folded rim.
-    for(const x of [-.156,.156]){
-      const curve=new THREE.CatmullRomCurve3([
-        new THREE.Vector3(x*.72,.192,-.16),
-        new THREE.Vector3(x,.207,-.07),
-        new THREE.Vector3(x,.207,.065),
-        new THREE.Vector3(x*.72,.192,.156)
-      ]);
-      cap.add(new THREE.Mesh(new THREE.TubeGeometry(curve,16,.004,5,false),felt));
+    for(const [name,coords,material] of [
+      ['side',bands.side,sideCloth],
+      ['roof',bands.roof,cloth],
+      ['top',bands.top,cloth]
+    ]){
+      const geo=new THREE.BufferGeometry();
+      geo.setAttribute('position',new THREE.Float32BufferAttribute(coords,3));
+      geo.computeVertexNormals();
+      const piece=new THREE.Mesh(geo,material);
+      piece.name='Pilotka_'+name;piece.castShadow=true;piece.receiveShadow=true;
+      cap.add(piece);
+    }
+    for(const sign of [-1,1]){
+      const fold=new THREE.CatmullRomCurve3(stations.map(v=>
+        new THREE.Vector3(sign*.018,v.t+.003,v.z)));
+      cap.add(new THREE.Mesh(new THREE.TubeGeometry(fold,32,.0035,5,false),seam));
+      const rim=new THREE.CatmullRomCurve3(stations.map(v=>
+        new THREE.Vector3(sign*v.w,v.b+.003,v.z)));
+      cap.add(new THREE.Mesh(new THREE.TubeGeometry(rim,32,.0045,5,false),edge));
+    }
+    // Tapered front/back cloth corners (the sidecap has no visor).
+    for(const idx of [0,stations.length-1]){
+      const v=stations[idx],tri=[
+        -v.w,v.b,v.z, v.w,v.b,v.z, 0,v.t,v.z
+      ];
+      const geo=new THREE.BufferGeometry();
+      geo.setAttribute('position',new THREE.Float32BufferAttribute(tri,3));
+      geo.computeVertexNormals();
+      cap.add(new THREE.Mesh(geo,sideCloth));
     }
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German full-crown pilotka V4';
+    u.cap=cap;u.headwear='German narrow Schiffchen V5';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
