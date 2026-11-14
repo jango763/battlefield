@@ -217,6 +217,41 @@ jobs:
                 await page.waitForTimeout(350);
                 await page.screenshot({path:'/tmp/army-grip-'+role+'.png'});
               }
+              // Compare weapon/palm contact offsets in the same front-angle
+              // shot. These frames are reviewed visually; CI only verifies
+              // the actual skinned hand reaches its contact at each offset.
+              result.contactLift=[];
+              await page.evaluate(()=>{
+                window.__armyGripContactLift=0;
+                const u=germanPreview.armyPilotUnit;
+                u.type='rf';u.aim=1;u.kick=0;
+              });
+              for(const [label,lift] of [['baseline',0],['low',.025],['medium',.055],['high',.085]]){
+                const item=await page.evaluate(lift=>{
+                  window.__armyGripContactLift=lift;
+                  const u=germanPreview.armyPilotUnit,r=u.germanPreview.nativeRig;
+                  for(let i=0;i<20;i++)animateGermanSoldier(u,1/60);
+                  r.visual.updateWorldMatrix(true,true);
+                  const forward=r.weapon.muzzleFlash.getWorldPosition(new THREE.Vector3())
+                    .sub(r.weapon.trigger.getWorldPosition(new THREE.Vector3()))
+                    .setY(0).normalize();
+                  const side=new THREE.Vector3(-forward.z,0,forward.x);
+                  window.__qaCamOffset=[
+                    forward.x*3.0+side.x*1.55,2.48,
+                    forward.z*3.0+side.z*1.55
+                  ];
+                  return {lift,weapon:r.weapon.activeModelId,
+                    rightError:r.weaponDiagnostics?.visibleRightError,
+                    leftError:r.weaponDiagnostics?.visibleLeftError};
+                },lift);
+                result.contactLift.push(item);
+                await page.waitForTimeout(250);
+                await page.screenshot({path:'/tmp/army-grip-contact-'+label+'.png'});
+              }
+              delete window.__armyGripContactLift;
+              if(result.contactLift.some(x=>x.weapon!=='de-kar98k'||
+                !Number.isFinite(x.rightError)||x.rightError>.12))
+                result.errors.push('contact lift sweep failed '+JSON.stringify(result.contactLift));
               result.success=result.errors.length===0;
             }catch(e){result.errors.push('exception '+e.stack)}
             finally{
@@ -244,4 +279,5 @@ jobs:
             /tmp/army-grip-rf.png
             /tmp/army-grip-smg.png
             /tmp/army-grip-mg.png
+            /tmp/army-grip-contact-*.png
           if-no-files-found: warn
