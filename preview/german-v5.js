@@ -528,6 +528,16 @@ function selectNativeHeroWW2Weapon(unit,rig){
     // MP40 photographed on iPhone: visible trigger hand floated below the
     // pistol grip. Adjust only its visual IK contact, never weapon gameplay.
     if(side==='red'&&key==='de-mp40')w.trigger.position.add(new THREE.Vector3(0,.058,-.016));
+    if(rig.armyUnit){
+      // The skinned donor palm is wider than the Quaternius bone target.
+      // Shift the WEAPON relative to the planted right wrist, rather than
+      // raising the entire gun+both arms (that preserved the palm-up gap).
+      // Source target is rebuilt each frame, so this never accumulates.
+      const defaults={'de-kar98k':.045,'de-mp40':.022,'de-mg42':.018};
+      const preview=Number(window.__armyGripContactLift);
+      w.trigger.position.y+=Number.isFinite(preview)
+        ?THREE.MathUtils.clamp(preview,-.035,.12):(defaults[key]||0);
+    }
     w.support.position.copy(vec(info.support)).addScaledVector(new THREE.Vector3().fromArray(info.supportPalm),.014);
     if(rig.armyUnit&&key==='de-mg42'){
       // The MG42 fore-end support in the original asset is beyond reach of
