@@ -107,7 +107,7 @@ if(process.argv.includes('--browser')){
       await page.goto(
         'http://127.0.0.1:8777/preview/formation-replenishment-v3.html?inspect=german',
         {waitUntil:'domcontentloaded',timeout:60000});
-      await page.waitForFunction(()=>P?.germanPreview?.nativeRig?.ww2Uniform?.cap,
+      await page.waitForFunction(()=>typeof P!=='undefined'&&!!P?.germanPreview?.nativeRig?.ww2Uniform?.cap,
         null,{timeout:130000});
       const changed=await page.evaluate(()=>{
         P.side='blue';
