@@ -1018,9 +1018,9 @@ function updateNativeHeroFieldUniform(rig){
     // Donor head pivot is much lower than the visible hairline. Raise the
     // sidecap from eyebrow level onto the crown.
     if(cap.userData.proceduralPilotka){
-      // Calibrated against the front hairline in the latest mobile render:
-      // lower the level cap band 4 cm to cover the exposed forehead wedge.
-      cap.position.y-=.04;
+      // Preserve upper-crown clearance: lowering the entire hat caused
+      // the bare scalp to cut through its roof in the v7 render.
+      // V8 keeps the crown up and extends only the cloth side panels down.
       cap.position.add(new THREE.Vector3(0,0,.01).applyQuaternion(cap.quaternion));
     }else{
       // Legacy A/B mode only; do not double-raise the new cloth shell.
@@ -1081,7 +1081,7 @@ function loadNativeHeroSideCap(rig){
   // ?pilotka=classic retains the old source mesh for A/B inspection.
   if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
     const cap=new THREE.Group();
-    cap.name='GermanPilotka_Schiffchen_V5';
+    cap.name='GermanPilotka_Schiffchen_V8';
     cap.userData.proceduralPilotka=true;
     // Narrow cloth Schiffchen silhouette, not an inflated beret.
     // Five cross-sections follow the scalp, with a pointed folded crest.
@@ -1093,12 +1093,12 @@ function loadNativeHeroSideCap(rig){
     liner.scale.set(.138,.037,.176);liner.position.set(0,.219,-.006);
     liner.castShadow=true;cap.add(liner);
     const stations=[
-      {z:-.194,w:.054,b:.224,s:.250,t:.258},
-      {z:-.134,w:.112,b:.211,s:.256,t:.296},
-      {z:-.062,w:.141,b:.207,s:.260,t:.317},
-      {z:.062,w:.141,b:.207,s:.260,t:.317},
-      {z:.134,w:.112,b:.211,s:.256,t:.296},
-      {z:.194,w:.054,b:.224,s:.250,t:.258}
+      {z:-.194,w:.054,b:.180,s:.250,t:.258},
+      {z:-.134,w:.112,b:.166,s:.256,t:.296},
+      {z:-.062,w:.141,b:.162,s:.260,t:.317},
+      {z:.062,w:.141,b:.162,s:.260,t:.317},
+      {z:.134,w:.112,b:.166,s:.256,t:.296},
+      {z:.194,w:.054,b:.180,s:.250,t:.258}
     ];
     const bands={side:[],roof:[],top:[]};
     const quad=(into,p,q,r,t)=>into.push(...p,...q,...r,...p,...r,...t);
@@ -1146,7 +1146,7 @@ function loadNativeHeroSideCap(rig){
       cap.add(new THREE.Mesh(geo,sideCloth));
     }
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German narrow Schiffchen V5';
+    u.cap=cap;u.headwear='German fitted Schiffchen V8';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
