@@ -633,7 +633,7 @@ function attachNativeArmyM43FieldCap(rig){
     model.scale.multiplyScalar(scale);
     // Place the original M43 crown ON the scalp, not suspended above it.
     // The previous +.171m offset created a visible bare-head gap.
-    model.position.set(-center.x*scale,.061-box.min.y*scale,-center.z*scale);
+    model.position.set(-center.x*scale,.119-box.min.y*scale,-center.z*scale);
     model.traverse(n=>{
       if(!n.isMesh)return;
       n.castShadow=true;n.receiveShadow=true;
