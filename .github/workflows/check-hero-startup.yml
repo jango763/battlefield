@@ -1,0 +1,41 @@
+name: Hero single-appearance startup QA
+on:
+  push:
+    branches: [fix/hero-startup-single-appearance-20261114]
+    paths:
+      - preview/german-v5.js
+      - preview/formation-replenishment-v3.html
+      - tools/infantry-v2/test-hero-startup.cjs
+      - .github/workflows/check-hero-startup.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hero-launch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check hero launch and core game syntax
+        run: |
+          node --check preview/german-v5.js
+          node --check tools/infantry-v2/test-hero-startup.cjs
+          node tools/infantry-v2/test-hero-startup.cjs
+          node tools/infantry-v2/test-clean-core.cjs
+      - name: Install Chromium for Safari-size and desktop tests
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/hero-startup-qa playwright@1.58.2
+          /tmp/hero-startup-qa/node_modules/.bin/playwright install chromium
+      - name: Check first-frame mask, final native model and permanent fallback
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/hero-startup-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-hero-startup.cjs --browser
+      - name: Keep rendered verification screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hero-startup-single-appearance-chromium
+          path: /tmp/startup-*-native.png
+          if-no-files-found: ignore
