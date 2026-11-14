@@ -1,0 +1,41 @@
+name: Wehrmacht army rollout / desktop and mobile Chromium
+on:
+  push:
+    branches:
+      - feature/wehrmacht-army-rollout-20261114
+    paths:
+      - preview/german-v5.js
+      - preview/formation-replenishment-v3.html
+      - tools/infantry-v2/test-wehrmacht-rollout.cjs
+      - .github/workflows/check-wehrmacht-rollout.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse both browser scripts and check army rollout invariants
+        run: |
+          node --check preview/german-v5.js
+          node --check tools/infantry-v2/test-wehrmacht-rollout.cjs
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs
+      - name: Install Chromium for mobile viewport and desktop smoke checks
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/wehrmacht-qa playwright@1.58.2
+          /tmp/wehrmacht-qa/node_modules/.bin/playwright install chromium
+      - name: Serve staging game and verify squads, distinct bones and LOD
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 > /tmp/wehrmacht-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs --browser
+      - name: Save real browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wehrmacht-rollout-desktop-mobile-qa
+          path: /tmp/wehrmacht-*.png
+          if-no-files-found: ignore
