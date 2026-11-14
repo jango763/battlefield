@@ -410,11 +410,25 @@ function attachNativeArmyM43FieldCap(rig){
     const size=box.getSize(new THREE.Vector3());
     if(![size.x,size.y,size.z].every(v=>Number.isFinite(v)&&v>.001))
       throw Error('German M43 cap asset bounds invalid');
-    const scale=Math.min(.25/size.x,.40/size.z,.155/size.y);
+    // M43 cap is intentionally flatter than the officer cap; the first
+    // four-soldier review showed an oversized dark cylindrical crown.
+    const scale=Math.min(.245/size.x,.39/size.z,.126/size.y);
     const center=box.getCenter(new THREE.Vector3());
     model.scale.multiplyScalar(scale);
-    model.position.set(-center.x*scale,.166-box.min.y*scale,-center.z*scale);
-    model.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
+    model.position.set(-center.x*scale,.167-box.min.y*scale,-center.z*scale);
+    model.traverse(n=>{
+      if(!n.isMesh)return;
+      n.castShadow=true;n.receiveShadow=true;
+      const color=new THREE.Color(0x69776a);
+      const recolor=m=>{
+        const copy=m.clone();
+        if(copy.color)copy.color.lerp(color,.62);
+        if('roughness' in copy)copy.roughness=.96;
+        if('metalness' in copy)copy.metalness=0;
+        return copy;
+      };
+      n.material=Array.isArray(n.material)?n.material.map(recolor):recolor(n.material);
+    });
     const cap=new THREE.Group();
     cap.name='ArmyM43_MIT_GLB';
     cap.userData.proceduralPilotka=true; // same approved head-delta animation
@@ -660,6 +674,36 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
   w.root.position.copy(desiredTrigger).sub(w.trigger.position.clone().applyQuaternion(w.root.quaternion));
   w.muzzleFlash.visible=unit.kick>0;
   vis.updateWorldMatrix(true,true);
+  // Per-army-soldier ergonomic support hand. The identical hero gun pose
+  // sometimes places the support grip BEYOND the WW2 uniform's forearm
+  // length during sprint (up to 21 cm). Slide the hand back ALONG the real
+  // fore-end toward the receiver, not toward an imaginary floating point.
+  // Do not modify hero grip, gameplay projectile, gun scale or damage.
+  if(rig.armyUnit&&rig.ww2Uniform?.donorHands?.left){
+    const left=rig.ww2Uniform.donorHands.left;
+    const a=left.upper.getWorldPosition(new THREE.Vector3());
+    const b=left.elbow.getWorldPosition(new THREE.Vector3());
+    const c=left.hand.getWorldPosition(new THREE.Vector3());
+    const reach=a.distanceTo(b)+b.distanceTo(c)-.014;
+    const original=w.support.position.clone(),near=w.trigger.position.clone();
+    const distanceAt=t=>a.distanceTo(w.root.localToWorld(original.clone().lerp(near,t)));
+    const d0=distanceAt(0),d1=distanceAt(.72);
+    let blend=0;
+    if(d0>reach&&d1<d0){
+      if(d1>reach)blend=.72;
+      else{
+        let lo=0,hi=.72;
+        for(let i=0;i<10;i++){
+          const mid=(lo+hi)*.5;
+          if(distanceAt(mid)>reach)lo=mid;
+          else hi=mid;
+        }
+        blend=hi;
+      }
+      w.support.position.copy(original.lerp(near,blend));
+    }
+    rig.armySupportFit={reach,d0,d1,blend};
+  }
   const targets={right:local(w.trigger),left:local(w.support)};
   const poles={
     right:sr.clone().add(new THREE.Vector3(sign*.51,-.27,-.10)),
