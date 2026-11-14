@@ -1626,7 +1626,7 @@ function updateNativeHeroFieldUniform(rig){
       .multiply(beret.userData.bindHeadLocalQ.clone().invert()).normalize();
     // Keep the rolled band above the eyebrows, not floating over the crown.
     // A small forward offset makes the badge readable in a front close-up.
-    beret.position.y+=.205;
+    beret.position.y+=.184;
     beret.position.add(new THREE.Vector3(0,0,.021).applyQuaternion(beret.quaternion));
   }
   updateNativeGermanHeroIdentity(rig);
@@ -1641,15 +1641,17 @@ function createNativeHeroBritishBeret(rig){
   if(!u?.headBone||u.beret)return;
   const beret=new THREE.Group();
   beret.name='WW2_British_Maroon_Beret';
-  beret.userData.profile='airborne-soft-slouch-v2';
+  beret.userData.profile='airborne-soft-slouch-v3';
+  // Keep the silhouette close to human head dimensions rather than a disc.
+  beret.scale.set(.81,.98,.84);
   // A real cloth beret is ONE low continuous felt crown, not two oversized
   // spheres stacked onto a cylinder (the old "mushroom/pot" silhouette).
   // 48 radial samples retain a smooth profile on mobile Three.js r128.
   const felt=new THREE.MeshLambertMaterial({
-    color:0x742338,roughness:1,side:THREE.DoubleSide
+    color:0x491624,roughness:1,side:THREE.DoubleSide
   });
-  const band=new THREE.MeshLambertMaterial({color:0x392126,roughness:1});
-  const seam=new THREE.MeshLambertMaterial({color:0x57202d,roughness:1});
+  const band=new THREE.MeshLambertMaterial({color:0x28181d,roughness:1});
+  const seam=new THREE.MeshLambertMaterial({color:0x371720,roughness:1});
   const badge=new THREE.MeshLambertMaterial({color:0xb6aa8a,roughness:1});
   const N=48;
   // The crown is deliberately low and grows to the soldier's RIGHT:
@@ -1660,9 +1662,9 @@ function createNativeHeroBritishBeret(rig){
     {r:.157,y:.029,shift:.004,drop:0},
     {r:.174,y:.054,shift:.021,drop:.008},
     {r:.189,y:.077,shift:.038,drop:.021},
-    {r:.171,y:.091,shift:.045,drop:.010},
-    {r:.111,y:.099,shift:.040,drop:0},
-    {r:.039,y:.100,shift:.034,drop:0}
+    {r:.171,y:.108,shift:.045,drop:.010},
+    {r:.111,y:.122,shift:.040,drop:0},
+    {r:.039,y:.126,shift:.034,drop:0}
   ];
   const positions=[],indices=[];
   for(let k=0;k<rings.length;k++){
@@ -1685,7 +1687,7 @@ function createNativeHeroBritishBeret(rig){
   }
   // Close the shallow crown smoothly; don't leave a visible central hole.
   const top=positions.length/3;
-  positions.push(.034,.102,0);
+  positions.push(.034,.129,0);
   for(let i=0;i<N;i++)indices.push((rings.length-1)*N+i,
     (rings.length-1)*N+(i+1)%N,top);
   const geo=new THREE.BufferGeometry();
