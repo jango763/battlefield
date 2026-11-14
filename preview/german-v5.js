@@ -1481,8 +1481,10 @@ function updateNativeHeroFieldUniform(rig){
     beret.quaternion.copy(inv.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
     // Raise the BRITISH beret to the hairline: it must never hide the eyes.
     // German sidecap placement above remains at its established height.
-    beret.position.y+=.235;
-    beret.position.add(new THREE.Vector3(0,0,.046).applyQuaternion(beret.quaternion));
+    // The earlier 0.235 / 0.046 offsets made the beret float above the
+    // forehead in portrait Safari screenshots. Seat the band on the crown.
+    beret.position.y+=.205;
+    beret.position.add(new THREE.Vector3(0,0,.029).applyQuaternion(beret.quaternion));
   }
 }
 
@@ -1494,25 +1496,35 @@ function createNativeHeroBritishBeret(rig){
   if(!u?.headBone||u.beret)return;
   const beret=new THREE.Group();
   beret.name='WW2_British_Maroon_Beret';
-  const felt=new THREE.MeshLambertMaterial({color:0x801a2d,side:THREE.DoubleSide});
-  const brim=new THREE.MeshLambertMaterial({color:0x3d2428});
+  const felt=new THREE.MeshLambertMaterial({color:0x742b37,side:THREE.DoubleSide});
+  const brim=new THREE.MeshLambertMaterial({color:0x382329});
   const badge=new THREE.MeshLambertMaterial({color:0xc4b58c});
   const add=(geo,mat,pos,scale)=>{
     const m=new THREE.Mesh(geo,mat);
     m.position.set(...pos);if(scale)m.scale.set(...scale);
     m.castShadow=true;m.receiveShadow=true;beret.add(m);return m;
   };
-  // Close-fitting band, low sloping felt crown with asymmetry to the wearer's right.
-  // Sized to the actual 65-bone hero's head, not the WW2 donor's helmet
-  // bounding box; the earlier test exaggerated the beret by ~60 percent.
-  const bandMesh=add(new THREE.CylinderGeometry(.146,.151,.036,20),brim,[0,.009,0]);
+  // Scale measured against the hero's head. The earlier flat 0.184-radius
+  // ellipsoid read as an oversized red pill in portrait Safari.
+  const bandMesh=add(new THREE.CylinderGeometry(.130,.135,.027,28),brim,[0,.008,0]);
   bandMesh.name='BritishBeret_Headband';
-  // ONE continuous felt crown. Previously two intersecting sphere meshes
-  // rendered as two stacked red berets on the same head on iPhone.
-  const crown=add(new THREE.SphereGeometry(1,28,16),felt,[.021,.057,-.002],[.184,.071,.168]);
+  // A single asymmetric cloth crown. Slightly drape the top to one side
+  // without adding a second intersecting felt mesh.
+  const crownShape=new THREE.SphereGeometry(1,32,18);
+  const positions=crownShape.getAttribute('position');
+  for(let i=0;i<positions.count;i++){
+    const x=positions.getX(i),y=positions.getY(i),z=positions.getZ(i);
+    const top=Math.max(0,y),drape=top*top;
+    positions.setXYZ(i,
+      x*.153+drape*.011,
+      y*.053-Math.max(0,x)*top*.012,
+      z*.149);
+  }
+  crownShape.computeVertexNormals();
+  const crown=add(crownShape,felt,[.012,.048,-.004]);
   crown.name='BritishBeret_SingleFeltCrown';
-  crown.rotation.z=-.08;
-  const insignia=add(new THREE.BoxGeometry(.029,.038,.009),badge,[-.083,.060,.151]);
+  crown.rotation.z=-.15;
+  const insignia=add(new THREE.BoxGeometry(.026,.033,.009),badge,[-.071,.051,.135]);
   insignia.name='BritishBeret_CapBadge';
   rig.visual.add(beret);
   u.beret=beret;
