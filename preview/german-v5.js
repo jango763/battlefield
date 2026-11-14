@@ -1313,6 +1313,10 @@ function updateNativeHeroFieldUniform(rig){
   const side=(rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P&&P.side)==='red'?'red':'blue';
   const armyHelmet=side==='red'&&rig.armyHeadwearChoice==='helmet';
   const britishHelmet=side==='blue'&&rig.armyHeadwearChoice==='brodie';
+  // The player can change faction without reloading the native hero.
+  // Keep exactly ONE actual headwear mesh instead of hiding extra hats.
+  if(!rig.armyUnit&&uniform.heroHeadwearInitialized&&uniform.heroHeadwearFaction!==side)
+    loadNativeHeroSideCap(rig);
   if(uniform.side!==side){
     uniform.side=side;
     if(uniform.cap)uniform.cap.visible=(side==='red'&&!armyHelmet)||britishHelmet;
@@ -1514,16 +1518,45 @@ function createNativeHeroBritishBeret(rig){
   const ownerSide=(rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P&&P.side);
   beret.visible=ownerSide==='blue';
 }
+// Only the hero's own cap/beret objects are disposable here. Army GLB
+// headwear (including shared source meshes) is managed by the army rig.
+function discardNativeHeroHeadwear(rig,property){
+  const uniform=rig.ww2Uniform,group=uniform?.[property];
+  if(!group)return;
+  rig.visual.remove(group);
+  const geometries=new Set(),materials=new Set();
+  group.traverse(node=>{
+    if(!node.isMesh)return;
+    if(node.geometry)geometries.add(node.geometry);
+    for(const m of (Array.isArray(node.material)?node.material:[node.material]))
+      if(m)materials.add(m);
+  });
+  for(const geo of geometries)geo.dispose();
+  for(const mat of materials)mat.dispose();
+  uniform[property]=null;
+}
 function loadNativeHeroSideCap(rig){
   const u=rig.ww2Uniform;
   if(!u||!u.headBone)return;
+  const side=(rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P?.side)==='red'?'red':'blue';
+  if(!rig.armyUnit){
+    u.heroHeadwearInitialized=true;
+    if(u.heroHeadwearFaction!==side){
+      discardNativeHeroHeadwear(rig,'cap');
+      discardNativeHeroHeadwear(rig,'beret');
+      u.heroHeadwearFaction=side;
+      u.headwear='none';
+    }
+  }
   if(new URLSearchParams(location.search).get('headwear')==='none')return;
-  // Never allocate an invisible UK beret for every German army soldier.
-  if(!rig.armyUnit||rig.armyUnit.t==='blue'&&rig.armyHeadwearChoice==='beret')
-    createNativeHeroBritishBeret(rig);
-  // British regulars use their independent helmet GLB; the captain's beret
-  // occupies the head slot. Never allocate a hidden German Schiffchen here.
-  if(rig.armyUnit?.t==='blue')return;
+  if(side==='blue'){
+    // Only the hero and a designated British officer wear maroon berets.
+    // Ordinary British soldiers wait for their own helmet GLB.
+    if(!rig.armyUnit||rig.armyHeadwearChoice==='beret')
+      createNativeHeroBritishBeret(rig);
+    return;
+  }
+  if(!rig.armyUnit&&u.cap)return; // idempotent: never duplicate the hero cap
   // The imported Soviet sidecap is shallow and sits across the forehead on
   // this head rig; simply rescaling it never covered the rear scalp. Use a
   // close-fitting, head-tracked geometry for the German pilotka by default.
@@ -1666,7 +1699,9 @@ function loadNativeHeroSideCap(rig){
   }
   const url=new URL('../assets/ww2-headwear/field-grey-sidecap.glb',location.href).href;
   new THREE.GLTFLoader().load(url,gltf=>{
-    if(rig.ww2Uniform!==u)return;
+    // A queued German GLB must not appear after the hero switches to Britain.
+    if(rig.ww2Uniform!==u||(!rig.armyUnit&&
+       (u.heroHeadwearFaction!=='red'||u.cap)))return;
     const cap=gltf.scene;
     cap.name='WW2_Feldgrau_SideCap_NoVisor';
     // Original side-cap mesh uses a head-local coordinate frame, NOT
