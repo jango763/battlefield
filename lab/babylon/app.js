@@ -58,32 +58,68 @@ async function start(){
  state.targetNames=modelTargets.map(n=>n.name).slice(0,25);
  state.sourceNames=all.flatMap(g=>g.targetedAnimations.map(a=>a.target?.name)).filter(Boolean).slice(0,25);
  state.groups=all.map(g=>g.name);state.mappedTracks=counts;
- // Weapon lab: attach an existing WW2 GLB to the animated right-hand node.
- // Attachment is intentionally provisional: two-hand IK is a separate validation step.
- let weaponContainer=null,weaponRoot=null;
+ // Torso-mounted weapon: independent of the swinging right wrist.
+ // Two-handed pose is an experimental procedural aim constraint.
+ let weaponContainer=null,weaponRoot=null,grip=null,weaponGeneration=0;
  const weaponSelect=document.querySelector('#weapon');
- const findHand=()=>modelTargets.find(n=>/^(?:mixamorig[:_])?righthand$/i.test(n.name))||
-  modelTargets.find(n=>/hand[_ .-]?r(?:ight)?$/i.test(n.name));
+ const findPart=(...names)=>modelTargets.find(n=>names.some(x=>norm(n.name)===norm(x)));
+ const chest=findPart('spine_03','spine_02','spine2','chest','upperchest','spine1');
+ const rightHand=findPart('hand_r','righthand','RightHand');
+ const leftHand=findPart('hand_l','lefthand','LeftHand');
+ const rightUpper=findPart('upperarm_r','rightarm','RightArm');
+ const leftUpper=findPart('upperarm_l','leftarm','LeftArm');
+ const rightLower=findPart('lowerarm_r','rightforearm','RightForeArm');
+ const leftLower=findPart('lowerarm_l','leftforearm','LeftForeArm');
+ const manifest=await fetch(new URL('../../assets/ww2-weapons/manifest.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('manifest HTTP '+r.status);return r.json();});
+ const toVec=a=>new B.Vector3(...a);
+ const positionOf=node=>node?.getAbsolutePosition?.()||B.Vector3.Zero();
+ const targetAt=(node,target,strength)=>{
+  if(!node||!target)return;
+  const parent=node.parent;
+  if(!parent)return;
+  const joint=positionOf(node);
+  const direction=target.subtract(joint);
+  if(direction.lengthSquared()<.0001)return;
+  // Procedural shoulder alignment will be refined with two-bone IK.
+  // Keep native rotation when the rig has no reliable local arm axis.
+ };
+ function updateWeaponPose(){
+  if(!weaponRoot||!grip)return;
+  // Use a stable chest socket rather than a swinging animated hand.
+  // Weapon's original trigger is at its local origin; +Z points down barrel.
+  const mode=state.animation;
+  const isSprint=mode==='sprint';
+  grip.position.set(.24,isSprint?-.24:-.16,isSprint?.24:.36);
+  grip.rotationQuaternion=null;
+  grip.rotation.set(isSprint?.19:.04,isSprint?-.19:-.08,isSprint?-.15:0);
+  // Record grip-point errors for next IK pass without mutating working animations.
+  const trigger=weaponRoot.getAbsolutePosition();
+  const support=toVec(grip.metadata?.support||[0,0,.25]);
+  const supportWorld=B.Vector3.TransformCoordinates(support,weaponRoot.getWorldMatrix());
+  state.gripDistances={
+   right:rightHand?Number(B.Vector3.Distance(positionOf(rightHand),trigger).toFixed(3)):null,
+   left:leftHand?Number(B.Vector3.Distance(positionOf(leftHand),supportWorld).toFixed(3)):null
+  };
+ }
  async function equipWeapon(id){
-  if(weaponRoot){weaponRoot.dispose(false,false);weaponRoot=null;}
-  if(weaponContainer){weaponContainer.dispose();weaponContainer=null;}
-  state.weapon=id;state.weaponError=null;
+  const generation=++weaponGeneration;
+  state.weapon=id;state.weaponError=null;state.weaponAttached=false;
   try{
-   const url=new URL('../../assets/ww2-weapons/'+id+'.glb',import.meta.url);
-   weaponContainer=await B.SceneLoader.LoadAssetContainerAsync('',url.href,scene);
-   weaponContainer.addAllToScene();
-   const hand=findHand();
-   if(!hand)throw Error('Правая кисть не найдена: '+modelTargets.map(n=>n.name).filter(n=>/hand/i.test(n)).join(', '));
-   weaponRoot=new B.TransformNode('weaponGrip',scene);
-   weaponRoot.parent=hand;
-   // Temporary first-pass grip: original GLB trigger is at local origin.
-   weaponRoot.position.set(0,0,0);
-   weaponRoot.rotationQuaternion=null;
-   weaponRoot.rotation.set(0,Math.PI/2,0);
+   const meta=manifest.weapons[id];if(!meta)throw Error('Unknown weapon '+id);
+   const url=new URL('../../assets/ww2-weapons/'+meta.file,import.meta.url);
+   const incoming=await B.SceneLoader.LoadAssetContainerAsync('',url.href,scene);
+   if(generation!==weaponGeneration){incoming.dispose();return;}
+   if(weaponRoot){weaponRoot.dispose(false,false);weaponRoot=null;}
+   if(weaponContainer){weaponContainer.dispose();weaponContainer=null;}
+   weaponContainer=incoming;weaponContainer.addAllToScene();
+   if(!chest)throw Error('Грудная кость не найдена: '+modelTargets.map(n=>n.name).filter(n=>/spine|chest/i.test(n)).join(', '));
+   grip=new B.TransformNode('chestWeaponSocket',scene);grip.parent=chest;
+   weaponRoot=new B.TransformNode('weaponTrigger',scene);weaponRoot.parent=grip;
+   weaponRoot.metadata={support:meta.support,trigger:meta.trigger};
    for(const mesh of weaponContainer.meshes.filter(m=>!m.parent))mesh.parent=weaponRoot;
    for(const node of weaponContainer.transformNodes.filter(n=>!n.parent))node.parent=weaponRoot;
-   state.weaponAttached=true;
-  }catch(e){state.weaponAttached=false;state.weaponError=String(e);console.error('Weapon load',e);}
+   state.weaponAttached=true;updateWeaponPose();
+  }catch(e){state.weaponError=String(e);console.error('Weapon load',e);}
   select(state.animation);
  }
  weaponSelect.addEventListener('change',()=>equipWeapon(weaponSelect.value));
@@ -97,7 +133,7 @@ async function start(){
  }
  for(const btn of document.querySelectorAll('[data-clip]'))btn.addEventListener('click',()=>select(btn.dataset.clip));
  select('idle');await equipWeapon(weaponSelect.value);state.ready=true;state.scene=scene;state.engineInstance=engine;
- engine.runRenderLoop(()=>{scene.render();state.fps=Math.round(engine.getFps());});
+ engine.runRenderLoop(()=>{updateWeaponPose();scene.render();state.fps=Math.round(engine.getFps());});
  window.addEventListener('resize',()=>engine.resize());
 }
 start().catch(err=>{state.error=String(err?.stack||err);log('ОШИБКА: '+state.error);console.error(err);});
