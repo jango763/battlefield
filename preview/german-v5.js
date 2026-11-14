@@ -53,7 +53,7 @@ function releaseNativeArmyVisual(unit,v){
   for(const object of [rig.ww2Uniform?.cap,rig.ww2Uniform?.knitCap]){
     if(!object)continue;
     object.traverse(n=>{
-      if(!n.isMesh)return;
+      if(!n.isMesh&&!n.isLineSegments)return;
       if(n.geometry&&object===rig.ww2Uniform?.knitCap)n.geometry.dispose();
       if(n.geometry&&object===rig.ww2Uniform?.cap&&
         object.name!=='ArmyM43_MIT_GLB'&&
@@ -1479,7 +1479,7 @@ function updateNativeHeroFieldUniform(rig){
     cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
     const inv=space.getWorldQuaternion(new THREE.Quaternion()).invert();
     cap.quaternion.copy(inv.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
-    // Sit below the former beret band and cover upper ears and scalp.
+    // Seat the wool cuff low enough to cover upper ears and scalp.
     // Follow the animated head bone without changing the native skeleton.
     cap.position.y+=.178;
     cap.position.add(new THREE.Vector3(0,0,.016).applyQuaternion(cap.quaternion));
@@ -1566,7 +1566,7 @@ function discardNativeHeroHeadwear(rig,property){
   rig.visual.remove(group);
   const geometries=new Set(),materials=new Set();
   group.traverse(node=>{
-    if(!node.isMesh)return;
+    if(!node.isMesh&&!node.isLineSegments)return;
     if(node.geometry)geometries.add(node.geometry);
     for(const m of (Array.isArray(node.material)?node.material:[node.material]))
       if(m)materials.add(m);
@@ -1604,7 +1604,7 @@ function loadNativeHeroSideCap(rig){
     const cap=new THREE.Group();
     cap.name='GermanPilotka_HeadTracked_V19_SoftCloth';
     cap.userData.proceduralPilotka=true;
-    // Narrow cloth Schiffchen silhouette, not an inflated beret.
+    // Narrow cloth Schiffchen silhouette, not an oversized soft cap.
     // Five cross-sections follow the scalp, with a pointed folded crest.
     const cloth=new THREE.MeshLambertMaterial({color:0x4a5751,side:THREE.DoubleSide});
     const sideCloth=new THREE.MeshLambertMaterial({color:0x435049,side:THREE.DoubleSide});
@@ -1630,7 +1630,7 @@ function loadNativeHeroSideCap(rig){
       geo.computeVertexNormals();
       return geo;
     };
-    // A thin inner liner stays beneath the folded cap, not a rounded beret.
+    // A thin inner liner stays beneath the folded cap.
     const liner=new THREE.Mesh(new THREE.SphereGeometry(1,22,14),cloth);
     liner.name='Pilotka_Interior_Liner';
     liner.scale.set(.138,.038,.176);liner.position.set(0,.219,-.006);
