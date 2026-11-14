@@ -27,28 +27,40 @@ async function start(){
  const clips=await B.SceneLoader.LoadAssetContainerAsync('',new URL('hero-three-clips-lite.glb',base).href,scene);
  const all=clips.animationGroups;
  const wanted={idle:'Idle_Loop',jog:'Jog_Fwd_Loop',sprint:'Sprint_Loop'};
- const bones=model.skeletons.flatMap(s=>s.bones);
- const boneByName=new Map(bones.map(b=>[b.name,b]));
- // GLB animation groups may target detached donor nodes. Match by name when safe.
- const remapped={};const counts={};
+ // The animation GLB has its own node hierarchy. Babylon animates transform nodes,
+ // not necessarily Skeleton.bones. Resolve targets against the imported character.
+ const modelTargets=[...model.transformNodes,...model.meshes,...model.skeletons.flatMap(x=>x.bones)];
+ const norm=name=>String(name||'').replace(/^mixamorig[:_]?/i,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
+ const byName=new Map();
+ for(const node of modelTargets){
+  const key=norm(node.name);
+  if(key&&!byName.has(key))byName.set(key,node);
+ }
+ const remapped={},counts={},unmatched={};
  for(const [mode,name] of Object.entries(wanted)){
   const group=all.find(g=>g.name===name||g.name.includes(name));
-  if(!group){counts[mode]=0;continue;}
-  const output=new B.AnimationGroup('battlefield-'+mode,scene);let count=0;
+  if(!group){counts[mode]=0;unmatched[mode]=['missing group '+name];continue;}
+  const output=new B.AnimationGroup('battlefield-'+mode,scene);
+  const misses=[];let count=0;
   for(const ta of group.targetedAnimations){
-   const old=ta.target;const target=bones.find(b=>b.name===old?.name)||model.transformNodes.find(n=>n.name===old?.name);
-   if(!target)continue;
-   // Bone animations on Babylon glTF are generally attached to TransformNodes.
-   const anim=ta.animation.clone();output.addTargetedAnimation(anim,target);count++;
+   const old=ta.target;
+   const target=byName.get(norm(old?.name));
+   if(!target){misses.push(old?.name||'(unnamed)');continue;}
+   // Preserve Babylon's glTF animation property (rotationQuaternion/position/scaling).
+   output.addTargetedAnimation(ta.animation.clone(),target);
+   count++;
   }
   if(count){output.normalize();output.stop();remapped[mode]=output;}
   else output.dispose();
-  counts[mode]=count;
+  counts[mode]=count;unmatched[mode]=misses.slice(0,12);
  }
+ state.unmatched=unmatched;
+ state.targetNames=modelTargets.map(n=>n.name).slice(0,25);
+ state.sourceNames=all.flatMap(g=>g.targetedAnimations.map(a=>a.target?.name)).filter(Boolean).slice(0,25);
  state.groups=all.map(g=>g.name);state.mappedTracks=counts;
  function select(mode){
   state.animation=mode;
-  for(const [name,group] of Object.entries(remapped)){if(name===mode)group.start(true,1,group.from,group.to,false);else group.stop();}
+  for(const group of Object.values(remapped))group.stop();\n  if(remapped[mode])remapped[mode].start(true,1,remapped[mode].from,remapped[mode].to,false);
   for(const btn of document.querySelectorAll('[data-clip]'))btn.setAttribute('aria-pressed',String(btn.dataset.clip===mode));
   log('Babylon.js | meshes: '+state.meshes+' | skeletons: '+state.skeletons+' | tracks: '+JSON.stringify(counts)+'\nAnimation: '+mode+' | '+(remapped[mode]?'active':'НЕ ПРИВЯЗАНА — требуется адаптация')+'\nSource groups: '+state.groups.join(', '));
  }
