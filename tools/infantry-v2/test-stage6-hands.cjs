@@ -41,7 +41,8 @@ if(process.argv.includes('--browser')){
           {waitUntil:'domcontentloaded',timeout:45000});
         await page.waitForFunction(()=>{
           try{return germanPreview.startupHeroReady==='native'&&
-            !!P?.germanPreview?.nativeRig?.ww2Uniform?.donorHands&&P.side==='blue';}
+            !!P?.germanPreview?.nativeRig?.ww2Uniform?.donorHands&&
+            P.germanPreview.nativeRig.weapon.ww2Models.has('uk-sten')&&P.side==='blue';}
           catch(e){return false;}
         },null,{timeout:120000});
         const stats=await page.evaluate(()=>{
@@ -55,6 +56,8 @@ if(process.argv.includes('--browser')){
               addedHandObjects.push({name:o.name,visible:o.visible});
           });
           const initialWeaponSlot=P.wpn;
+          const supportedWeaponMesh=weapon.ww2Models.has('uk-sten');
+          const initialSupportLocal=weapon.support.position.toArray();
           const start={x:P.x,z:P.z,hp:P.hp};
           const states={};
           const pose=(label,speed,aim,dt=1/60)=>{
@@ -85,7 +88,7 @@ if(process.argv.includes('--browser')){
           P.wpn=1;
           pose('return-smg',0,0);
           return{
-            faction:P.side,initialWeaponSlot,handVisualSource:rig.handVisualSource,
+            faction:P.side,initialWeaponSlot,supportedWeaponMesh,initialSupportLocal,handVisualSource:rig.handVisualSource,
             originalMeshVisible:visibleOriginal,donorVisibleCount:costumes.length,
             extraHandMeshes:addedHandObjects,
             extraSupportPalm:!!weapon.supportPalm,
@@ -97,6 +100,11 @@ if(process.argv.includes('--browser')){
         });
         assert.equal(stats.faction,'blue');
         assert.equal(stats.initialWeaponSlot,1,'hand inspect mode does not select Sten slot');
+        assert(stats.supportedWeaponMesh,'actual STEN GLB model not loaded');
+        assert(stats.initialSupportLocal[2]>.30&&stats.initialSupportLocal[2]<.50&&
+               stats.initialSupportLocal[1]<.04,
+          'British STEN support glove is not below the fore-end: '+
+            JSON.stringify(stats.initialSupportLocal));
         assert.equal(stats.handVisualSource,'ww2-donor');
         assert.equal(stats.originalMeshVisible.length,0,'underlying Quaternius hands also visible');
         assert.equal(stats.extraHandMeshes.length,0,'floating hand mesh remains');
