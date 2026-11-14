@@ -452,7 +452,7 @@ function selectNativeHeroWW2Weapon(unit,rig){
       // The WW2 donor sleeve ends at a different bind-pose wrist length.
       // Shift the support contact on the real fore-end to reveal the LEFT
       // palm outside the cuff, instead of covering it with a fake fist.
-      const testOffset=window.__ww2SupportOffset||{x:0,y:-.065,z:.12};
+      const testOffset=window.__ww2SupportOffset||{x:0,y:.10,z:.13};
       w.support.position.add(new THREE.Vector3(testOffset.x||0,testOffset.y||0,testOffset.z||0));
     }
     w.muzzleFlash.position.copy(vec(info.muzzle));

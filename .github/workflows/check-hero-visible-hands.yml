@@ -125,8 +125,8 @@ jobs:
               // Compare real support-hand targets against the actual MP40 cuff.
               // These are deliberate screenshot checkpoints, not extra gameplay.
               for(const [name,y,z] of [
-                ['original',0,0],['slight',-.05,.09],
-                ['medium',-.095,.16],['extended',-.14,.22]
+                ['original',0,0],['raise-low',.055,.08],
+                ['raise-mid',.11,.15],['raise-high',.17,.22]
               ]){
                 await page.evaluate(({y,z})=>{
                   window.__ww2SupportOffset={x:0,y,z};
