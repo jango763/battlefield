@@ -1163,7 +1163,11 @@ function createNativeHeroBritishBeret(rig){
   add(new THREE.BoxGeometry(.039,.052,.011),badge,[-.083,.061,.151]);
   rig.visual.add(beret);
   u.beret=beret;
-  beret.visible=(P&&P.side)!=='red';
+  // The original hero-only logic referenced P.side here; when a RED army
+  // infantryman used the same headwear constructor with a BLUE hero,
+  // both the red beret and German sidecap rendered on his head.
+  const ownerSide=(rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P&&P.side);
+  beret.visible=ownerSide==='blue';
 }
 function loadNativeHeroSideCap(rig){
   const u=rig.ww2Uniform;
