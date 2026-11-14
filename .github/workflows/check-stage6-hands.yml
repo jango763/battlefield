@@ -1,0 +1,44 @@
+name: Stage 6 hero hand deduplication QA
+on:
+  push:
+    branches: [feature/hero-hands-dedup-20261114]
+    paths:
+      - 'preview/german-v5.js'
+      - 'preview/formation-replenishment-v3.html'
+      - 'tools/infantry-v2/test-stage6-hands.cjs'
+      - 'tools/infantry-v2/test-stage2-startup.cjs'
+      - 'tools/infantry-v2/test-stage4-british-hero.cjs'
+      - 'tools/infantry-v2/test-stage5-beret.cjs'
+      - '.github/workflows/check-stage6-hands.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hands:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate no extra palms and previous hero and beret fixes
+        run: |
+          node tools/infantry-v2/test-stage2-startup.cjs
+          node tools/infantry-v2/test-stage4-british-hero.cjs
+          node tools/infantry-v2/test-stage5-beret.cjs
+          node tools/infantry-v2/test-stage6-hands.cjs
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs
+      - name: Install Chromium for desktop and iPhone-sized browser QA
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage6-qa playwright@1.58.2
+          /tmp/stage6-qa/node_modules/.bin/playwright install --with-deps chromium
+      - name: Check British Sten hands at idle, aim, jog, sprint and rifle
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/stage6-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-stage6-hands.cjs --browser
+      - name: Archive actual hand close-ups
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage6-single-hands-desktop-mobile
+          path: /tmp/stage6-hands-*.png
+          if-no-files-found: warn
