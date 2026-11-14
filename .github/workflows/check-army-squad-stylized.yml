@@ -144,7 +144,7 @@ jobs:
               for(const [name,speed,aim] of [['idle',0,0],['jog',3.2,0],['sprint',5.6,0],['aim',0,1]]){
                 const sample=await page.evaluate(([speed,aim])=>{
                   let maxGrip=0,maxCostumeGrip=0,modifiedPosition=false;
-                  const units=germanPreview.armySquad;
+                  const units=germanPreview.armySquad,details=[];
                   for(let i=0;i<units.length;i++){
                     const u=units[i],beforeX=u.x,beforeZ=u.z;
                     u.sv=speed;u.aim=aim;u.aimT=u.g.rotation.y;
@@ -153,9 +153,24 @@ jobs:
                     const d=u.germanPreview.nativeRig.weaponDiagnostics;
                     maxGrip=Math.max(maxGrip,d?.rightError??Infinity,d?.leftError??Infinity);
                     maxCostumeGrip=Math.max(maxCostumeGrip,d?.visibleRightError??Infinity,d?.visibleLeftError??Infinity);
+                    const rig=u.germanPreview.nativeRig,arms=rig.ww2Uniform.donorHands;
+                    const metrics={unit:i,variant:rig.armyHeadwearChoice};
+                    for(const side of ['right','left']){
+                      const arm=arms[side];
+                      const a=arm.upper.getWorldPosition(new THREE.Vector3());
+                      const b=arm.elbow.getWorldPosition(new THREE.Vector3());
+                      const c=arm.hand.getWorldPosition(new THREE.Vector3());
+                      const t=(side==='right'?rig.weapon.trigger:rig.weapon.support)
+                        .getWorldPosition(new THREE.Vector3());
+                      const reach=a.distanceTo(b)+b.distanceTo(c);
+                      const distance=a.distanceTo(t);
+                      metrics[side]={error:c.distanceTo(t),distance,reach,
+                        shortBy:Math.max(0,distance-reach)};
+                    }
+                    details.push(metrics);
                   }
                   return {states:units.map(u=>u.germanPreview.nativeRig.state),
-                    positionsStable:!modifiedPosition,maxGrip,maxCostumeGrip,
+                    positionsStable:!modifiedPosition,maxGrip,maxCostumeGrip,details,
                     soldierCount:germanPreview.armyNativeInstalled};
                 },[speed,aim]);
                 result.states[name]=sample;
