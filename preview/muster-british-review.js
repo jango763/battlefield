@@ -1,51 +1,84 @@
-// Side-by-side in-game model review. Original Muster geometry, not a new
-// procedural imitation. Source and license: assets/muster-british/LICENSE-MUSTER.txt
-// IMPORTANT: Upstream models have fixed poses (no skeleton). This review does
-// not replace live infantry, alter the combat simulation or downgrade movement.
-const musterBritishPreview={ready:false,loaded:0,errors:[],models:[],positions:[]};
+// Original MIT-licensed Muster WWII British rifleman, leader and Bren gunner.
+// Each is the ORIGINAL source-generated GLB, not a handmade approximation.
+// Deliberately unrigged: a one-at-a-time visual review, not a gameplay swap.
+// Source: https://github.com/Kenton-GMI/muster-ww2
+// License: assets/muster-british/LICENSE-MUSTER.txt
+const musterBritishPreview={ready:false,loaded:0,errors:[],models:[],selected:0,loading:0};
+function musterBritishSelectRole(index){
+  musterBritishPreview.selected=index;
+  for(const item of musterBritishPreview.models)
+    item.object.visible=item.index===index;
+  if(musterBritishPreview.label){
+    const names=['СТРЕЛОК · LEE-ENFIELD','КОМАНДИР · STEN','ПУЛЕМЁТЧИК · BREN'];
+    const model=musterBritishPreview.models.find(o=>o.index===index);
+    musterBritishPreview.label.textContent='MUSTER WWII · '+names[index]+
+      (model?' · ОРИГИНАЛЬНАЯ МОДЕЛЬ':' · Загрузка…')+' · БЕЗ АНИМАЦИИ';
+    for(const button of musterBritishPreview.buttons||[])
+      button.style.background=Number(button.dataset.musterRole)===index?'#6a744a':'#283b2d';
+  }
+}
 function musterBritishPreviewTick(){
   if(new URLSearchParams(location.search).get('inspect')!=='muster')return;
   if(!musterBritishPreview.ready){
     musterBritishPreview.ready=true;
     const roles=['rifleman','leader','bren'];
-    const labels=['СТРЕЛОК · LEE-ENFIELD','КОМАНДИР · STEN','ПУЛЕМЁТЧИК · BREN'];
+    const names=['Стрелок','Командир','Пулемётчик'];
+    const panel=document.createElement('div');
+    panel.style.cssText='position:fixed;top:calc(env(safe-area-inset-top,0px) + 115px);left:8px;right:8px;z-index:990;max-width:560px;pointer-events:auto';
     const label=document.createElement('div');
     label.id='muster-british-review';
-    label.textContent='MUSTER WWII · Загрузка оригинальных британцев…';
-    label.style.cssText='position:fixed;top:calc(env(safe-area-inset-top,0px) + 118px);left:8px;z-index:990;background:#25352dee;color:#fff;padding:7px 10px;border:1px solid #a2a58d;border-radius:6px;font:700 12px Arial;pointer-events:none';
-    document.body.appendChild(label);
+    label.style.cssText='background:#25352de9;color:#fff;padding:6px 9px;border:1px solid #a2a58d;border-radius:6px;font:700 11px Arial';
+    panel.appendChild(label);
+    const chooser=document.createElement('div');
+    chooser.style.cssText='display:flex;gap:5px;margin-top:5px';
+    musterBritishPreview.buttons=names.map((name,i)=>{
+      const btn=document.createElement('button');
+      btn.type='button';btn.textContent=name;
+      btn.dataset.musterRole=String(i);
+      btn.style.cssText='flex:1;padding:8px 3px;border:1px solid #aeb8a0;border-radius:4px;background:#283b2d;color:#fff;font:700 11px Arial';
+      btn.addEventListener('click',()=>musterBritishSelectRole(i));
+      chooser.appendChild(btn);return btn;
+    });
+    panel.appendChild(chooser);document.body.appendChild(panel);
     musterBritishPreview.label=label;
+    musterBritishSelectRole(0);
+    // The stock player remains in the simulation but is hidden only
+    // in the opt-in one-model gallery (it otherwise blocks the soldiers).
+    P.g.visible=false;
     const loader=new THREE.GLTFLoader();
     roles.forEach((role,i)=>{
       const url=new URL('../assets/muster-british/'+role+'.glb',location.href).href;
       loader.load(url,gltf=>{
         const model=gltf.scene,box=new THREE.Box3().setFromObject(model);
         const size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
-        if(!Number.isFinite(size.y)||size.y<.7||size.y>10)
-          throw new Error('Muster '+role+' invalid height '+size.y);
-        // Exporter authored in metres. Keep unit scale and full source gear.
+        if(!Number.isFinite(size.y)||size.y<.7||size.y>10)throw Error('Invalid source model height: '+size.y);
         const scale=1.8/size.y;
         model.scale.setScalar(scale);
-        model.position.set(-center.x*scale, -box.min.y*scale, -center.z*scale);
+        model.position.set(-center.x*scale,-box.min.y*scale,-center.z*scale);
         const slot=new THREE.Group();
         slot.name='MusterWW2_British_'+role;
         slot.add(model);
-        slot.position.set(P.x+(i-1)*2.9,0,P.z+4.2);
+        slot.position.set(P.x,0,P.z-3.4);
+        // Muster +Z is its soldier's front. Face the camera at -Z.
+        slot.rotation.y=Math.PI;
+        slot.visible=i===musterBritishPreview.selected;
         slot.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
         scene.add(slot);
-        musterBritishPreview.models.push({role,object:slot,source:'muster-ww2',height:size.y,scale,triangles:0});
+        musterBritishPreview.models.push({
+          index:i,role,object:slot,source:'muster-ww2',
+          height:size.y,scale
+        });
         musterBritishPreview.loaded++;
-        label.textContent='MUSTER WWII · '+musterBritishPreview.loaded+'/3 · '+labels.join(' | ')+' · МОДЕЛИ БЕЗ АНИМАЦИИ';
         window.__musterBritishModels=musterBritishPreview.models;
+        musterBritishSelectRole(musterBritishPreview.selected);
       },undefined,err=>{
         const message=role+': '+(err?.message||String(err));
         musterBritishPreview.errors.push(message);
-        label.textContent='Не загружена модель '+message;
-        console.warn('Muster British pilot GLB fallback:',message);
+        label.textContent='ОШИБКА ЗАГРУЗКИ · '+message;
       });
     });
   }
-  // Camera is modified ONLY for the dedicated gallery URL.
-  cam.position.set(P.x,4.0,P.z-8.2);
-  cam.lookAt(P.x,1.35,P.z+4.2);
+  // A large, centered frontal view fits iPhone portrait without cropping.
+  cam.position.set(P.x,2.8,P.z-8.15);
+  cam.lookAt(P.x,1.05,P.z-3.4);
 }
