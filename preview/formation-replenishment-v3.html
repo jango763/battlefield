@@ -15,7 +15,7 @@
   try{
     const chunks=new Array(17);let next=0,done=0;
     const worker=async()=>{while(next<17){const i=next++;chunks[i]=await get('parts/german-'+String(i).padStart(3,'0')+'.txt');progress.textContent='Загрузка игры: '+Math.round(++done/18*100)+'%';}};
-    const work=await Promise.all([get('german-v5.js?v=20261114-stage5-beret-r5'),...Array.from({length:4},worker)]);
+    const work=await Promise.all([get('german-v5.js?v=20261114-stage6-single-hands-r1'),...Array.from({length:4},worker)]);
     let html=chunks.join('');const start='// === Preview integration: German WW2 Panzergrenadier (red faction) ===',end='// === End of preview integration ===';
     const a=html.indexOf(start),b=html.indexOf(end,a);if(a<0||b<a)throw new Error('Не найдена основа тестовой версии');
     html=html.slice(0,a)+work[0]+html.slice(b+end.length);
@@ -34,9 +34,9 @@
     // Optional German close-up, activated only by ?inspect=german.
     // The RTS camera and faction selection remain unchanged in normal play.
     html=once(html,'pm.band.material.color.setHex(HX.blue);',
-      "pm.band.material.color.setHex(HX.blue);if(['german','squad','wehrmacht'].includes(new URLSearchParams(location.search).get('inspect'))){P.side='red';pm.band.material.color.setHex(HX.red);}if(new URLSearchParams(location.search).get('inspect')==='british-hero'){P.side='blue';pm.band.material.color.setHex(HX.blue);}");
+      "pm.band.material.color.setHex(HX.blue);if(['german','squad','wehrmacht'].includes(new URLSearchParams(location.search).get('inspect'))){P.side='red';pm.band.material.color.setHex(HX.red);}if(['british-hero','hands'].includes(new URLSearchParams(location.search).get('inspect'))){P.side='blue';pm.band.material.color.setHex(HX.blue);}if(new URLSearchParams(location.search).get('inspect')==='hands')P.wpn=1;");
     html=once(html,'cam.lookAt(camP.x,0,camP.z);',
-      "cam.lookAt(camP.x,0,camP.z);if(['german','british-hero'].includes(new URLSearchParams(location.search).get('inspect'))&&P.germanPreview?.nativeRig){const a=P.g.rotation.y;cam.position.set(P.x+Math.sin(a)*3.8+Math.cos(a)*.65,2.95,P.z+Math.cos(a)*3.8-Math.sin(a)*.65);cam.lookAt(P.x,2.0,P.z);}"
+      "cam.lookAt(camP.x,0,camP.z);if(['german','british-hero','hands'].includes(new URLSearchParams(location.search).get('inspect'))&&P.germanPreview?.nativeRig){const a=P.g.rotation.y;cam.position.set(P.x+Math.sin(a)*3.8+Math.cos(a)*.65,2.95,P.z+Math.cos(a)*3.8-Math.sin(a)*.65);cam.lookAt(P.x,2.0,P.z);if(new URLSearchParams(location.search).get('inspect')==='hands'){cam.position.set(P.x+Math.sin(a)*2.6+Math.cos(a)*.48,2.48,P.z+Math.cos(a)*2.6-Math.sin(a)*.48);cam.lookAt(P.x,1.60,P.z);}}"
       +"if(new URLSearchParams(location.search).get('inspect')==='squad'&&new URLSearchParams(location.search).get('armyRig')==='squad'&&germanPreview.armyNativeTemplate){"
       +"if(!window.__squadReview){window.__squadReview=[];for(let i=0;i<4;i++){const u=mk('red',false,false);u.type=i===1?'smg':i===2?'mg':'rf';u.x=P.x+(i-1.5)*1.8;u.z=P.z+4;u.g.position.set(u.x,0,u.z);u.guard=true;u.slot={x:u.x,z:u.z};window.__squadReview.push(u);}}"
       +"cam.position.set(P.x,4.2,P.z-8.0);cam.lookAt(P.x,1.45,P.z+4);}"
