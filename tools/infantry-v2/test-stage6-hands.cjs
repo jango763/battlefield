@@ -101,9 +101,9 @@ if(process.argv.includes('--browser')){
         assert.equal(stats.faction,'blue');
         assert.equal(stats.initialWeaponSlot,1,'hand inspect mode does not select Sten slot');
         assert(stats.supportedWeaponMesh,'actual STEN GLB model not loaded');
-        assert(stats.initialSupportLocal[2]>.30&&stats.initialSupportLocal[2]<.50&&
-               stats.initialSupportLocal[1]<.04,
-          'British STEN support glove is not below the fore-end: '+
+        assert(stats.initialSupportLocal[2]>.52&&stats.initialSupportLocal[2]<.64&&
+               stats.initialSupportLocal[1]>.015&&stats.initialSupportLocal[1]<.07,
+          'British STEN support glove is not positioned on the fore-end: '+
             JSON.stringify(stats.initialSupportLocal));
         assert.equal(stats.handVisualSource,'ww2-donor');
         assert.equal(stats.originalMeshVisible.length,0,'underlying Quaternius hands also visible');
@@ -121,62 +121,6 @@ if(process.argv.includes('--browser')){
         }
         assert(stats.gameUnaffected,'cosmetic arm fix changed combat attributes');
         await page.screenshot({path:'/tmp/stage6-hands-'+device.name+'-close.png'});
-        if(process.argv.includes('--probe')){
-          // Visual-only fixture: try alternate fore-end contact points without
-          // writing any experimental offsets into production game code.
-          await page.evaluate(()=>{
-            const original=selectNativeHeroWW2Weapon;
-            selectNativeHeroWW2Weapon=function(unit,rig){
-              const selected=original(unit,rig);
-              const delta=window.__stage6GripProbe;
-              if(delta&&unit.kind==='p'&&unit.side==='blue'&&(unit.wpn|0)===1&&
-                  rig.weapon.activeModelId==='uk-sten'){
-                rig.weapon.support.position.y+=delta.dy;
-                rig.weapon.support.position.z+=delta.dz;
-              }
-              return selected;
-            };
-          });
-          for(const cfg of [
-            {label:'A-current',dy:0,dz:0},
-            {label:'B-early',dy:.04,dz:.08},
-            {label:'C-mid',dy:.055,dz:.12},
-            {label:'D-fore',dy:.07,dz:.16},
-            {label:'E-outer',dy:.095,dz:.20},
-            {label:'F-original',dy:.11,dz:.24}
-          ]){
-            const grip=await page.evaluate(cfg=>{
-              window.__stage6GripProbe=cfg;P.sv=0;P.aim=0;P.wpn=1;
-              for(let j=0;j<35;j++)animateGermanSoldier(P,1/60);
-              return P.germanPreview.nativeRig.weapon.support.position.toArray();
-            },cfg);
-            await page.waitForTimeout(250);
-            await page.screenshot({path:'/tmp/stage6-grip-'+device.name+'-'+cfg.label+'.png'});
-            console.log('STAGE 6 GRIP PROBE',device.name,cfg.label,JSON.stringify(grip));
-          }
-          // The earlier visual set showed the hand buried in the cuff for
-          // near grips. Compare wrist orientations at a middle fore-end point.
-          for(const pose of [
-            {label:'X0',left:{x:0},right:{x:0}},
-            {label:'Xp08',left:{x:.8},right:{x:.8}},
-            {label:'Xm08',left:{x:-.8},right:{x:-.8}},
-            {label:'Yp08',left:{y:.8},right:{y:.8}},
-            {label:'Ym08',left:{y:-.8},right:{y:-.8}},
-            {label:'Zp08',left:{z:.8},right:{z:.8}},
-            {label:'Zm08',left:{z:-.8},right:{z:-.8}},
-            {label:'Xmixed',left:{x:.8},right:{x:-.8}}
-          ]){
-            await page.evaluate(pose=>{
-              window.__stage6GripProbe={dy:.07,dz:.16};
-              window.__stage6WristProbe={left:pose.left,right:pose.right};
-              P.sv=0;P.aim=0;P.wpn=1;
-              for(let j=0;j<35;j++)animateGermanSoldier(P,1/60);
-            },pose);
-            await page.waitForTimeout(250);
-            await page.screenshot({path:'/tmp/stage6-wrist-'+device.name+'-'+pose.label+'.png'});
-            console.log('STAGE 6 WRIST PROBE',device.name,pose.label);
-          }
-        }
         console.log('STAGE 6 BROWSER PASS',device.name,JSON.stringify(stats));
         await page.close();
       }
