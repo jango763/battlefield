@@ -109,9 +109,12 @@ jobs:
                     grip:rig.weaponDiagnostics?.rightError,
                     gripLeft:rig.weaponDiagnostics?.leftError,
                     uniformGrip:rig.weaponDiagnostics?.visibleRightError,
-                    headwearVisible:(rig.ww2Uniform?.armyHeadwearMeshes||0)>0};
+                    headwearVisible:(rig.ww2Uniform?.armyHeadwearMeshes||0)>0,
+                    blend:{...rig.armyBlendWeights}};
                 },[speed,aim]);
                 result.states[label]=check;
+                if(label==='sprint'&&(!check.blend||check.blend.jog<.70||check.blend.sprint>.27))
+                  result.errors.push('sprint gait not softened: '+JSON.stringify(check.blend));
                 if(check.state!==(speed<.28?'idle':speed<4.2?'jog':'sprint')||
                   !check.xStable||!check.zStable||!check.headwearVisible||
                   !Number.isFinite(check.grip)||check.grip>.12||
@@ -144,6 +147,20 @@ jobs:
                 await page.screenshot({path:'/tmp/army-native-'+name+'.png'});
               }
               await page.screenshot({path:'/tmp/army-native-first-soldier.png'});
+              // Deterministic visual pose QA, without touching gameplay code.
+              await page.evaluate(()=>{
+                const u=germanPreview.armyPilotUnit;
+                window.__qaForcedSpeed=0;
+                Object.defineProperty(u,'sv',{
+                  configurable:true,get(){return window.__qaForcedSpeed;},set(){}
+                });
+                window.__qaCamOffset=[0,3.1,-5.8];
+              });
+              for(const [name,speed] of [['idle',0],['running',5.6]]){
+                await page.evaluate(v=>{window.__qaForcedSpeed=v;},speed);
+                await page.waitForTimeout(700);
+                await page.screenshot({path:'/tmp/army-native-'+name+'.png'});
+              }
               result.success=result.errors.length===0;
             }catch(e){result.errors.push('exception '+e.stack)}
             finally{
@@ -166,4 +183,6 @@ jobs:
             /tmp/army-native-right.png
             /tmp/army-native-back.png
             /tmp/army-native-left.png
+            /tmp/army-native-idle.png
+            /tmp/army-native-running.png
           if-no-files-found: warn
