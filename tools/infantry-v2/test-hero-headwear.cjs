@@ -103,7 +103,7 @@ if(process.argv.includes('--browser')){
             assert.equal(p.knitCap,true,'British hero lacks knitCap: '+JSON.stringify(p));
             assert.equal(p.hats.length,1,'British hero contains extra hats: '+JSON.stringify(p));
             assert.equal(p.crownCount,1,'British knitCap has more than one felt crown: '+JSON.stringify(p));
-            assert(p.crownWidth>0.27&&p.crownWidth<0.34,'KnitCap width outside human head fit: '+JSON.stringify(p));
+            assert(p.crownWidth>0.245&&p.crownWidth<0.29,'KnitCap no longer close-fitting: '+JSON.stringify(p));
             assert(p.crownHeight>=.135,'KnitCap is still a thin halo with scalp exposed: '+JSON.stringify(p));
             assert.equal(p.crownClosed,true,'KnitCap crown is not fully closed: '+JSON.stringify(p));
             assert(p.hasFoldedCuff&&p.hasKnitRibs,'Knitted cuff or ribs missing: '+JSON.stringify(p));
