@@ -1106,6 +1106,7 @@ function tryLoadNativeGermanCapGlb(rig){
   const url=new URL('../assets/ww2-headwear/german-m34-fieldcap.glb',location.href);
   new THREE.GLTFLoader().load(url.href,gltf=>{
     if(rig.ww2Uniform!==u)return;
+    try{
     const model=gltf.scene;
     const bounds=new THREE.Box3().setFromObject(model);
     const size=bounds.getSize(new THREE.Vector3());
@@ -1148,6 +1149,10 @@ function tryLoadNativeGermanCapGlb(rig){
     if(old){
       rig.visual.remove(old);
       old.traverse(n=>{if(n.isMesh)n.geometry?.dispose?.();});
+    }
+    }catch(error){
+      u.externalGermanCapError=String(error?.message||error);
+      console.warn('Invalid German M34 GLB: retain previous model',error);
     }
   },undefined,error=>{
     // Do not hide a missing asset, and never replace the playable hero.
