@@ -1,7 +1,7 @@
 name: WW2 boat-cap and readable weapon silhouette acceptance
 on:
   push:
-    branches: [feature/ww2-sidecap-weapon-profile-20261114]
+    branches: [feature/german-m34-external-glb-loader-20261114]
     paths:
       - preview/german-v5.js
       - preview/formation-replenishment-v3.html
@@ -21,6 +21,10 @@ jobs:
       - name: Validate each side, grips, animations, weapon slots and WW2 cap
         shell: bash
         run: |
+          # Use the *already licensed, already committed* generic cap as
+          # a synthetic loader fixture. It is NOT the promised German M34
+          # source, and is not written back to the Git repository.
+          cp assets/ww2-headwear/field-grey-sidecap.glb assets/ww2-headwear/german-m34-fieldcap.glb
           python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/ww2-server.log 2>&1 &
           sleep 2
           node - <<'JS'
@@ -33,7 +37,7 @@ jobs:
               const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
               page.on('pageerror',e=>{if(report.errors.length<20)report.errors.push('page '+e.message)});
               page.on('console',m=>{if(m.type()==='error'&&report.errors.length<20)report.errors.push('console '+m.text())});
-              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html',{waitUntil:'domcontentloaded',timeout:45000});
+              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html?pilotka=external',{waitUntil:'domcontentloaded',timeout:45000});
               await page.waitForFunction(()=>{
                 try{return !!(P?.germanPreview?.nativeRig?.weapon?.ww2Manifest);}
                 catch(e){return false}
@@ -42,6 +46,11 @@ jobs:
                 try{return !!P.germanPreview.nativeRig?.ww2Uniform?.cap;}
                 catch(e){return false}
               },null,{timeout:40000});
+              await page.waitForFunction(()=>{
+                try{return !!P.germanPreview.nativeRig?.ww2Uniform?.cap?.userData.externalGlb;}
+                catch(e){return false}
+              },null,{timeout:45000});
+              report.externalGlbFixtureLoaded=true;
               const initial=await page.evaluate(()=>{
                 const r=P.germanPreview.nativeRig,u=r.ww2Uniform;
                 const bb=new THREE.Box3().setFromObject(u.cap);
