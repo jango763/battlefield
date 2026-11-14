@@ -326,6 +326,13 @@ const NATIVE_HERO_ASSET_ROOTS=[
   'https://cdn.jsdelivr.net/gh/jango763/battlefield@'+NATIVE_HERO_REF+'/assets/native-hero-quaternius/'
 ];
 function nativeHeroLabel(msg){
+  // The loader banner belongs to diagnostic sessions only. In production
+  // never cover HUD/touch controls with a continuously updated status panel.
+  // Loader failures still appear in the console and retain the old hero.
+  if(new URLSearchParams(location.search).get('rigdebug')!=='1'){
+    document.getElementById('native-hero-rig-label')?.remove();
+    return;
+  }
   let node=document.getElementById('native-hero-rig-label');
   if(!node){
     node=document.createElement('div');node.id='native-hero-rig-label';
@@ -860,13 +867,24 @@ function dressNativeHeroFieldUniform(rig){
     };
     if(Object.values(donorHands).some(h=>!h.upper||!h.elbow||!h.hand))
       throw new Error('WW2 uniform sleeve/hand joints missing');
+    // Bind-space wrist offsets convert the native weapon-controlled wrist
+    // orientation into the donor costume's anatomical axis basis.
+    // Without this calibration the donor hands retain their pre-IK pose and
+    // appear backwards, despite reaching the correct physical grip points.
+    const donorHandBindOffsets={};
+    for(const side of ['right','left']){
+      const nativeQ=rig.hands[side].hand.getWorldQuaternion(new THREE.Quaternion());
+      const costumeQ=donorHands[side].hand.getWorldQuaternion(new THREE.Quaternion());
+      donorHandBindOffsets[side]=nativeQ.invert().multiply(costumeQ).normalize();
+    }
     const donorFingers=[];
     for(const [name,bone] of garmentBones){
       const match=name.match(/^(Left|Right)Hand(Thumb|Index|Middle|Ring|Pinky)([123])$/);
       if(match)donorFingers.push({bone,name,digit:match[2],segment:Number(match[3])});
     }
     ww2={donor,bindings,donorMeshes,originalMeshes,side:null,modelType:'existing-panzergrenadier',
-      headwear:'none',headBone:garmentBones.get('Head'),donorHands,donorFingers,matchedBones:bindings.length};
+      headwear:'none',headBone:garmentBones.get('Head'),donorHands,donorFingers,
+      donorHandBindOffsets,matchedBones:bindings.length};
     rig.ww2Uniform=ww2;
     rig.ww2OutfitTemporary=null;
     for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
@@ -897,6 +915,7 @@ function updateNativeHeroFieldUniform(rig){
   if(uniform.side!==side){
     uniform.side=side;
     if(uniform.cap)uniform.cap.visible=side==='red';
+    if(uniform.beret)uniform.beret.visible=side==='blue';
     for(const item of uniform.donorMeshes){
       item.mesh.material=side==='red'?item.german:item.british;
       // Original WWII M42 helmet is deliberately NOT substituted for M43.
@@ -922,13 +941,16 @@ function updateNativeHeroFieldUniform(rig){
   if(uniform.donorHands&&rig.weapon){
     const vis=rig.visual,w=rig.weapon,arms=uniform.donorHands;
     vis.updateWorldMatrix(true,true);
-    // Preserve each donor palm's intended retargeted orientation BEFORE IK
-    // repositions the elbow. Otherwise a solved hand ends up palm-up.
+    // Native Quaternius wrists already follow the weapon grips. Match the
+    // visible WW2 glove to those wrists through its calibrated bind rotation,
+    // instead of freezing a palm-up costume pose before the arm IK.
     const invSpaceQ=vis.getWorldQuaternion(new THREE.Quaternion()).invert();
-    const handLocalQ={
-      right:invSpaceQ.clone().multiply(arms.right.hand.getWorldQuaternion(new THREE.Quaternion())),
-      left:invSpaceQ.clone().multiply(arms.left.hand.getWorldQuaternion(new THREE.Quaternion()))
-    };
+    const handLocalQ={};
+    for(const side of ['right','left']){
+      const nativeQ=rig.hands[side].hand.getWorldQuaternion(new THREE.Quaternion());
+      handLocalQ[side]=invSpaceQ.clone().multiply(nativeQ)
+        .multiply(uniform.donorHandBindOffsets[side]);
+    }
     const local=bone=>vis.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
     const right=local(arms.right.upper),left=local(arms.left.upper);
     const sign=Math.sign(right.x-left.x)||-1;
@@ -973,15 +995,50 @@ function updateNativeHeroFieldUniform(rig){
     // Donor head pivot is much lower than the visible hairline. Raise the
     // sidecap from eyebrow level onto the crown.
     cap.position.y+=.115;
-    cap.position.add(new THREE.Vector3(0,0,.028).applyQuaternion(cap.quaternion));
+    // Move the sidecap FORWARD along the face axis, not lower on the brow.
+    cap.position.add(new THREE.Vector3(0,0,.135).applyQuaternion(cap.quaternion));
+  }
+  if(uniform.beret&&uniform.headBone){
+    const beret=uniform.beret,head=uniform.headBone,space=rig.visual;
+    space.updateWorldMatrix(true,true);
+    beret.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
+    const inv=space.getWorldQuaternion(new THREE.Quaternion()).invert();
+    beret.quaternion.copy(inv.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
+    beret.position.y+=.135;
+    beret.position.add(new THREE.Vector3(0,0,.048).applyQuaternion(beret.quaternion));
   }
 }
 
 
+// The British faction wears a soft maroon airborne-style beret, not the
+// German field-grey sidecap. All geometry is lightweight and head-following.
+function createNativeHeroBritishBeret(rig){
+  const u=rig.ww2Uniform;
+  if(!u?.headBone||u.beret)return;
+  const beret=new THREE.Group();
+  beret.name='WW2_British_Maroon_Beret';
+  const felt=new THREE.MeshLambertMaterial({color:0x902c3a,side:THREE.DoubleSide});
+  const brim=new THREE.MeshLambertMaterial({color:0x3d2428});
+  const badge=new THREE.MeshLambertMaterial({color:0xc4b58c});
+  const add=(geo,mat,pos,scale)=>{
+    const m=new THREE.Mesh(geo,mat);
+    m.position.set(...pos);if(scale)m.scale.set(...scale);
+    m.castShadow=true;m.receiveShadow=true;beret.add(m);return m;
+  };
+  // Close-fitting band, low sloping felt crown with asymmetry to the wearer's right.
+  add(new THREE.CylinderGeometry(.207,.213,.052,20),brim,[0,.012,0]);
+  add(new THREE.SphereGeometry(1,20,12),felt,[.045,.096,-.005],[.264,.115,.241]);
+  add(new THREE.SphereGeometry(1,16,9),felt,[-.07,.071,.003],[.18,.073,.213]);
+  add(new THREE.BoxGeometry(.054,.078,.017),badge,[-.115,.085,.210]);
+  rig.visual.add(beret);
+  u.beret=beret;
+  beret.visible=(P&&P.side)!=='red';
+}
 function loadNativeHeroSideCap(rig){
   const u=rig.ww2Uniform;
   if(!u||!u.headBone)return;
   if(new URLSearchParams(location.search).get('headwear')==='none')return;
+  createNativeHeroBritishBeret(rig);
   const url=new URL('../assets/ww2-headwear/field-grey-sidecap.glb',location.href).href;
   new THREE.GLTFLoader().load(url,gltf=>{
     if(rig.ww2Uniform!==u)return;
