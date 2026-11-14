@@ -15,7 +15,7 @@
   try{
     const chunks=new Array(17);let next=0,done=0;
     const worker=async()=>{while(next<17){const i=next++;chunks[i]=await get('parts/german-'+String(i).padStart(3,'0')+'.txt');progress.textContent='Загрузка игры: '+Math.round(++done/18*100)+'%';}};
-    const work=await Promise.all([get('german-v5.js?v=20261114-british-pilot-r1'),...Array.from({length:4},worker)]);
+    const work=await Promise.all([get('german-v5.js?v=20261114-single-hero-startup-r1'),...Array.from({length:4},worker)]);
     let html=chunks.join('');const start='// === Preview integration: German WW2 Panzergrenadier (red faction) ===',end='// === End of preview integration ===';
     const a=html.indexOf(start),b=html.indexOf(end,a);if(a<0||b<a)throw new Error('Не найдена основа тестовой версии');
     html=html.slice(0,a)+work[0]+html.slice(b+end.length);
@@ -63,6 +63,30 @@
     html=once(html,"scene.background=new THREE.Color(0x8a8780);scene.fog=new THREE.Fog(0x938d80,70,175);","scene.background=new THREE.Color(0x85877f);scene.fog=new THREE.Fog(0x82857d,70,175);");
     html=once(html,"scene.add(new THREE.HemisphereLight(0xe6e0cc,0x5a5238,.9));const sun=new THREE.DirectionalLight(0xffd9a0,1);","scene.add(new THREE.HemisphereLight(0xe5e5dc,0x50544b,.95));const sun=new THREE.DirectionalLight(0xf6e5c7,.9);");
     html=once(html,"tex('#54402c',['#46341f','#62503a','#3a2b1c','#6b5a44','#4f5a60'],650,[20,14])","tex('#595c4e',['#4c5346','#6e6854','#41483e','#77725e','#5e625b'],650,[20,14])");
+    // Insert a completely opaque startup layer BEFORE Three.js or the
+    // provisional figures begin rendering. Do not hide the world by turning
+    // off WebGL; draw normally underneath and expose it when the final hero
+    // has both its agreed uniform and the correct physical WW2 weapon.
+    const startupCover='<div id="hero-startup-cover" role="status" aria-live="polite" '+
+      'style="position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;'+
+      'background:#20251d;color:#f2ead7;text-align:center;font:16px/1.5 Arial,sans-serif;'+
+      'transition:opacity .16s ease;pointer-events:auto">'+
+      '<div style="padding:24px"><div style="font-size:22px;font-weight:bold">Капрал на линии фронта</div>'+
+      '<div id="hero-startup-text" style="margin:12px 0;color:#dbc99e">Подготовка героя и снаряжения…</div>'+
+      '<button id="hero-startup-retry" type="button" hidden '+
+      'style="background:#48553b;padding:10px 16px;color:white;border:1px solid #aa9c71">Перезагрузить игру</button>'+
+      '</div></div>';
+    // This watchdog works even if the game script never initialises because
+    // a third-party Three.js library failed to load. No infinite blank mask.
+    const independentWatchdog='<script>setTimeout(function(){'+
+      'const el=document.getElementById("hero-startup-cover");if(!el)return;'+
+      'const gate=window.__heroStartupGate;'+
+      'if(gate&&gate.phase==="loading"){gate.fallback("independent watchdog");return;}'+
+      'if(!gate){document.getElementById("hero-startup-text").textContent="Не удалось запустить графику";'+
+      'const retry=document.getElementById("hero-startup-retry");retry.hidden=false;'+
+      'retry.onclick=function(){location.reload()};}'+
+      '},26000);</scr'+'ipt>';
+    html=once(html,'<body>','<body>'+startupCover+independentWatchdog);
     progress.textContent='Запуск…';document.open();document.write(html);document.close();
   }catch(e){error.textContent='Не удалось загрузить игру: '+(e.name==='AbortError'?'превышено время ожидания':e.message);progress.textContent='Загрузка прервана';retry.hidden=false;}
 })();
