@@ -89,9 +89,10 @@ async function start(){
   // Weapon's original trigger is at its local origin; +Z points down barrel.
   const mode=state.animation;
   const isSprint=mode==='sprint';
-  grip.position.set(.24,isSprint?-.24:-.16,isSprint?.24:.36);
+  const combat=mode==='combat';
+  grip.position.set(combat?.12:.24,combat?-.10:(isSprint?-.24:-.16),combat?.28:(isSprint?.24:.36));
   grip.rotationQuaternion=null;
-  grip.rotation.set(isSprint?.19:.04,isSprint?-.19:-.08,isSprint?-.15:0);
+  grip.rotation.set(combat?0:(isSprint?.19:.04),combat?0:(isSprint?-.19:-.08),combat?0:(isSprint?-.15:0));
   // Record grip-point errors for next IK pass without mutating working animations.
   const trigger=weaponRoot.getAbsolutePosition();
   const support=toVec(grip.metadata?.support||[0,0,.25]);
@@ -127,9 +128,10 @@ async function start(){
  function select(mode){
   state.animation=mode;
   for(const group of Object.values(remapped))group.stop();
-  if(remapped[mode])remapped[mode].start(true,1,remapped[mode].from,remapped[mode].to,false);
+  if(mode==='combat'&&remapped.idle){remapped.idle.start(true,1,remapped.idle.from,remapped.idle.to,false);remapped.idle.pause();}
+  else if(remapped[mode])remapped[mode].start(true,1,remapped[mode].from,remapped[mode].to,false);
   for(const btn of document.querySelectorAll('[data-clip]'))btn.setAttribute('aria-pressed',String(btn.dataset.clip===mode));
-  log('Babylon.js | meshes: '+state.meshes+' | skeletons: '+state.skeletons+' | tracks: '+JSON.stringify(counts)+'\nAnimation: '+mode+' | '+(remapped[mode]?'active':'НЕ ПРИВЯЗАНА — требуется адаптация')+'\nSource groups: '+state.groups.join(', '));
+  log('Babylon.js | meshes: '+state.meshes+' | skeletons: '+state.skeletons+' | tracks: '+JSON.stringify(counts)+'\nAnimation: '+mode+' | '+(mode==='combat'?'static inspection pose; grip not yet solved':remapped[mode]?'active':'НЕ ПРИВЯЗАНА — требуется адаптация')+'\nSource groups: '+state.groups.join(', '));
  }
  for(const btn of document.querySelectorAll('[data-clip]'))btn.addEventListener('click',()=>select(btn.dataset.clip));
  select('idle');await equipWeapon(weaponSelect.value);state.ready=true;state.scene=scene;state.engineInstance=engine;
