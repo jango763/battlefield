@@ -56,7 +56,7 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
    });
    assert(!one.error,'one-rig panel missing: '+one.error);
    assert(!one.hasDonor,'Mixamo donor rig still drives clothes');
-   assert(one.sameSkeleton,'costume is not bound exclusively to Quaternius bones');
+   assert(one.sameSkeleton,'costume must be bound to one original WW2 armature');
    assert.equal(one.clothingMeshes,2,'missing visible Panzergrenadier skinned meshes');
    assert(one.stats?.remappedBoneEntries>=35,'too few native bone remappings');
    assert(one.weaponReady,'weapon did not load on one-rig character');
@@ -76,6 +76,7 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
    assert(Number.isFinite(settled?.dual?.right?.closestVertexToGrip));
    console.log('R187 LAB STARTUP PASS',config.name,JSON.stringify(settled));
    await page.screenshot({path:'/tmp/r187-lab-'+config.name+'-blue-idle.png'});
+   if(config.name==='desktop')await page.screenshot({path:'/tmp/one-rig-visual.jpg',type:'jpeg',quality:32});
    await page.locator('#focusDual').click();
    await page.waitForTimeout(160);
    await page.screenshot({path:'/tmp/r187-lab-'+config.name+'-glove-closeup.png'});
@@ -123,6 +124,13 @@ const {chromium}=require('/tmp/r187-lab-qa/node_modules/playwright');
      }
      console.log('ONE_RIG_VARIANT_REPORT',config.name,x.snap,
        JSON.stringify({left:stat.single.left,right:stat.single.right}));
+     if(x.retarget==='project'){
+       for(const hand of ['left','right']){
+         const distance=stat.single[hand].closestVertexToGrip;
+         assert(distance<0.25,'ONE RIG glove not close to '+x.snap+' '+hand+
+           ': '+distance+' (requires rig/rest-pose correction)');
+       }
+     }
      console.log('R187 LAB VARIANT PASS',config.name,x.snap,
        JSON.stringify({weapon:stat.loadedWeapon,
        left:stat.dual.left,right:stat.dual.right}));
