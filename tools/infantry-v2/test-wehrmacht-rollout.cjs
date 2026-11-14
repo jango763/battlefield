@@ -16,8 +16,11 @@ for(const name of [
   "unit.t==='red'","wehrmachtRollout.max>0"
 ])assert(source.includes(name),'Missing German army rollout guard: '+name);
 assert(wrapper.includes("get('inspect')==='wehrmacht'"),'Missing Wehrmacht visual inspection scene');
-assert(source.includes("rig.armyUnit.t==='blue'"),'British asset exclusion missing');
-console.log('STATIC PASS: German-only rollout, full roster, reversible proximity LOD, syntax');
+assert(source.includes("const side=wehrmachtRollout.mode==='british'?'blue':'red'") &&
+  source.includes("if(side==='blue'&&inspect==='british'&&!unit.britishPilot)return false") &&
+  source.includes("unit.t===side"),
+  'British pilot must be opt-in; normal Wehrmacht must use German-only units');
+console.log('STATIC PASS: German rollout with opt-in British pilot, reversible proximity LOD, syntax');
 
 if(process.argv.includes('--browser')){
   const {chromium}=require('/tmp/wehrmacht-qa/node_modules/playwright');
