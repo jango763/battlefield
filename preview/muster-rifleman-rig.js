@@ -31,6 +31,11 @@ function musterRigSemantic(mesh){
   if(/hand-r|hand_r/.test(route))return 'hand_r';
   if(/boot-l|sole-l|lace-l/.test(route))return 'foot_l';
   if(/boot-r|sole-r|lace-r/.test(route))return 'foot_r';
+  // Anklets/gaiters and their horizontal rings belong to the lower leg,
+  // NOT the generic web-equipment strap class. Otherwise detached rings
+  // float several centimetres from the soldier's boots during jogging.
+  if(/legwear-strap-l|legwear-l|trouser-bottom-l/.test(route))return 'calf_l';
+  if(/legwear-strap-r|legwear-r|trouser-bottom-r/.test(route))return 'calf_r';
   // Webbing, pack, ammunition pouches and straps belong to the chest/hips.
   // The first fit accidentally assigned off-centre kit to upper-arm bones,
   // causing the pack and ammo boxes to swing with each running arm.
@@ -49,7 +54,7 @@ function musterRigWeights(x,y,z,kind,bones){
   if(kind==='weapon'){add('hand_r',1);}
   else if(kind==='helmet'||kind==='head'){add('Head',1);}
   else if(kind==='hand_l'||kind==='hand_r'){add(kind,1);}
-  else if(kind==='foot_l'||kind==='foot_r'){add(kind,1);}
+  else if(kind==='foot_l'||kind==='foot_r'||kind==='calf_l'||kind==='calf_r'){add(kind,1);}
   else if(kind==='gear'){
     // Rigidly follow just the torso or hip: external equipment never deforms.
     add(y<1.35?'pelvis':y<1.75?'spine_02':'spine_03',1);
