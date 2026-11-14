@@ -70,6 +70,14 @@ async function start(){
  const leftUpper=findPart('upperarm_l','leftarm','LeftArm');
  const rightLower=findPart('lowerarm_r','rightforearm','RightForeArm');
  const leftLower=findPart('lowerarm_l','leftforearm','LeftForeArm');
+ const auditRig=()=>{
+  const joints={chest,rightUpper,rightLower,rightHand,leftUpper,leftLower,leftHand};
+  const info={};
+  for(const [key,node] of Object.entries(joints))info[key]=node?{name:node.name,type:node.getClassName?.(),parent:node.parent?.name||null,rotationQuaternion:!!node.rotationQuaternion}:null;
+  state.rigAudit={joints:info,skeletons:model.skeletons.map(x=>({name:x.name,bones:x.bones.map(b=>b.name)})),armCandidates:modelTargets.map(n=>n.name).filter(n=>/arm|hand|clavicle|spine|chest|wrist/i.test(n))};
+  return state.rigAudit;
+ };
+ auditRig();
  const manifest=await fetch(new URL('../../assets/ww2-weapons/manifest.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('manifest HTTP '+r.status);return r.json();});
  const toVec=a=>new B.Vector3(...a);
  const positionOf=node=>node?.getAbsolutePosition?.()||B.Vector3.Zero();
@@ -148,7 +156,7 @@ async function start(){
  }
  for(const btn of document.querySelectorAll('[data-clip]'))btn.addEventListener('click',()=>select(btn.dataset.clip));
  select('idle');await equipWeapon(weaponSelect.value);state.ready=true;state.scene=scene;state.engineInstance=engine;
- engine.runRenderLoop(()=>{try{updateWeaponPose();}catch(e){state.poseError=String(e);console.error('Combat pose',e);}scene.render();state.fps=Math.round(engine.getFps());});
+ engine.runRenderLoop(()=>{try{updateWeaponPose();}catch(e){state.poseError=String(e);status.textContent='ОШИБКА БОЕВОЙ ПОЗЫ: '+state.poseError;console.error('Combat pose',e);}scene.render();state.fps=Math.round(engine.getFps());});
  window.addEventListener('resize',()=>engine.resize());
 }
 start().catch(err=>{state.error=String(err?.stack||err);log('ОШИБКА: '+state.error);console.error(err);});
