@@ -15,7 +15,7 @@ assert(!source.includes('NativeQuaterniusSupportPalm'),
 assert(source.includes("rig.handVisualSource='ww2-donor'"));
 assert(source.includes(":(side==='right'?-.12:.18)"),
   'British wrists not separately calibrated');
-assert(wrapper.includes("stage6-single-hands-r1"),'stale browser code cache');
+assert(wrapper.includes("stage6-single-hands-r2"),'stale browser code cache');
 assert(wrapper.includes("'hands'"),'no hero hands close-up mode');
 console.log('STAGE 6 STATIC PASS: standalone spare hand removed; gloves only from donor rig');
 
