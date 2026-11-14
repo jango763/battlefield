@@ -30,7 +30,7 @@ jobs:
               const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
               page.on('pageerror',e=>{if(report.errors.length<12)report.errors.push(e.message)});
               await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html',{waitUntil:'domcontentloaded',timeout:45000});
-              await page.waitForFunction(()=>!!(P?.germanPreview?.nativeRig?.weapon?.ww2Manifest&&P?.germanPreview?.nativeRig?.ww2Uniform?.cap),null,{timeout:100000});
+              await page.waitForFunction(()=>{try{return !!(P&&P.germanPreview?.nativeRig?.weapon?.ww2Manifest&&P.germanPreview?.nativeRig?.ww2Uniform?.cap)}catch(e){return false}},null,{timeout:100000});
               await page.evaluate(()=>{
                 P.side='red';P.wpn=1;P.sv=0;P.aim=0;P.aimT=P.g.rotation.y;
                 scene.background=new THREE.Color(0xa6aaa6);
