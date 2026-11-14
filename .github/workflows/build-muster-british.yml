@@ -1,0 +1,74 @@
+name: Bake original Muster WWII British soldier models (MIT)
+on:
+  push:
+    branches:
+      - feature/muster-british-field-test-20261114
+    paths:
+      - tools/infantry-v2/muster-export-entry.ts
+      - tools/infantry-v2/export-muster-british.cjs
+      - .github/workflows/build-muster-british.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  bake:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Check out pinned MIT Muster source
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/Kenton-GMI/muster-ww2.git /tmp/muster
+          git -C /tmp/muster fetch --depth=1 origin 7d2fa86ebc3b999eaf085831cdcd5dccefea63d4
+          git -C /tmp/muster checkout --detach 7d2fa86ebc3b999eaf085831cdcd5dccefea63d4
+          cp tools/infantry-v2/muster-export-entry.ts /tmp/muster/src/battlefield-export-entry.ts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pinned upstream dependencies and Chromium
+        run: |
+          npm ci --prefix /tmp/muster --no-audit --no-fund
+          npm install --prefix /tmp/muster --no-save --no-audit --no-fund playwright@1.58.2
+          /tmp/muster/node_modules/.bin/playwright install chromium
+      - name: Build Rifleman, Section Leader and Bren Gunner as portable GLB
+        shell: bash
+        run: |
+          cd /tmp/muster
+          npm run dev -- --host 127.0.0.1 > /tmp/muster-dev.log 2>&1 &
+          cd "$GITHUB_WORKSPACE"
+          for i in {1..35}; do
+            if curl -fsS http://127.0.0.1:5199/ -o /dev/null; then break; fi
+            sleep 2
+          done
+          node tools/infantry-v2/export-muster-british.cjs
+          node - <<'NODE'
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('assets/muster-british/manifest.json','utf8'));
+          if(d.models.length!==3||d.models.some(m=>m.bytes<2000||m.triangles<500))throw Error('Muster models missing');
+          console.log('MUSTER_EXPORT_QA_PASS',JSON.stringify(d.models.map(m=>({
+            name:m.id,bytes:m.bytes,triangles:m.triangles,parts:m.meshParts
+          }))));
+          NODE
+      - name: Commit actual GLB models to feature branch only
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/muster-british/*.glb assets/muster-british/manifest.json
+          if git diff --cached --quiet; then
+            echo "No model changes"
+          else
+            git commit -m "Bake three MIT-licensed British WWII Muster soldiers as source-derived GLB models"
+            git push origin HEAD:feature/muster-british-field-test-20261114
+          fi
+      - name: Retain generated assets if push blocked
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: muster-british-soldiers-glb
+          path: |
+            assets/muster-british/*.glb
+            assets/muster-british/manifest.json
+          if-no-files-found: warn
