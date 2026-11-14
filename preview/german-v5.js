@@ -1125,12 +1125,12 @@ function loadNativeHeroSideCap(rig){
     frontBand.castShadow=true;frontBand.receiveShadow=true;
     cap.add(frontBand);
     const stations=[
-      {z:-.194,w:.054,b:.194,s:.247,t:.254},
-      {z:-.134,w:.112,b:.191,s:.251,t:.278},
-      {z:-.062,w:.141,b:.188,s:.253,t:.298},
-      {z:.062,w:.141,b:.188,s:.253,t:.298},
-      {z:.134,w:.112,b:.191,s:.251,t:.278},
-      {z:.194,w:.054,b:.194,s:.247,t:.254}
+      {z:-.194,w:.054,b:.180,s:.247,t:.254},
+      {z:-.134,w:.112,b:.166,s:.251,t:.278},
+      {z:-.062,w:.141,b:.162,s:.253,t:.298},
+      {z:.062,w:.141,b:.162,s:.253,t:.298},
+      {z:.134,w:.112,b:.166,s:.251,t:.278},
+      {z:.194,w:.054,b:.180,s:.247,t:.254}
     ];
     // 5% extra breadth along the rim; crest stays low and boat-shaped.
     // Radius changes affect this German cap only.
