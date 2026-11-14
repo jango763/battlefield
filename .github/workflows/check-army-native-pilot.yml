@@ -248,7 +248,7 @@ jobs:
                 await page.waitForTimeout(250);
                 await page.screenshot({path:'/tmp/army-grip-contact-'+label+'.png'});
               }
-              delete window.__armyGripContactLift;
+              await page.evaluate(()=>{delete window.__armyGripContactLift;});
               if(result.contactLift.some(x=>x.weapon!=='de-kar98k'||
                 !Number.isFinite(x.rightError)||x.rightError>.12))
                 result.errors.push('contact lift sweep failed '+JSON.stringify(result.contactLift));
