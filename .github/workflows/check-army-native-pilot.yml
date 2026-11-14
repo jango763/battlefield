@@ -1,0 +1,135 @@
+name: Army native animation pilot (one German infantryman)
+on:
+  push:
+    branches: [feature/headwear-staged-hero-armies-20261114]
+    paths:
+      - preview/german-v5.js
+      - preview/formation-replenishment-v3.html
+      - docs/INFANTRY-MODERNIZATION-STAGES.md
+      - .github/workflows/check-army-native-pilot.yml
+permissions:
+  contents: read
+jobs:
+  pilot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/army-pilot playwright@1.58.2
+          /tmp/army-pilot/node_modules/.bin/playwright install chromium
+      - name: Check one soldier's independent animated skeleton and fallback
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/army-http.log 2>&1 &
+          sleep 2
+          node - <<'JS'
+          const {chromium}=require('/tmp/army-pilot/node_modules/playwright');
+          const fs=require('fs');
+          (async()=>{
+            const result={success:false,checks:[],errors:[],states:{},pilot:null};
+            let browser;
+            try{
+              browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
+              const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
+              page.on('pageerror',e=>result.errors.push('page '+e.message));
+              page.on('console',m=>{if(m.type()==='error')result.errors.push('console '+m.text())});
+              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html?armyRig=pilot',
+                {waitUntil:'domcontentloaded',timeout:45000});
+              await page.waitForFunction(()=>{
+                try{return !!P?.germanPreview?.nativeRig&&!!germanPreview?.armyNativeTemplate;}catch(e){return false}
+              },null,{timeout:120000});
+              await page.evaluate(()=>{
+                // If no red regulars are alive when the hero finishes loading,
+                // spawn one using the unchanged game's own unit factory.
+                if(!U.some(u=>u.t==='red'&&!u.cmd&&!u.eng&&u.hp>0&&u.germanPreview)){
+                  mk('red',false,false);
+                }
+                for(const u of U.filter(u=>u.t==='red'&&!u.cmd&&!u.eng&&u.hp>0&&u.germanPreview)){
+                  animateGermanSoldier(u,1/60);
+                }
+              });
+              await page.waitForFunction(()=>{
+                try{
+                  for(const u of U.filter(u=>u.t==='red'&&!u.cmd&&!u.eng&&u.hp>0&&u.germanPreview))
+                    animateGermanSoldier(u,1/60);
+                  return !!germanPreview.armyPilotInstalled;
+                }catch(e){return false}
+              },null,{timeout:30000});
+              result.pilot=await page.evaluate(()=>{
+                const u=germanPreview.armyPilotUnit,r=u.germanPreview.nativeRig;
+                const bones=[],heroBones=[];
+                r.model.traverse(n=>{if(n.isBone)bones.push(n)});
+                P.germanPreview.nativeRig.model.traverse(n=>{if(n.isBone)heroBones.push(n)});
+                return {role:u.germanPreview.role,side:u.t,
+                  separateModel:r.model!==P.germanPreview.nativeRig.model,
+                  separateBones:bones.every(n=>!heroBones.includes(n)),
+                  boneCount:bones.length,
+                  clips:Object.keys(r.actions),
+                  uniformBones:r.ww2Uniform?.matchedBones||0,
+                  headwear:!!r.ww2Uniform?.cap,
+                  heroState:P.germanPreview.nativeRig.state,
+                  autoPilotCount:U.filter(x=>x.germanPreview?.nativeRig&&x.kind!=='p').length};
+              });
+              if(!result.pilot.separateModel||!result.pilot.separateBones||result.pilot.boneCount<30)
+                result.errors.push('native soldier skeleton is shared with hero or incomplete');
+              if(result.pilot.clips.join(',')!=='idle,jog,sprint')result.errors.push('native clips mismatch');
+              if(result.pilot.uniformBones<16||!result.pilot.headwear)
+                result.errors.push('soldier WW2 outfit or cap retarget unavailable');
+              if(result.pilot.autoPilotCount!==1)result.errors.push('not a one soldier rollout');
+              for(const [label,speed,aim] of [['idle',0,0],['jog',3.2,0],['sprint',5.6,0],['aim',0,1]]){
+                const check=await page.evaluate(([speed,aim])=>{
+                  const u=germanPreview.armyPilotUnit;
+                  u.sv=speed;u.aim=aim;u.aimT=u.g.rotation.y;u.kick=0;
+                  const x=u.x,z=u.z;
+                  for(let i=0;i<32;i++)animateGermanSoldier(u,1/60);
+                  const rig=u.germanPreview.nativeRig;
+                  return {state:rig.state,weapon:rig.weapon?.activeModelId,
+                    bones:rig.ww2Uniform?.matchedBones,
+                    xStable:x===u.x,zStable:z===u.z,
+                    grip:rig.weaponDiagnostics?.rightError,
+                    gripLeft:rig.weaponDiagnostics?.leftError,
+                    uniformGrip:rig.weaponDiagnostics?.visibleRightError,
+                    headwearVisible:rig.ww2Uniform?.cap?.visible};
+                },[speed,aim]);
+                result.states[label]=check;
+                if(check.state!==(speed<.28?'idle':speed<4.2?'jog':'sprint')||
+                  !check.xStable||!check.zStable||!check.headwearVisible||
+                  !Number.isFinite(check.grip)||check.grip>.12||
+                  !Number.isFinite(check.gripLeft)||check.gripLeft>.12)
+                  result.errors.push('soldier pose '+label+' '+JSON.stringify(check));
+              }
+              await page.evaluate(()=>{
+                const u=germanPreview.armyPilotUnit;
+                u.x=P.x+2;u.z=P.z+2;u.g.position.set(u.x,0,u.z);
+                u.sv=0;u.aim=0;
+                for(let i=0;i<8;i++)animateGermanSoldier(u,1/60);
+                const old=cam.updateMatrixWorld.bind(cam);
+                cam.updateMatrixWorld=function(force){
+                  this.position.set(u.x+2.7,3.75,u.z+5);
+                  this.lookAt(u.x,1.50,u.z);
+                  return old(force);
+                };
+              });
+              await page.waitForTimeout(600);
+              await page.screenshot({path:'/tmp/army-native-first-soldier.png'});
+              result.success=result.errors.length===0;
+            }catch(e){result.errors.push('exception '+e.stack)}
+            finally{
+              fs.writeFileSync('/tmp/army-native-pilot.json',JSON.stringify(result,null,2));
+              console.log(JSON.stringify(result,null,2));
+              if(browser)await browser.close();
+              if(!result.success)process.exitCode=1;
+            }
+          })();
+          JS
+      - name: Archive proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: army-native-pilot
+          path: |
+            /tmp/army-native-pilot.json
+            /tmp/army-native-first-soldier.png
+          if-no-files-found: warn
