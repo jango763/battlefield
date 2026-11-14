@@ -301,7 +301,7 @@ function makePanel(x,character,costume,library,side){
 /**
  * Experimental *single skeleton* surface rebind. All donor geometry is baked
  * into the native armature's rest world-space; original donor weight groups
- * are remapped by corresponding bone name (unmapped groups fall back to a
+ * are mapped through donor/native rest-bone matrices by corresponding bone name (unmapped groups fall back to a
  * mapped ancestor). One THREE.Skeleton references only Quaternius bones.
  * This is not yet a Blender export or production-quality re-skin.
  */
@@ -349,10 +349,20 @@ function makeSingleRigPanel(x,character,costume,library,side){
   const oldIndex=geometry.getAttribute('skinIndex'),oldWeight=geometry.getAttribute('skinWeight');
   if(!position||!oldIndex||!oldWeight)throw Error('Нет skin weights в форме: '+mesh.name);
   const nativeIndices=mesh.skeleton.bones.map(mapBone);
+  // Rest-space fit: convert every donor bone's rest-space influence into the
+  // native bone's rest-space. A mere index swap puts hands metres away.
+  const restToNative=mesh.skeleton.bones.map((bone,i)=>
+    rigBones[nativeIndices[i]].matrixWorld.clone().multiply(
+      bone.matrixWorld.clone().invert()));
   const ids=new Uint16Array(position.count*4),weights=new Float32Array(position.count*4);
-  const temp=V();
+  const temp=V(), fitted=V(), touched=V();
   for(let i=0;i<position.count;i++){
    const merged=new Map();
+   let total=0;
+   temp.fromBufferAttribute(position,i);
+   mesh.applyBoneTransform(i,temp); // donor skinned rest pose in donor mesh space
+   temp.applyMatrix4(mesh.matrixWorld); // scene/world space
+   fitted.set(0,0,0);
    for(let k=0;k<4;k++){
     const weight=oldWeight.getComponent(i,k);
     if(weight<=0)continue;
@@ -360,19 +370,24 @@ function makeSingleRigPanel(x,character,costume,library,side){
     const nativeBone=nativeIndices[donorIndex];
     if(nativeBone===undefined)throw Error('Invalid donor skinIndex '+donorIndex);
     merged.set(nativeBone,(merged.get(nativeBone)||0)+weight);
+    touched.copy(temp).applyMatrix4(restToNative[donorIndex]);
+    fitted.addScaledVector(touched,weight);
+    total+=weight;
    }
+   if(total<=0)throw Error('Vertex with zero skin weights: '+mesh.name+' '+i);
+   fitted.multiplyScalar(1/total).applyMatrix4(originInverse);
+   position.setXYZ(i,fitted.x,fitted.y,fitted.z);
    const sorted=[...merged.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4);
    const sum=sorted.reduce((s,a)=>s+a[1],0)||1;
    for(let k=0;k<sorted.length;k++){
     ids[i*4+k]=sorted[k][0];weights[i*4+k]=sorted[k][1]/sum;
    }
-   temp.fromBufferAttribute(position,i);
-   mesh.applyBoneTransform(i,temp); // bake original glTF bind/rest deformation
-   position.setXYZ(i,temp.x,temp.y,temp.z);
   }
   geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(ids,4));
   geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute(weights,4));
-  geometry.applyMatrix4(originInverse.clone().multiply(mesh.matrixWorld));
+  // Surface geometry is already in anchor-local coordinates; recompute
+  // normals to avoid donor-space normals on repositioned native anatomy.
+  geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
   const single=new THREE.SkinnedMesh(geometry,mesh.material);
   single.name='ONE_RIG_'+(mesh.name||'uniform');
