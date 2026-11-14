@@ -45,7 +45,7 @@ jobs:
                   result.warnings.push('network '+m.text());
                 else if(m.type()==='error')result.errors.push('console '+m.text());
               });
-              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html?armyRig=pilot&armyHeadwear=helmet',
+              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html?armyRig=pilot&armyHeadwear=helmet&inspect=army',
                 {waitUntil:'domcontentloaded',timeout:45000});
               await page.waitForFunction(()=>{
                 try{return !!P?.germanPreview?.nativeRig&&!!germanPreview?.armyNativeTemplate;}catch(e){return false}
@@ -67,6 +67,13 @@ jobs:
                   return !!germanPreview.armyPilotInstalled;
                 }catch(e){return false}
               },null,{timeout:30000});
+              result.preview=await page.evaluate(()=>({
+                badge:document.body.textContent.includes('ТЕСТ ПЕХОТЫ'),
+                installed:germanPreview.armyPilotInstalled,
+                alive:!!germanPreview.armyPilotUnit?.hp
+              }));
+              if(!result.preview.badge||!result.preview.installed||!result.preview.alive)
+                result.errors.push('inspect=army close-up not ready '+JSON.stringify(result.preview));
               result.pilot=await page.evaluate(()=>{
                 const u=germanPreview.armyPilotUnit,r=u.germanPreview.nativeRig;
                 const bones=[],heroBones=[];
