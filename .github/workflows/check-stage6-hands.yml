@@ -43,4 +43,5 @@ jobs:
           path: |
             /tmp/stage6-hands-*.png
             /tmp/stage6-grip-*.png
+            /tmp/stage6-wrist-*.png
           if-no-files-found: warn
