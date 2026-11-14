@@ -950,11 +950,12 @@ function updateNativeHeroFieldUniform(rig){
       const nativeQ=rig.hands[side].hand.getWorldQuaternion(new THREE.Quaternion());
       handLocalQ[side]=invSpaceQ.clone().multiply(nativeQ)
         .multiply(uniform.donorHandBindOffsets[side]);
-      // Keep the grip point fixed and turn the *costume wrist* inward around
-      // its local roll axis. A nine-pose close-up comparison found the old
-      // exposed palm orientation had been visibly twisted outwards.
+      // The original equal roll on both hands twists the mirrored support
+      // wrist outwards. Only the German hero gets the mirrored, smaller rolls;
+      // the British uniform keeps its previously approved alignment.
+      const roll=uniform.side==='red'?(side==='right'?-.48:.48):-.85;
       handLocalQ[side].multiply(new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(0,0,1),-.85));
+        new THREE.Vector3(0,0,1),roll));
     }
     const local=bone=>vis.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
     const right=local(arms.right.upper),left=local(arms.left.upper);
@@ -1000,8 +1001,11 @@ function updateNativeHeroFieldUniform(rig){
     // Donor head pivot is much lower than the visible hairline. Raise the
     // sidecap from eyebrow level onto the crown.
     cap.position.y+=.115;
-    // Move the sidecap FORWARD along the face axis, not lower on the brow.
-    cap.position.add(new THREE.Vector3(0,0,.135).applyQuaternion(cap.quaternion));
+    // German sidecap: advance the crown towards the forehead, while preserving
+    // its approved vertical position. Allow safe visual tuning via URL.
+    const fit=Number(new URLSearchParams(location.search).get('capforward'));
+    const forward=Number.isFinite(fit)&&fit>0?THREE.MathUtils.clamp(fit,.12,.24):.185;
+    cap.position.add(new THREE.Vector3(0,0,forward).applyQuaternion(cap.quaternion));
   }
   if(uniform.beret&&uniform.headBone){
     const beret=uniform.beret,head=uniform.headBone,space=rig.visual;
