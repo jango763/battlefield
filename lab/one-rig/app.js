@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { clone as cloneSkinned, retargetClip } from 'three/addons/utils/SkeletonUtils.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // Non-production lab: use actual assets/weapon pivot coordinates and the same
@@ -299,127 +299,73 @@ function makePanel(x,character,costume,library,side){
 }
 
 /**
- * Experimental *single skeleton* surface rebind. All donor geometry is baked
- * into the native armature's rest world-space; original donor weight groups
- * are mapped through donor/native rest-bone matrices by corresponding bone name (unmapped groups fall back to a
- * mapped ancestor). One THREE.Skeleton references only Quaternius bones.
- * This is not yet a Blender export or production-quality re-skin.
+ * Actual ONE-skeleton route: retain the authored Panzergrenadier skin/bind,
+ * bake only Quaternius animation rotations into it, remove the source rig.
  */
 function makeSingleRigPanel(x,character,costume,library,side){
- const panel=makePanel(x,character,null,library,side);
- panel.anchor.name='OneRigReboundCostume';
- panel.anchor.updateWorldMatrix(true,true);
+ const anchor=new THREE.Group();anchor.name='OneWW2Skeleton';anchor.position.x=x;
+ world.scene.add(anchor);
  const donor=cloneSkinned(costume);
  boxScaleToHeight(donor,2.55);
- panel.anchor.add(donor);
- donor.updateWorldMatrix(true,true);
- colorWw2Donor(donor,side);
- const original=vertices(panel.native);
- const baseSkeleton=original[0]?.skeleton;
- if(!baseSkeleton || baseSkeleton.bones.length<60)
-  throw Error('Единый скелет: не найдены кости Quaternius');
- const rigBones=baseSkeleton.bones;
- const nativeIndex=new Map(rigBones.map((bone,index)=>[bone.name,index]));
- // Use the actual native *rest* bone positions; never capture animated frames.
- panel.anchor.updateWorldMatrix(true,true);
- const rig=new THREE.Skeleton(rigBones,rigBones.map(b=>b.matrixWorld.clone().invert()));
- const originInverse=panel.anchor.matrixWorld.clone().invert();
- const meshes=vertices(donor).filter(n=>n.visible);
- const group=new THREE.Group();group.name='NativeOneRigUniform';
- panel.anchor.add(group);
- let remapped=0,fallback=0,unmapped=0;
- const mapBone=bone=>{
-  let current=bone;
-  while(current){
-   const id=current.name.replace(/_\d+$/,'').replace(/^mixamorig[:_]?/i,'');
-   const nativeName=matched[id];
-   if(nativeName && nativeIndex.has(nativeName)){
-    if(current!==bone)fallback++;
-    else remapped++;
-    return nativeIndex.get(nativeName);
-   }
-   current=current.parent?.isBone?current.parent:null;
-  }
-  unmapped++;
-  return nativeIndex.get('pelvis')??0;
- };
- for(const mesh of meshes){
-  mesh.updateWorldMatrix(true,false);
-  const geometry=mesh.geometry.clone(),position=geometry.getAttribute('position');
-  const oldIndex=geometry.getAttribute('skinIndex'),oldWeight=geometry.getAttribute('skinWeight');
-  if(!position||!oldIndex||!oldWeight)throw Error('Нет skin weights в форме: '+mesh.name);
-  const nativeIndices=mesh.skeleton.bones.map(mapBone);
-  // Rest-space fit: convert every donor bone's rest-space influence into the
-  // native bone's rest-space. A mere index swap puts hands metres away.
-  // GLB armatures have incompatible authored scales. A direct world-matrix
-  // product explodes garment size (measured 60+ units for a 2.55-unit body).
-  // Keep only world-space joint position and orientation; intentionally drop
-  // per-rig basis scale before building donor-rest -> native-rest transforms.
-  const unitScale=new THREE.Vector3(1,1,1);
-  const restToNative=mesh.skeleton.bones.map((bone,i)=>{
-   const source=rigBones[nativeIndices[i]];
-   const targetMatrix=new THREE.Matrix4().compose(
-     source.getWorldPosition(V()),source.getWorldQuaternion(Q()),unitScale);
-   const donorMatrix=new THREE.Matrix4().compose(
-     bone.getWorldPosition(V()),bone.getWorldQuaternion(Q()),unitScale);
-   return targetMatrix.multiply(donorMatrix.invert());
-  });
-  const ids=new Uint16Array(position.count*4),weights=new Float32Array(position.count*4);
-  const temp=V(), fitted=V(), touched=V();
-  for(let i=0;i<position.count;i++){
-   const merged=new Map();
-   let total=0;
-   temp.fromBufferAttribute(position,i);
-   mesh.applyBoneTransform(i,temp); // donor skinned rest pose in donor mesh space
-   temp.applyMatrix4(mesh.matrixWorld); // scene/world space
-   fitted.set(0,0,0);
-   for(let k=0;k<4;k++){
-    const weight=oldWeight.getComponent(i,k);
-    if(weight<=0)continue;
-    const donorIndex=oldIndex.getComponent(i,k);
-    const nativeBone=nativeIndices[donorIndex];
-    if(nativeBone===undefined)throw Error('Invalid donor skinIndex '+donorIndex);
-    merged.set(nativeBone,(merged.get(nativeBone)||0)+weight);
-    touched.copy(temp).applyMatrix4(restToNative[donorIndex]);
-    fitted.addScaledVector(touched,weight);
-    total+=weight;
-   }
-   if(total<=0)throw Error('Vertex with zero skin weights: '+mesh.name+' '+i);
-   fitted.multiplyScalar(1/total).applyMatrix4(originInverse);
-   position.setXYZ(i,fitted.x,fitted.y,fitted.z);
-   const sorted=[...merged.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4);
-   const sum=sorted.reduce((s,a)=>s+a[1],0)||1;
-   for(let k=0;k<sorted.length;k++){
-    ids[i*4+k]=sorted[k][0];weights[i*4+k]=sorted[k][1]/sum;
-   }
-  }
-  geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(ids,4));
-  geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute(weights,4));
-  // Surface geometry is already in anchor-local coordinates; recompute
-  // normals to avoid donor-space normals on repositioned native anatomy.
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-  if(!Number.isFinite(geometry.boundingSphere?.radius)||geometry.boundingSphere.radius>4)
-   throw Error('One-rig garment rest-space exploded: radius='+
-     geometry.boundingSphere?.radius+' mesh='+mesh.name);
-  const single=new THREE.SkinnedMesh(geometry,mesh.material);
-  single.name='ONE_RIG_'+(mesh.name||'uniform');
-  single.castShadow=true;single.receiveShadow=true;single.frustumCulled=false;
-  group.add(single);
-  single.updateWorldMatrix(true,false);
-  single.bind(rig, single.matrixWorld.clone());
+ anchor.add(donor);donor.updateWorldMatrix(true,true);colorWw2Donor(donor,side);
+ const skins=vertices(donor),visible=skins.filter(m=>m.visible);
+ const target=skins[0],targetRig=target?.skeleton;
+ if(!targetRig||visible.length!==2)throw Error('WW2 GLB skin missing');
+ const anatomy=boneMap(donor,true);
+ const src=cloneSkinned(character);
+ boxScaleToHeight(src,2.55);anchor.add(src);src.updateWorldMatrix(true,true);
+ const sourceMesh=vertices(src)[0];
+ if(!sourceMesh?.skeleton)throw Error('No Quaternius skeleton');
+ const sourceMap=boneMap(src),namesMap={};
+ let mapped=0;
+ for(const bone of targetRig.bones){
+  const k=bone.name.replace(/_\d+$/,'').replace(/^mixamorig[:_]?/i,'');
+  const v=matched[k];
+  if(v&&sourceMap.has(v)){namesMap[bone.name]=v;mapped++;}
  }
- if(!group.children.length)throw Error('No costume meshes were rebound to the native rig');
- // Native geometry is deliberately hidden: only the real WW2 costume renders.
- original.forEach(mesh=>{mesh.visible=false;});
- panel.anchor.remove(donor);
- panel.oneRigUniform=group;
- panel.oneRigRig=rig;
- panel.skinMeshes=group.children;
- panel.oneRigDetails={sourceBones:rigBones.length,sourceSkinMeshes:original.length,
-  visibleCostumeMeshes:group.children.length,remappedBoneEntries:remapped,
-  fallbackBoneEntries:fallback,unmappedBoneEntries:unmapped};
- return panel;
+ if(mapped<48)throw Error('Insufficient mapped bone names: '+mapped);
+ const mixer=new THREE.AnimationMixer(donor),actions={};
+ const clips={idle:'Idle_Loop',jog:'Jog_Fwd_Loop',sprint:'Sprint_Loop'};
+ for(const [mode,label] of Object.entries(clips)){
+  const clip=library.find(c=>c.name===label);
+  if(!clip)throw Error('Missing source clip '+label);
+  const baked=retargetClip(target,sourceMesh,clip,{
+   names:namesMap,fps:30,hip:'pelvis',preserveBoneMatrix:true,
+   preserveBonePositions:true,useTargetMatrix:false
+  });
+  if(!baked?.tracks?.length)throw Error('Empty retargeted '+label);
+  baked.tracks=baked.tracks.filter(t=>!/\.scale$/.test(t.name));
+  actions[mode]=mixer.clipAction(baked);
+ }
+ anchor.remove(src); // temporary source was used only for baking clips
+ actions.idle.play();
+ const hands={
+  left:{upper:anatomy.get('LeftArm'),elbow:anatomy.get('LeftForeArm'),hand:anatomy.get('LeftHand')},
+  right:{upper:anatomy.get('RightArm'),elbow:anatomy.get('RightForeArm'),hand:anatomy.get('RightHand')}
+ };
+ if(Object.values(hands).some(h=>!h.upper||!h.elbow||!h.hand))
+  throw Error('Missing original WW2 arm bones');
+ const p={anchor,native:donor,anatomy,mixer,actions,state:'idle',hands,
+  sourceHandQ:{},weapon:null,costume:null,bindings:[],skinMeshes:visible,
+  mode:'single',side,metrics:null,donorSingleRig:true,oneRigUniform:donor,
+  oneRigRig:targetRig,oneRigDetails:{sourceBones:targetRig.bones.length,
+   sourceSkinMeshes:skins.length,visibleCostumeMeshes:visible.length,
+   remappedBoneEntries:mapped,fallbackBoneEntries:0,
+   unmappedBoneEntries:targetRig.bones.length-mapped,animations:Object.keys(actions)}};
+ donor.updateWorldMatrix(true,true);
+ for(const hand of ['left','right'])
+  p.sourceHandQ[hand]=anchor.getWorldQuaternion(Q()).invert().multiply(
+   hands[hand].hand.getWorldQuaternion(Q()));
+ p.markers={};
+ for(const hand of ['left','right']){
+  p.markers[hand]={};
+  for(const [which,color] of [['grip',0xf7bc52],['surface',0x29d4dd],['wrist',0xff5d62]]){
+   const m=new THREE.Mesh(new THREE.SphereGeometry(.027,9,7),
+    new THREE.MeshBasicMaterial({color,depthTest:false}));
+   m.renderOrder=100;anchor.add(m);p.markers[hand][which]=m;
+  }
+ }
+ return p;
 }
 
 function configureWeapon(panel,source,info,id){
@@ -536,7 +482,7 @@ function handSurface(panel,hand){
    for(let k=0;k<4;k++){
     const name=mesh.skeleton.bones[bones[k]]?.name||'';
     const normalized=name.replace(/_\d+$/,'').replace(/^mixamorig[:_]?/i,'');
-    if(panel.costume
+    if((panel.costume||panel.donorSingleRig)
       ?normalized.startsWith(hand==='left'?'LeftHand':'RightHand')
       :/^(hand_|(?:thumb|index|middle|ring|pinky)_)/.test(normalized)&&normalized.endsWith(hand==='left'?'_l':'_r')
     )wt+=weights[k];
@@ -576,7 +522,7 @@ function report(){
  state.stats=stats;
  $('report').textContent=[
  'Текущая версия Three.js: r'+stats.revision+' | WebGL 2: '+stats.webgl2+' | '+state.fps+' FPS',
- 'Слева: военная форма на ЕДИНОМ скелете Quaternius:',
+ 'Слева: ЕДИНЫЙ штатный скелет Panzergrenadier:',
  '  кисть Л: сустав→оружие '+stats.single.left.wristToGrip+'; геометрия→оружие '+stats.single.left.surfaceToGrip,
  '  кисть П: сустав→оружие '+stats.single.right.wristToGrip+'; геометрия→оружие '+stats.single.right.surfaceToGrip,
  'Справа: прежние ДВА скелета, совпало костей: '+stats.dual.matchedBones,
