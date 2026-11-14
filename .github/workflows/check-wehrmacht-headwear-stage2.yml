@@ -1,0 +1,51 @@
+name: Stage 2 Wehrmacht headwear lifecycle and fit QA
+on:
+  push:
+    branches: [fix/wehrmacht-headwear-stage2-20261114]
+    paths:
+      - preview/german-v5.js
+      - preview/german-visual-classes.js
+      - preview/formation-replenishment-v3.html
+      - tools/infantry-v2/test-wehrmacht-headwear-stage2.cjs
+      - .github/workflows/check-wehrmacht-headwear-stage2.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  headwear:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static syntax, source and Army regression assertions
+        run: |
+          node --check preview/german-v5.js
+          node --check preview/german-visual-classes.js
+          node tools/infantry-v2/test-wehrmacht-headwear-stage2.cjs
+          node tools/infantry-v2/test-german-visual-classes.cjs
+          node tools/infantry-v2/test-clean-core.cjs
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs
+          node tools/infantry-v2/test-british-pilot.cjs
+      - name: Install browser
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/wehrmacht-headwear-qa playwright@1.58.2
+          npm install --no-audit --no-fund --prefix /tmp/wehrmacht-visual-qa playwright@1.58.2
+          npm install --no-audit --no-fund --prefix /tmp/wehrmacht-qa playwright@1.58.2
+          npm install --no-audit --no-fund --prefix /tmp/british-pilot playwright@1.58.2
+          /tmp/wehrmacht-headwear-qa/node_modules/.bin/playwright install chromium
+      - name: Verify every headwear class and no gameplay regression
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/wehrmacht-headwear-server.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-wehrmacht-headwear-stage2.cjs --browser
+          node tools/infantry-v2/test-german-visual-classes.cjs --browser
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs --browser
+          node tools/infantry-v2/test-british-pilot.cjs --browser
+      - name: Save model closeups for visual inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wehrmacht-headwear-stage2-screenshots
+          path: /tmp/wehrmacht-headwear-*.jpg
+          if-no-files-found: ignore
