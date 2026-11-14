@@ -122,6 +122,18 @@ jobs:
                 await page.screenshot({path:'/tmp/ww2-weapon-'+tag+'.png'});
                 report.sampleShots.push(tag);
               }
+              // Diagnostic screenshots: isolate which anatomical hand is
+              // missing, without conflating original and overlaid gloves.
+              for(const mode of ['none','left','right','both']){
+                await page.evaluate(mode=>{
+                  P.side='red';P.wpn=1;P.sv=0;P.aim=0;
+                  for(let i=0;i<5;i++)animateNativeHeroRig(P,P.germanPreview,1/60);
+                  for(const hand of P.germanPreview.nativeRig.ww2Uniform.nativeHands)
+                    hand.visible=mode==='both'||hand.userData.side===mode;
+                },mode);
+                await page.waitForTimeout(140);
+                await page.screenshot({path:'/tmp/ww2-hand-overlay-'+mode+'.png'});
+              }
               report.success=report.failures.length===0;
             }catch(e){report.failures.push('exception: '+e.stack)}
             finally{
@@ -140,4 +152,5 @@ jobs:
           path: |
             /tmp/ww2-weapons-report.json
             /tmp/ww2-weapon-*.png
+            /tmp/ww2-hand-overlay-*.png
           if-no-files-found: warn
