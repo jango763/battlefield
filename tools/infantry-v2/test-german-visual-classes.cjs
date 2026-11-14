@@ -45,6 +45,35 @@ if(process.argv.includes('--browser')){
               u.germanPreview?.nativeRig?.ww2Uniform?.visualIdentityKit?.parts?.length>0);}
           catch(e){return false;}
         },null,{timeout:140000});
+        // Role gallery must show actual running rig even when map geometry
+        // (buildings, tree trunks) blocks the normal battlefield camera.
+        await page.waitForFunction(()=>window.__germanRoleGallery?.ready &&
+          document.getElementById('german-role-gallery'),null,{timeout:25000});
+        for(let i=0;i<6;i++){
+          await page.locator('button[data-class-index="'+i+'"]').click();
+          const active=await page.evaluate(()=>({
+            selected:window.__germanRoleGallery.selected,
+            rigModel:window.__germanRoleGallery.selectedVisual,
+            expectedRig:window.__germanRoleGallery.cast[
+              window.__germanRoleGallery.selected].germanPreview.nativeRig.visual,
+            inStage:window.__germanRoleGallery.selectedVisual?.parent===
+              window.__germanRoleGallery.stage,
+            hiddenMapParts:window.__germanRoleGallery.cast
+              .filter((u,n)=>n!==window.__germanRoleGallery.selected)
+              .every(u=>u.germanPreview.nativeRig.visual.parent!==
+                window.__germanRoleGallery.stage)
+          }));
+          assert.equal(active.selected,i,'Role buttons did not switch costume');
+          assert(active.inStage&&active.hiddenMapParts,
+            'Real animated unit was not moved into isolated gallery');
+        }
+        await page.locator('button[data-class-index="0"]').click();
+        const oldRotation=await page.evaluate(()=>window.__germanRoleGallery.stage.rotation.y);
+        await page.locator('#german-role-turn').click();
+        const newRotation=await page.evaluate(()=>window.__germanRoleGallery.stage.rotation.y);
+        assert(Math.abs(newRotation-oldRotation-Math.PI/4)<1e-5,
+          'Rotate control did not change soldier view');
+        await page.locator('button[data-class-index="0"]').click();
         // Let MP40/MG42 GLB weapon and helmet async loads complete.
         await page.waitForTimeout(800);
         const result=await page.evaluate(()=>{
@@ -92,13 +121,21 @@ if(process.argv.includes('--browser')){
         assert(new Set(result.soldiers.map(x=>x.headwear)).size>=3,
           'Roles do not have distinguishable headwear');
         assert(!failures.length,'Browser JS exceptions: '+failures.join(';'));
-        const jpg=await page.screenshot({
-          path:'/tmp/wehrmacht-visual-'+device.name+'.png',
+        await page.screenshot({
+          path:'/tmp/wehrmacht-visual-'+device.name+'-hero.png',
           type:'png',fullPage:false
         });
         const preview=await page.screenshot({type:'jpeg',quality:63});
-        console.log('GERMAN_VISUAL_SCREEN_'+device.name.toUpperCase().replace('-','_'),
+        console.log('GERMAN_VISUAL_SCREEN_'+device.name.toUpperCase().replace('-','_')+'_HERO',
           preview.toString('base64'));
+        for(const [id,key] of [[2,'SMG'],[3,'MG'],[5,'CAPTAIN']]){
+          await page.locator('button[data-class-index="'+id+'"]').click();
+          await page.waitForTimeout(125);
+          const shot=await page.screenshot({type:'jpeg',quality:63,
+            path:'/tmp/wehrmacht-visual-'+device.name+'-'+key.toLowerCase()+'.jpg'});
+          console.log('GERMAN_VISUAL_SCREEN_'+device.name.toUpperCase().replace('-','_')+'_'+key,
+            shot.toString('base64'));
+        }
         console.log('GERMAN_VISUAL_CLASSES_BROWSER_PASS',device.name,
           JSON.stringify(result));
         await context.close();
