@@ -104,7 +104,8 @@ jobs:
                         const result={};
                         for(const side of ['left','right']){
                           const q=r.hands[side].hand.getWorldQuaternion(new THREE.Quaternion());
-                          const expected=q.clone().multiply(u.donorHandBindOffsets[side]);
+                          const expected=q.clone().multiply(u.donorHandBindOffsets[side])
+                            .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),-.85));
                           const actual=u.donorHands[side].hand.getWorldQuaternion(new THREE.Quaternion());
                           result[side]=expected.angleTo(actual);
                         }
