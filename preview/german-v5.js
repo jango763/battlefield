@@ -1626,8 +1626,8 @@ function updateNativeHeroFieldUniform(rig){
       .multiply(beret.userData.bindHeadLocalQ.clone().invert()).normalize();
     // Keep the rolled band above the eyebrows, not floating over the crown.
     // A small forward offset makes the badge readable in a front close-up.
-    beret.position.y+=.184;
-    beret.position.add(new THREE.Vector3(0,0,.021).applyQuaternion(beret.quaternion));
+    beret.position.y+=.163;
+    beret.position.add(new THREE.Vector3(0,0,.056).applyQuaternion(beret.quaternion));
   }
   updateNativeGermanHeroIdentity(rig);
   updateNativeBritishHeroIdentity(rig);
@@ -1641,14 +1641,14 @@ function createNativeHeroBritishBeret(rig){
   if(!u?.headBone||u.beret)return;
   const beret=new THREE.Group();
   beret.name='WW2_British_Maroon_Beret';
-  beret.userData.profile='airborne-soft-slouch-v3';
+  beret.userData.profile='airborne-soft-fitted-v4';
   // Keep the silhouette close to human head dimensions rather than a disc.
-  beret.scale.set(.81,.98,.84);
+  beret.scale.set(.86,.91,.86);
   // A real cloth beret is ONE low continuous felt crown, not two oversized
   // spheres stacked onto a cylinder (the old "mushroom/pot" silhouette).
   // 48 radial samples retain a smooth profile on mobile Three.js r128.
   const felt=new THREE.MeshLambertMaterial({
-    color:0x491624,roughness:1,side:THREE.DoubleSide
+    color:0x522231,roughness:1,side:THREE.DoubleSide
   });
   const band=new THREE.MeshLambertMaterial({color:0x28181d,roughness:1});
   const seam=new THREE.MeshLambertMaterial({color:0x371720,roughness:1});
@@ -1658,13 +1658,13 @@ function createNativeHeroBritishBeret(rig){
   // a close-fitting band, rounded cloth expansion, then a soft flat top.
   // Y drops on the right edge to suggest a natural wool slouch.
   const rings=[
-    {r:.148,y:.010,shift:0,drop:0},
-    {r:.157,y:.029,shift:.004,drop:0},
-    {r:.174,y:.054,shift:.021,drop:.008},
-    {r:.189,y:.077,shift:.038,drop:.021},
-    {r:.171,y:.108,shift:.045,drop:.010},
-    {r:.111,y:.122,shift:.040,drop:0},
-    {r:.039,y:.126,shift:.034,drop:0}
+    {r:.137,y:.006,shift:0,drop:0},
+    {r:.144,y:.022,shift:0,drop:0},
+    {r:.150,y:.041,shift:.005,drop:.003},
+    {r:.156,y:.058,shift:.012,drop:.012},
+    {r:.139,y:.075,shift:.014,drop:.007},
+    {r:.093,y:.086,shift:.012,drop:0},
+    {r:.026,y:.090,shift:.009,drop:0}
   ];
   const positions=[],indices=[];
   for(let k=0;k<rings.length;k++){
@@ -1687,7 +1687,7 @@ function createNativeHeroBritishBeret(rig){
   }
   // Close the shallow crown smoothly; don't leave a visible central hole.
   const top=positions.length/3;
-  positions.push(.034,.129,0);
+  positions.push(.009,.093,0);
   for(let i=0;i<N;i++)indices.push((rings.length-1)*N+i,
     (rings.length-1)*N+(i+1)%N,top);
   const geo=new THREE.BufferGeometry();
@@ -1700,7 +1700,7 @@ function createNativeHeroBritishBeret(rig){
   beret.add(crown);
   // Thin rolled leather-like wool band (no tall cylindrical bucket brim).
   const bandMesh=new THREE.Mesh(
-    new THREE.TorusGeometry(.150,.010,7,48),band);
+    new THREE.TorusGeometry(.139,.009,7,48),band);
   bandMesh.name='BritishBeretCloseFitBand';
   bandMesh.rotation.x=Math.PI/2;
   bandMesh.position.y=.012;
@@ -1710,15 +1710,15 @@ function createNativeHeroBritishBeret(rig){
   // A small muted insignia on the LEFT front, not a large metal plaque.
   const insignia=new THREE.Mesh(new THREE.BoxGeometry(.022,.033,.007),badge);
   insignia.name='BritishBeretSmallInsignia';
-  insignia.position.set(-.096,.038,.124);
+  insignia.position.set(-.086,.033,.118);
   insignia.rotation.z=-.14;
   insignia.castShadow=true;
   beret.add(insignia);
   const fold=new THREE.Mesh(
     new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
-      new THREE.Vector3(.151,.048,-.079),
-      new THREE.Vector3(.176,.057,-.013),
-      new THREE.Vector3(.165,.060,.062)
+      new THREE.Vector3(.139,.040,-.070),
+      new THREE.Vector3(.152,.052,-.012),
+      new THREE.Vector3(.146,.053,.061)
     ]),16,.0026,5,false),seam);
   fold.name='BritishBeretSubtleFeltFold';
   beret.add(fold);
