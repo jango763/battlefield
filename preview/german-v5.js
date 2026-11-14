@@ -1484,7 +1484,9 @@ function updateNativeHeroFieldUniform(rig){
     // Lower the cuff ~3.5 cm from the loose, helmet-like test fit.
     // Make the position relative to the animated head's own orientation.
     cap.position.y+=.143;
-    cap.position.add(new THREE.Vector3(0,0,.023).applyQuaternion(cap.quaternion));
+    // Measured donor-head scalp extends ~5-6 cm in front of the old wool
+    // geometry; place the knit cover across the forehead, not behind it.
+    cap.position.add(new THREE.Vector3(0,0,.050).applyQuaternion(cap.quaternion));
   }
 }
 
@@ -1515,10 +1517,10 @@ function createNativeHeroBritishKnitCap(rig){
     {r:.117,y:-.052,x:0},
     {r:.124,y:-.035,x:0},
     {r:.129,y:-.005,x:0},
-    {r:.129,y:.028,x:.001},
-    {r:.118,y:.069,x:.003},
-    {r:.091,y:.108,x:.004},
-    {r:.047,y:.137,x:.004}
+    {r:.129,y:.038,x:.001},
+    {r:.118,y:.085,x:.003},
+    {r:.091,y:.135,x:.004},
+    {r:.047,y:.190,x:.004}
   ];
   const vertices=[],triangles=[];
   for(let k=0;k<sections.length;k++){
@@ -1534,7 +1536,7 @@ function createNativeHeroBritishKnitCap(rig){
       }
     }
   }
-  const apex=vertices.length/3;vertices.push(.004,.145,0);
+  const apex=vertices.length/3;vertices.push(.004,.204,0);
   for(let i=0;i<segments;i++)
     triangles.push((sections.length-1)*segments+i,apex,
       (sections.length-1)*segments+(i+1)%segments);
@@ -1556,6 +1558,10 @@ function createNativeHeroBritishKnitCap(rig){
   ribGeo.setAttribute('position',new THREE.Float32BufferAttribute(ribVertices,3));
   const ribs=new THREE.LineSegments(ribGeo,ribWool);
   ribs.name='BritishKnitCap_CuffRibs';knitCap.add(ribs);
+  // A fitted wool cap must cover BOTH front hairline and rear crown. The
+  // donor skinned head is ~30 cm deep; the old 24 cm wool cover penetrated
+  // the face mesh and rendered only behind the scalp.
+  knitCap.scale.z=1.23;
   rig.visual.add(knitCap);
   u.knitCap=knitCap;
   u.headwear='British dark olive knitted cap';
