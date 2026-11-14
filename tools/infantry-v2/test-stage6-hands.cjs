@@ -121,6 +121,40 @@ if(process.argv.includes('--browser')){
         }
         assert(stats.gameUnaffected,'cosmetic arm fix changed combat attributes');
         await page.screenshot({path:'/tmp/stage6-hands-'+device.name+'-close.png'});
+        if(process.argv.includes('--probe')){
+          // Visual-only fixture: try alternate fore-end contact points without
+          // writing any experimental offsets into production game code.
+          await page.evaluate(()=>{
+            const original=selectNativeHeroWW2Weapon;
+            selectNativeHeroWW2Weapon=function(unit,rig){
+              const selected=original(unit,rig);
+              const delta=window.__stage6GripProbe;
+              if(delta&&unit.kind==='p'&&unit.side==='blue'&&(unit.wpn|0)===1&&
+                  rig.weapon.activeModelId==='uk-sten'){
+                rig.weapon.support.position.y+=delta.dy;
+                rig.weapon.support.position.z+=delta.dz;
+              }
+              return selected;
+            };
+          });
+          for(const cfg of [
+            {label:'A-current',dy:0,dz:0},
+            {label:'B-early',dy:.04,dz:.08},
+            {label:'C-mid',dy:.055,dz:.12},
+            {label:'D-fore',dy:.07,dz:.16},
+            {label:'E-outer',dy:.095,dz:.20},
+            {label:'F-original',dy:.11,dz:.24}
+          ]){
+            const grip=await page.evaluate(cfg=>{
+              window.__stage6GripProbe=cfg;P.sv=0;P.aim=0;P.wpn=1;
+              for(let j=0;j<35;j++)animateGermanSoldier(P,1/60);
+              return P.germanPreview.nativeRig.weapon.support.position.toArray();
+            },cfg);
+            await page.waitForTimeout(250);
+            await page.screenshot({path:'/tmp/stage6-grip-'+device.name+'-'+cfg.label+'.png'});
+            console.log('STAGE 6 GRIP PROBE',device.name,cfg.label,JSON.stringify(grip));
+          }
+        }
         console.log('STAGE 6 BROWSER PASS',device.name,JSON.stringify(stats));
         await page.close();
       }
