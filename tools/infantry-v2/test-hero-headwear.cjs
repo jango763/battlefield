@@ -101,6 +101,43 @@ if(process.argv.includes('--browser')){
             type:'jpeg',quality:72});
           console.log('KNIT_HEAD_CROP_BASE64',jpg.toString('base64'));
           console.log('KNIT_HEAD_SCREEN',JSON.stringify(screen));
+          // Render the existing skinned hero (not a mock-up) to an isolated
+          // studio canvas so buildings/HUD can't hide the headwear review.
+          const studio=await page.evaluate(()=>{
+            const rig=P.germanPreview.nativeRig,visual=rig.visual;
+            const oldParent=visual.parent;
+            const studioScene=new THREE.Scene();
+            studioScene.background=new THREE.Color(0x7d807b);
+            studioScene.add(new THREE.HemisphereLight(0xf8f4e8,0x55564a,1.2));
+            const key=new THREE.DirectionalLight(0xffffff,1.6);
+            key.position.set(1.6,3.4,2.2);studioScene.add(key);
+            const c=document.createElement('canvas');
+            const renderer2=new THREE.WebGLRenderer({
+              canvas:c,antialias:true,preserveDrawingBuffer:true
+            });
+            renderer2.setSize(300,300,false);
+            const camera2=new THREE.PerspectiveCamera(34,1,.01,50);
+            const images={};
+            try{
+              // Keep the exact Quaternius animated face and donor clothing;
+              // detach only for the duration of these synchronous renders.
+              studioScene.add(visual);
+              for(const [name,x,z] of [
+                ['front',0,1.55],['side',1.55,0],['back',0,-1.55]
+              ]){
+                camera2.position.set(x,2.32,z);
+                camera2.lookAt(0,2.29,0);
+                renderer2.render(studioScene,camera2);
+                images[name]=c.toDataURL('image/jpeg',.68).split(',')[1];
+              }
+            }finally{
+              if(oldParent)oldParent.add(visual);
+              renderer2.dispose();
+            }
+            return images;
+          });
+          for(const [view,data] of Object.entries(studio))
+            console.log('KNIT_STUDIO_'+view.toUpperCase()+'_BASE64',data);
         }
         const data=await page.evaluate(async type=>{
           const rig=P.germanPreview.nativeRig,uniform=rig.ww2Uniform;
