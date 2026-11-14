@@ -50,3 +50,16 @@ Feature branch commit `b48cee694c958a0e038f324ad887ae45d31e780f`, GitHub Actions
 - A1/B1/B2/B3 passed as single-soldier pilot in `feature/headwear-staged-hero-armies-20261114`.
 - Model-source license and binary GLB import are tracked separately in `feature/german-m34-external-glb-loader-20261114`; model not yet acquired.
 - The approved `main` hero remains the working version while the army pilot is tested.
+
+## Second checkpoint — German four-soldier squad (staging only)
+
+**Branch:** `feature/army-four-squad-stylized-20261114`  
+**Mobile Chromium QA:** run `43584325528`, commit `bde34a267150488d11b5b8373390bc56fa15128c` — passed.
+
+- `?armyRig=squad` migrates **at most four** German regular infantrymen to independent Quaternius skeletons and native idle/jog/sprint clips.
+- Three deterministic headwear variants: field-grey pilotka V19, existing MIT-licensed German M43 GLB, and original skinned WW2 helmet. British beret does not appear on German units.
+- Four independent skeletons with 65 bones each and 52 WW2 uniform retarget bindings; current game orders, unit x/z and damage rules stay unchanged.
+- Mobile Chromium initially exposed **21.6 cm** left hand–weapon reach error. The support contact now adjusts along the gun fore-end: maximum **4.4 cm** in jogging, **1.2 cm** in sprint and approximately zero in idle/aim test samples.
+- Shared weapon GLB parsing/material/geometry cut test renderer geometry count from **742 to 677** (roughly **8.8%**). This is a comparable Chromium render-memory indicator, **not an iPhone FPS or RAM measurement**.
+- Original `main` unchanged. **Visual acceptance still pending**: M43 fit, close-up finger positions, Safari stability and 4-soldier readability.
+- Next gate: real iPhone Safari, screenshot front/3⁄4/back under locomotion, FPS and memory checks, then expansion beyond four only if successful.
