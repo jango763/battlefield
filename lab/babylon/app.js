@@ -73,16 +73,28 @@ async function start(){
  const manifest=await fetch(new URL('../../assets/ww2-weapons/manifest.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('manifest HTTP '+r.status);return r.json();});
  const toVec=a=>new B.Vector3(...a);
  const positionOf=node=>node?.getAbsolutePosition?.()||B.Vector3.Zero();
- const targetAt=(node,target,strength)=>{
-  if(!node||!target)return;
-  const parent=node.parent;
-  if(!parent)return;
-  const joint=positionOf(node);
-  const direction=target.subtract(joint);
-  if(direction.lengthSquared()<.0001)return;
-  // Procedural shoulder alignment will be refined with two-bone IK.
-  // Keep native rotation when the rig has no reliable local arm axis.
- };
+ // Static combat pose: CCD only while the fourth button is selected.
+ function aimJoint(joint,hand,target){
+  if(!joint||!hand||!joint.parent)return;
+  joint.computeWorldMatrix(true);hand.computeWorldMatrix(true);
+  const pivot=joint.getAbsolutePosition();
+  const from=hand.getAbsolutePosition().subtract(pivot).normalize();
+  const to=target.subtract(pivot).normalize();
+  const axis=B.Vector3.Cross(from,to);
+  const length=axis.length();
+  if(length<1e-5)return;
+  const angle=Math.min(Math.atan2(length,B.Vector3.Dot(from,to)),.24);
+  const parentRotation=new B.Quaternion();
+  joint.parent.computeWorldMatrix(true).decompose(undefined,parentRotation,undefined);
+  const localAxis=B.Vector3.TransformNormal(axis.scale(1/length),B.Matrix.FromQuaternion(parentRotation.conjugate())).normalize();
+  const q=B.Quaternion.RotationAxis(localAxis,angle);
+  const original=joint.rotationQuaternion||B.Quaternion.FromEulerAngles(joint.rotation.x,joint.rotation.y,joint.rotation.z);
+  joint.rotationQuaternion=q.multiply(original).normalize();
+ }
+ function poseArm(upper,lower,hand,target){
+  if(!upper||!lower||!hand)return;
+  for(let i=0;i<8;i++){aimJoint(lower,hand,target);aimJoint(upper,hand,target);}
+ }
  function updateWeaponPose(){
   if(!weaponRoot||!grip)return;
   // Use a stable chest socket rather than a swinging animated hand.
@@ -92,11 +104,12 @@ async function start(){
   const combat=mode==='combat';
   grip.position.set(combat?.12:.24,combat?-.10:(isSprint?-.24:-.16),combat?.28:(isSprint?.24:.36));
   grip.rotationQuaternion=null;
-  grip.rotation.set(combat?0:(isSprint?.19:.04),combat?0:(isSprint?-.19:-.08),combat?0:(isSprint?-.15:0));
+  grip.rotation.set(combat?-1.15:(isSprint?.19:.04),combat?0:(isSprint?-.19:-.08),combat?0:(isSprint?-.15:0));
   // Record grip-point errors for next IK pass without mutating working animations.
   const trigger=weaponRoot.getAbsolutePosition();
-  const support=toVec(grip.metadata?.support||[0,0,.25]);
+  const support=toVec(weaponRoot.metadata?.support||[0,0,.25]);
   const supportWorld=B.Vector3.TransformCoordinates(support,weaponRoot.getWorldMatrix());
+  if(combat){poseArm(rightUpper,rightLower,rightHand,trigger);poseArm(leftUpper,leftLower,leftHand,supportWorld);}
   state.gripDistances={
    right:rightHand?Number(B.Vector3.Distance(positionOf(rightHand),trigger).toFixed(3)):null,
    left:leftHand?Number(B.Vector3.Distance(positionOf(leftHand),supportWorld).toFixed(3)):null
@@ -110,7 +123,7 @@ async function start(){
    const url=new URL('../../assets/ww2-weapons/'+meta.file,import.meta.url);
    const incoming=await B.SceneLoader.LoadAssetContainerAsync('',url.href,scene);
    if(generation!==weaponGeneration){incoming.dispose();return;}
-   if(weaponRoot){weaponRoot.dispose(false,false);weaponRoot=null;}
+   if(grip){grip.dispose(false,false);grip=null;weaponRoot=null;}
    if(weaponContainer){weaponContainer.dispose();weaponContainer=null;}
    weaponContainer=incoming;weaponContainer.addAllToScene();
    if(!chest)throw Error('Грудная кость не найдена: '+modelTargets.map(n=>n.name).filter(n=>/spine|chest/i.test(n)).join(', '));
@@ -135,7 +148,7 @@ async function start(){
  }
  for(const btn of document.querySelectorAll('[data-clip]'))btn.addEventListener('click',()=>select(btn.dataset.clip));
  select('idle');await equipWeapon(weaponSelect.value);state.ready=true;state.scene=scene;state.engineInstance=engine;
- engine.runRenderLoop(()=>{updateWeaponPose();scene.render();state.fps=Math.round(engine.getFps());});
+ engine.runRenderLoop(()=>{try{updateWeaponPose();}catch(e){state.poseError=String(e);console.error('Combat pose',e);}scene.render();state.fps=Math.round(engine.getFps());});
  window.addEventListener('resize',()=>engine.resize());
 }
 start().catch(err=>{state.error=String(err?.stack||err);log('ОШИБКА: '+state.error);console.error(err);});
