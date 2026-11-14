@@ -1092,7 +1092,7 @@ function loadNativeHeroSideCap(rig){
   // ?pilotka=classic retains the old source mesh for A/B inspection.
   if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
     const cap=new THREE.Group();
-    cap.name='GermanPilotka_Schiffchen_V13';
+    cap.name='GermanPilotka_Schiffchen_V15_Narrow';
     cap.userData.proceduralPilotka=true;
     // Narrow cloth Schiffchen silhouette, not an inflated beret.
     // Five cross-sections follow the scalp, with a pointed folded crest.
@@ -1112,7 +1112,7 @@ function loadNativeHeroSideCap(rig){
     for(let i=0;i<steps;i++){
       const theta0=-1.32+(2.64*i/steps),theta1=-1.32+(2.64*(i+1)/steps);
       // Fold follows the actual cap nose, not a tall outward cylinder.
-      const point=(a,y)=>[.151*Math.sin(a),y,(.200-(y-.190)*.20)*Math.cos(a)+.003];
+      const point=(a,y)=>[.129*Math.sin(a),y,(.200-(y-.190)*.20)*Math.cos(a)+.003];
       const v0=point(theta0,.185),v1=point(theta1,.185),
         w0=point(theta0,.250),w1=point(theta1,.250);
       facing.push(...v0,...v1,...w1,...v0,...w1,...w0);
@@ -1132,10 +1132,10 @@ function loadNativeHeroSideCap(rig){
       {z:.134,w:.112,b:.166,s:.251,t:.278},
       {z:.194,w:.054,b:.180,s:.247,t:.254}
     ];
-    // 5% extra breadth along the rim; crest stays low and boat-shaped.
-    // Radius changes affect this German cap only.
-    for(const section of stations)section.w*=1.05;
-    liner.scale.x*=1.05;
+    // Bring the German sidecap 15% closer to the temples. Leave its
+    // front-to-back length and height untouched to keep the scalp covered.
+    for(const section of stations)section.w*=.89;
+    liner.scale.x*=.89;
     const bands={side:[],roof:[],top:[]};
     const quad=(into,p,q,r,t)=>into.push(...p,...q,...r,...p,...r,...t);
     for(let i=0;i<stations.length-1;i++){
@@ -1182,7 +1182,7 @@ function loadNativeHeroSideCap(rig){
       cap.add(new THREE.Mesh(geo,sideCloth));
     }
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German fitted Schiffchen V13';
+    u.cap=cap;u.headwear='German fitted Schiffchen V15 narrow';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
