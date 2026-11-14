@@ -1825,7 +1825,9 @@ function loadGermanSoldierPreview(){
         prepareSoldierGeometry(figure);
         germanPreview.template=figure;germanPreview.bounds=bounds;
         const queue=[P,...U,...germanPreview.pending];germanPreview.pending.length=0;
-        for(const u of queue)if(u.hp>0)attachGermanSoldier(u);
+        // Once the first-frame deadline has expired, preserve the fallback
+        // hero instead of showing a delayed donor model swap during combat.
+        for(const u of queue)if(u.hp>0&&(u!==P||heroStartupGate.pending()))attachGermanSoldier(u);
         nativeHeroLoad();
         refreshGermanPreviewLabel();
       }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');heroStartupGate.finish('parse-fallback');}
