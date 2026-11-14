@@ -2,6 +2,57 @@
 // Gameplay, damage and input stay in the original game.
 // Model: britdawgmasterfunk, CC BY 4.0; see assets/soldiers/CREDITS.md.
 const creditsLink=document.createElement('a');creditsLink.textContent='Авторы моделей';creditsLink.href='../assets/soldiers/CREDITS.md';creditsLink.target='_blank';creditsLink.rel='noopener';creditsLink.style.cssText='position:fixed;z-index:23;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 113px);font:10px Arial;color:#e7dec8;background:#20251dcc;padding:3px 5px';document.body.appendChild(creditsLink);
+// Display the accepted native hero only after its first fully dressed,
+// armed animated frame. Before then an opaque mask hides provisional figures.
+const heroStartupGate=(()=>{
+  const cover=document.getElementById('hero-startup-cover');
+  const label=document.getElementById('hero-startup-text');
+  const params=new URLSearchParams(location.search);
+  let phase=cover?'loading':'disabled',timer=0;
+  const req=Number(params.get('startupTimeoutMs'));
+  const maxWait=Number.isFinite(req)&&req>=500?
+    THREE.MathUtils.clamp(req,500,30000):20000;
+  const close=()=>{
+    if(!cover)return;
+    cover.style.opacity='0';cover.style.pointerEvents='none';
+    setTimeout(()=>cover.remove(),180);
+  };
+  const finish=(state,msg)=>{
+    if(phase!=='loading')return false;
+    phase=state;clearTimeout(timer);
+    if(label)label.textContent=msg;close();
+    return true;
+  };
+  const gate={
+    get phase(){return phase;},
+    ready(){return finish('native','Герой готов');},
+    fallback(reason){
+      const changed=finish('fallback','Резервная модель');
+      if(changed)console.warn('Hero start fallback:',reason);
+      return changed;
+    },
+    afterFrame(unit,rig){
+      if(phase!=='loading'||unit.kind!=='p'||!rig?.weapon||!rig.ww2Uniform)return;
+      if(rig.ww2Uniform.side!==(unit.side==='red'?'red':'blue'))return;
+      if(params.get('headwear')!=='none'&&
+          (!rig.ww2Uniform.headwear||rig.ww2Uniform.headwear==='none'))return;
+      const slot=Math.max(0,Math.min(5,unit.wpn|0));
+      if(slot<4){
+        const keys=unit.side==='red'?
+          ['de-kar98k','de-mp40','de-mg42','de-kar98k']:
+          ['uk-lee-enfield','uk-sten','uk-bren','uk-lee-enfield'];
+        if(rig.weapon.activeModelId!==keys[slot])return;
+      }
+      this.ready();
+    }
+  };
+  if(cover){
+    timer=setTimeout(()=>gate.fallback('Native assets timed out at '+maxWait+'ms'),maxWait);
+    if(params.get('rig')==='original')gate.fallback('Original rig selected');
+  }
+  window.__heroStartupGate=gate;
+  return gate;
+})();
 const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null,visualSequence:0};
 function germanPreviewLabel(message){const e=document.getElementById('german-preview-status');if(e){e.hidden=!message;if(e.textContent!==message)e.textContent=message;}}
 // Wehrmacht-wide visual rollout. Only the German visual tier changes; the
@@ -223,6 +274,8 @@ function makeGermanWeapon(){
   root.name='GermanWeapon';return{root,flash,rear,front,rifle,machineGun,launcher,scope,magazine,barrel};
 }
 function attachGermanSoldier(unit){
+  // Never swap the fallback hero again after a delayed model download.
+  if(unit.kind==='p'&&heroStartupGate.phase==='fallback')return;
   if(unit.germanPreview||unit.hp<=0)return;
   if(!germanPreview.template){if(!germanPreview.pending.includes(unit))germanPreview.pending.push(unit);return;}
   let figure;
@@ -1786,11 +1839,12 @@ function loadNativeHeroSideCap(rig){
 }
 
 function nativeHeroLoad(){
+  if(heroStartupGate.phase==='fallback')return;
   const oldMode=new URLSearchParams(location.search).get('rig')==='original';
-  if(oldMode){nativeHeroLabel('СТАРЫЙ СКЕЛЕТ: выбран для сравнения. Новая модель отключена.');return;}
+  if(oldMode){heroStartupGate.fallback('Old rig selected');nativeHeroLabel('СТАРЫЙ СКЕЛЕТ: выбран для сравнения. Новая модель отключена.');return;}
   if(germanPreview.nativeHeroRequested)return;
   germanPreview.nativeHeroRequested=true;
-  if(typeof THREE.GLTFLoader!=='function'){nativeHeroLabel('ОШИБКА: нет загрузчика GLTFLoader. Используется старая модель.');return;}
+  if(typeof THREE.GLTFLoader!=='function'){heroStartupGate.fallback('No GLTFLoader');nativeHeroLabel('ОШИБКА: нет загрузчика GLTFLoader. Используется старая модель.');return;}
   nativeHeroLabel('СКЕЛЕТ v17: облегчённые GLB 1,5 МБ — начинаю загрузку.');
   // Try GitHub raw first, then a pinned jsDelivr mirror. Errors are
   // visible instead of silently falling back to the unchanged hero.
@@ -1821,6 +1875,8 @@ function nativeHeroLoad(){
     throw new Error(name+': '+(lastError&&lastError.message||'оба источника недоступны'));
   };
   Promise.all([loadFile('night-striker-lite.glb'),loadFile('hero-three-clips-lite.glb')]).then(([character,library])=>{
+    // A timed-out load must not swap the hero after showing the fallback.
+    if(heroStartupGate.phase==='fallback')return;
     const unit=P,v=unit&&unit.germanPreview;
     if(!v||v.role!=='hero'||v.nativeRig)throw new Error('Нет подготовленного героя');
     const model=character.scene;
@@ -1908,6 +1964,7 @@ function nativeHeroLoad(){
     }
   }).catch(e=>{
     console.warn('Native hero rig fallback to original:',e);
+    heroStartupGate.fallback(e?.message||String(e));
     nativeHeroLabel('ОШИБКА СКЕЛЕТА v17: прежний герой. Причина: '+e.message);
   });
 }
@@ -1926,6 +1983,7 @@ function animateNativeHeroRig(unit,v,dt){
   r.mixer.update(THREE.MathUtils.clamp(Number.isFinite(dt)?dt:0,0,.08));
   updateNativeHeroWeapon(unit,v,r,dt);
   updateNativeHeroFieldUniform(r);
+  heroStartupGate.afterFrame(unit,r);
   unit.g.position.set(unit.x,0,unit.z);
   unit.g.rotation.x=0;unit.g.rotation.z=0;
   if(speed<.6&&unit.aim>0&&unit.aimT!=null){
