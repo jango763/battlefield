@@ -26,6 +26,7 @@ Baseline: `main`, last approved hero/cap close-up V19. **Do not overwrite it unt
 - [ ] D1. Reuse approved native animation library / soldier rig with side-correct clothing, skin and weapon manifest.
 - [ ] D2. British Brodie helmets with/without camouflage for ordinary troops; maroon berets only for airborne/appropriate elite roles, other caps for support troops.
 - [ ] D3. Verify UI faction switch, all roles, running, firing, projectiles, no clipping or weapon-hand mismatch; 30+ FPS on representative iPhone.
+- [ ] D4. Final cross-faction release regression on iPhone Safari and desktop: 3–4 person squads, all four headgear categories, smoke/fire effects, memory and user acceptance, then merge branch to main.
 
 ## Release gates
 
