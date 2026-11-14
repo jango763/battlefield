@@ -68,3 +68,12 @@
 - Chromium desktop/mobile: [run 43629296614](https://github.com/jango763/battlefield/actions/runs/43629296614) passed. Screenshot artifact: [stage5 beret inspection](https://github.com/jango763/battlefield/actions/runs/43629296614/artifacts/14126489386).
 - Remaining: the British tunic appears too pale/near-white in actual screenshot; grip error under jogging is ~0.177 m and needs separate arm/weapon IK work in stage 8. Real iPhone Safari not yet validated.
 - Status: awaiting visual approval, `main` unchanged. Do not mark whole stage 5 complete: German knitted cap also remains.
+
+## Emergency visual hotfix: four hands (2026-11-14)
+- Source screenshot showed extra hand geometry over British STEN and outward-twisted, unnatural wrists; work branched from unmerged stage-5 preview, `feature/hero-hands-dedup-20261114`.
+- Removed obsolete baked `NativeQuaterniusSupportPalm` mesh generator entirely. The original Quaternius skinned mesh remains hidden, and the WW2 donor costume alone draws its own two gloves.
+- Compared 6 STEN fore-end positions and 8 hand-roll calibrations with staged Chromium screenshots; adopted the intermediate actual fore-end contact and British hero only mirrored wrist X rotations (left +0.8, right -0.8 radians). No edits to projectile/rules/camera/squad logic.
+- New `?inspect=hands` preview mode chooses British STEN and close-up camera without affecting normal gameplay camera.
+- Automated test `tools/infantry-v2/test-stage6-hands.cjs` checks no spare hands, original source meshes hidden, left/right donor bone wrists, idle, aim, jog, sprint, rifle-to-STEN switch and zero gameplay state mutations.
+- Verified desktop and mobile Chromium: [CI run 43631630343](https://github.com/jango763/battlefield/actions/runs/43631630343). This is *not* real iPhone Safari validation.
+- The remaining fine finger sculpt/hand pose and arm ergonomics belong to the later arm/weapon stage; the screenshot still has low-poly fingers and the British tunic remains too pale. Keep `main` unchanged until user visual acceptance.
