@@ -748,11 +748,10 @@ function selectNativeHeroWW2Weapon(unit,rig){
     // MG42 original forward contact was beyond reach in the aimed pose.
     if(rig.armyUnit&&key==='de-mg42')w.support.position.z-=.09;
     if(key==='uk-sten'&&!rig.armyUnit){
-      // The old +8 cm forward/+5.5 cm upward wrist target put the British
-      // support palm next to the muzzle and above the barrel. It looked like
-      // a second detached hand. Support the STEN from BELOW, nearer its
-      // receiver/fore-end and clear of the muzzle. Visual IK only.
-      w.support.position.add(new THREE.Vector3(0,-.055,-.16));
+      // Visual comparison of six grip positions showed the best fit with
+      // the left palm on the STEN perforated barrel shroud: far enough out
+      // of the jacket cuff, safely behind the muzzle. No extra hand mesh.
+      w.support.position.add(new THREE.Vector3(0,.015,0));
     }else if(key==='de-mp40'||key==='uk-sten'){
       // Preserve approved German and regular-army contacts unchanged.
       const testOffset=window.__ww2SupportOffset||{x:0,y:.055,z:.08};
@@ -1450,13 +1449,13 @@ function updateNativeHeroFieldUniform(rig){
         :(side==='right'?-.12:.18); // British mirrored natural wrists; no -0.85 rad double twist
       handLocalQ[side].multiply(new THREE.Quaternion().setFromAxisAngle(
         new THREE.Vector3(0,0,1),roll));
-      // Strictly diagnostic: visual comparison of anatomical wrist axes in
-      // the hands inspection view, never active during normal RTS play.
-      const handProbe=uniform.side==='blue'&&!rig.armyUnit&&
-        new URLSearchParams(location.search).get('inspect')==='hands'
-        ?window.__stage6WristProbe?.[side]:null;
-      if(handProbe)handLocalQ[side].multiply(new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(handProbe.x||0,handProbe.y||0,handProbe.z||0,'XYZ')));
+      // Real British STEN grip, calibrated against screenshot variants:
+      // the right hand wraps down onto the pistol grip while the left palm
+      // cups the fore-end. Apply only to the player's SMG so rifle/MG and
+      // regular infantry retain their previous weapon pose.
+      if(uniform.side==='blue'&&!rig.armyUnit&&(P?.wpn|0)===1)
+        handLocalQ[side].multiply(new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(1,0,0),side==='right' ? -.8 : .8));
     }
     const local=bone=>vis.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
     const right=local(arms.right.upper),left=local(arms.left.upper);
