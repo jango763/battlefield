@@ -101,6 +101,10 @@ if(process.argv.includes('--browser')){
           assert.equal(state.state,mode);
           joints.push({mode,...state});
           await page.screenshot({path:'/tmp/muster-rig-'+device.name+'-'+mode+'.png'});
+          // Source-derived visual check, not a synthetic character rendering.
+          const jpg=await page.screenshot({type:'jpeg',quality:57});
+          console.log('MUSTER_RIG_FRAME_'+device.name.toUpperCase().replace('-','_')+
+            '_'+mode.toUpperCase()+' '+jpg.toString('base64'));
         }
         const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
         const footTravel=Math.max(distance(joints[0].foot,joints[1].foot),
