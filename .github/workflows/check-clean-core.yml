@@ -1,0 +1,47 @@
+name: Clean core armies · no Muster trial
+on:
+  push:
+    branches: [feature/core-armies-clean-20261114]
+    paths:
+      - preview/german-v5.js
+      - preview/formation-replenishment-v3.html
+      - tools/infantry-v2/test-clean-core.cjs
+      - docs/CORE-CONTINUATION.md
+      - .github/workflows/check-clean-core.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  clean-core-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure Muster models absent and game JavaScript syntax valid
+        run: |
+          node --check preview/german-v5.js
+          node tools/infantry-v2/test-clean-core.cjs
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs
+          node tools/infantry-v2/test-british-pilot.cjs
+          node tools/infantry-v2/test-hero-headwear.cjs
+      - name: Install Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/british-pilot playwright@1.58.2
+          npm install --no-audit --no-fund --prefix /tmp/wehrmacht-qa playwright@1.58.2
+          /tmp/british-pilot/node_modules/.bin/playwright install chromium
+      - name: Run game server and verify all supported army visual modes
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/clean-core-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs --browser
+          node tools/infantry-v2/test-british-pilot.cjs --browser
+          node tools/infantry-v2/test-hero-headwear.cjs --browser
+      - name: Preserve screenshots for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clean-core-wehrmacht-british-preview
+          path: |
+            /tmp/wehrmacht-*.png
+            /tmp/british-four-pilot.png
+          if-no-files-found: ignore
