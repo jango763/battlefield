@@ -207,6 +207,25 @@ jobs:
               if(!result.stats.manifestShared||
                 Object.values(result.stats.ww2Loads).some(n=>n!==1))
                 result.errors.push('duplicated WW2 GLB parsing/manifest '+JSON.stringify(result.stats));
+              // The shareable four-man inspection URL should actually
+              // spawn and frame the squad without manual test-console calls.
+              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html?armyRig=squad&inspect=squad',
+                {waitUntil:'domcontentloaded',timeout:45000});
+              await page.waitForFunction(()=>{
+                try{return !!window.__squadReview&&window.__squadReview.length===4
+                  &&(germanPreview.armyNativeInstalled||0)===4;}catch(e){return false}
+              },null,{timeout:120000});
+              await page.waitForTimeout(700);
+              result.userPreview=await page.evaluate(()=>({
+                count:window.__squadReview?.length,
+                title:document.body.textContent.includes('ТЕСТ ОТРЯДА'),
+                faction:P.side,
+                rigged:window.__squadReview?.filter(u=>!!u.germanPreview?.nativeRig)?.length
+              }));
+              if(result.userPreview.count!==4||result.userPreview.rigged!==4||
+                !result.userPreview.title||result.userPreview.faction!=='red')
+                result.errors.push('broken shareable squad preview '+JSON.stringify(result.userPreview));
+              await page.screenshot({path:'/tmp/army-four-user-preview.png'});
               result.success=result.errors.length===0;
             }catch(e){result.errors.push('exception '+e.stack)}
             finally{
@@ -225,4 +244,5 @@ jobs:
           path: |
             /tmp/army-four-qa.json
             /tmp/army-four-*.png
+            /tmp/army-four-user-preview.png
           if-no-files-found: warn
