@@ -3,6 +3,37 @@
 // Model: britdawgmasterfunk, CC BY 4.0; see assets/soldiers/CREDITS.md.
 const creditsLink=document.createElement('a');creditsLink.textContent='Авторы моделей';creditsLink.href='../assets/soldiers/CREDITS.md';creditsLink.target='_blank';creditsLink.rel='noopener';creditsLink.style.cssText='position:fixed;z-index:23;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 113px);font:10px Arial;color:#e7dec8;background:#20251dcc;padding:3px 5px';document.body.appendChild(creditsLink);
 const germanPreview={template:null,pending:[],bounds:null,materials:new Map(),error:null,visualSequence:0};
+
+// The page loader already covered HTML assembly. Keep the first rendered
+// game frame behind a short startup gate until the approved hero rig is posed.
+// This prevents a visible original -> donor -> native animation/model swap.
+// There is NO persistent "loading new hero" badge above gameplay controls.
+const heroStartupGate=(()=>{
+  const oldMode=new URLSearchParams(location.search).get('rig')==='original';
+  if(oldMode)return {pending:()=>false,finish:()=>false};
+  const cover=document.createElement('div');
+  cover.id='hero-startup-gate';
+  cover.setAttribute('role','status');
+  cover.setAttribute('aria-live','polite');
+  cover.style.cssText='position:fixed;inset:0;z-index:99998;background:#20251d;color:#f5eedc;display:flex;align-items:center;justify-content:center;text-align:center;font:700 16px Arial,sans-serif;pointer-events:auto';
+  cover.textContent='Подготовка боя…';
+  document.body.appendChild(cover);
+  let ready=false;
+  let timer;
+  const finish=(reason)=>{
+    if(ready)return false;
+    ready=true;
+    clearTimeout(timer);
+    germanPreview.startupHeroReady=reason;
+    cover.remove();
+    return true;
+  };
+  // Never trap a player behind loading when mobile GLB sources are unavailable.
+  // If the deadline expires, keep the stable existing rig; suppress late swaps.
+  timer=setTimeout(()=>finish('timeout-fallback'),10000);
+  return {pending:()=>!ready,finish};
+})();
+
 function germanPreviewLabel(message){const e=document.getElementById('german-preview-status');if(e){e.hidden=!message;if(e.textContent!==message)e.textContent=message;}}
 // Wehrmacht-wide visual rollout. Only the German visual tier changes; the
 // original unit simulation, weapon damage, movement and AI are untouched.
@@ -1626,10 +1657,10 @@ function loadNativeHeroSideCap(rig){
 
 function nativeHeroLoad(){
   const oldMode=new URLSearchParams(location.search).get('rig')==='original';
-  if(oldMode){nativeHeroLabel('СТАРЫЙ СКЕЛЕТ: выбран для сравнения. Новая модель отключена.');return;}
+  if(oldMode){nativeHeroLabel('СТАРЫЙ СКЕЛЕТ: выбран для сравнения. Новая модель отключена.');heroStartupGate.finish('original');return;}
   if(germanPreview.nativeHeroRequested)return;
   germanPreview.nativeHeroRequested=true;
-  if(typeof THREE.GLTFLoader!=='function'){nativeHeroLabel('ОШИБКА: нет загрузчика GLTFLoader. Используется старая модель.');return;}
+  if(typeof THREE.GLTFLoader!=='function'){nativeHeroLabel('ОШИБКА: нет загрузчика GLTFLoader. Используется старая модель.');heroStartupGate.finish('no-loader-fallback');return;}
   nativeHeroLabel('СКЕЛЕТ v17: облегчённые GLB 1,5 МБ — начинаю загрузку.');
   // Try GitHub raw first, then a pinned jsDelivr mirror. Errors are
   // visible instead of silently falling back to the unchanged hero.
@@ -1660,6 +1691,9 @@ function nativeHeroLoad(){
     throw new Error(name+': '+(lastError&&lastError.message||'оба источника недоступны'));
   };
   Promise.all([loadFile('night-striker-lite.glb'),loadFile('hero-three-clips-lite.glb')]).then(([character,library])=>{
+    // A network timeout may have exposed the fallback. Never replace it
+    // several seconds into a live battle, creating another visible pop.
+    if(!heroStartupGate.pending())return;
     const unit=P,v=unit&&unit.germanPreview;
     if(!v||v.role!=='hero'||v.nativeRig)throw new Error('Нет подготовленного героя');
     const model=character.scene;
@@ -1734,7 +1768,11 @@ function nativeHeroLoad(){
       marker.position.set(0,2.92,0);
       marker.renderOrder=120;
       if(new URLSearchParams(location.search).has('rigdebug'))visual.add(marker);
+      // Apply the correct animation and equipment BEFORE the first visible
+      // render; do not show idle first and cross-fade to the real state later.
+      animateNativeHeroRig(unit,v,0);
       nativeHeroLabel('НОВЫЙ СКЕЛЕТ v17: АКТИВЕН ✓ '+nativeHeroOrigins['night-striker-lite.glb']+' + '+nativeHeroOrigins['hero-three-clips-lite.glb']+'. Полевая форма.');
+      heroStartupGate.finish('native');
       console.info('Quaternius native hero rig ready',{
         skeletonBones:bones.size,skinnedMeshes:meshCount,clips:Object.keys(actions)
       });
@@ -1748,6 +1786,7 @@ function nativeHeroLoad(){
   }).catch(e=>{
     console.warn('Native hero rig fallback to original:',e);
     nativeHeroLabel('ОШИБКА СКЕЛЕТА v17: прежний герой. Причина: '+e.message);
+    heroStartupGate.finish('load-fallback');
   });
 }
 function animateNativeHeroRig(unit,v,dt){
@@ -1775,7 +1814,7 @@ function animateNativeHeroRig(unit,v,dt){
   return true;
 }
 function loadGermanSoldierPreview(){
-  if(typeof THREE.GLTFLoader!=='function'){germanPreviewLabel('Модель недоступна — исходные бойцы');return;}
+  if(typeof THREE.GLTFLoader!=='function'){germanPreviewLabel('Модель недоступна — исходные бойцы');heroStartupGate.finish('no-loader-fallback');return;}
   try{
     const base64=document.getElementById('preview-german-glb').textContent.trim(),bytes=Uint8Array.from(atob(base64),c=>c.charCodeAt(0));
     new THREE.GLTFLoader().parse(bytes.buffer,'',gltf=>{
@@ -1789,8 +1828,8 @@ function loadGermanSoldierPreview(){
         for(const u of queue)if(u.hp>0)attachGermanSoldier(u);
         nativeHeroLoad();
         refreshGermanPreviewLabel();
-      }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');}
-    },e=>{console.error(e);germanPreviewLabel('Ошибка загрузки — исходные бойцы');});
-  }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');}
+      }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');heroStartupGate.finish('parse-fallback');}
+    },e=>{console.error(e);germanPreviewLabel('Ошибка загрузки — исходные бойцы');heroStartupGate.finish('model-fallback');});
+  }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');heroStartupGate.finish('model-fallback');}
 }
 setTimeout(loadGermanSoldierPreview,200);
