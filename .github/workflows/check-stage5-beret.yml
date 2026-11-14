@@ -1,0 +1,40 @@
+name: Stage 5 British beret shape and fit QA
+on:
+  push:
+    branches: [feature/stage5-beret-fit-20261114]
+    paths:
+      - 'preview/german-v5.js'
+      - 'preview/formation-replenishment-v3.html'
+      - 'tools/infantry-v2/test-stage5-beret.cjs'
+      - '.github/workflows/check-stage5-beret.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  beret:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static JS and side-specific regression checks
+        run: |
+          node tools/infantry-v2/test-stage2-startup.cjs
+          node tools/infantry-v2/test-stage4-british-hero.cjs
+          node tools/infantry-v2/test-stage5-beret.cjs
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs
+      - name: Install desktop/mobile Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage5-qa playwright@1.58.2
+          /tmp/stage5-qa/node_modules/.bin/playwright install --with-deps chromium
+      - name: Test new beret geometry, head rotation and motion on browsers
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/stage5-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-stage5-beret.cjs --browser
+      - name: Archive front and three-quarter images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage5-beret-inspection
+          path: /tmp/stage5-beret-*.png
+          if-no-files-found: warn
