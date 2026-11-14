@@ -188,8 +188,17 @@ jobs:
                 loadedM43:germanPreview.armyM43Loaded||0,
                 canvasCount:document.querySelectorAll('canvas').length,
                 webglMemory:typeof R!=='undefined'&&R.info?R.info.memory:null,
+                ww2Loads:Object.fromEntries(germanPreview.ww2Resources?.parseCounts||[]),
+                manifestShared:(()=>{
+                  const rigs=germanPreview.armySquad.map(u=>u.germanPreview.nativeRig);
+                  const manifests=rigs.map(r=>r.weapon.ww2Manifest).filter(Boolean);
+                  return manifests.length===4&&manifests.every(m=>m===manifests[0]);
+                })(),
                 errors:germanPreview.armyPilotError||null
               }));
+              if(!result.stats.manifestShared||
+                Object.values(result.stats.ww2Loads).some(n=>n!==1))
+                result.errors.push('duplicated WW2 GLB parsing/manifest '+JSON.stringify(result.stats));
               result.success=result.errors.length===0;
             }catch(e){result.errors.push('exception '+e.stack)}
             finally{
