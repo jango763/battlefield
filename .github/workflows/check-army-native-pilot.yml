@@ -6,7 +6,7 @@ on:
       - preview/german-v5.js
       - preview/formation-replenishment-v3.html
       - docs/INFANTRY-MODERNIZATION-STAGES.md
-      - .github/workflows/check-army-four-qa.yml
+      - .github/workflows/check-army-native-pilot.yml
 permissions:
   contents: read
 jobs:
