@@ -1702,7 +1702,7 @@ function createNativeHeroBritishBeret(rig){
   bandMesh.name='BritishBeretCloseFitBand';
   bandMesh.rotation.x=Math.PI/2;
   bandMesh.position.y=.012;
-  bandMesh.scale.z=.92;
+  bandMesh.scale.y=.92; // local Y becomes head-forward Z after band rotation
   bandMesh.castShadow=true;
   beret.add(bandMesh);
   // A small muted insignia on the LEFT front, not a large metal plaque.
