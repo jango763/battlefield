@@ -105,7 +105,8 @@ function solveArm(root,upper,lower,hand,endLocal,poleLocal){
  direction.multiplyScalar(1/Math.max(d0,1e-6));
  const d=THREE.MathUtils.clamp(d0,Math.abs(lengthA-lengthB)+1e-5,lengthA+lengthB-1e-5);
  const along=(lengthA*lengthA-lengthB*lengthB+d*d)/(2*d);
- const bend=pole.sub(a).addScaledVector(direction,-pole.sub(a).dot(direction));
+ const bend=pole.sub(a);
+ bend.addScaledVector(direction,-bend.dot(direction));
  if(bend.lengthSq()<1e-8)bend.set(0,0,1).cross(direction);
  bend.normalize();
  const elbow=a.clone().addScaledVector(direction,along).addScaledVector(
