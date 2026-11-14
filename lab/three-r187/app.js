@@ -82,18 +82,26 @@ function boxScaleToHeight(model,height){
 function colorWw2Donor(model,side){
  model.traverse(n=>{
   if(!n.isSkinnedMesh)return;
-  const name=n.material?.name||'';
+  // Cache per-faction materials, do not progressively recolor the same
+  // texture every time the viewer switches faction in the lab.
+  n.userData.rigLabBaseMaterial??=n.material;
+  n.userData.rigLabMaterials??={};
+  const base=n.userData.rigLabBaseMaterial;
+  const name=Array.isArray(base)?base.map(m=>m.name).join(' '):base?.name||'';
   n.visible=!/helmet|scrim/i.test(name);
   n.castShadow=true;n.receiveShadow=true;n.frustumCulled=false;
   if(!n.visible)return;
-  const tint=side==='red'?0x5e695e:0xc7b798;
-  const adjust=m=>{
-    const out=m.clone();
-    if(out.color)out.color.lerp(new THREE.Color(tint),.18);
-    out.side=THREE.DoubleSide;
-    return out;
-  };
-  n.material=Array.isArray(n.material)?n.material.map(adjust):adjust(n.material);
+  if(!n.userData.rigLabMaterials[side]){
+    const tint=side==='red'?0x5e695e:0xc7b798;
+    const adjust=m=>{
+      const out=m.clone();
+      if(out.color)out.color.lerp(new THREE.Color(tint),.18);
+      out.side=THREE.DoubleSide;
+      return out;
+    };
+    n.userData.rigLabMaterials[side]=Array.isArray(base)?base.map(adjust):adjust(base);
+  }
+  n.material=n.userData.rigLabMaterials[side];
  });
 }
 function solveArm(root,upper,lower,hand,endLocal,poleLocal){
