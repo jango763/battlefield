@@ -31,6 +31,11 @@ function musterRigSemantic(mesh){
   if(/hand-r|hand_r/.test(route))return 'hand_r';
   if(/boot-l|sole-l|lace-l/.test(route))return 'foot_l';
   if(/boot-r|sole-r|lace-r/.test(route))return 'foot_r';
+  // Webbing, pack, ammunition pouches and straps belong to the chest/hips.
+  // The first fit accidentally assigned off-centre kit to upper-arm bones,
+  // causing the pack and ammo boxes to swing with each running arm.
+  if(/pouch|webbing|brace|haversack|pack|frog|scabbard|carrier|bottle|buckle|strap|belt|brass|frog|flap|kit:/.test(route))
+    return 'gear';
   return 'body';
 }
 // Anatomical envelope weights use original model vertex positions, not the
@@ -45,6 +50,10 @@ function musterRigWeights(x,y,z,kind,bones){
   else if(kind==='helmet'||kind==='head'){add('Head',1);}
   else if(kind==='hand_l'||kind==='hand_r'){add(kind,1);}
   else if(kind==='foot_l'||kind==='foot_r'){add(kind,1);}
+  else if(kind==='gear'){
+    // Rigidly follow just the torso or hip: external equipment never deforms.
+    add(y<1.35?'pelvis':y<1.75?'spine_02':'spine_03',1);
+  }
   else if(y<1.26){
     const side=x>=0?'l':'r';
     const leg=1-blend(y,1.06,1.26);
@@ -199,8 +208,18 @@ function musterRigBuild(source){
     actions[name]=mixer.clipAction(safe);
   }
   actions.idle.play();
+  // Muster's rifle is authored in a fixed port-arms pose. Native Quaternius
+  // clips swing its arms in a different grip pose, tearing the original
+  // rifleman's arms away. Until real pose retargeting is solved, keep ONLY
+  // the upper limbs in their bind pose, and animate all legs, pelvis, spine
+  // and neck from the native clips. This avoids false "working grip" claims.
+  const fixedArms=[];
+  model.traverse(n=>{
+    if(!n.isBone||!/^(clavicle|upperarm|lowerarm|hand|thumb|index|middle|ring|pinky)_/i.test(n.name))return;
+    fixedArms.push({bone:n,q:n.quaternion.clone(),p:n.position.clone()});
+  });
   state.rig={model,group,mixer,actions,state:'idle',skeleton,
-    nativeBones:boneMap,names,sourceHeight:srcHeight,parts,vertices,triangles};
+    fixedArms,nativeBones:boneMap,names,sourceHeight:srcHeight,parts,vertices,triangles};
   state.skinnedVerts=vertices;state.triangles=triangles;
   state.ready=true;
   musterRigMotion(state.motion);
@@ -266,13 +285,17 @@ function musterRiflemanRigDraw(){
     const dt=state.lastTime?Math.max(0,Math.min(.04,(now-state.lastTime)/1000)):.016;
     state.lastTime=now;
     state.rig.mixer.update(dt);
+    for(const fixed of state.rig.fixedArms){
+      fixed.bone.position.copy(fixed.p);
+      fixed.bone.quaternion.copy(fixed.q);
+    }
   }
   const camera=state.camera;
   camera.aspect=R.domElement.clientWidth/Math.max(1,R.domElement.clientHeight);
   camera.updateProjectionMatrix();
   // Full 2.55m figure; look at the middle of the animated body.
-  camera.position.set(0,2.75,5.3);
-  camera.lookAt(0,1.35,0);
+  camera.position.set(0,2.85,5.8);
+  camera.lookAt(0,1.58,0);
   const clear=R.autoClear;
   R.autoClear=false;R.clearDepth();
   R.render(state.scene,camera);
