@@ -1111,9 +1111,10 @@ function loadNativeHeroSideCap(rig){
     const steps=28;
     for(let i=0;i<steps;i++){
       const theta0=-1.32+(2.64*i/steps),theta1=-1.32+(2.64*(i+1)/steps);
-      const point=(a,y)=>[.164*Math.sin(a),y,.221*Math.cos(a)+.003];
-      const v0=point(theta0,.157),v1=point(theta1,.157),
-        w0=point(theta0,.244),w1=point(theta1,.244);
+      // Fold follows the actual cap nose, not a tall outward cylinder.
+      const point=(a,y)=>[.151*Math.sin(a),y,(.200-(y-.190)*.20)*Math.cos(a)+.003];
+      const v0=point(theta0,.185),v1=point(theta1,.185),
+        w0=point(theta0,.250),w1=point(theta1,.250);
       facing.push(...v0,...v1,...w1,...v0,...w1,...w0);
     }
     const frontGeo=new THREE.BufferGeometry();
