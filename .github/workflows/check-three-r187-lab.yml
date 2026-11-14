@@ -14,6 +14,10 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
+      - name: Check module and browser test syntax
+        run: |
+          node --check --input-type=module < lab/three-r187/app.js
+          node --check lab/three-r187/test-r187-lab.cjs
       - name: Install Playwright and Chromium
         run: |
           npm install --no-audit --no-fund --prefix /tmp/r187-lab-qa playwright@1.58.2
@@ -22,11 +26,11 @@ jobs:
         run: |
           python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/r187-lab-server.log 2>&1 &
           sleep 2
-          node lab/three-r187/check-browser.cjs
+          node lab/three-r187/test-r187-lab.cjs
       - name: Store real render screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: r187-lab-real-GLB-screenshots
-          path: /tmp/r187-*.png
+          path: /tmp/r187-lab-*.png
           if-no-files-found: warn
