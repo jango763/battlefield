@@ -1,0 +1,48 @@
+name: Wehrmacht six visual classes and hero identity QA
+on:
+  push:
+    branches: [feature/wehrmacht-visual-classes-20261114]
+    paths:
+      - preview/german-visual-classes.js
+      - preview/german-v5.js
+      - preview/formation-replenishment-v3.html
+      - tools/infantry-v2/test-german-visual-classes.cjs
+      - .github/workflows/check-german-visual-classes.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  classes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax, unmodified gameplay and independent classes
+        run: |
+          node --check preview/german-v5.js
+          node --check preview/german-visual-classes.js
+          node tools/infantry-v2/test-german-visual-classes.cjs
+          node tools/infantry-v2/test-clean-core.cjs
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs
+          node tools/infantry-v2/test-british-pilot.cjs
+      - name: Install real browser
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/wehrmacht-visual-qa playwright@1.58.2
+          npm install --no-audit --no-fund --prefix /tmp/wehrmacht-qa playwright@1.58.2
+          npm install --no-audit --no-fund --prefix /tmp/british-pilot playwright@1.58.2
+          /tmp/wehrmacht-visual-qa/node_modules/.bin/playwright install chromium
+      - name: Verify German roles and regression-test German/British armies
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 > /tmp/wehrmacht-visual-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-german-visual-classes.cjs --browser
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs --browser
+          node tools/infantry-v2/test-british-pilot.cjs --browser
+      - name: Save visual frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wehrmacht-roles-desktop-iphone-viewport
+          path: /tmp/wehrmacht-visual-*.png
+          if-no-files-found: ignore
