@@ -17,7 +17,7 @@ for(const required of [
   'BritishBeretSmallInsignia',
   "beret.userData.profile='airborne-soft-slouch-v3'",
   'beret.userData.bindHeadLocalQ=headLocal.clone()',
-  "beret.position.y+=.205",
+  "beret.position.y+=.184",
   'beret.quaternion.copy(headLocal)',
   "beret.visible=ownerSide==='blue'"
 ])assert(source.includes(required),'beret redesign missing '+required);
