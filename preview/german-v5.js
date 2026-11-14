@@ -838,6 +838,13 @@ function updateNativeHeroFieldUniform(rig){
   if(uniform.donorHands&&rig.weapon){
     const vis=rig.visual,w=rig.weapon,arms=uniform.donorHands;
     vis.updateWorldMatrix(true,true);
+    // Preserve each donor palm's intended retargeted orientation BEFORE IK
+    // repositions the elbow. Otherwise a solved hand ends up palm-up.
+    const invSpaceQ=vis.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const handLocalQ={
+      right:invSpaceQ.clone().multiply(arms.right.hand.getWorldQuaternion(new THREE.Quaternion())),
+      left:invSpaceQ.clone().multiply(arms.left.hand.getWorldQuaternion(new THREE.Quaternion()))
+    };
     const local=bone=>vis.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
     const right=local(arms.right.upper),left=local(arms.left.upper);
     const sign=Math.sign(right.x-left.x)||-1;
@@ -849,6 +856,9 @@ function updateNativeHeroFieldUniform(rig){
     for(const [side,grip,pole] of pairs){
       const arm=arms[side],goal=local(grip);
       GermanRig.solve(vis,arm.upper,arm.elbow,arm.hand,goal,pole);
+      // Restore the intended weapon-aligned palm rotation after changing
+      // the upper arm and forearm; leaves the solved wrist position intact.
+      GermanRig.orient(vis,arm.hand,handLocalQ[side]);
       errors[side]=arm.hand.getWorldPosition(new THREE.Vector3()).distanceTo(grip.getWorldPosition(new THREE.Vector3()));
     }
     // Hand bones reach the rifle but open fingers still look like "offering"
@@ -876,7 +886,10 @@ function updateNativeHeroFieldUniform(rig){
     const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
     cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
     // Source geometry already includes its scalp/ridge height.
-    cap.position.add(new THREE.Vector3(0,.013,.028).applyQuaternion(cap.quaternion));
+    // Donor head pivot is much lower than the visible hairline. Raise the
+    // sidecap from eyebrow level onto the crown.
+    cap.position.y+=.190;
+    cap.position.add(new THREE.Vector3(0,0,.028).applyQuaternion(cap.quaternion));
   }
 }
 
