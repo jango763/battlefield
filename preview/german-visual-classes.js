@@ -32,11 +32,11 @@ function wehrmachtVisualResources(){
     cylinder:new THREE.CylinderGeometry(.5,.5,1,10),
     torus:new THREE.TorusGeometry(.5,.065,5,12),
     material:{
-      webbing:mat(0x777660),olive:mat(0x565f50),
-      linen:mat(0x8c876a),leather:mat(0x473a30),
-      darkLeather:mat(0x332e29),metal:mat(0x515950,.12),
-      brass:mat(0x9d9564,.16),canvas:mat(0x666851),
-      black:mat(0x252a28),stitch:mat(0xaaa48a)
+      webbing:mat(0x525744),olive:mat(0x414f42),
+      linen:mat(0x555b46),leather:mat(0x3a2f28),
+      darkLeather:mat(0x282822),metal:mat(0x3d4742,.12),
+      brass:mat(0x847950,.16),canvas:mat(0x4c5546),
+      black:mat(0x232725),stitch:mat(0x807f65)
     }
   };
 }
@@ -201,8 +201,10 @@ function germanRoleGalleryTick(){
   g.cast=[P,...units];
   g.scene=new THREE.Scene();
   g.scene.background=new THREE.Color(0x777d73);
-  g.scene.add(new THREE.HemisphereLight(0xf5f3e8,0x474d45,2.0));
-  const light=new THREE.DirectionalLight(0xffecd4,1.9);
+  // Keep the same muted battlefield look. The earlier preview was lit
+  // with almost 4x ambient/key energy and washed every role to white.
+  g.scene.add(new THREE.HemisphereLight(0xe6e4d9,0x353a32,.82));
+  const light=new THREE.DirectionalLight(0xffead2,.91);
   light.position.set(2.5,6,4.5);
   g.scene.add(light);
   g.stage=new THREE.Group();
@@ -251,7 +253,7 @@ function germanRoleGalleryDraw(){
   c.aspect=R.domElement.clientWidth/Math.max(1,R.domElement.clientHeight);
   c.updateProjectionMatrix();
   // Keep helmet below title/buttons in iPhone portrait and boots in frame.
-  c.position.set(0,3.10,5.8);
+  c.position.set(0,3.15,6.5);
   c.lookAt(0,1.90,0);
   R.render(g.scene,c);
   return true;
