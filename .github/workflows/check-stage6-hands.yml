@@ -34,7 +34,7 @@ jobs:
         run: |
           python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/stage6-http.log 2>&1 &
           sleep 2
-          node tools/infantry-v2/test-stage6-hands.cjs --browser --probe
+          node tools/infantry-v2/test-stage6-hands.cjs --browser
       - name: Archive actual hand close-ups
         if: always()
         uses: actions/upload-artifact@v4
@@ -42,6 +42,4 @@ jobs:
           name: stage6-single-hands-desktop-mobile
           path: |
             /tmp/stage6-hands-*.png
-            /tmp/stage6-grip-*.png
-            /tmp/stage6-wrist-*.png
           if-no-files-found: warn
