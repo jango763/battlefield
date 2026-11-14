@@ -1107,7 +1107,7 @@ function loadNativeHeroSideCap(rig){
     // Unmarked WWII M34-inspired wool Schiffchen: continuous curved fabric,
     // low folded side wall, no rigid polygonal roof or pointed helmet apex.
     const cap=new THREE.Group();
-    cap.name='GermanM34SoftCap_V21';
+    cap.name='GermanM34SoftCap_V22';
     cap.userData.proceduralPilotka=true;
     const wool=new THREE.MeshStandardMaterial({
       color:0x48574d,roughness:1,metalness:0,side:THREE.DoubleSide
@@ -1175,8 +1175,10 @@ function loadNativeHeroSideCap(rig){
     const roofPositions=[],roofIndices=[];
     const longitudinal=40,across=18;
     const crownHeight=(u,v)=>{
-      const side=.247-.010*Math.abs(v);
-      const center=.288-.025*v*v+.003*v;
+      // Clearance above the donor scalp is necessary in every animated pose:
+      // the smaller V21 crown exposed orange scalp pixels through the roof.
+      const side=.253-.010*Math.abs(v);
+      const center=.307-.026*v*v+.003*v;
       // Soft flatter wool crown, with minute irregular fabric dents.
       return side+(center-side)*Math.pow(Math.max(0,1-u*u),.56)
         +.0028*Math.sin(u*2.6+v*5)*(1-Math.abs(u))*(1-Math.abs(v));
@@ -1221,7 +1223,7 @@ function loadNativeHeroSideCap(rig){
     cap.add(new THREE.Mesh(new THREE.TubeGeometry(
       new THREE.CatmullRomCurve3(rimPts,true),64,.0012,5,true),rimMat));
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German M34-inspired soft wool Schiffchen V21';
+    u.cap=cap;u.headwear='German M34-inspired soft wool Schiffchen V22';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
