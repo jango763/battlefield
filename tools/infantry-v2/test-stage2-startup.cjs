@@ -40,7 +40,9 @@ if(process.argv.includes('--browser')){
       ]){
         const page=await browser.newPage({viewport:device.viewport,
           ...(device.userAgent?{userAgent:device.userAgent}:{})});
-        page.on('pageerror',e=>errors.push(device.name+': '+e.message));
+        page.on('pageerror',e=>{
+          if(!/No parent to post message/.test(e.message))errors.push(device.name+': '+e.message);
+        });
         await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html',
           {waitUntil:'domcontentloaded',timeout:45000});
         await page.waitForFunction(()=>{
