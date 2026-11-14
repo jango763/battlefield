@@ -534,19 +534,31 @@ function makeNativeHeroAssaultRifle(){
 }
 
 const WW2_WEAPON_GAME_SCALE=1.40;
+// One catalog and one decoded mesh hierarchy per weapon ID are shared
+// across the hero and all visible soldiers. Cloned mesh instances retain
+// independent transforms but reuse immutable geometry/material GPU data.
+function nativeWW2Resources(){
+  return germanPreview.ww2Resources||(germanPreview.ww2Resources={
+    manifestPromise:null,modelPromises:new Map(),parseCounts:new Map()
+  });
+}
 function initNativeHeroWW2WeaponCatalog(rig){
   const w=rig.weapon;
   if(!w)return;
-  const url=new URL('../assets/ww2-weapons/manifest.json',location.href);
-  fetch(url).then(async response=>{
-    if(!response.ok)throw new Error('WW2 manifest HTTP '+response.status);
-    return response.json();
-  }).then(manifest=>{
-    const expected=['de-kar98k','de-mp40','de-mg42','uk-lee-enfield','uk-sten','uk-bren'];
-    if(expected.some(key=>!manifest.weapons?.[key]?.trigger||!manifest.weapons[key]?.support))
-      throw new Error('Incomplete licensed WW2 weapon catalog');
-    w.ww2Manifest=manifest;
-  }).catch(error=>{w.ww2CatalogError=String(error);console.warn('WW2 catalog fallback:',error);});
+  const cache=nativeWW2Resources();
+  if(!cache.manifestPromise){
+    const url=new URL('../assets/ww2-weapons/manifest.json',location.href);
+    cache.manifestPromise=fetch(url).then(async response=>{
+      if(!response.ok)throw new Error('WW2 manifest HTTP '+response.status);
+      const manifest=await response.json();
+      const expected=['de-kar98k','de-mp40','de-mg42','uk-lee-enfield','uk-sten','uk-bren'];
+      if(expected.some(key=>!manifest.weapons?.[key]?.trigger||!manifest.weapons[key]?.support))
+        throw new Error('Incomplete licensed WW2 weapon catalog');
+      return manifest;
+    }).catch(error=>{cache.manifestPromise=null;throw error;});
+  }
+  cache.manifestPromise.then(manifest=>{w.ww2Manifest=manifest;})
+    .catch(error=>{w.ww2CatalogError=String(error);console.warn('WW2 catalog fallback:',error);});
 }
 function nativeArmyWeaponSlot(unit){
   return unit.type==='smg'?1:unit.type==='mg'?2:0;
@@ -560,30 +572,43 @@ function selectNativeHeroWW2Weapon(unit,rig){
   const key=slot>=4?null:ids[slot],catalog=w.ww2Manifest,info=key?catalog?.weapons?.[key]:null;
   if(info&&!w.ww2Models.has(key)&&!w.ww2Pending.has(key)&&!w.ww2Failed.has(key)){
     w.ww2Pending.add(key);
-    const url=new URL('../assets/ww2-weapons/'+info.file,location.href);
-    new THREE.GLTFLoader().load(url.href,gltf=>{
+    const resources=nativeWW2Resources();
+    if(!resources.modelPromises.has(key)){
+      const url=new URL('../assets/ww2-weapons/'+info.file,location.href);
+      resources.parseCounts.set(key,(resources.parseCounts.get(key)||0)+1);
+      const promise=new Promise((resolve,reject)=>{
+        new THREE.GLTFLoader().load(url.href,gltf=>{
+          const source=gltf.scene;
+          source.traverse(n=>{
+            if(!n.isMesh)return;
+            n.castShadow=true;n.receiveShadow=true;
+            const adjust=mat=>{
+              const m=mat.clone();
+              if(m.color&&m.color.r<.22&&m.color.g<.22&&m.color.b<.22)
+                m.color.lerp(new THREE.Color(0x545a56),.32);
+              if('roughness' in m)m.roughness=Math.min(m.roughness??.85,.78);
+              if('metalness' in m)m.metalness=.12;
+              return m;
+            };
+            n.material=Array.isArray(n.material)?n.material.map(adjust):adjust(n.material);
+          });
+          resolve(source);
+        },undefined,reject);
+      }).catch(error=>{
+        resources.modelPromises.delete(key);
+        throw error;
+      });
+      resources.modelPromises.set(key,promise);
+    }
+    resources.modelPromises.get(key).then(source=>{
       if(!rig.weapon||rig.weapon!==w)return;
-      const obj=gltf.scene;
+      const obj=source.clone(true);
       obj.name='WW2_'+key;
       obj.scale.setScalar(WW2_WEAPON_GAME_SCALE);
-      obj.traverse(n=>{
-        if(!n.isMesh)return;
-        n.castShadow=true;n.receiveShadow=true;
-        const adjust=mat=>{
-          const m=mat.clone();
-          // Lift dark steel from near-black: preserve wood/bakelite contrast.
-          if(m.color&&m.color.r<.22&&m.color.g<.22&&m.color.b<.22)
-            m.color.lerp(new THREE.Color(0x545a56),.32);
-          if('roughness' in m)m.roughness=Math.min(m.roughness??.85,.78);
-          if('metalness' in m)m.metalness=.12;
-          return m;
-        };
-        n.material=Array.isArray(n.material)?n.material.map(adjust):adjust(n.material);
-      });
       w.root.add(obj);
       w.ww2Models.set(key,obj);
       w.ww2Pending.delete(key);
-    },undefined,error=>{
+    }).catch(error=>{
       w.ww2Pending.delete(key);
       w.ww2Failed.set(key,String(error?.message||error));
       console.warn('WW2 weapon fallback '+key,error);
