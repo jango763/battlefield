@@ -1094,11 +1094,74 @@ function createNativeHeroBritishBeret(rig){
   u.beret=beret;
   beret.visible=(P&&P.side)!=='red';
 }
+// Loads an authored German field sidecap as a real GLB asset, rather than
+// synthesizing more fabric triangles inside the runtime. The model is NOT
+// bundled until its original creator-supplied file is available and checked.
+// In preview, select ?pilotka=external to try it; absent/invalid GLB leaves
+// the stable V19 pilotka untouched. No battle-state modifications.
+function tryLoadNativeGermanCapGlb(rig){
+  const u=rig.ww2Uniform;
+  if(!u||u.externalGermanCapRequested)return;
+  u.externalGermanCapRequested=true;
+  const url=new URL('../assets/ww2-headwear/german-m34-fieldcap.glb',location.href);
+  new THREE.GLTFLoader().load(url.href,gltf=>{
+    if(rig.ww2Uniform!==u)return;
+    const model=gltf.scene;
+    const bounds=new THREE.Box3().setFromObject(model);
+    const size=bounds.getSize(new THREE.Vector3());
+    if(![size.x,size.y,size.z].every(v=>Number.isFinite(v)&&v>.0001))
+      throw new Error('Invalid German sidecap mesh bounds');
+    let visibleCount=0;
+    model.traverse(n=>{
+      if(n.isMesh){
+        visibleCount++;
+        n.castShadow=true;n.receiveShadow=true;
+        if(n.material){
+          const updateMat=m=>{
+            if('roughness' in m)m.roughness=Math.max(.86,m.roughness??.86);
+            if('metalness' in m)m.metalness=0;
+          };
+          if(Array.isArray(n.material))n.material.forEach(updateMat);
+          else updateMat(n.material);
+        }
+      }
+    });
+    if(!visibleCount)throw new Error('Imported GLB has no cloth meshes');
+    // Mesh-only export, +Y up, +Z front. Fit uniformly: no stretching
+    // across the temples. Original cap from the author should be isolated
+    // from the rest of the headwear collection before GLB export.
+    const fit=Math.min(.270/size.x,.410/size.z,.152/size.y);
+    const boxCenter=bounds.getCenter(new THREE.Vector3());
+    model.scale.multiplyScalar(fit);
+    model.position.set(-boxCenter.x*fit,.162-bounds.min.y*fit,
+      -boxCenter.z*fit);
+    const cap=new THREE.Group();
+    cap.name='GermanM34ImportedCap';
+    cap.userData.proceduralPilotka=true; // reuse tested bone-delta retarget
+    cap.userData.externalGlb=true;
+    cap.add(model);
+    const old=u.cap;
+    rig.visual.add(cap);
+    u.cap=cap;u.headwear='Imported WW2 German field cap GLB';
+    cap.visible=u.side==='red';
+    updateNativeHeroFieldUniform(rig);
+    if(old){
+      rig.visual.remove(old);
+      old.traverse(n=>{if(n.isMesh)n.geometry?.dispose?.();});
+    }
+  },undefined,error=>{
+    // Do not hide a missing asset, and never replace the playable hero.
+    u.externalGermanCapError=String(error?.message||error);
+    console.warn('German M34 GLB unavailable; approved sidecap retained',error);
+  });
+}
 function loadNativeHeroSideCap(rig){
   const u=rig.ww2Uniform;
   if(!u||!u.headBone)return;
   if(new URLSearchParams(location.search).get('headwear')==='none')return;
   createNativeHeroBritishBeret(rig);
+  if(new URLSearchParams(location.search).get('pilotka')==='external')
+    tryLoadNativeGermanCapGlb(rig);
   // The imported Soviet sidecap is shallow and sits across the forehead on
   // this head rig; simply rescaling it never covered the rear scalp. Use a
   // close-fitting, head-tracked geometry for the German pilotka by default.
