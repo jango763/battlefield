@@ -52,6 +52,13 @@ jobs:
                   modelVisible:!!r.model.visible,weaponCatalog:Object.keys(r.weapon.ww2Manifest.weapons)};
               });
               report.initial=initial;
+              report.supportPalm=await page.evaluate(()=>{
+                const w=P.germanPreview.nativeRig.weapon;
+                return {ready:!!w.supportPalm,triangles:w.supportPalmTriangles||0,visible:w.supportPalm?.visible};
+              });
+              if(!report.supportPalm.ready||report.supportPalm.triangles<100)
+                report.failures.push('actual sculpted support palm not generated: '+JSON.stringify(report.supportPalm));
+
               report.skinnedDonorMeshes=await page.evaluate(()=>
                 P.germanPreview.nativeRig.ww2Uniform.donorMeshes.filter(x=>x.type==='garment').length);
               if(!report.skinnedDonorMeshes)report.failures.push('missing original visible skinned soldier geometry');
