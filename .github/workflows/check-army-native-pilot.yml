@@ -202,8 +202,16 @@ jobs:
                   !Number.isFinite(check.visibleLeft)||check.visibleLeft>.12)
                   result.errors.push('unacceptable grip '+role+' '+JSON.stringify(check));
                 await page.evaluate(()=>{
-                  const u=germanPreview.armyPilotUnit;
-                  window.__qaCamOffset=[2.25,2.42,2.55];
+                  const u=germanPreview.armyPilotUnit,r=u.germanPreview.nativeRig;
+                  r.visual.updateWorldMatrix(true,true);
+                  const trigger=r.weapon.trigger.getWorldPosition(new THREE.Vector3());
+                  const muzzle=r.weapon.muzzleFlash.getWorldPosition(new THREE.Vector3());
+                  const forward=muzzle.sub(trigger).setY(0).normalize();
+                  const side=new THREE.Vector3(-forward.z,0,forward.x);
+                  window.__qaCamOffset=[
+                    forward.x*3.0+side.x*1.55,2.48,
+                    forward.z*3.0+side.z*1.55
+                  ];
                   u.aim=1;u.kick=0;
                 });
                 await page.waitForTimeout(350);
