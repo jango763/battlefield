@@ -3,7 +3,7 @@
 // Deliberately unrigged: a one-at-a-time visual review, not a gameplay swap.
 // Source: https://github.com/Kenton-GMI/muster-ww2
 // License: assets/muster-british/LICENSE-MUSTER.txt
-const musterBritishPreview={ready:false,loaded:0,errors:[],models:[],selected:0,loading:0};
+const musterBritishPreview={ready:false,loaded:0,errors:[],models:[],selected:0,loading:0,scene:null,camera:null};
 function musterBritishSelectRole(index){
   musterBritishPreview.selected=index;
   for(const item of musterBritishPreview.models)
@@ -21,6 +21,13 @@ function musterBritishPreviewTick(){
   if(new URLSearchParams(location.search).get('inspect')!=='muster')return;
   if(!musterBritishPreview.ready){
     musterBritishPreview.ready=true;
+    musterBritishPreview.scene=new THREE.Scene();
+    musterBritishPreview.scene.background=null;
+    musterBritishPreview.scene.add(new THREE.HemisphereLight(0xffffff,0x675e4a,2.4));
+    const sun=new THREE.DirectionalLight(0xfff6db,2.0);
+    sun.position.set(-2,5,-4);
+    musterBritishPreview.scene.add(sun);
+    musterBritishPreview.camera=new THREE.PerspectiveCamera(34,1,.1,50);
     const roles=['rifleman','leader','bren'];
     const names=['Стрелок','Командир','Пулемётчик'];
     const panel=document.createElement('div');
@@ -58,12 +65,12 @@ function musterBritishPreviewTick(){
         const slot=new THREE.Group();
         slot.name='MusterWW2_British_'+role;
         slot.add(model);
-        slot.position.set(P.x,0,P.z-3.4);
+        slot.position.set(0,0,0);
         // Muster +Z is its soldier's front. Face the camera at -Z.
         slot.rotation.y=Math.PI;
         slot.visible=i===musterBritishPreview.selected;
         slot.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
-        scene.add(slot);
+        musterBritishPreview.scene.add(slot);
         musterBritishPreview.models.push({
           index:i,role,object:slot,source:'muster-ww2',
           height:size.y,scale
@@ -78,7 +85,20 @@ function musterBritishPreviewTick(){
       });
     });
   }
-  // A large, centered frontal view fits iPhone portrait without cropping.
-  cam.position.set(P.x,2.8,P.z-8.15);
-  cam.lookAt(P.x,1.05,P.z-3.4);
+  // Gallery rendered by musterBritishPreviewDraw() after the main scene.
+  // This keeps the source GLB visible through map walls, even on iPhone.
+}
+function musterBritishPreviewDraw(){
+  if(!musterBritishPreview.ready||!musterBritishPreview.scene||
+      new URLSearchParams(location.search).get('inspect')!=='muster')return;
+  const camera=musterBritishPreview.camera;
+  camera.aspect=R.domElement.clientWidth/Math.max(1,R.domElement.clientHeight);
+  camera.updateProjectionMatrix();
+  camera.position.set(0,2.0,-4.1);
+  camera.lookAt(0,1.0,0);
+  const clear=R.autoClear;
+  R.autoClear=false;
+  R.clearDepth();
+  R.render(musterBritishPreview.scene,camera);
+  R.autoClear=clear;
 }
