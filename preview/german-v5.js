@@ -638,7 +638,9 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
     w.supportPalm.quaternion.multiply(new THREE.Quaternion().setFromEuler(
       new THREE.Euler(pose.x||0,pose.y||0,pose.z||0,'XYZ')));
     w.supportPalm.position.set(0,-.028,.10);
-    w.supportPalm.visible=(unit.kind==='p'?(unit.wpn|0):nativeArmyWeaponSlot(unit))===1;
+    // Regular soldiers use their own retargeted glove, not the separately
+    // baked Quaternius palm that caused a duplicated third hand.
+    w.supportPalm.visible=unit.kind==='p'&&(unit.wpn|0)===1;
   }
   vis.updateWorldMatrix(true,true);
   const rightError=rig.hands.right.hand.getWorldPosition(new THREE.Vector3())
@@ -971,7 +973,12 @@ function dressNativeHeroFieldUniform(rig){
     rig.ww2Uniform=ww2;
     rig.ww2OutfitTemporary=null;
     for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
-    try{createNativeSupportPalm(rig);}catch(error){console.warn('Support palm fallback:',error);}
+    // The separate baked support palm duplicates the already skinned WW2
+    // soldier hand when an army soldier uses MP40. Retain it for the HERO
+    // only, who has his own approved diagnostic mode.
+    if(!rig.armyUnit){
+      try{createNativeSupportPalm(rig);}catch(error){console.warn('Support palm fallback:',error);}
+    }
     updateNativeHeroFieldUniform(rig);
     loadNativeHeroSideCap(rig);
   }catch(error){
@@ -987,6 +994,45 @@ function dressNativeHeroFieldUniform(rig){
     // The rejected pot-shaped helmet must never return as fallback.
     rig.fieldUniform.helmet.visible=false;
   }
+}
+// Read-only visual finger presets for the first regular German infantryman.
+// Three phalanx bends per digit (base / middle / tip), anatomically restrained.
+// Using unit.type ensures rifle, SMG and MG soldiers do not share one fist.
+function nativeInfantryGripPreset(unit){
+  const rifle={
+    name:'rifle',
+    right:{
+      Thumb:[.24,.32,.19],Index:[.28,.27,.20],
+      Middle:[.50,.58,.36],Ring:[.52,.60,.39],Pinky:[.48,.55,.36]
+    },
+    left:{
+      Thumb:[.29,.28,.17],Index:[.44,.53,.37],
+      Middle:[.48,.58,.41],Ring:[.48,.56,.41],Pinky:[.43,.50,.35]
+    }
+  };
+  const smg={
+    name:'smg',
+    right:{
+      Thumb:[.27,.34,.21],Index:[.28,.30,.23],
+      Middle:[.55,.67,.45],Ring:[.59,.71,.48],Pinky:[.55,.66,.46]
+    },
+    left:{
+      Thumb:[.30,.32,.18],Index:[.43,.52,.38],
+      Middle:[.50,.61,.45],Ring:[.49,.60,.44],Pinky:[.43,.54,.37]
+    }
+  };
+  const mg={
+    name:'mg',
+    right:{
+      Thumb:[.27,.34,.21],Index:[.27,.28,.19],
+      Middle:[.54,.63,.45],Ring:[.57,.67,.48],Pinky:[.51,.62,.43]
+    },
+    left:{
+      Thumb:[.31,.31,.18],Index:[.48,.58,.43],
+      Middle:[.52,.62,.46],Ring:[.49,.59,.43],Pinky:[.45,.54,.39]
+    }
+  };
+  return unit.type==='mg'?mg:unit.type==='smg'?smg:rifle;
 }
 function updateNativeHeroFieldUniform(rig){
   const uniform=rig.ww2Uniform;
@@ -1079,7 +1125,9 @@ function updateNativeHeroFieldUniform(rig){
       // the British uniform keeps its previously approved alignment.
       // Avoid the exaggerated right wrist roll responsible for the claw
       // silhouette; leave left support and British calibration unchanged.
-      const roll=uniform.side==='red'?(side==='right'?-.17:.48):-.85;
+      const roll=rig.armyUnit&&uniform.side==='red'
+        ?(side==='right'?-.09:.30)
+        :uniform.side==='red'?(side==='right'?-.17:.48):-.85;
       handLocalQ[side].multiply(new THREE.Quaternion().setFromAxisAngle(
         new THREE.Vector3(0,0,1),roll));
     }
@@ -1099,22 +1147,30 @@ function updateNativeHeroFieldUniform(rig){
       GermanRig.orient(vis,arm.hand,handLocalQ[side]);
       errors[side]=arm.hand.getWorldPosition(new THREE.Vector3()).distanceTo(grip.getWorldPosition(new THREE.Vector3()));
     }
-    // Hand bones reach the rifle but open fingers still look like "offering"
-    // the gun on flat palms. Curl digits over the grips after pose retarget:
-    // every mixer frame resets to native animation, so there is no drift.
+    // Infantry hand pose presets: fingers close around REAL grip and fore-end,
+    // indexed per WW2 weapon. All angles in radians, all changes visual-only.
+    // Index fingers on the trigger hand remain bent but not clenched into a
+    // cartoon fist. The thumb is crossed into the grip, not twisted at wrist.
+    // Never reuse these adjustments on the already approved player hero.
+    const armyGrip=rig.armyUnit?nativeInfantryGripPreset(rig.armyUnit):null;
     const grasp=new THREE.Quaternion(),axis=new THREE.Vector3(1,0,0);
     for(const entry of uniform.donorFingers){
       const angle=entry.digit==='Thumb'?
         (entry.segment===1?-.32:entry.segment===2?-.38:-.23):
         (entry.segment===1?-.57:entry.segment===2?-.74:-.56);
-      // Preserve the index finger near the trigger; close the other German
-      // gripping fingers around the pistol grip instead of displaying a claw.
       const germanTrigger=uniform.side==='red'&&entry.hand==='right';
-      const adjusted=germanTrigger?(entry.digit==='Index'?angle*.94:angle*1.35):angle;
+      let adjusted=germanTrigger?(entry.digit==='Index'?angle*.94:angle*1.35):angle;
+      if(armyGrip){
+        const config=armyGrip[entry.hand];
+        adjusted=-(config[entry.digit]||config.Middle)[entry.segment-1];
+      }
       entry.bone.quaternion.multiply(grasp.setFromAxisAngle(axis,adjusted));
-      // The donor thumb points sideways in the mobile close-up. Fold its base
-      // towards the palm rather than twisting the whole wrist again.
-      if(germanTrigger&&entry.digit==='Thumb'&&entry.segment===1){
+      if(armyGrip&&entry.digit==='Thumb'&&entry.segment===1){
+        // Hand-local thumb adduction: small corrective roll towards palm.
+        // Different from a whole-hand rotate; no animated wrist twisting.
+        entry.bone.quaternion.multiply(grasp.setFromAxisAngle(
+          new THREE.Vector3(0,0,1),entry.hand==='right'?-.14:.13));
+      }else if(!armyGrip&&germanTrigger&&entry.digit==='Thumb'&&entry.segment===1){
         entry.bone.quaternion.multiply(
           grasp.setFromAxisAngle(new THREE.Vector3(0,0,1),-.31));
       }
@@ -1125,6 +1181,8 @@ function updateNativeHeroFieldUniform(rig){
       rig.weaponDiagnostics.visualFingerBones=uniform.donorFingers.length;
       rig.weaponDiagnostics.visibleRightError=errors.right;
       rig.weaponDiagnostics.visibleLeftError=errors.left;
+      rig.weaponDiagnostics.armyFingerPose=armyGrip?.name||null;
+      rig.weaponDiagnostics.extraSupportPalm=!!rig.weapon.supportPalm?.visible;
     }
   }
   if(uniform.cap&&uniform.headBone){
