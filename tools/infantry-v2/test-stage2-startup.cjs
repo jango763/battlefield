@@ -23,7 +23,7 @@ assert(source.includes("if(!heroStartupGate.pending())return;"),'late async nati
 assert(source.includes("u!==P||heroStartupGate.pending()"),'late donor swap not blocked');
 assert(source.indexOf('animateNativeHeroRig(unit,v,0);') <
   source.indexOf("heroStartupGate.finish('native')"),'first pose must be applied before reveal');
-assert(wrapper.includes('german-v5.js?v=20261114-stage2-startup-r2'), 'stale loader cache URL');
+assert(wrapper.includes('german-v5.js?v=20261114-stage3-hero-r3'), 'stale loader cache URL');
 console.log('STAGE 2 STATIC PASS: script parses, startup gate bounded, stable fallback, hero posed first');
 
 if(process.argv.includes('--browser')){
