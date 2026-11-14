@@ -448,6 +448,13 @@ function selectNativeHeroWW2Weapon(unit,rig){
   if(active){
     w.trigger.position.copy(vec(info.trigger)).addScaledVector(new THREE.Vector3().fromArray(info.triggerPalm),.013);
     w.support.position.copy(vec(info.support)).addScaledVector(new THREE.Vector3().fromArray(info.supportPalm),.014);
+    if(key==='de-mp40'||key==='uk-sten'){
+      // The WW2 donor sleeve ends at a different bind-pose wrist length.
+      // Shift the support contact on the real fore-end to reveal the LEFT
+      // palm outside the cuff, instead of covering it with a fake fist.
+      const testOffset=window.__ww2SupportOffset||{x:0,y:-.065,z:.12};
+      w.support.position.add(new THREE.Vector3(testOffset.x||0,testOffset.y||0,testOffset.z||0));
+    }
     w.muzzleFlash.position.copy(vec(info.muzzle));
   }else{
     w.trigger.position.set(0,-.105,-.16);
@@ -701,67 +708,6 @@ function updateNativeHeroPrimitiveUniform(rig){
 // and rifle IK remain untouched; a separate outfit skeleton only follows pose.
 // This is intentionally a preview until visual acceptance on mobile Safari.
 
-// Restore actual skinned hands from the Quaternius avatar (never procedural
-// cylinders): the Panzergrenadier overlay has independent hand geometry and
-// its wrist may visually disappear even when the Mixamo IK target is correct.
-// Only triangles with dominant palm/finger skin weights are retained.
-function addNativeHeroVisibleHands(rig){
-  const results=[],stats={triangles:0,meshes:0,bySide:{left:0,right:0}};
-  const isHandName=name=>/^(?:hand_[lr]|(?:thumb|index|middle|ring|pinky)_(?:0?[1-3])_[lr])$/i.test(name);
-  const overlayMode=new URLSearchParams(location.search).get('handOverlay')||'right';
-  for(const src of rig.ww2Uniform.originalMeshes){
-    const g=src.geometry,indices=g.getAttribute('skinIndex'),weights=g.getAttribute('skinWeight');
-    if(!indices||!weights||!src.skeleton?.bones)continue;
-    const scores={left:new Float32Array(indices.count),right:new Float32Array(indices.count)};
-    for(let i=0;i<indices.count;i++)for(let k=0;k<4;k++){
-      const index=k===0?indices.getX(i):k===1?indices.getY(i):k===2?indices.getZ(i):indices.getW(i);
-      const weight=k===0?weights.getX(i):k===1?weights.getY(i):k===2?weights.getZ(i):weights.getW(i);
-      const name=src.skeleton.bones[index]?.name;
-      if(name&&isHandName(name)){
-        if(name.endsWith('_l'))scores.left[i]+=weight;
-        if(name.endsWith('_r'))scores.right[i]+=weight;
-      }
-    }
-    const ix=g.index?.array || Uint32Array.from({length:indices.count},(_,i)=>i);
-    for(const side of ['left','right']){
-      const weightsBySide=scores[side],accepted=[];
-      for(let k=0;k+2<ix.length;k+=3){
-        const a=ix[k],b=ix[k+1],c=ix[k+2];
-        if(Math.min(weightsBySide[a],weightsBySide[b],weightsBySide[c])>.22&&
-          Math.max(weightsBySide[a],weightsBySide[b],weightsBySide[c])>.58)
-          accepted.push(a,b,c);
-      }
-      if(!accepted.length)continue;
-      const geometry=g.clone();geometry.setIndex(accepted);geometry.clearGroups();
-      const mat=new THREE.MeshStandardMaterial({
-        name:'NativeHeroSkin_'+side,color:0x96745a,skinning:true,
-        side:THREE.DoubleSide,metalness:0,roughness:.97
-      });
-      const overlay=new THREE.SkinnedMesh(geometry,mat);
-      overlay.name='NativeHeroSkin_'+side;
-      overlay.userData.side=side;
-      overlay.position.copy(src.position);overlay.quaternion.copy(src.quaternion);
-      overlay.scale.copy(src.scale);overlay.bindMode=src.bindMode;
-      overlay.bind(src.skeleton,src.bindMatrix.clone());
-      overlay.bindMatrixInverse.copy(src.bindMatrixInverse);
-      overlay.frustumCulled=false;overlay.castShadow=true;overlay.receiveShadow=true;
-      // Panzergrenadier's left (support) hand is already visible in the
-      // jacket mesh, while its right firing palm can disappear. Avoid
-      // duplicating the support fist. Force 'both' only for diagnostics.
-      overlay.visible=overlayMode==='both'||overlayMode===side;
-      src.parent.add(overlay);
-      results.push(overlay);stats.triangles+=accepted.length/3;
-      stats.meshes++;stats.bySide[side]+=accepted.length/3;
-    }
-  }
-  rig.ww2Uniform.nativeHands=results;
-  rig.ww2Uniform.handSkinStats=stats;
-  rig.ww2Uniform.handOverlayMode=overlayMode;
-  if(stats.bySide.left<45||stats.bySide.right<45)
-    console.warn('Native hand mesh extraction insufficient:',stats);
-  return stats;
-}
-
 function dressNativeHeroFieldUniform(rig){
   if(new URLSearchParams(location.search).get('uniform')==='prototype'){
     dressNativeHeroPrimitiveUniform(rig);
@@ -849,7 +795,6 @@ function dressNativeHeroFieldUniform(rig){
     rig.ww2Uniform=ww2;
     rig.ww2OutfitTemporary=null;
     for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
-    addNativeHeroVisibleHands(rig);
     updateNativeHeroFieldUniform(rig);
     loadNativeHeroSideCap(rig);
   }catch(error){
@@ -859,9 +804,6 @@ function dressNativeHeroFieldUniform(rig){
     if(rig.ww2Uniform)rig.visual.remove(rig.ww2Uniform.donor);
     if(rig.ww2OutfitTemporary)rig.visual.remove(rig.ww2OutfitTemporary);
     rig.ww2OutfitTemporary=null;
-    for(const hand of (rig.ww2Uniform?.nativeHands||[])){
-      hand.parent?.remove(hand);hand.geometry.dispose();hand.material.dispose();
-    }
     rig.ww2Uniform=null;
     rig.model.traverse(n=>{if(n.isSkinnedMesh)n.visible=true;});
     dressNativeHeroPrimitiveUniform(rig);
