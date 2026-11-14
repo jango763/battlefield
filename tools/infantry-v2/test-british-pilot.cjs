@@ -41,7 +41,7 @@ if(process.argv.includes('--browser')){
           headwear:rigs[i].ww2Uniform.headwear,
           variant:rigs[i].armyHeadwearChoice,
           uniformSide:rigs[i].ww2Uniform.side,
-          visibleBeret:!!rigs[i].ww2Uniform.beret?.visible,
+          visibleKnitCap:!!rigs[i].ww2Uniform.knitCap?.visible,
           hatSource:rigs[i].ww2Uniform.cap?.userData?.headwearSource||null,
           selectedGun:rigs[i].weapon?.activeModelId,
           leftGripError:rigs[i].weaponDiagnostics?.visibleLeftError
@@ -55,8 +55,11 @@ if(process.argv.includes('--browser')){
       assert.equal(stats.count,4);
       assert(stats.uniqueBones,'British soldier skeletons are shared');
       assert(stats.roles.every(s=>s.side==='blue'&&s.uniformSide==='blue'),'Wrong UK palette');
-      assert(stats.roles.some(s=>s.role==='captain'&&s.visibleBeret),'Captain lacks UK maroon beret');
-      assert(stats.roles.every(s=>s.role==='captain'||!s.visibleBeret),'British regular incorrectly wears maroon beret');
+      assert(stats.roles.some(s=>s.role==='captain'&&s.visibleKnitCap),'Captain lacks dark olive knitted cap');
+      assert(stats.roles.some(s=>s.role==='captain'&&s.variant==='knit'&&
+        s.headwear==='British dark olive knitted cap'),
+        'British officer has wrong headwear assignment');
+      assert(stats.roles.every(s=>s.role==='captain'||!s.visibleKnitCap),'British regular incorrectly wears officer knitted cap');
       assert(stats.roles.some(s=>s.selectedGun==='uk-lee-enfield'),'No British Lee-Enfield');
       assert(stats.roles.some(s=>s.selectedGun==='uk-sten'),'No British Sten');
       assert(stats.roles.some(s=>s.selectedGun==='uk-bren'),'No British Bren');
