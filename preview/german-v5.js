@@ -14,7 +14,7 @@ const wehrmachtRollout=(()=>{
     (navigator.maxTouchPoints>1&&Math.min(screen.width,screen.height)<900);
   const defaultLimit=mobile?12:28;
   const requested=Number(params.get('armyLimit'));
-  const max=mode==='off'?0:mode==='pilot'?1:mode==='squad'?4:
+  const max=mode==='off'?0:mode==='pilot'?1:mode==='squad'||mode==='british'?4:
     Number.isFinite(requested)&&requested>0?
       Math.min(mobile?16:48,Math.max(1,Math.floor(requested))):defaultLimit;
   const enterRange=mobile?52:84,exitRange=mobile?72:110;
@@ -25,13 +25,17 @@ function wehrmachtArmyDistance(unit){
   return Math.hypot((unit.x||0)-(P?.x||0),(unit.z||0)-(P?.z||0));
 }
 function wehrmachtArmyEligible(unit,v){
-  return unit.kind!=='p'&&unit.t==='red'&&
+  // Normal gameplay keeps the accepted German rollout. The UK native army
+  // pilot is deliberately opt-in and never replaces German rigs by default.
+  const side=wehrmachtRollout.mode==='british'?'blue':'red';
+  return unit.kind!=='p'&&unit.t===side&&
     (v.role==='infantry'||v.role==='captain'||v.role==='engineer');
 }
 function wehrmachtArmyCanInstall(unit,v){
   if(!wehrmachtArmyEligible(unit,v)||wehrmachtRollout.max===0)return false;
   if((germanPreview.armyNativeInstalled||0)>=wehrmachtRollout.max)return false;
   return wehrmachtRollout.mode==='pilot'||wehrmachtRollout.mode==='squad'||
+    wehrmachtRollout.mode==='british'||
     wehrmachtArmyDistance(unit)<wehrmachtRollout.enterRange;
 }
 function releaseNativeArmyVisual(unit,v){
@@ -423,8 +427,10 @@ function installNativeArmyPilot(unit,v){
   // Keep German unit identities stable through combat, LOD and recruitment.
   // Officers, engineers and ordinary infantry remain visibly distinguishable.
   const number=v.armyVisualIndex||0;
-  const headwear=v.role==='captain'?'m43':v.role==='engineer'?'helmet':
-    ['sidecap','m43','helmet','sidecap'][number%4];
+  const headwear=unit.t==='blue'
+    ?(v.role==='captain'?'beret':'brodie')
+    :v.role==='captain'?'m43':v.role==='engineer'?'helmet':
+      ['sidecap','m43','helmet','sidecap'][number%4];
   const rig={visual,model,mixer,actions,state:'idle',previous,
     armyUnit:unit,armyHeadwearChoice:headwear,
     armyPhaseSeed:((v.phase||0)/(Math.PI*2))%1,
@@ -436,6 +442,7 @@ function installNativeArmyPilot(unit,v){
     initNativeHeroWeapon(v,rig);
     dressNativeHeroFieldUniform(rig);
     if(headwear==='m43')attachNativeArmyM43FieldCap(rig);
+    if(headwear==='brodie')attachNativeArmyBritishBrodie(rig);
     v.nativeRig=rig;
     v.figure.visible=false;
     v.weapon.root.visible=false;
@@ -467,6 +474,56 @@ function installNativeArmyPilot(unit,v){
 /* MIT-licensed German M43 field cap from the repository's pinned muster-ww2
    source, loaded ONCE and cloned for the visible pilot squad. This is a
    different authored mesh, not the rejected procedural M34 experiments. */
+// British infantry field helmet: licensed low-poly steel dish silhouette.
+ // Prototype GLB is hotlinked (not redistributed); final local asset and fit
+ // acceptance remain separate release gates. The UK officer keeps his beret.
+function attachNativeArmyBritishBrodie(rig){
+  if(!rig?.ww2Uniform||rig.armyHeadwearChoice!=='brodie')return;
+  if(!germanPreview.britishBrodieSourcePromise){
+    // Publisher documents hotlink and in-game reuse. This is a staging-only
+    // dependency; a failed request leaves the original outfit intact.
+    const url='https://polyfork.dev/cdn/steel-helmet-f5aa7d.glb';
+    germanPreview.britishBrodieSourcePromise=new Promise((resolve,reject)=>{
+      new THREE.GLTFLoader().load(url,gltf=>resolve(gltf.scene),undefined,reject);
+    }).catch(error=>{germanPreview.britishBrodieSourcePromise=null;throw error;});
+  }
+  germanPreview.britishBrodieSourcePromise.then(source=>{
+    if(!rig.ww2Uniform||!rig.visual.parent)return;
+    const model=source.clone(true),box=new THREE.Box3().setFromObject(model);
+    const size=box.getSize(new THREE.Vector3());
+    if(![size.x,size.y,size.z].every(v=>Number.isFinite(v)&&v>.001))
+      throw Error('British helmet model bounds invalid');
+    const scale=Math.min(.34/size.x,.34/size.z,.17/size.y);
+    const center=box.getCenter(new THREE.Vector3());
+    model.scale.multiplyScalar(scale);
+    model.position.set(-center.x*scale,.145-box.min.y*scale,-center.z*scale);
+    model.traverse(n=>{
+      if(!n.isMesh)return;
+      n.castShadow=true;n.receiveShadow=true;
+      const adjust=m=>{
+        const mat=m.clone();if(mat.color)mat.color.setHex(0x777a5e);
+        if('roughness' in mat)mat.roughness=.97;
+        if('metalness' in mat)mat.metalness=.12;
+        return mat;
+      };
+      n.material=Array.isArray(n.material)?n.material.map(adjust):adjust(n.material);
+    });
+    const cap=new THREE.Group();cap.name='BritishFieldDishHelmet_PreviewGLB';
+    cap.userData.proceduralPilotka=true;
+    cap.userData.headwearSource='polyfork-steel-helmet-f5aa7d.glb';
+    cap.add(model);rig.visual.add(cap);
+    const u=rig.ww2Uniform,previous=u.cap;u.cap=cap;
+    if(previous){rig.visual.remove(previous);previous.traverse(n=>{
+      if(n.isMesh){n.geometry?.dispose();n.material?.dispose();}
+    });}
+    u.headwear='British field helmet / GLB test';
+    u.side=null;updateNativeHeroFieldUniform(rig);
+    germanPreview.britishBrodieLoaded=(germanPreview.britishBrodieLoaded||0)+1;
+  }).catch(error=>{
+    rig.britishBrodieLoadError=String(error?.message||error);
+    console.warn('British helmet GLB staging fallback:',error);
+  });
+}
 function attachNativeArmyM43FieldCap(rig){
   if(!rig?.ww2Uniform||rig.armyHeadwearChoice!=='m43')return;
   if(!germanPreview.m43SourcePromise){
@@ -1252,9 +1309,10 @@ function updateNativeHeroFieldUniform(rig){
   }
   const side=(rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P&&P.side)==='red'?'red':'blue';
   const armyHelmet=side==='red'&&rig.armyHeadwearChoice==='helmet';
+  const britishHelmet=side==='blue'&&rig.armyHeadwearChoice==='brodie';
   if(uniform.side!==side){
     uniform.side=side;
-    if(uniform.cap)uniform.cap.visible=side==='red'&&!armyHelmet;
+    if(uniform.cap)uniform.cap.visible=(side==='red'&&!armyHelmet)||britishHelmet;
     if(uniform.beret)uniform.beret.visible=side==='blue';
     for(const item of uniform.donorMeshes){
       item.mesh.material=side==='red'?item.german:item.british;
@@ -1369,7 +1427,7 @@ function updateNativeHeroFieldUniform(rig){
   }
   // The approved model retains its existing head follow; helmet uses the
   // original skinned WW2 donor helmet and never overlaps the pilotka.
-  if(uniform.cap)uniform.cap.visible=side==='red'&&!armyHelmet;
+  if(uniform.cap)uniform.cap.visible=(side==='red'&&!armyHelmet)||britishHelmet;
   if(uniform.beret)uniform.beret.visible=side==='blue';
   if(uniform.cap&&uniform.headBone){
     const cap=uniform.cap,head=uniform.headBone,space=rig.visual;
@@ -1457,7 +1515,8 @@ function loadNativeHeroSideCap(rig){
   if(!u||!u.headBone)return;
   if(new URLSearchParams(location.search).get('headwear')==='none')return;
   // Never allocate an invisible UK beret for every German army soldier.
-  if(!rig.armyUnit||rig.armyUnit.t==='blue')createNativeHeroBritishBeret(rig);
+  if(!rig.armyUnit||rig.armyUnit.t==='blue'&&rig.armyHeadwearChoice==='beret')
+    createNativeHeroBritishBeret(rig);
   // The imported Soviet sidecap is shallow and sits across the forehead on
   // this head rig; simply rescaling it never covered the rear scalp. Use a
   // close-fitting, head-tracked geometry for the German pilotka by default.
