@@ -456,7 +456,7 @@ function selectNativeHeroWW2Weapon(unit,rig){
     w.trigger.position.copy(vec(info.trigger)).addScaledVector(new THREE.Vector3().fromArray(info.triggerPalm),.013);
     // MP40 photographed on iPhone: visible trigger hand floated below the
     // pistol grip. Adjust only its visual IK contact, never weapon gameplay.
-    if(side==='red'&&key==='de-mp40')w.trigger.position.add(new THREE.Vector3(0,.058,-.016));
+    if(side==='red'&&key==='de-mp40')w.trigger.position.add(new THREE.Vector3(0,.086,-.016));
     w.support.position.copy(vec(info.support)).addScaledVector(new THREE.Vector3().fromArray(info.supportPalm),.014);
     if(key==='de-mp40'||key==='uk-sten'){
       // The WW2 donor sleeve ends at a different bind-pose wrist length.
@@ -964,10 +964,10 @@ function updateNativeHeroFieldUniform(rig){
       const nativeQ=rig.hands[side].hand.getWorldQuaternion(new THREE.Quaternion());
       handLocalQ[side]=invSpaceQ.clone().multiply(nativeQ)
         .multiply(uniform.donorHandBindOffsets[side]);
-      // The original equal roll on both hands twists the mirrored support
-      // wrist outwards. Only the German hero gets the mirrored, smaller rolls;
-      // the British uniform keeps its previously approved alignment.
-      const roll=uniform.side==='red'?(side==='right'?-.48:.48):-.85;
+      // Retarget German right wrist without the supplementary outward roll:
+      // its original turn made the palm look like a claw under MP40.
+      // British and German support wrists stay at previously accepted angles.
+      const roll=uniform.side==='red'?(side==='right'?0:.48):-.85;
       handLocalQ[side].multiply(new THREE.Quaternion().setFromAxisAngle(
         new THREE.Vector3(0,0,1),roll));
     }
@@ -998,13 +998,13 @@ function updateNativeHeroFieldUniform(rig){
       // Preserve the index finger near the trigger; close the other German
       // gripping fingers around the pistol grip instead of displaying a claw.
       const germanTrigger=uniform.side==='red'&&entry.hand==='right';
-      const adjusted=germanTrigger?(entry.digit==='Index'?angle*1.40:angle*1.24):angle;
+      const adjusted=germanTrigger?(entry.digit==='Index'?angle*1.70:angle*1.43):angle;
       entry.bone.quaternion.multiply(grasp.setFromAxisAngle(axis,adjusted));
       // The donor thumb points sideways in the mobile close-up. Fold its base
       // towards the palm rather than twisting the whole wrist again.
       if(germanTrigger&&entry.digit==='Thumb'&&entry.segment===1){
         entry.bone.quaternion.multiply(
-          grasp.setFromAxisAngle(new THREE.Vector3(0,0,1),-.85));
+          grasp.setFromAxisAngle(new THREE.Vector3(0,0,1),-.18));
       }
       entry.bone.updateWorldMatrix(false,true);
     }
@@ -1092,7 +1092,7 @@ function loadNativeHeroSideCap(rig){
   // ?pilotka=classic retains the old source mesh for A/B inspection.
   if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
     const cap=new THREE.Group();
-    cap.name='GermanPilotka_Schiffchen_V13';
+    cap.name='GermanPilotka_Schiffchen_V14';
     cap.userData.proceduralPilotka=true;
     // Narrow cloth Schiffchen silhouette, not an inflated beret.
     // Five cross-sections follow the scalp, with a pointed folded crest.
@@ -1113,7 +1113,9 @@ function loadNativeHeroSideCap(rig){
       const theta0=-1.32+(2.64*i/steps),theta1=-1.32+(2.64*(i+1)/steps);
       // Fold follows the actual cap nose, not a tall outward cylinder.
       const point=(a,y)=>[.151*Math.sin(a),y,(.200-(y-.190)*.20)*Math.cos(a)+.003];
-      const v0=point(theta0,.185),v1=point(theta1,.185),
+      // Drop the *cloth facing only*, not the folded roof. The running
+      // animation exposed forehead at the bottom of the original facing.
+      const v0=point(theta0,.118),v1=point(theta1,.118),
         w0=point(theta0,.250),w1=point(theta1,.250);
       facing.push(...v0,...v1,...w1,...v0,...w1,...w0);
     }
@@ -1182,7 +1184,7 @@ function loadNativeHeroSideCap(rig){
       cap.add(new THREE.Mesh(geo,sideCloth));
     }
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German fitted Schiffchen V13';
+    u.cap=cap;u.headwear='German fitted Schiffchen V14';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
