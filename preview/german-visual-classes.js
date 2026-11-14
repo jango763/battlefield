@@ -71,7 +71,11 @@ function installWehrmachtVisualIdentity(rig){
   function add(parent,name,shape,material,xyz,size,rot){
     const m=new THREE.Mesh(cache[shape],base[material]);
     m.name='GermanKit_'+type+'_'+name;
-    m.position.set(...xyz);m.scale.set(...size);
+    // Keep pouches outside the real skinned tunic: the first prototype's
+    // chest equipment was hidden inside the donor's thick uniform geometry.
+    // Both front webbing and rear packs follow the original animated bones.
+    const depth=xyz[2]>=.075?.115:xyz[2]<=-.18?-.075:0;
+    m.position.set(xyz[0],xyz[1],xyz[2]+depth);m.scale.set(...size);
     if(rot)m.rotation.set(...rot);
     m.castShadow=true;m.receiveShadow=true;
     parent.add(m);kit.meshes++;kit.meshNames.push(name);
