@@ -1092,14 +1092,14 @@ function loadNativeHeroSideCap(rig){
   // ?pilotka=classic retains the old source mesh for A/B inspection.
   if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
     const cap=new THREE.Group();
-    cap.name='GermanPilotka_Schiffchen_V11';
+    cap.name='GermanPilotka_Schiffchen_V13';
     cap.userData.proceduralPilotka=true;
     // Narrow cloth Schiffchen silhouette, not an inflated beret.
     // Five cross-sections follow the scalp, with a pointed folded crest.
     const cloth=new THREE.MeshLambertMaterial({color:0x4a5751,side:THREE.DoubleSide});
     const sideCloth=new THREE.MeshLambertMaterial({color:0x435049,side:THREE.DoubleSide});
     const edge=new THREE.MeshLambertMaterial({color:0x36433e,side:THREE.DoubleSide});
-    const seam=new THREE.MeshLambertMaterial({color:0x6b766d,side:THREE.DoubleSide});
+    const seam=new THREE.MeshLambertMaterial({color:0x526058,side:THREE.DoubleSide});
     // A thin inner liner stays beneath the folded cap, not a rounded beret.
     const liner=new THREE.Mesh(new THREE.SphereGeometry(1,22,14),cloth);
     liner.name='Pilotka_Interior_Liner';
@@ -1125,12 +1125,12 @@ function loadNativeHeroSideCap(rig){
     frontBand.castShadow=true;frontBand.receiveShadow=true;
     cap.add(frontBand);
     const stations=[
-      {z:-.194,w:.054,b:.180,s:.250,t:.258},
-      {z:-.134,w:.112,b:.166,s:.256,t:.296},
-      {z:-.062,w:.141,b:.162,s:.260,t:.317},
-      {z:.062,w:.141,b:.162,s:.260,t:.317},
-      {z:.134,w:.112,b:.166,s:.256,t:.296},
-      {z:.194,w:.054,b:.180,s:.250,t:.258}
+      {z:-.194,w:.054,b:.194,s:.247,t:.254},
+      {z:-.134,w:.112,b:.191,s:.251,t:.278},
+      {z:-.062,w:.141,b:.188,s:.253,t:.298},
+      {z:.062,w:.141,b:.188,s:.253,t:.298},
+      {z:.134,w:.112,b:.191,s:.251,t:.278},
+      {z:.194,w:.054,b:.194,s:.247,t:.254}
     ];
     // 5% extra breadth along the rim; crest stays low and boat-shaped.
     // Radius changes affect this German cap only.
@@ -1166,10 +1166,10 @@ function loadNativeHeroSideCap(rig){
     for(const sign of [-1,1]){
       const fold=new THREE.CatmullRomCurve3(stations.map(v=>
         new THREE.Vector3(sign*.018,v.t+.003,v.z)));
-      cap.add(new THREE.Mesh(new THREE.TubeGeometry(fold,32,.0035,5,false),seam));
+      cap.add(new THREE.Mesh(new THREE.TubeGeometry(fold,32,.0018,5,false),seam));
       const rim=new THREE.CatmullRomCurve3(stations.map(v=>
         new THREE.Vector3(sign*v.w,v.b+.003,v.z)));
-      cap.add(new THREE.Mesh(new THREE.TubeGeometry(rim,32,.0045,5,false),edge));
+      cap.add(new THREE.Mesh(new THREE.TubeGeometry(rim,32,.0026,5,false),edge));
     }
     // Tapered front/back cloth corners (the sidecap has no visor).
     for(const idx of [0,stations.length-1]){
@@ -1182,7 +1182,7 @@ function loadNativeHeroSideCap(rig){
       cap.add(new THREE.Mesh(geo,sideCloth));
     }
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German fitted Schiffchen V11';
+    u.cap=cap;u.headwear='German fitted Schiffchen V13';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
