@@ -33,6 +33,34 @@ if(process.argv.includes('--browser')){
           catch(e){return false}
         },
           null,{timeout:120000});
+        if(type==='default'){
+          const fit=await page.evaluate(()=>{
+            const r=P.germanPreview.nativeRig, u=r.ww2Uniform, cap=u.knitCap;
+            r.visual.updateWorldMatrix(true,true);
+            const toLocal=object=>r.visual.worldToLocal(object.getWorldPosition(new THREE.Vector3())).toArray();
+            const boneNames=[];
+            r.model.traverse(n=>{if(n.isBone&&/head|neck/i.test(n.name))boneNames.push({name:n.name,position:toLocal(n)});});
+            return{
+              playerSide:P.side,headBone:toLocal(u.headBone),
+              capPosition:cap.position.toArray(),capQuaternion:cap.quaternion.toArray(),
+              capAxes:{
+                x:new THREE.Vector3(1,0,0).applyQuaternion(cap.quaternion).toArray(),
+                y:new THREE.Vector3(0,1,0).applyQuaternion(cap.quaternion).toArray(),
+                z:new THREE.Vector3(0,0,1).applyQuaternion(cap.quaternion).toArray(),
+              },
+              nativeHeadBones:boneNames,
+              capBox:(()=>{
+                const box=new THREE.Box3().setFromObject(cap);
+                return{min:box.min.toArray(),max:box.max.toArray()};
+              })(),
+              donorMeshes:u.donorMeshes.map(x=>({
+                name:x.mesh.name,material:x.mesh.material.name,type:x.type,
+                visible:x.mesh.visible
+              })).slice(0,25)
+            };
+          });
+          console.log('KNIT_FIT_DIAG',JSON.stringify(fit));
+        }
         const data=await page.evaluate(async type=>{
           const rig=P.germanPreview.nativeRig,uniform=rig.ww2Uniform;
           const crowns=()=>rig.visual.children.filter(n=>n.name==='WW2_British_DarkOlive_KnitCap')
