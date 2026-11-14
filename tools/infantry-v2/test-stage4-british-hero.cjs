@@ -26,7 +26,7 @@ for(const needle of [
   'installNativeBritishHeroIdentity(v.nativeRig);',
   "'british-hero'"
 ])assert(code.includes(needle)||loader.includes(needle),'Missing stage-4 requirement '+needle);
-assert(loader.includes('german-v5.js?v=20261114-stage5-beret-r4'),
+assert(loader.includes('german-v5.js?v=20261114-stage5-beret-r5'),
   'Stage 4 game loader has stale asset URL');
 console.log('STAGE 4 STATIC PASS: both scripts parse, British hero field kit role and side gated');
 if(process.argv.includes('--browser')){
