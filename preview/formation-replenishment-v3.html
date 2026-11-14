@@ -36,7 +36,21 @@
     html=once(html,'pm.band.material.color.setHex(HX.blue);',
       "pm.band.material.color.setHex(HX.blue);if(new URLSearchParams(location.search).get('inspect')==='german'){P.side='red';pm.band.material.color.setHex(HX.red);}");
     html=once(html,'cam.lookAt(camP.x,0,camP.z);',
-      "cam.lookAt(camP.x,0,camP.z);if(new URLSearchParams(location.search).get('inspect')==='german'&&P.germanPreview?.nativeRig){const a=P.g.rotation.y;cam.position.set(P.x+Math.sin(a)*3.8+Math.cos(a)*.65,2.95,P.z+Math.cos(a)*3.8-Math.sin(a)*.65);cam.lookAt(P.x,2.0,P.z);}");
+      "cam.lookAt(camP.x,0,camP.z);if(new URLSearchParams(location.search).get('inspect')==='german'&&P.germanPreview?.nativeRig){const a=P.g.rotation.y;cam.position.set(P.x+Math.sin(a)*3.8+Math.cos(a)*.65,2.95,P.z+Math.cos(a)*3.8-Math.sin(a)*.65);cam.lookAt(P.x,2.0,P.z);}"
+      +"if(new URLSearchParams(location.search).get('inspect')==='army'&&new URLSearchParams(location.search).get('armyRig')==='pilot'){"
+      +"if(germanPreview.armyNativeTemplate&&!germanPreview.armyPilotInstalled&&!window.__armyPreviewSpawned){"
+      +"window.__armyPreviewSpawned=true;const soldier=mk('red',false,false);"
+      +"if(soldier){soldier.x=P.x+3;soldier.z=P.z+3;soldier.g.position.set(soldier.x,0,soldier.z);}}"
+      +"const soldier=germanPreview.armyPilotUnit;if(soldier?.hp>0&&soldier.germanPreview?.nativeRig){"
+      +"const a=soldier.g.rotation.y;cam.position.set(soldier.x-Math.sin(a)*3.9+Math.cos(a)*.7,3.05,soldier.z-Math.cos(a)*3.9-Math.sin(a)*.7);"
+      +"cam.lookAt(soldier.x,1.78,soldier.z);}}");
+    // Test-only soldier preview label; never shown in the normal RTS.
+    if(new URLSearchParams(location.search).get('inspect')==='army'){
+      const label=document.createElement('div');
+      label.textContent='ТЕСТ ПЕХОТЫ · КАСКА + НОВЫЙ БЕГ';
+      label.style.cssText='position:fixed;right:8px;top:calc(env(safe-area-inset-top,0px) + 115px);z-index:990;padding:6px 9px;color:#fff;background:#26372fe8;border:1px solid #aaa;border-radius:6px;font:700 12px Arial;pointer-events:none';
+      document.body.appendChild(label);
+    }
     // Visible build check for the close-up only; standard RTS HUD unchanged.
     html=once(html,'const PTS=[];',
       "const PTS=[];if(new URLSearchParams(location.search).get('inspect')==='german'){const lab=document.createElement('div');lab.textContent='НЕМЕЦ · ПИЛОТКА V19';lab.style.cssText='position:fixed;right:9px;top:calc(env(safe-area-inset-top,0px) + 120px);z-index:990;padding:5px 8px;color:#fff;background:#253b32dc;border:1px solid #c1c3ad;border-radius:5px;font:700 12px Arial;pointer-events:none';document.body.appendChild(lab);}");
