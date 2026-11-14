@@ -1887,8 +1887,8 @@ function loadNativeHeroSideCap(rig){
       for(let i=0;i<=brimSegments;i++){
         const x=-.129+.258*i/brimSegments;
         const edgeFactor=1-(x/.129)*(x/.129);
-        visorVertices.push(x,.163,.168,
-          x,.154-.004*edgeFactor,.229+.056*Math.max(0,edgeFactor));
+        visorVertices.push(x,.186,.176,
+          x,.178-.003*edgeFactor,.213+.039*Math.max(0,edgeFactor));
         if(i>0){
           const k=i*2,p=(i-1)*2;
           visorFaces.push(p,k,p+1,p+1,k,k+1);
@@ -1907,7 +1907,7 @@ function loadNativeHeroSideCap(rig){
         new THREE.TubeGeometry(new THREE.CatmullRomCurve3(
           Array.from({length:17},(_,i)=>{
             const x=-.129+.258*i/16,e=Math.max(0,1-(x/.129)**2);
-            return new THREE.Vector3(x,.156-.004*e,.229+.056*e);
+            return new THREE.Vector3(x,.179-.003*e,.213+.039*e);
           })),32,.0017,4,false),
         edge
       );
