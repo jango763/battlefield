@@ -454,6 +454,9 @@ function selectNativeHeroWW2Weapon(unit,rig){
   const vec=(data)=>new THREE.Vector3().fromArray(data).multiplyScalar(WW2_WEAPON_GAME_SCALE);
   if(active){
     w.trigger.position.copy(vec(info.trigger)).addScaledVector(new THREE.Vector3().fromArray(info.triggerPalm),.013);
+    // MP40 photographed on iPhone: visible trigger hand floated below the
+    // pistol grip. Adjust only its visual IK contact, never weapon gameplay.
+    if(side==='red'&&key==='de-mp40')w.trigger.position.add(new THREE.Vector3(0,.058,-.016));
     w.support.position.copy(vec(info.support)).addScaledVector(new THREE.Vector3().fromArray(info.supportPalm),.014);
     if(key==='de-mp40'||key==='uk-sten'){
       // The WW2 donor sleeve ends at a different bind-pose wrist length.
@@ -1010,13 +1013,17 @@ function updateNativeHeroFieldUniform(rig){
     // Source geometry already includes its scalp/ridge height.
     // Donor head pivot is much lower than the visible hairline. Raise the
     // sidecap from eyebrow level onto the crown.
-    cap.position.y+=.145;
-    // Counter the earlier over-forward 0.185 m setting: it left the back of
-    // the shaved scalp fully exposed and pushed the cloth over the eyebrows.
-    // The extended GLB shell now overlaps the rear of the crown.
-    const fit=Number(new URLSearchParams(location.search).get('capforward'));
-    const forward=Number.isFinite(fit)&&fit>=0?THREE.MathUtils.clamp(fit,0,.20):.055;
-    cap.position.add(new THREE.Vector3(0,0,forward).applyQuaternion(cap.quaternion));
+    if(cap.userData.proceduralPilotka){
+      // New cap geometry has its own calibrated head-local vertical extent.
+      // Keep it centered over the head rather than pushing it onto the face.
+      cap.position.add(new THREE.Vector3(0,0,.01).applyQuaternion(cap.quaternion));
+    }else{
+      // Legacy A/B mode only; do not double-raise the new cloth shell.
+      cap.position.y+=.145;
+      const fit=Number(new URLSearchParams(location.search).get('capforward'));
+      const forward=Number.isFinite(fit)&&fit>=0?THREE.MathUtils.clamp(fit,0,.20):.055;
+      cap.position.add(new THREE.Vector3(0,0,forward).applyQuaternion(cap.quaternion));
+    }
   }
   if(uniform.beret&&uniform.headBone){
     const beret=uniform.beret,head=uniform.headBone,space=rig.visual;
@@ -1063,6 +1070,56 @@ function loadNativeHeroSideCap(rig){
   if(!u||!u.headBone)return;
   if(new URLSearchParams(location.search).get('headwear')==='none')return;
   createNativeHeroBritishBeret(rig);
+  // The imported Soviet sidecap is shallow and sits across the forehead on
+  // this head rig; simply rescaling it never covered the rear scalp. Use a
+  // close-fitting, head-tracked geometry for the German pilotka by default.
+  // ?pilotka=classic retains the old source mesh for A/B inspection.
+  if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
+    const cap=new THREE.Group();
+    cap.name='GermanPilotka_FullCrown_V4';
+    cap.userData.proceduralPilotka=true;
+    const felt=new THREE.MeshLambertMaterial({color:0x4d5a52,side:THREE.DoubleSide});
+    const edge=new THREE.MeshLambertMaterial({color:0x35433e,side:THREE.DoubleSide});
+    const seam=new THREE.MeshLambertMaterial({color:0x6c7770,side:THREE.DoubleSide});
+    const patch=(material,center,radii)=>{
+      const part=new THREE.Mesh(new THREE.SphereGeometry(1,24,14),material);
+      part.position.set(...center);part.scale.set(...radii);
+      part.castShadow=true;part.receiveShadow=true;cap.add(part);
+      return part;
+    };
+    // Low oval cloth band wraps the forehead AND the back of the scalp.
+    // Offsets are in the calibrated WW2 donor head-bone frame.
+    patch(edge,[0,.192,-.012],[.184,.034,.224]);
+    patch(felt,[0,.256,-.014],[.178,.084,.215]);
+    // Twin upper folds make this read as a soft Schiffchen sidecap rather
+    // than a rounded steel helmet. Each is a lightweight smooth cloth seam.
+    for(const x of [-.065,.065]){
+      const curve=new THREE.CatmullRomCurve3([
+        new THREE.Vector3(x*.8,.278,-.185),
+        new THREE.Vector3(x,.322,-.10),
+        new THREE.Vector3(x,.337,-.01),
+        new THREE.Vector3(x,.322,.10),
+        new THREE.Vector3(x*.8,.278,.172)
+      ]);
+      const fold=new THREE.Mesh(new THREE.TubeGeometry(curve,24,.006,6,false),seam);
+      fold.castShadow=true;cap.add(fold);
+    }
+    // Fine lower seam emphasizes the cap's flexible folded rim.
+    for(const x of [-.156,.156]){
+      const curve=new THREE.CatmullRomCurve3([
+        new THREE.Vector3(x*.72,.192,-.16),
+        new THREE.Vector3(x,.207,-.07),
+        new THREE.Vector3(x,.207,.065),
+        new THREE.Vector3(x*.72,.192,.156)
+      ]);
+      cap.add(new THREE.Mesh(new THREE.TubeGeometry(curve,16,.004,5,false),felt));
+    }
+    rig.visual.add(cap);
+    u.cap=cap;u.headwear='German full-crown pilotka V4';
+    cap.visible=u.side==='red';
+    updateNativeHeroFieldUniform(rig);
+    return;
+  }
   const url=new URL('../assets/ww2-headwear/field-grey-sidecap.glb',location.href).href;
   new THREE.GLTFLoader().load(url,gltf=>{
     if(rig.ww2Uniform!==u)return;
