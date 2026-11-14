@@ -211,16 +211,17 @@ function disposeGermanSoldier(unit){
 }
 function animateGermanSoldier(unit,dt=.016){
   const v=unit.germanPreview;if(!v)return;
-  // The first army migration is an opt-in, one-soldier pilot. Not a wholesale
-  // swap: combat, pathfinding and every ordinary army visual stay unchanged.
-  if(!v.nativeRig&&germanPreview.armyNativeTemplate
-    &&new URLSearchParams(location.search).get('armyRig')==='pilot'
+  // Opt-in rollout: one infantryman (?armyRig=pilot) or a four-man German
+  // squad (?armyRig=squad). Never change unit AI, orders, damage or economy.
+  const mode=new URLSearchParams(location.search).get('armyRig');
+  const limit=mode==='squad'?4:mode==='pilot'?1:0;
+  if(limit&&!v.nativeRig&&!v.armyNativeFailed&&germanPreview.armyNativeTemplate
     &&unit.kind!=='p'&&unit.t==='red'&&v.role==='infantry'
-    &&!germanPreview.armyPilotInstalled){
+    &&(germanPreview.armyNativeInstalled||0)<limit){
     try{installNativeArmyPilot(unit,v);}
     catch(error){
+      v.armyNativeFailed=true;
       germanPreview.armyPilotError=String(error?.stack||error);
-      germanPreview.armyPilotInstalled=false;
       console.warn('Army pilot visual fallback: old animation retained',error);
     }
   }
@@ -330,7 +331,9 @@ function animateGermanSoldier(unit,dt=.016){
 // No changes to army HP, orders, AI targets, weapons damage or unit position.
 function installNativeArmyPilot(unit,v){
   if(!germanPreview.armyNativeTemplate||!germanPreview.armyNativeClips)return false;
-  if(v.nativeRig||germanPreview.armyPilotInstalled)return false;
+  const mode=new URLSearchParams(location.search).get('armyRig');
+  const limit=mode==='squad'?4:mode==='pilot'?1:0;
+  if(v.nativeRig||(germanPreview.armyNativeInstalled||0)>=limit)return false;
   const model=germanSkeletonClone(germanPreview.armyNativeTemplate);
   model.updateWorldMatrix(true,true);
   const box=new THREE.Box3().setFromObject(model);
@@ -353,23 +356,32 @@ function installNativeArmyPilot(unit,v){
     oldFigureVisible:v.figure.visible,oldWeaponVisible:v.weapon.root.visible,
     oldIdentityVisible:v.identity.root.visible
   };
-  const rig={visual,model,mixer,actions,state:'idle',previous,armyUnit:unit};
+  const number=germanPreview.armyNativeInstalled||0;
+  const headwear=['sidecap','m43','helmet','sidecap'][number%4];
+  const rig={visual,model,mixer,actions,state:'idle',previous,
+    armyUnit:unit,armyHeadwearChoice:headwear,
+    armyPhaseSeed:((v.phase||0)/(Math.PI*2))%1,
+    armyVisualIndex:number};
   v.anchor.add(visual);
   try{
     // Reuse the hero's already implemented 2-hand grip and WW2 outfit
     // retargeter, not the legacy soldier bone animation.
     initNativeHeroWeapon(v,rig);
     dressNativeHeroFieldUniform(rig);
+    if(headwear==='m43')attachNativeArmyM43FieldCap(rig);
     v.nativeRig=rig;
     v.figure.visible=false;
     v.weapon.root.visible=false;
     v.identity.root.visible=false;
+    germanPreview.armyNativeInstalled=(germanPreview.armyNativeInstalled||0)+1;
     germanPreview.armyPilotInstalled=true;
-    germanPreview.armyPilotUnit=unit;
+    if(!germanPreview.armyPilotUnit)germanPreview.armyPilotUnit=unit;
+    if(!germanPreview.armySquad)germanPreview.armySquad=[];
+    germanPreview.armySquad.push(unit);
     germanPreview.armyPilotStats={role:v.role,faction:unit.t,
       clips:Object.keys(actions),bones:(()=>{
         let n=0;model.traverse(x=>{if(x.isBone)n++});return n;
-      })()};
+      })(),squadSize:germanPreview.armyNativeInstalled};
     return true;
   }catch(error){
     v.nativeRig=null;
@@ -380,6 +392,48 @@ function installNativeArmyPilot(unit,v){
     throw error;
   }
 }
+
+/* MIT-licensed German M43 field cap from the repository's pinned muster-ww2
+   source, loaded ONCE and cloned for the visible pilot squad. This is a
+   different authored mesh, not the rejected procedural M34 experiments. */
+function attachNativeArmyM43FieldCap(rig){
+  if(!rig?.ww2Uniform||rig.armyHeadwearChoice!=='m43')return;
+  if(!germanPreview.m43SourcePromise){
+    const url=new URL('../assets/ww2-headwear/m43-field-cap.glb',location.href).href;
+    germanPreview.m43SourcePromise=new Promise((resolve,reject)=>{
+      new THREE.GLTFLoader().load(url,gltf=>resolve(gltf.scene),undefined,reject);
+    });
+  }
+  germanPreview.m43SourcePromise.then(source=>{
+    if(!rig.ww2Uniform||!rig.visual.parent)return;
+    const model=source.clone(true),box=new THREE.Box3().setFromObject(model);
+    const size=box.getSize(new THREE.Vector3());
+    if(![size.x,size.y,size.z].every(v=>Number.isFinite(v)&&v>.001))
+      throw Error('German M43 cap asset bounds invalid');
+    const scale=Math.min(.25/size.x,.40/size.z,.155/size.y);
+    const center=box.getCenter(new THREE.Vector3());
+    model.scale.multiplyScalar(scale);
+    model.position.set(-center.x*scale,.166-box.min.y*scale,-center.z*scale);
+    model.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
+    const cap=new THREE.Group();
+    cap.name='ArmyM43_MIT_GLB';
+    cap.userData.proceduralPilotka=true; // same approved head-delta animation
+    cap.userData.headwearSource='m43-field-cap.glb';
+    cap.add(model);
+    rig.visual.add(cap);
+    const uniform=rig.ww2Uniform,previous=uniform.cap;
+    uniform.cap=cap;
+    if(previous){rig.visual.remove(previous);}
+    uniform.headwear='Army German M43 (MIT GLB)';
+    uniform.side=null; // ensure faction visibility/materials get refreshed
+    updateNativeHeroFieldUniform(rig);
+    germanPreview.armyM43Loaded=(germanPreview.armyM43Loaded||0)+1;
+  }).catch(error=>{
+    rig.armyHeadwearLoadError=String(error);
+    console.warn('German M43 unavailable: approved sidecap remains',error);
+  });
+}
+
 // Native rig diagnostic: Quaternius mesh + its OWN skeleton + animation library.
 // No retargeting and no changes to the army or gameplay. Only the HERO.
 // Assets from https://github.com/Seyamalam/blood-league-kickoff/ (CC0
@@ -986,14 +1040,16 @@ function updateNativeHeroFieldUniform(rig){
     return;
   }
   const side=(rig.armyUnit?(rig.armyUnit.t||rig.armyUnit.side):P&&P.side)==='red'?'red':'blue';
+  const armyHelmet=side==='red'&&rig.armyHeadwearChoice==='helmet';
   if(uniform.side!==side){
     uniform.side=side;
-    if(uniform.cap)uniform.cap.visible=side==='red';
+    if(uniform.cap)uniform.cap.visible=side==='red'&&!armyHelmet;
     if(uniform.beret)uniform.beret.visible=side==='blue';
     for(const item of uniform.donorMeshes){
       item.mesh.material=side==='red'?item.german:item.british;
       // Original WWII M42 helmet is deliberately NOT substituted for M43.
-      item.mesh.visible=item.type==='garment'||(item.type==='pouches'&&side==='red');
+      item.mesh.visible=item.type==='garment'||(item.type==='pouches'&&side==='red')||
+        (armyHelmet&&item.type==='headgear'&&/helmet/i.test(item.mesh.material?.name||''));
     }
   }
   // Re-target the already tested Quaternius anatomical pose to the secondary
@@ -1088,6 +1144,10 @@ function updateNativeHeroFieldUniform(rig){
       rig.weaponDiagnostics.visibleLeftError=errors.left;
     }
   }
+  // The approved model retains its existing head follow; helmet uses the
+  // original skinned WW2 donor helmet and never overlaps the pilotka.
+  if(uniform.cap)uniform.cap.visible=side==='red'&&!armyHelmet;
+  if(uniform.beret)uniform.beret.visible=side==='blue';
   if(uniform.cap&&uniform.headBone){
     const cap=uniform.cap,head=uniform.headBone,space=rig.visual;
     space.updateWorldMatrix(true,true);
@@ -1310,7 +1370,7 @@ function loadNativeHeroSideCap(rig){
     }
     rig.visual.add(cap);
     u.cap=cap;u.headwear='German head-following Schiffchen V19';
-    cap.visible=u.side==='red';
+    cap.visible=u.side==='red'&&rig.armyHeadwearChoice!=='helmet';
     updateNativeHeroFieldUniform(rig);
     return;
   }
@@ -1396,7 +1456,7 @@ function nativeHeroLoad(){
     // Snapshot the UNMODIFIED hero asset before it is dressed or animated.
     // One test soldier can clone this character with independent skeleton
     // and mixer while sharing the read-only source animation clips.
-    if(new URLSearchParams(location.search).get('armyRig')==='pilot'){
+    if(['pilot','squad'].includes(new URLSearchParams(location.search).get('armyRig'))){
       germanPreview.armyNativeTemplate=germanSkeletonClone(model);
       germanPreview.armyNativeClips=selected;
     }
@@ -1475,6 +1535,7 @@ function animateNativeHeroRig(unit,v,dt){
     const old=r.actions[r.state],action=r.actions[next];
     old.fadeOut(.16);
     action.reset().fadeIn(.16).play();
+    if(r.armyUnit)action.time=r.armyPhaseSeed*action.getClip().duration;
     r.state=next;
   }
   r.mixer.update(THREE.MathUtils.clamp(Number.isFinite(dt)?dt:0,0,.08));
