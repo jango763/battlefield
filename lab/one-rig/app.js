@@ -351,9 +351,19 @@ function makeSingleRigPanel(x,character,costume,library,side){
   const nativeIndices=mesh.skeleton.bones.map(mapBone);
   // Rest-space fit: convert every donor bone's rest-space influence into the
   // native bone's rest-space. A mere index swap puts hands metres away.
-  const restToNative=mesh.skeleton.bones.map((bone,i)=>
-    rigBones[nativeIndices[i]].matrixWorld.clone().multiply(
-      bone.matrixWorld.clone().invert()));
+  // GLB armatures have incompatible authored scales. A direct world-matrix
+  // product explodes garment size (measured 60+ units for a 2.55-unit body).
+  // Keep only world-space joint position and orientation; intentionally drop
+  // per-rig basis scale before building donor-rest -> native-rest transforms.
+  const unitScale=new THREE.Vector3(1,1,1);
+  const restToNative=mesh.skeleton.bones.map((bone,i)=>{
+   const source=rigBones[nativeIndices[i]];
+   const targetMatrix=new THREE.Matrix4().compose(
+     source.getWorldPosition(V()),source.getWorldQuaternion(Q()),unitScale);
+   const donorMatrix=new THREE.Matrix4().compose(
+     bone.getWorldPosition(V()),bone.getWorldQuaternion(Q()),unitScale);
+   return targetMatrix.multiply(donorMatrix.invert());
+  });
   const ids=new Uint16Array(position.count*4),weights=new Float32Array(position.count*4);
   const temp=V(), fitted=V(), touched=V();
   for(let i=0;i<position.count;i++){
@@ -389,6 +399,9 @@ function makeSingleRigPanel(x,character,costume,library,side){
   // normals to avoid donor-space normals on repositioned native anatomy.
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
+  if(!Number.isFinite(geometry.boundingSphere?.radius)||geometry.boundingSphere.radius>4)
+   throw Error('One-rig garment rest-space exploded: radius='+
+     geometry.boundingSphere?.radius+' mesh='+mesh.name);
   const single=new THREE.SkinnedMesh(geometry,mesh.material);
   single.name='ONE_RIG_'+(mesh.name||'uniform');
   single.castShadow=true;single.receiveShadow=true;single.frustumCulled=false;
