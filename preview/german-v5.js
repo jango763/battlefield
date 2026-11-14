@@ -353,6 +353,14 @@ function disposeGermanSoldier(unit){
 }
 function animateGermanSoldier(unit,dt=.016){
   const v=unit.germanPreview;if(!v)return;
+  // Infantry weapons/roles may be assigned by the game immediately AFTER
+  // mk() constructs the unit (e.g. rifle -> MP40). Re-dress the same native
+  // skeleton once if the resolved class changes; never leave an MP40 fighter
+  // wearing the rifleman's pouches. Gameplay properties stay untouched.
+  if(v.nativeRig?.armyUnit&&unit.t==='red'&&
+      v.nativeRig.ww2VisualClass!==wehrmachtVisualClass(unit)){
+    releaseNativeArmyVisual(unit,v);
+  }
   // Every German soldier may use the accepted native skeleton and wardrobe.
   // Safari/desktop proximity LOD bounds the number of simultaneously active
   // heavy skeletons. Distant Germans retain the prior German visual model.
