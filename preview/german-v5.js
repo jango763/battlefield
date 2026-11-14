@@ -55,7 +55,7 @@ function releaseNativeArmyVisual(unit,v){
       for(const mat of mats)mat?.dispose();
     });
   }
-  rig.visual.removeFromParent();
+  if(rig.visual.parent)rig.visual.parent.remove(rig.visual);
   rig.ww2Uniform=null;
   // Pending asynchronous GLB loads must not reattach models to a dead unit.
   rig.weapon=null;
