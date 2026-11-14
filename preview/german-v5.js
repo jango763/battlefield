@@ -880,7 +880,7 @@ function dressNativeHeroFieldUniform(rig){
     const donorFingers=[];
     for(const [name,bone] of garmentBones){
       const match=name.match(/^(Left|Right)Hand(Thumb|Index|Middle|Ring|Pinky)([123])$/);
-      if(match)donorFingers.push({bone,name,digit:match[2],segment:Number(match[3])});
+      if(match)donorFingers.push({bone,name,hand:match[1].toLowerCase(),digit:match[2],segment:Number(match[3])});
     }
     ww2={donor,bindings,donorMeshes,originalMeshes,side:null,modelType:'existing-panzergrenadier',
       headwear:'none',headBone:garmentBones.get('Head'),donorHands,donorFingers,
@@ -981,7 +981,17 @@ function updateNativeHeroFieldUniform(rig){
       const angle=entry.digit==='Thumb'?
         (entry.segment===1?-.32:entry.segment===2?-.38:-.23):
         (entry.segment===1?-.57:entry.segment===2?-.74:-.56);
-      entry.bone.quaternion.multiply(grasp.setFromAxisAngle(axis,angle));
+      // Preserve the index finger near the trigger; close the other German
+      // gripping fingers around the pistol grip instead of displaying a claw.
+      const germanTrigger=uniform.side==='red'&&entry.hand==='right';
+      const adjusted=germanTrigger&&entry.digit!=='Index'?angle*1.24:angle;
+      entry.bone.quaternion.multiply(grasp.setFromAxisAngle(axis,adjusted));
+      // The donor thumb points sideways in the mobile close-up. Fold its base
+      // towards the palm rather than twisting the whole wrist again.
+      if(germanTrigger&&entry.digit==='Thumb'&&entry.segment===1){
+        entry.bone.quaternion.multiply(
+          grasp.setFromAxisAngle(new THREE.Vector3(0,0,1),-.42));
+      }
       entry.bone.updateWorldMatrix(false,true);
     }
     uniform.visualGripErrors=errors;
@@ -1000,11 +1010,12 @@ function updateNativeHeroFieldUniform(rig){
     // Source geometry already includes its scalp/ridge height.
     // Donor head pivot is much lower than the visible hairline. Raise the
     // sidecap from eyebrow level onto the crown.
-    cap.position.y+=.115;
-    // German sidecap: advance the crown towards the forehead, while preserving
-    // its approved vertical position. Allow safe visual tuning via URL.
+    cap.position.y+=.145;
+    // Counter the earlier over-forward 0.185 m setting: it left the back of
+    // the shaved scalp fully exposed and pushed the cloth over the eyebrows.
+    // The extended GLB shell now overlaps the rear of the crown.
     const fit=Number(new URLSearchParams(location.search).get('capforward'));
-    const forward=Number.isFinite(fit)&&fit>0?THREE.MathUtils.clamp(fit,.12,.24):.185;
+    const forward=Number.isFinite(fit)&&fit>=0?THREE.MathUtils.clamp(fit,0,.20):.055;
     cap.position.add(new THREE.Vector3(0,0,forward).applyQuaternion(cap.quaternion));
   }
   if(uniform.beret&&uniform.headBone){
@@ -1059,7 +1070,9 @@ function loadNativeHeroSideCap(rig){
     cap.name='WW2_Feldgrau_SideCap_NoVisor';
     // Original side-cap mesh uses a head-local coordinate frame, NOT
     // the bottom of a helmet band. No large M43 vertical offset.
-    cap.scale.set(1.48,1.37,1.44);
+    // V2 screenshot fit: the old short shell exposed a large rear scalp wedge.
+    // Lengthen the crown backward, widen the band, keep a slim sidecap silhouette.
+    cap.scale.set(1.76,1.37,2.04);
     cap.traverse(n=>{
       if(!n.isMesh)return;
       n.castShadow=true;n.receiveShadow=true;
