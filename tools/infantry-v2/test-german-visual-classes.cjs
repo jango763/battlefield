@@ -53,9 +53,9 @@ if(process.argv.includes('--browser')){
           await page.locator('button[data-class-index="'+i+'"]').click();
           const active=await page.evaluate(()=>({
             selected:window.__germanRoleGallery.selected,
-            rigModel:window.__germanRoleGallery.selectedVisual,
-            expectedRig:window.__germanRoleGallery.cast[
-              window.__germanRoleGallery.selected].germanPreview.nativeRig.visual,
+            usesRealRig:window.__germanRoleGallery.selectedVisual===
+              window.__germanRoleGallery.cast[
+                window.__germanRoleGallery.selected].germanPreview.nativeRig.visual,
             inStage:window.__germanRoleGallery.selectedVisual?.parent===
               window.__germanRoleGallery.stage,
             hiddenMapParts:window.__germanRoleGallery.cast
@@ -64,7 +64,7 @@ if(process.argv.includes('--browser')){
                 window.__germanRoleGallery.stage)
           }));
           assert.equal(active.selected,i,'Role buttons did not switch costume');
-          assert(active.inStage&&active.hiddenMapParts,
+          assert(active.usesRealRig&&active.inStage&&active.hiddenMapParts,
             'Real animated unit was not moved into isolated gallery');
         }
         await page.locator('button[data-class-index="0"]').click();
