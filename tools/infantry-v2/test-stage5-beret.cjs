@@ -15,7 +15,7 @@ for(const required of [
   'BritishBeretCloseFitBand',
   'BritishBeretSubtleFeltFold',
   'BritishBeretSmallInsignia',
-  "beret.userData.profile='airborne-soft-slouch-v2'",
+  "beret.userData.profile='airborne-soft-slouch-v3'",
   'beret.userData.bindHeadLocalQ=headLocal.clone()',
   "beret.position.y+=.205",
   'beret.quaternion.copy(headLocal)',
@@ -100,7 +100,7 @@ if(process.argv.includes('--browser')){
         });
         console.log('STAGE 5 GEOMETRY + MOTION DIAGNOSTICS',device.name,JSON.stringify(data));
         assert.equal(data.headwearName,'WW2_British_Maroon_Beret');
-        assert.equal(data.profile,'airborne-soft-slouch-v2');
+        assert.equal(data.profile,'airborne-soft-slouch-v3');
         assert(data.headwearVisible&&data.britishHeroRestoresBeret&&data.germanHeroHidesBeret);
         for(const piece of ['BritishBeretOnePieceFeltCrown','BritishBeretCloseFitBand',
           'BritishBeretSmallInsignia','BritishBeretSubtleFeltFold'])
