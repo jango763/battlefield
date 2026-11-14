@@ -145,6 +145,20 @@ jobs:
                   P.side='red';P.wpn=1;P.sv=0;P.aim=0;
                   for(let i=0;i<8;i++)animateNativeHeroRig(P,P.germanPreview,1/60);
                 },{y,z});
+                const palmDebug=await page.evaluate(()=>{
+                  const w=P.germanPreview.nativeRig.weapon,palm=w.supportPalm;
+                  if(!palm)return null;
+                  palm.updateWorldMatrix(true,true);
+                  palm.geometry.computeBoundingBox();
+                  const b=new THREE.Box3().setFromObject(palm);
+                  return {visible:palm.visible,geoMin:palm.geometry.boundingBox.min.toArray(),
+                    geoMax:palm.geometry.boundingBox.max.toArray(),
+                    worldMin:b.min.toArray(),worldMax:b.max.toArray(),
+                    support:w.support.getWorldPosition(new THREE.Vector3()).toArray(),
+                    sourceBone:P.germanPreview.nativeRig.hands.left.hand.getWorldPosition(new THREE.Vector3()).toArray(),
+                    worldCenter:b.getCenter(new THREE.Vector3()).toArray()};
+                });
+                (report.palmVariants|| (report.palmVariants=[])).push({name,y,z,palmDebug});
                 await page.waitForTimeout(180);
                 await page.screenshot({path:'/tmp/ww2-real-left-hand-'+name+'.png'});
               }
