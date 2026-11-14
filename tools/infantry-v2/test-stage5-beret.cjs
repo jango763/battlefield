@@ -23,7 +23,7 @@ for(const required of [
 ])assert(source.includes(required),'beret redesign missing '+required);
 assert(!source.includes("add(new THREE.SphereGeometry(1,20,12),felt"),
   'old giant cartoon crown still present');
-assert(wrapper.includes('stage5-beret-r5'),'game cache still selects outdated beret');
+assert(wrapper.includes('stage6-single-hands-r1'),'game cache still selects outdated beret');
 console.log('STAGE 5 STATIC PASS: low crown, head-bone delta and no old double-sphere');
 
 if(process.argv.includes('--browser')){
