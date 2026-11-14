@@ -412,17 +412,22 @@ function attachNativeArmyM43FieldCap(rig){
       throw Error('German M43 cap asset bounds invalid');
     // M43 cap is intentionally flatter than the officer cap; the first
     // four-soldier review showed an oversized dark cylindrical crown.
-    const scale=Math.min(.245/size.x,.39/size.z,.126/size.y);
+    // Mobile capture revealed the extra-flat fit clipped entirely inside
+    // the scalp. Restore a full cloth crown, keeping the original proportions.
+    const scale=Math.min(.245/size.x,.39/size.z,.155/size.y);
     const center=box.getCenter(new THREE.Vector3());
     model.scale.multiplyScalar(scale);
-    model.position.set(-center.x*scale,.167-box.min.y*scale,-center.z*scale);
+    model.position.set(-center.x*scale,.171-box.min.y*scale,-center.z*scale);
     model.traverse(n=>{
       if(!n.isMesh)return;
       n.castShadow=true;n.receiveShadow=true;
       const color=new THREE.Color(0x69776a);
       const recolor=m=>{
         const copy=m.clone();
-        if(copy.color)copy.color.lerp(color,.62);
+        // The original dark texture made the cap look like a black cylinder
+        // on the squad screenshot. Use our matte field-grey fabric palette.
+        if(copy.color)copy.color.setHex(0x647166);
+        if('map' in copy)copy.map=null;
         if('roughness' in copy)copy.roughness=.96;
         if('metalness' in copy)copy.metalness=0;
         return copy;
