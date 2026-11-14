@@ -865,20 +865,7 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
     const orientation=w.root.quaternion.clone().multiply(rig.weaponHandQ[side]);
     GermanRig.orient(vis,a.hand,orientation);
   }
-  if(w.supportPalm){
-    w.support.updateWorldMatrix(true,true);
-    const localQ=w.support.getWorldQuaternion(new THREE.Quaternion()).invert();
-    w.supportPalm.quaternion.copy(localQ.multiply(
-      rig.hands.left.hand.getWorldQuaternion(new THREE.Quaternion())));
-    // The frozen source hand is accurate sculpted geometry, but the reference
-    // skeletal pose is an open grip. Adjust its palm *orientation* relative
-    // to the magazine sleeve; never deform a finger by guesswork.
-    const pose=window.__supportPalmPose||{x:0,y:.62,z:0};
-    w.supportPalm.quaternion.multiply(new THREE.Quaternion().setFromEuler(
-      new THREE.Euler(pose.x||0,pose.y||0,pose.z||0,'XYZ')));
-    w.supportPalm.position.set(0,-.028,.10);
-    w.supportPalm.visible=unit.kind==='p'&&(unit.wpn|0)===1;
-  }
+  // No extra rigid palm: the existing donor left glove owns the fore-end.
   vis.updateWorldMatrix(true,true);
   const rightError=rig.hands.right.hand.getWorldPosition(new THREE.Vector3())
     .distanceTo(w.trigger.getWorldPosition(new THREE.Vector3()));
@@ -1050,68 +1037,11 @@ function updateNativeHeroPrimitiveUniform(rig){
 // This is intentionally a preview until visual acceptance on mobile Safari.
 
 
-// Bake the original Quaternius LEFT palm/fingers into a small rigid weapon
-// attachment. The WW2 donor's separately rigged sleeve can swallow its own
-// supporting hand; changing only the IK wrist position cannot fix that.
-function createNativeSupportPalm(rig){
-  if(!rig.weapon?.support||!rig.hands?.left?.hand)return null;
-  const handBone=rig.hands.left.hand;
-  rig.model.updateWorldMatrix(true,true);
-  handBone.updateWorldMatrix(true,true);
-  const inverse=handBone.matrixWorld.clone().invert();
-  const positions=[],vertex=new THREE.Vector3();
-  const isLeftHand=name=>/^(?:hand_l|(?:thumb|index|middle|ring|pinky)_(?:0?[1-3])_l)$/i.test(name);
-  for(const mesh of rig.ww2Uniform.originalMeshes){
-    const geom=mesh.geometry,idx=geom.getAttribute('skinIndex'),
-      weights=geom.getAttribute('skinWeight'),base=geom.getAttribute('position');
-    if(!idx||!weights||!base||typeof mesh.boneTransform!=='function')continue;
-    mesh.skeleton.update();
-    const weightByVertex=new Float32Array(idx.count);
-    for(let i=0;i<idx.count;i++){
-      for(let k=0;k<4;k++){
-        const id=k===0?idx.getX(i):k===1?idx.getY(i):k===2?idx.getZ(i):idx.getW(i);
-        const w=k===0?weights.getX(i):k===1?weights.getY(i):k===2?weights.getZ(i):weights.getW(i);
-        if(isLeftHand(mesh.skeleton.bones[id]?.name||''))weightByVertex[i]+=w;
-      }
-    }
-    const tris=geom.index?.array||Uint32Array.from({length:idx.count},(_,i)=>i);
-    for(let i=0;i+2<tris.length;i+=3){
-      const a=tris[i],b=tris[i+1],c=tris[i+2];
-      if(Math.min(weightByVertex[a],weightByVertex[b],weightByVertex[c])<.22||
-        Math.max(weightByVertex[a],weightByVertex[b],weightByVertex[c])<.58)continue;
-      for(const index of [a,b,c]){
-        vertex.fromBufferAttribute(base,index);
-        mesh.boneTransform(index,vertex);
-        vertex.applyMatrix4(mesh.matrixWorld).applyMatrix4(inverse);
-        positions.push(vertex.x,vertex.y,vertex.z);
-      }
-    }
-  }
-  if(positions.length<450)throw Error('Native glove mesh missing or not baked');
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
-  // The original GLB pose can include the actor's world translation inside
-  // the baked skin-matrix output. Rebase to the palm's actual mesh bounds,
-  // or the hand ends up ~12 world units away despite a correct IK target.
-  g.computeBoundingBox();
-  const palmCenter=g.boundingBox.getCenter(new THREE.Vector3());
-  g.translate(-palmCenter.x,-palmCenter.y,-palmCenter.z);
-  g.computeBoundingBox();
-  g.computeVertexNormals();
-  const skin=new THREE.MeshStandardMaterial({
-    name:'QuaterniusRealSupportPalm',color:0x543b29,
-    roughness:.93,metalness:0,side:THREE.DoubleSide
-  });
-  const mesh=new THREE.Mesh(g,skin);
-  mesh.name='NativeQuaterniusSupportPalm';
-  mesh.scale.setScalar(.67);
-  mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;
-  rig.weapon.support.add(mesh);
-  rig.weapon.supportPalm=mesh;
-  rig.weapon.supportPalmTriangles=positions.length/9;
-  return mesh;
-}
-
+// The WWII donor coat already has its own skinned left and right hands.
+// Never bake or attach a second standalone support palm to the weapon.
+// It was displayed over the existing glove when the player selected a SMG,
+// making four hands appear on screen. Wrist/finger posing stays on the
+// donor skeleton, which follows native weapon IK.
 
 // German PLAYER ONLY: recognisable field kit and a muted olive tunic. Army
 // infantry/engineers/officers keep their own silhouettes and materials.
@@ -1381,10 +1311,9 @@ function dressNativeHeroFieldUniform(rig){
     rig.ww2Uniform=ww2;
     rig.ww2OutfitTemporary=null;
     for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
-    // Army's WW2 donor has an actual skinned glove: avoid an extra fake palm.
-    if(!rig.armyUnit){
-      try{createNativeSupportPalm(rig);}catch(error){console.warn('Support palm fallback:',error);}
-    }
+    // One visible glove per side: donor costume hands only. The native
+    // Quaternius geometry remains hidden but drives IK invisibly.
+    rig.handVisualSource='ww2-donor';
     updateNativeHeroFieldUniform(rig);
     loadNativeHeroSideCap(rig);
   }catch(error){
@@ -1513,7 +1442,8 @@ function updateNativeHeroFieldUniform(rig){
       // silhouette; leave left support and British calibration unchanged.
       const roll=rig.armyUnit&&uniform.side==='red'
         ?(side==='right'?-.09:.30)
-        :uniform.side==='red'?(side==='right'?-.17:.48):-.85;
+        :uniform.side==='red'?(side==='right'?-.17:.48)
+        :(side==='right'?-.12:.18); // British mirrored natural wrists; no -0.85 rad double twist
       handLocalQ[side].multiply(new THREE.Quaternion().setFromAxisAngle(
         new THREE.Vector3(0,0,1),roll));
     }
