@@ -1478,11 +1478,15 @@ function updateNativeHeroFieldUniform(rig){
     space.updateWorldMatrix(true,true);
     cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
     const inv=space.getWorldQuaternion(new THREE.Quaternion()).invert();
-    cap.quaternion.copy(inv.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
-    // Seat the wool cuff low enough to cover upper ears and scalp.
-    // Follow the animated head bone without changing the native skeleton.
-    // Lower the cuff ~3.5 cm from the loose, helmet-like test fit.
-    // Make the position relative to the animated head's own orientation.
+    const headLocalQ=inv.multiply(head.getWorldQuaternion(new THREE.Quaternion()));
+    // Mixamo donor head bone has a ~14-degree bind-pose tilt. Copying its
+    // absolute orientation pitched the cuff down onto the eyes and left
+    // forehead hair sticking through the front. Align the hat upright on
+    // the first pose, and follow ONLY subsequent head animation deltas.
+    if(!cap.userData.headBindLocalQ)
+      cap.userData.headBindLocalQ=headLocalQ.clone();
+    cap.quaternion.copy(headLocalQ).multiply(
+      cap.userData.headBindLocalQ.clone().invert()).normalize();
     cap.position.y+=.143;
     // Measured donor-head scalp extends ~5-6 cm in front of the old wool
     // geometry; place the knit cover across the forehead, not behind it.
