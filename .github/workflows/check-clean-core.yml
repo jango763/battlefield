@@ -6,6 +6,9 @@ on:
       - preview/german-v5.js
       - preview/formation-replenishment-v3.html
       - tools/infantry-v2/test-clean-core.cjs
+      - tools/infantry-v2/test-wehrmacht-rollout.cjs
+      - tools/infantry-v2/test-british-pilot.cjs
+      - tools/infantry-v2/test-hero-headwear.cjs
       - docs/CORE-CONTINUATION.md
       - .github/workflows/check-clean-core.yml
   workflow_dispatch:
