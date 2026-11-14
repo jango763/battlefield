@@ -967,7 +967,9 @@ function updateNativeHeroFieldUniform(rig){
       // The original equal roll on both hands twists the mirrored support
       // wrist outwards. Only the German hero gets the mirrored, smaller rolls;
       // the British uniform keeps its previously approved alignment.
-      const roll=uniform.side==='red'?(side==='right'?-.48:.48):-.85;
+      // Avoid the exaggerated right wrist roll responsible for the claw
+      // silhouette; leave left support and British calibration unchanged.
+      const roll=uniform.side==='red'?(side==='right'?-.17:.48):-.85;
       handLocalQ[side].multiply(new THREE.Quaternion().setFromAxisAngle(
         new THREE.Vector3(0,0,1),roll));
     }
@@ -998,13 +1000,13 @@ function updateNativeHeroFieldUniform(rig){
       // Preserve the index finger near the trigger; close the other German
       // gripping fingers around the pistol grip instead of displaying a claw.
       const germanTrigger=uniform.side==='red'&&entry.hand==='right';
-      const adjusted=germanTrigger?(entry.digit==='Index'?angle*1.40:angle*1.24):angle;
+      const adjusted=germanTrigger?(entry.digit==='Index'?angle*.94:angle*1.35):angle;
       entry.bone.quaternion.multiply(grasp.setFromAxisAngle(axis,adjusted));
       // The donor thumb points sideways in the mobile close-up. Fold its base
       // towards the palm rather than twisting the whole wrist again.
       if(germanTrigger&&entry.digit==='Thumb'&&entry.segment===1){
         entry.bone.quaternion.multiply(
-          grasp.setFromAxisAngle(new THREE.Vector3(0,0,1),-.85));
+          grasp.setFromAxisAngle(new THREE.Vector3(0,0,1),-.31));
       }
       entry.bone.updateWorldMatrix(false,true);
     }
@@ -1103,7 +1105,7 @@ function loadNativeHeroSideCap(rig){
   // ?pilotka=classic retains the old source mesh for A/B inspection.
   if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
     const cap=new THREE.Group();
-    cap.name='GermanPilotka_HeadTracked_V16';
+    cap.name='GermanPilotka_HeadTracked_V17';
     cap.userData.proceduralPilotka=true;
     // Narrow cloth Schiffchen silhouette, not an inflated beret.
     // Five cross-sections follow the scalp, with a pointed folded crest.
@@ -1136,12 +1138,14 @@ function loadNativeHeroSideCap(rig){
     frontBand.castShadow=true;frontBand.receiveShadow=true;
     cap.add(frontBand);
     const stations=[
-      {z:-.194,w:.054,b:.180,s:.247,t:.254},
-      {z:-.134,w:.112,b:.166,s:.251,t:.278},
-      {z:-.062,w:.141,b:.162,s:.253,t:.298},
-      {z:.062,w:.141,b:.162,s:.253,t:.298},
-      {z:.134,w:.112,b:.166,s:.251,t:.278},
-      {z:.194,w:.054,b:.180,s:.247,t:.254}
+      // Lift only the crown and shoulder panels above the hair volume.
+      // The face band and side widths remain exactly as in approved V16.
+      {z:-.194,w:.054,b:.180,s:.255,t:.267},
+      {z:-.134,w:.112,b:.166,s:.266,t:.307},
+      {z:-.062,w:.141,b:.162,s:.269,t:.329},
+      {z:.062,w:.141,b:.162,s:.269,t:.329},
+      {z:.134,w:.112,b:.166,s:.266,t:.307},
+      {z:.194,w:.054,b:.180,s:.255,t:.267}
     ];
     // Bring the German sidecap 15% closer to the temples. Leave its
     // front-to-back length and height untouched to keep the scalp covered.
@@ -1193,7 +1197,7 @@ function loadNativeHeroSideCap(rig){
       cap.add(new THREE.Mesh(geo,sideCloth));
     }
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German head-following Schiffchen V16';
+    u.cap=cap;u.headwear='German head-following Schiffchen V17';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
