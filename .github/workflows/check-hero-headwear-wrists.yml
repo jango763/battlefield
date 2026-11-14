@@ -1,0 +1,225 @@
+name: Hero headwear wrists debug acceptance
+on:
+  push:
+    branches: [fix/hero-headwear-wrists-status-20261114]
+    paths:
+      - preview/german-v5.js
+      - preview/formation-replenishment-v3.html
+      - .github/workflows/check-hero-headwear-wrists.yml
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mobile Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/ww2-playwright playwright@1.58.2
+          /tmp/ww2-playwright/node_modules/.bin/playwright install chromium
+      - name: Validate each side, grips, animations, weapon slots and WW2 cap
+        shell: bash
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/ww2-server.log 2>&1 &
+          sleep 2
+          node - <<'JS'
+          const {chromium}=require('/tmp/ww2-playwright/node_modules/playwright'),fs=require('fs');
+          (async()=>{
+            const report={success:false,failures:[],errors:[],factions:{},poses:{},sampleShots:[]};
+            let browser;
+            try{
+              browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
+              const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
+              page.on('pageerror',e=>{if(report.errors.length<20)report.errors.push('page '+e.message)});
+              page.on('console',m=>{if(m.type()==='error'&&report.errors.length<20)report.errors.push('console '+m.text())});
+              await page.goto('http://127.0.0.1:8777/preview/formation-replenishment-v3.html',{waitUntil:'domcontentloaded',timeout:45000});
+              await page.waitForFunction(()=>{
+                try{return !!(P?.germanPreview?.nativeRig?.weapon?.ww2Manifest);}
+                catch(e){return false}
+              },null,{timeout:100000});
+              await page.waitForFunction(()=>{
+                try{return !!P.germanPreview.nativeRig?.ww2Uniform?.cap;}
+                catch(e){return false}
+              },null,{timeout:40000});
+              const initial=await page.evaluate(()=>{
+                const r=P.germanPreview.nativeRig,u=r.ww2Uniform;
+                const bb=new THREE.Box3().setFromObject(u.cap);
+                return {clips:Object.keys(r.actions),matchedBones:u.matchedBones,
+                  capMeshes:(()=>{let n=0;u.cap.traverse(x=>{if(x.isMesh)n++});return n;})(),
+                  capClearance:bb.min.y-u.headBone.getWorldPosition(new THREE.Vector3()).y,
+                  capMaxY:bb.max.y,headY:u.headBone.getWorldPosition(new THREE.Vector3()).y,
+                  modelVisible:!!r.model.visible,weaponCatalog:Object.keys(r.weapon.ww2Manifest.weapons)};
+              });
+              report.initial=initial;
+              report.headwear=await page.evaluate(()=>{
+                const r=P.germanPreview.nativeRig,u=r.ww2Uniform;
+                const head=u.headBone;
+                const capOffset=head.worldToLocal(u.cap.getWorldPosition(new THREE.Vector3()));
+                return {beretReady:!!u.beret,beretMeshes:u.beret?.children.filter(n=>n.isMesh).length,
+                  capForward:capOffset.z,capHeight:capOffset.y,
+                  debugBannerPresent:!!document.getElementById('native-hero-rig-label'),
+                  wristOffsetsReady:!!u.donorHandBindOffsets?.right&&!!u.donorHandBindOffsets?.left};
+              });
+              if(!report.headwear.beretReady||report.headwear.beretMeshes<3)report.failures.push('British beret not generated');
+              if(report.headwear.capForward<.075)report.failures.push('German cap not advanced forward on head '+report.headwear.capForward);
+              if(report.headwear.debugBannerPresent)report.failures.push('Diagnostic loading panel leaked into production');
+              if(!report.headwear.wristOffsetsReady)report.failures.push('No calibrated donor wrist offsets');
+              report.supportPalm=await page.evaluate(()=>{
+                const w=P.germanPreview.nativeRig.weapon;
+                return {ready:!!w.supportPalm,triangles:w.supportPalmTriangles||0,visible:w.supportPalm?.visible};
+              });
+              if(!report.supportPalm.ready||report.supportPalm.triangles<100)
+                report.failures.push('actual sculpted support palm not generated: '+JSON.stringify(report.supportPalm));
+
+              report.skinnedDonorMeshes=await page.evaluate(()=>
+                P.germanPreview.nativeRig.ww2Uniform.donorMeshes.filter(x=>x.type==='garment').length);
+              if(!report.skinnedDonorMeshes)report.failures.push('missing original visible skinned soldier geometry');
+              if(initial.clips.join(',')!=='idle,jog,sprint'||initial.matchedBones<16)report.failures.push('native clip or donor rig changed');
+              if(initial.capClearance<0.02||initial.capClearance>0.18||initial.capMeshes<1)report.failures.push('sidecap cap fit '+initial.capClearance);
+              if(initial.weaponCatalog.length!==6)report.failures.push('not six WW2 GLB models');
+              for(const [side,keys] of [
+                ['red',['de-kar98k','de-mp40','de-mg42','de-kar98k']],
+                ['blue',['uk-lee-enfield','uk-sten','uk-bren','uk-lee-enfield']]
+              ]){
+                report.factions[side]=[];
+                for(let slot=0;slot<6;slot++){
+                  await page.evaluate(([s,slot])=>{
+                    P.side=s;P.wpn=slot;P.sv=0;P.aim=0;P.aimT=P.g.rotation.y;
+                    animateNativeHeroRig(P,P.germanPreview,1/60);
+                  },[side,slot]);
+                  if(slot<4)await page.waitForFunction(([s,slot,key])=>{
+                    try{
+                      P.side=s;P.wpn=slot;
+                      animateNativeHeroRig(P,P.germanPreview,1/60);
+                      return P.germanPreview.nativeRig.weapon.activeModelId===key;
+                    }catch(e){return false}
+                  },[side,slot,keys[slot]],{timeout:80000});
+                  const out=await page.evaluate(()=>{
+                    const r=P.germanPreview.nativeRig,w=r.weapon,u=r.ww2Uniform;
+                    for(let i=0;i<12;i++)animateNativeHeroRig(P,P.germanPreview,1/60);
+                    return {slot:P.wpn,side:P.side,key:w.activeModelId,diag:{...r.weaponDiagnostics},
+                      capVisible:u.cap?.visible,beretVisible:u.beret?.visible,
+                      wristAngles:(()=>{
+                        const result={};
+                        for(const side of ['left','right']){
+                          const q=r.hands[side].hand.getWorldQuaternion(new THREE.Quaternion());
+                          const expected=q.clone().multiply(u.donorHandBindOffsets[side]);
+                          const actual=u.donorHands[side].hand.getWorldQuaternion(new THREE.Quaternion());
+                          result[side]=expected.angleTo(actual);
+                        }
+                        return result;
+                      })(),oldGunVisible:w.fallback.visible,
+                      source:!!w.ww2Manifest,
+                      trigger:w.trigger.position.toArray(),
+                      support:w.support.position.toArray(),
+                      supportPalmVisible:!!w.supportPalm?.visible,
+                      supportPalmError:w.supportPalm?
+                        new THREE.Box3().setFromObject(w.supportPalm).getCenter(new THREE.Vector3())
+                          .distanceTo(w.support.getWorldPosition(new THREE.Vector3())):null};
+                  });
+                  report.factions[side].push(out);
+                  if(slot<4&&out.key!==keys[slot])report.failures.push('incorrect model '+side+' '+slot+': '+out.key);
+                  if(slot<4&&out.oldGunVisible)report.failures.push('obsolete test gun visible '+side+' '+slot);
+                  if(slot===1&&(!out.supportPalmVisible||out.supportPalmError>.22))
+                    report.failures.push('visible sculpted support palm missing or displaced '+side+': '+JSON.stringify(out));
+                  if(slot>=4&&out.key!=='launcher-prototype')report.failures.push('launcher fallback '+side+' '+slot);
+                  if(side==='red'&&(!out.capVisible||out.beretVisible)||side==='blue'&&(out.capVisible||!out.beretVisible))
+                    report.failures.push('incorrect faction headwear: '+JSON.stringify(out));
+                  if(out.wristAngles.left>.22||out.wristAngles.right>.22)
+                    report.failures.push('donor wrists not aligned to weapon-controlled hands: '+JSON.stringify(out.wristAngles));
+                  if(out.diag.leftError>.12||out.diag.rightError>.12)report.failures.push('hands not on actual grips '+side+' '+slot);
+                  if(!Number.isFinite(out.diag.visibleLeftError)||out.diag.visibleLeftError>.12||!Number.isFinite(out.diag.visibleRightError)||out.diag.visibleRightError>.12)
+                    report.failures.push('visible uniform hand does not touch gun '+side+' '+slot+' '+JSON.stringify(out.diag));
+                }
+              }
+              for(const [name,speed,aim] of [['idle',0,0],['jog',3.2,0],['sprint',5.6,0],['aim',0,1]]){
+                const pose=await page.evaluate(([name,speed,aim])=>{
+                  P.side='red';P.wpn=1;P.sv=speed;P.aim=aim;P.aimT=P.g.rotation.y;
+                  for(let i=0;i<40;i++)animateNativeHeroRig(P,P.germanPreview,1/60);
+                  const d=P.germanPreview.nativeRig.weaponDiagnostics;
+                  return {...d};
+                },[name,speed,aim]);
+                report.poses[name]=pose;
+                if(pose.leftError>.12||pose.rightError>.12||pose.weaponId!=='de-mp40')report.failures.push('movement IK '+name);
+              }
+              await page.evaluate(()=>{
+                P.sv=0;P.aim=0;
+                // Isolate the hero from map buildings: an occluding wall must
+                // never mask a missing limb during the image review.
+                scene.background=new THREE.Color(0xa6aaa6);
+                for(const node of scene.children)
+                  if(node!==P.g&&!node.isLight)node.visible=false;
+                const old=cam.updateMatrixWorld.bind(cam);
+                cam.updateMatrixWorld=function(force){
+                  this.position.set(P.x+2.2,3.6,P.z+5);
+                  this.lookAt(P.x,1.35,P.z);
+                  return old(force);
+                };
+              });
+              for(const [side,slot,tag] of [['red',1,'de-mp40'],['blue',1,'uk-sten'],['red',2,'de-mg42']]){
+                await page.evaluate(([side,slot])=>{
+                  P.side=side;P.wpn=slot;P.sv=0;P.aim=0;
+                  for(let i=0;i<3;i++)animateNativeHeroRig(P,P.germanPreview,1/60);
+                },[side,slot]);
+                await page.waitForTimeout(500);
+                await page.screenshot({path:'/tmp/ww2-weapon-'+tag+'.png'});
+                report.sampleShots.push(tag);
+              }
+              // Render candidate wrist rotations on an isolated character.
+              for(const [name,x,y,z] of [
+                ['baseline',0,0,0],['roll-plus',0,0,.58],
+                ['roll-minus',0,0,-.58],['pitch-plus',.62,0,0],
+                ['pitch-minus',-.62,0,0],['yaw-plus',0,.62,0]
+              ]){
+                await page.evaluate(({x,y,z})=>{
+                  window.__ww2SupportOffset={x:0,y:.055,z:.08};
+                  window.__supportPalmPose={x,y,z};
+                  P.side='red';P.wpn=1;P.sv=0;P.aim=0;
+                  for(let i=0;i<8;i++)animateNativeHeroRig(P,P.germanPreview,1/60);
+                },{x,y,z});
+                const palm=await page.evaluate(()=>{
+                  const w=P.germanPreview.nativeRig.weapon,mesh=w.supportPalm;
+                  const b=new THREE.Box3().setFromObject(mesh);
+                  return {visible:mesh.visible,worldCenter:b.getCenter(new THREE.Vector3()).toArray(),
+                    support:w.support.getWorldPosition(new THREE.Vector3()).toArray()};
+                });
+                (report.palmVariants||(report.palmVariants=[])).push({name,x,y,z,palm});
+                await page.waitForTimeout(120);
+                await page.screenshot({path:'/tmp/ww2-hand-pose-'+name+'.png'});
+              }
+              report.success=report.failures.length===0;
+            }catch(e){report.failures.push('exception: '+e.stack)}
+            finally{
+              fs.writeFileSync('/tmp/ww2-weapons-report.json',JSON.stringify(report,null,2));
+              console.log(JSON.stringify(report,null,2));
+              if(browser)await browser.close();
+              if(!report.success)process.exitCode=1;
+            }
+          })();
+          JS
+      - name: Make profile screenshot visible in workflow logs
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64,pathlib
+          for side in ('de-mp40','uk-sten'):
+            path=pathlib.Path('/tmp/ww2-weapon-'+side+'.png')
+            if not path.exists():continue
+            data=base64.b64encode(path.read_bytes()).decode('ascii')
+            print('HATSHOT_BEGIN '+side+' '+str(len(data)))
+            for i in range(0,len(data),48000):
+              print('HATSHOT_PART '+side+' '+data[i:i+48000])
+            print('HATSHOT_END '+side)
+          PY
+      - name: Archive render evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hero-headwear-wrists-qa
+          path: |
+            /tmp/ww2-weapons-report.json
+            /tmp/ww2-weapon-*.png
+            /tmp/ww2-hand-pose-*.png
+          if-no-files-found: warn
