@@ -1510,7 +1510,34 @@ function animateNativeHeroRig(unit,v,dt){
   if(!r)return false;
   const speed=Math.max(0,Number.isFinite(unit.sv)?unit.sv:0);
   const next=speed<.28?'idle':speed<4.2?'jog':'sprint';
-  if(r.state!==next){
+  if(r.armyUnit){
+    // Native Sprint_Loop is a very long, forward-leaning heroic dash.
+    // It reads as a cartoon lunge on ordinary infantry. Blend it at most
+    // 24% into the grounded Jog_Fwd_Loop, while retaining all three native
+    // clips and the normal gameplay speed (no movement physics changes).
+    const sprintMix=next==='sprint'
+      ?THREE.MathUtils.clamp((speed-4.2)/2.5,0,1)*.24:0;
+    const target={
+      idle:next==='idle'?1:0,
+      jog:next==='idle'?0:1-sprintMix,
+      sprint:sprintMix
+    };
+    if(!r.armyBlendWeights){
+      r.armyBlendWeights={idle:1,jog:0,sprint:0};
+      for(const action of Object.values(r.actions)){
+        action.enabled=true;action.setEffectiveWeight(0);action.play();
+      }
+    }
+    const blend=1-Math.exp(-Math.max(0,Math.min(dt||0,.08))*12);
+    for(const name of ['idle','jog','sprint']){
+      const action=r.actions[name];
+      r.armyBlendWeights[name]+=blend*(target[name]-r.armyBlendWeights[name]);
+      action.setEffectiveWeight(r.armyBlendWeights[name]);
+    }
+    // Shorter cadence adjustment for running; visual only.
+    r.actions.jog.setEffectiveTimeScale(1+THREE.MathUtils.clamp((speed-3)/6,0,.25));
+    r.state=next;
+  }else if(r.state!==next){
     const old=r.actions[r.state],action=r.actions[next];
     old.fadeOut(.16);
     action.reset().fadeIn(.16).play();
