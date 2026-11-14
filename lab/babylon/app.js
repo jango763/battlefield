@@ -62,7 +62,6 @@ async function start(){
  // Two-handed pose is an experimental procedural aim constraint.
  let weaponContainer=null,weaponRoot=null,grip=null,weaponGeneration=0;
  const weaponSelect=document.querySelector('#weapon');
- weaponSelect.value='de-mp40';
  const findPart=(...names)=>modelTargets.find(n=>names.some(x=>norm(n.name)===norm(x)));
  const chest=findPart('spine_03','spine_02','spine2','chest','upperchest','spine1');
  const rightHand=findPart('hand_r','righthand','RightHand');
@@ -74,37 +73,16 @@ async function start(){
  const manifest=await fetch(new URL('../../assets/ww2-weapons/manifest.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('manifest HTTP '+r.status);return r.json();});
  const toVec=a=>new B.Vector3(...a);
  const positionOf=node=>node?.getAbsolutePosition?.()||B.Vector3.Zero();
- // CCD arm solver. Runs AFTER the animation mixer and BEFORE render.
- // Each joint is rotated in its parent space; native lower-body clips stay intact.
- function rotateJointToward(joint,hand,target,maxAngle){
-  if(!joint||!hand||!joint.parent||!joint.rotationQuaternion)return false;
-  joint.computeWorldMatrix(true);hand.computeWorldMatrix(true);
-  const pivot=positionOf(joint),from=positionOf(hand).subtract(pivot),to=target.subtract(pivot);
-  if(from.lengthSquared()<1e-7||to.lengthSquared()<1e-7)return false;
-  from.normalize();to.normalize();
-  const dot=B.Scalar.Clamp(B.Vector3.Dot(from,to),-1,1);
-  const angle=Math.min(Math.acos(dot),maxAngle);
-  if(angle<.0001)return false;
-  const axis=B.Vector3.Cross(from,to);
-  if(axis.lengthSquared()<1e-8)return false;
-  axis.normalize();
-  const parentWorld=joint.parent.getWorldMatrix();
-  const parentRotation=new B.Quaternion();
-  parentWorld.decompose(undefined,parentRotation,undefined);
-  const inverse=parentRotation.conjugate();
-  const localAxis=B.Vector3.TransformNormal(axis,B.Matrix.FromQuaternion(inverse)).normalize();
-  const delta=B.Quaternion.RotationAxis(localAxis,angle);
-  joint.rotationQuaternion=delta.multiply(joint.rotationQuaternion).normalize();
-  joint.computeWorldMatrix(true);
-  return true;
- }
- function solveArm(upper,lower,hand,target){
-  if(!upper||!lower||!hand)return;
-  for(let i=0;i<5;i++){
-   rotateJointToward(lower,hand,target,.27);
-   rotateJointToward(upper,hand,target,.22);
-  }
- }
+ const targetAt=(node,target,strength)=>{
+  if(!node||!target)return;
+  const parent=node.parent;
+  if(!parent)return;
+  const joint=positionOf(node);
+  const direction=target.subtract(joint);
+  if(direction.lengthSquared()<.0001)return;
+  // Procedural shoulder alignment will be refined with two-bone IK.
+  // Keep native rotation when the rig has no reliable local arm axis.
+ };
  function updateWeaponPose(){
   if(!weaponRoot||!grip)return;
   // Use a stable chest socket rather than a swinging animated hand.
@@ -116,10 +94,8 @@ async function start(){
   grip.rotation.set(isSprint?.19:.04,isSprint?-.19:-.08,isSprint?-.15:0);
   // Record grip-point errors for next IK pass without mutating working animations.
   const trigger=weaponRoot.getAbsolutePosition();
-  const support=toVec(weaponRoot.metadata?.support||[0,0,.25]);
+  const support=toVec(grip.metadata?.support||[0,0,.25]);
   const supportWorld=B.Vector3.TransformCoordinates(support,weaponRoot.getWorldMatrix());
-  solveArm(rightUpper,rightLower,rightHand,trigger);
-  solveArm(leftUpper,leftLower,leftHand,supportWorld);
   state.gripDistances={
    right:rightHand?Number(B.Vector3.Distance(positionOf(rightHand),trigger).toFixed(3)):null,
    left:leftHand?Number(B.Vector3.Distance(positionOf(leftHand),supportWorld).toFixed(3)):null
@@ -133,7 +109,7 @@ async function start(){
    const url=new URL('../../assets/ww2-weapons/'+meta.file,import.meta.url);
    const incoming=await B.SceneLoader.LoadAssetContainerAsync('',url.href,scene);
    if(generation!==weaponGeneration){incoming.dispose();return;}
-   if(grip){grip.dispose(false,false);grip=null;weaponRoot=null;}
+   if(weaponRoot){weaponRoot.dispose(false,false);weaponRoot=null;}
    if(weaponContainer){weaponContainer.dispose();weaponContainer=null;}
    weaponContainer=incoming;weaponContainer.addAllToScene();
    if(!chest)throw Error('Грудная кость не найдена: '+modelTargets.map(n=>n.name).filter(n=>/spine|chest/i.test(n)).join(', '));
@@ -157,7 +133,7 @@ async function start(){
  }
  for(const btn of document.querySelectorAll('[data-clip]'))btn.addEventListener('click',()=>select(btn.dataset.clip));
  select('idle');await equipWeapon(weaponSelect.value);state.ready=true;state.scene=scene;state.engineInstance=engine;
- engine.runRenderLoop(()=>{scene.onBeforeRenderObservable.addOnce(()=>updateWeaponPose());scene.render();state.fps=Math.round(engine.getFps());});
+ engine.runRenderLoop(()=>{updateWeaponPose();scene.render();state.fps=Math.round(engine.getFps());});
  window.addEventListener('resize',()=>engine.resize());
 }
 start().catch(err=>{state.error=String(err?.stack||err);log('ОШИБКА: '+state.error);console.error(err);});
