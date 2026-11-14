@@ -1019,12 +1019,23 @@ function updateNativeHeroFieldUniform(rig){
     const cap=uniform.cap,head=uniform.headBone,space=rig.visual;
     space.updateWorldMatrix(true,true);
     cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
-    const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
-    cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
-    // The donor Mixamo head-bone axes include a large bind rotation; applying
-    // it directly to a native-Y-up procedural hat tips the whole pilotka
-    // sideways. The hero visual group already follows body heading.
-    if(cap.userData.proceduralPilotka)cap.quaternion.identity();
+    const headLocalQ=space.getWorldQuaternion(new THREE.Quaternion()).invert()
+      .multiply(head.getWorldQuaternion(new THREE.Quaternion())).normalize();
+    if(cap.userData.proceduralPilotka){
+      // A German procedural sidecap is modelled Y-up, while the donor Mixamo
+      // head bone has a rotated bind basis. Align to the first known pose,
+      // then follow the *relative* bone animation (idle/jog/sprint/aim).
+      // This retains the calibrated upright fit but removes the old
+      // cap.quaternion.identity() freeze that made it slide during running.
+      if(!cap.userData.headBindLocalQ)
+        cap.userData.headBindLocalQ=headLocalQ.clone();
+      cap.quaternion.copy(headLocalQ)
+        .multiply(cap.userData.headBindLocalQ.clone().invert()).normalize();
+      cap.userData.headFollowRadians=2*Math.acos(
+        THREE.MathUtils.clamp(Math.abs(cap.quaternion.w),0,1));
+    }else{
+      cap.quaternion.copy(headLocalQ);
+    }
     // Source geometry already includes its scalp/ridge height.
     // Donor head pivot is much lower than the visible hairline. Raise the
     // sidecap from eyebrow level onto the crown.
@@ -1092,7 +1103,7 @@ function loadNativeHeroSideCap(rig){
   // ?pilotka=classic retains the old source mesh for A/B inspection.
   if(new URLSearchParams(location.search).get('pilotka')!=='classic'){
     const cap=new THREE.Group();
-    cap.name='GermanPilotka_Schiffchen_V15_Narrow';
+    cap.name='GermanPilotka_HeadTracked_V16';
     cap.userData.proceduralPilotka=true;
     // Narrow cloth Schiffchen silhouette, not an inflated beret.
     // Five cross-sections follow the scalp, with a pointed folded crest.
@@ -1182,7 +1193,7 @@ function loadNativeHeroSideCap(rig){
       cap.add(new THREE.Mesh(geo,sideCloth));
     }
     rig.visual.add(cap);
-    u.cap=cap;u.headwear='German fitted Schiffchen V15 narrow';
+    u.cap=cap;u.headwear='German head-following Schiffchen V16';
     cap.visible=u.side==='red';
     updateNativeHeroFieldUniform(rig);
     return;
