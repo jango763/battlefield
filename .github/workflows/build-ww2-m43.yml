@@ -1,0 +1,92 @@
+name: Bake MIT M43 field cap for native hero
+on:
+  push:
+    branches: [feature/ww2-m43-cap-asset-20261113]
+    paths:
+      - .github/workflows/build-ww2-m43.yml
+permissions:
+  contents: write
+jobs:
+  bake:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone pinned MIT WWII model source
+        run: |
+          git clone --quiet https://github.com/Kenton-GMI/muster-ww2.git /tmp/muster-ww2
+          cd /tmp/muster-ww2
+          git checkout --quiet 7d2fa86ebc3b999eaf085831cdcd5dccefea63d4
+          npm ci --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund tsx
+      - name: Export original M43 geometry as compressed self-contained GLB
+        shell: bash
+        run: |
+          cat >/tmp/muster-ww2/export-m43.ts <<'JS'
+          import fs from 'node:fs';
+          import * as THREE from 'three';
+          import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
+          import {fieldCap} from './src/assets/germany/infantry/kit/cap.ts';
+          class FileReaderPolyfill {
+            result:any=null;
+            onload:any=null;onloadend:any=null;onerror:any=null;
+            async readAsArrayBuffer(blob:Blob){
+              try{this.result=await blob.arrayBuffer();this.onload?.({target:this});this.onloadend?.({target:this});}
+              catch(e){this.onerror?.(e)}
+            }
+            async readAsDataURL(blob:Blob){
+              try{this.result='data:'+blob.type+';base64,'+Buffer.from(await blob.arrayBuffer()).toString('base64');this.onload?.({target:this});this.onloadend?.({target:this});}
+              catch(e){this.onerror?.(e)}
+            }
+          }
+          (globalThis as any).FileReader=FileReaderPolyfill;
+          const cap=fieldCap();
+          cap.name='M43_Field_Cap_Kenton_GMI_MIT';
+          let triangles=0,meshes=0;
+          cap.traverse((o:any)=>{
+            if(!o.isMesh)return;
+            meshes++;
+            triangles+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;
+            const old=o.material;
+            o.material=new THREE.MeshStandardMaterial({
+              name:'WW2_M43_Wool',
+              color:old.color||new THREE.Color(0x4a5450),
+              roughness:0.92,metalness:0
+            });
+          });
+          console.log('M43 triangles',triangles,'meshes',meshes);
+          if(meshes<4||triangles>160000)throw Error('Invalid exported M43 model');
+          const exporter=new GLTFExporter();
+          const data=await exporter.parseAsync(cap,{binary:true,trs:true,onlyVisible:true});
+          const buf=Buffer.from(data as ArrayBuffer);
+          if(buf.toString('ascii',0,4)!=='glTF')throw Error('Export not GLB');
+          const path=process.env.GITHUB_WORKSPACE+'/assets/ww2-headwear/m43-field-cap.glb';
+          fs.mkdirSync(process.env.GITHUB_WORKSPACE+'/assets/ww2-headwear',{recursive:true});
+          fs.writeFileSync(path,buf);
+          fs.writeFileSync(process.env.GITHUB_WORKSPACE+'/assets/ww2-headwear/build-report.json',
+            JSON.stringify({source:'Kenton-GMI/muster-ww2',source_commit:'7d2fa86ebc3b999eaf085831cdcd5dccefea63d4',
+              model:'src/assets/germany/infantry/kit/cap.ts',license:'MIT',meshes,triangles,bytes:buf.length},null,2));
+          console.log('Exported',path,buf.length);
+          JS
+          cd /tmp/muster-ww2
+          ./node_modules/.bin/tsx export-m43.ts
+      - name: Keep MIT attribution
+        run: |
+          cp /tmp/muster-ww2/LICENSE assets/ww2-headwear/MUSTER-LICENSE.txt
+          cat >assets/ww2-headwear/SOURCE.md <<'EOT'
+          # M43 German field cap
+          Source: https://github.com/Kenton-GMI/muster-ww2
+          Original cap geometry: src/assets/germany/infantry/kit/cap.ts
+          Pinned commit: 7d2fa86ebc3b999eaf085831cdcd5dccefea63d4
+          Copyright (c) 2026 Kenton Wang
+          License: MIT (see MUSTER-LICENSE.txt)
+          Exported as static GLB for browser game from original MIT geometry.
+          Not the separate CC0/CC-BY Sketchfab WW2 Headwear asset.
+          EOT
+      - name: Commit baked headwear asset to isolated branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/ww2-headwear/
+          git commit -m 'assets: bake licensed M43 field cap as GLB' || exit 0
+          git push origin HEAD:refs/heads/feature/ww2-m43-cap-asset-20261113

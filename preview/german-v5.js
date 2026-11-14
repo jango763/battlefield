@@ -24,13 +24,13 @@ function prepareSoldierGeometry(figure){
     g.setAttribute('uniformMask',new THREE.BufferAttribute(mask,1));
   });
 }
-function soldierMaterial(source,palette){
-  const key=source.uuid+':'+palette;if(germanPreview.materials.has(key))return germanPreview.materials.get(key);
+function soldierMaterial(source,palette,customTint){
+  const key=source.uuid+':'+palette+(customTint==null?'':':'+customTint);if(germanPreview.materials.has(key))return germanPreview.materials.get(key);
   const m=source.clone(),cloth=m.name==='Material.003',helmet=/helmet/.test(m.name);
   m.metalness=helmet?.08:0;m.metalnessMap=null;m.roughness=.88;m.aoMapIntensity=.62;
   m.emissive.setHex(0x292b2c);m.emissiveIntensity=.16;
   if(cloth||helmet){
-    const tint=new THREE.Color(palette==='hero'?0x555960:palette==='grey'?0x93979b:0xb4ad85);
+    const tint=new THREE.Color(customTint==null?(palette==='hero'?0x555960:palette==='grey'?0x93979b:0xb4ad85):customTint);
     m.userData.uniformTint=tint.toArray();m.userData.clothMask=cloth;
     m.onBeforeCompile=shader=>{
       shader.uniforms.uniformTint={value:tint};
@@ -211,6 +211,7 @@ function disposeGermanSoldier(unit){
 }
 function animateGermanSoldier(unit,dt=.016){
   const v=unit.germanPreview;if(!v)return;
+  if(v.nativeRig&&animateNativeHeroRig(unit,v,dt))return;
   v.legacy.visible=false;v.anchor.visible=true;
   // Visual locomotion is independent of combat speed, collision and gameplay.
   // Filter speed so the stride cycle decelerates naturally instead of snapping.
@@ -312,6 +313,841 @@ function animateGermanSoldier(unit,dt=.016){
   v.identity.band.material.color.setHex((hero?unit.side:unit.t)==='red'?0x9e4a44:0x4d7391);
   v.anchor.updateWorldMatrix(true,true);
 }
+// Native rig diagnostic: Quaternius mesh + its OWN skeleton + animation library.
+// No retargeting and no changes to the army or gameplay. Only the HERO.
+// Assets from https://github.com/Seyamalam/blood-league-kickoff/ (CC0
+// Quaternius, see docs/ASSET_CREDITS.md in upstream), pinned to source commit.
+// Keep every fallback on the same exact test build and use the stripped
+// assets. Derive the commit from the immutable GitHack preview URL.
+const NATIVE_HERO_REF=location.pathname.split('/').filter(Boolean)[2]||'main';
+const NATIVE_HERO_ASSET_ROOTS=[
+  new URL('../assets/native-hero-quaternius/',location.href).href,
+  'https://raw.githubusercontent.com/jango763/battlefield/'+NATIVE_HERO_REF+'/assets/native-hero-quaternius/',
+  'https://cdn.jsdelivr.net/gh/jango763/battlefield@'+NATIVE_HERO_REF+'/assets/native-hero-quaternius/'
+];
+function nativeHeroLabel(msg){
+  let node=document.getElementById('native-hero-rig-label');
+  if(!node){
+    node=document.createElement('div');node.id='native-hero-rig-label';
+    node.style.cssText='position:fixed;z-index:1000;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 118px);max-width:390px;min-height:44px;padding:10px 12px;color:white;background:#6d280bfa;border:2px solid #ffd45b;border-radius:8px;box-shadow:0 2px 14px #000c;font:700 15px/1.3 Arial;pointer-events:none';
+    document.body.appendChild(node);
+  }
+  if(/^НОВЫЙ СКЕЛЕТ v17: АКТИВЕН/.test(msg)&&!new URLSearchParams(location.search).has('rigdebug')){node.remove();return;}
+  node.textContent=msg;
+  node.style.background=/^НОВЫЙ СКЕЛЕТ v17: АКТИВЕН/.test(msg)?'#16582efa':/^СТАРЫЙ СКЕЛЕТ/.test(msg)?'#314255f5':'#6d280bfa';
+}
+// Hero-only native Quaternius rifle hold. This applies AFTER the native
+// animation mixer, so the accepted walk/run/leg clips stay unchanged.
+// Right hand controls the stock/trigger, left palm supports the fore-end.
+function makeNativeHeroAssaultRifle(){
+  const root=new THREE.Group();
+  root.name='NativeHeroTwoHandRifle';
+  const steel=new THREE.MeshLambertMaterial({color:0x313733}),
+    dark=new THREE.MeshLambertMaterial({color:0x212623}),
+    wood=new THREE.MeshLambertMaterial({color:0x6a4730}),
+    edge=new THREE.MeshLambertMaterial({color:0x464c44}),
+    flashMat=new THREE.MeshBasicMaterial({color:0xffe09b});
+  const cube=(mat,x,y,z,px,py,pz,group=root)=>{
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(x,y,z),mat);
+    mesh.position.set(px,py,pz);mesh.castShadow=true;group.add(mesh);return mesh;
+  };
+  // STG-44-inspired field rifle, recognizable side profile, one rigid object.
+  // +Z is forward. Stock remains against the right upper torso.
+  cube(wood,.115,.135,.36,0,-.017,-.32);
+  cube(wood,.19,.18,.11,0,-.08,-.49);
+  cube(steel,.13,.12,.38,0,.006,-.055);
+  cube(edge,.11,.10,.29,0,.025,.18);
+  cube(wood,.14,.105,.29,0,-.033,.31);
+  cube(dark,.045,.11,.13,0,-.112,-.12); // pistol grip
+  cube(steel,.095,.18,.095,0,-.156,.025).rotation.x=-.17; // magazine
+  cube(edge,.047,.038,.11,0,.097,-.15);
+  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.022,.026,.45,9),steel);
+  barrel.rotation.x=Math.PI/2;barrel.position.set(0,.022,.57);barrel.castShadow=true;root.add(barrel);
+  cube(dark,.055,.043,.065,0,.045,.84);
+  cube(dark,.021,.075,.017,0,.101,.48);
+  // Grip positions are wrist attachment points in rifle-local coordinates,
+  // never applied as world or gameplay positions.
+  const trigger=new THREE.Object3D();
+  trigger.position.set(0,-.105,-.16);root.add(trigger);
+  const support=new THREE.Object3D();
+  support.position.set(0,-.10,.35);root.add(support);
+  const muzzleFlash=new THREE.Mesh(new THREE.SphereGeometry(.072,7,5),flashMat);
+  muzzleFlash.position.set(0,.022,.89);muzzleFlash.scale.set(.7,.7,1.8);
+  muzzleFlash.visible=false;root.add(muzzleFlash);
+  // Preserve the old test model as a safe fallback; it is hidden when a
+  // historically modelled WW2 GLB has loaded. Launcher slots are separate.
+  const fallback=new THREE.Group();fallback.name='LegacyTestRifle';
+  for(const n of [...root.children])if(n!==trigger&&n!==support&&n!==muzzleFlash)fallback.add(n);
+  root.add(fallback);
+  const launcher=makeGermanWeapon().launcher;
+  launcher.name='PrototypeLauncher';launcher.visible=false;root.add(launcher);
+  return{root,trigger,support,muzzleFlash,fallback,launcher,
+    ww2Models:new Map(),ww2Pending:new Set(),ww2Failed:new Map(),
+    ww2Manifest:null,activeModel:null,activeModelId:'fallback'};
+}
+
+const WW2_WEAPON_GAME_SCALE=1.40;
+function initNativeHeroWW2WeaponCatalog(rig){
+  const w=rig.weapon;
+  if(!w)return;
+  const url=new URL('../assets/ww2-weapons/manifest.json',location.href);
+  fetch(url).then(async response=>{
+    if(!response.ok)throw new Error('WW2 manifest HTTP '+response.status);
+    return response.json();
+  }).then(manifest=>{
+    const expected=['de-kar98k','de-mp40','de-mg42','uk-lee-enfield','uk-sten','uk-bren'];
+    if(expected.some(key=>!manifest.weapons?.[key]?.trigger||!manifest.weapons[key]?.support))
+      throw new Error('Incomplete licensed WW2 weapon catalog');
+    w.ww2Manifest=manifest;
+  }).catch(error=>{w.ww2CatalogError=String(error);console.warn('WW2 catalog fallback:',error);});
+}
+function selectNativeHeroWW2Weapon(unit,rig){
+  const w=rig.weapon;
+  const side=unit.side==='red'?'red':'blue',slot=Math.max(0,Math.min(5,unit.wpn|0));
+  const ids=side==='red'?['de-kar98k','de-mp40','de-mg42','de-kar98k']:
+    ['uk-lee-enfield','uk-sten','uk-bren','uk-lee-enfield'];
+  const key=slot>=4?null:ids[slot],catalog=w.ww2Manifest,info=key?catalog?.weapons?.[key]:null;
+  if(info&&!w.ww2Models.has(key)&&!w.ww2Pending.has(key)&&!w.ww2Failed.has(key)){
+    w.ww2Pending.add(key);
+    const url=new URL('../assets/ww2-weapons/'+info.file,location.href);
+    new THREE.GLTFLoader().load(url.href,gltf=>{
+      if(!rig.weapon||rig.weapon!==w)return;
+      const obj=gltf.scene;
+      obj.name='WW2_'+key;
+      obj.scale.setScalar(WW2_WEAPON_GAME_SCALE);
+      obj.traverse(n=>{
+        if(!n.isMesh)return;
+        n.castShadow=true;n.receiveShadow=true;
+        const adjust=mat=>{
+          const m=mat.clone();
+          // Lift dark steel from near-black: preserve wood/bakelite contrast.
+          if(m.color&&m.color.r<.22&&m.color.g<.22&&m.color.b<.22)
+            m.color.lerp(new THREE.Color(0x545a56),.32);
+          if('roughness' in m)m.roughness=Math.min(m.roughness??.85,.78);
+          if('metalness' in m)m.metalness=.12;
+          return m;
+        };
+        n.material=Array.isArray(n.material)?n.material.map(adjust):adjust(n.material);
+      });
+      w.root.add(obj);
+      w.ww2Models.set(key,obj);
+      w.ww2Pending.delete(key);
+    },undefined,error=>{
+      w.ww2Pending.delete(key);
+      w.ww2Failed.set(key,String(error?.message||error));
+      console.warn('WW2 weapon fallback '+key,error);
+    });
+  }
+  const active=!!(info&&w.ww2Models.has(key));
+  for(const [name,model] of w.ww2Models)model.visible=active&&name===key;
+  w.fallback.visible=!active&&slot<4;
+  w.launcher.visible=slot>=4;
+  w.activeModelId=active?key:slot>=4?'launcher-prototype':'fallback';
+  w.activeModel=active?info:null;
+  const vec=(data)=>new THREE.Vector3().fromArray(data).multiplyScalar(WW2_WEAPON_GAME_SCALE);
+  if(active){
+    w.trigger.position.copy(vec(info.trigger)).addScaledVector(new THREE.Vector3().fromArray(info.triggerPalm),.013);
+    w.support.position.copy(vec(info.support)).addScaledVector(new THREE.Vector3().fromArray(info.supportPalm),.014);
+    if(key==='de-mp40'||key==='uk-sten'){
+      // The WW2 donor sleeve ends at a different bind-pose wrist length.
+      // Shift the support contact on the real fore-end to reveal the LEFT
+      // palm outside the cuff, instead of covering it with a fake fist.
+      const testOffset=window.__ww2SupportOffset||{x:0,y:.055,z:.08};
+      w.support.position.add(new THREE.Vector3(testOffset.x||0,testOffset.y||0,testOffset.z||0));
+    }
+    w.muzzleFlash.position.copy(vec(info.muzzle));
+  }else{
+    w.trigger.position.set(0,-.105,-.16);
+    w.support.position.set(0,-.10,slot>=4?.32:.35);
+    w.muzzleFlash.position.set(0,.022,slot>=4?1.0:.89);
+  }
+  // Sniper slots keep their established game rules and use the same
+  // rifle mesh with a small optical attachment. No stat changes.
+  if(!w.scope){
+    const scope=new THREE.Group();scope.name='SniperOpticOnly';
+    const mat=new THREE.MeshLambertMaterial({color:0x272d2b});
+    const tube=new THREE.Mesh(new THREE.CylinderGeometry(.023,.025,.20,12),mat);
+    tube.rotation.x=Math.PI/2;tube.position.set(0,.13,.12);scope.add(tube);
+    w.root.add(scope);w.scope=scope;
+  }
+  w.scope.visible=active&&slot===3;
+  return w.activeModelId;
+}
+
+function initNativeHeroWeapon(v,rig){
+  const boneMap=new Map();
+  rig.model.traverse(n=>{if(n.isBone)boneMap.set(n.name,n);});
+  const names=['upperarm_r','lowerarm_r','hand_r','upperarm_l','lowerarm_l','hand_l'];
+  if(names.some(name=>!boneMap.has(name)))throw new Error('Нет костей хвата оружия: '+names.filter(name=>!boneMap.has(name)).join(','));
+  const hands={
+    right:{upper:boneMap.get('upperarm_r'),elbow:boneMap.get('lowerarm_r'),hand:boneMap.get('hand_r')},
+    left:{upper:boneMap.get('upperarm_l'),elbow:boneMap.get('lowerarm_l'),hand:boneMap.get('hand_l')}
+  };
+  v.anchor.updateWorldMatrix(true,true);
+  const weapon=makeNativeHeroAssaultRifle();
+  rig.visual.add(weapon.root);
+  rig.weapon=weapon;
+  rig.hands=hands;
+  rig.weaponHandQ={};
+  for(const side of ['right','left']){
+    const q=hands[side].hand.getWorldQuaternion(new THREE.Quaternion());
+    const inv=rig.visual.getWorldQuaternion(new THREE.Quaternion()).invert();
+    rig.weaponHandQ[side]=inv.multiply(q);
+  }
+  rig.weaponDiagnostics={ready:false,rightError:null,leftError:null,poseUpdates:0};
+  initNativeHeroWW2WeaponCatalog(rig);
+}
+function updateNativeHeroWeapon(unit,v,rig,dt){
+  if(!rig.weapon||!rig.hands)return;
+  const vis=rig.visual,w=rig.weapon;
+  vis.updateWorldMatrix(true,true);
+  const local=bone=>vis.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
+  const sr=local(rig.hands.right.upper),sl=local(rig.hands.left.upper);
+  const sign=Math.sign(sr.x-sl.x)||-1;
+  const aimed=unit.aim>0,speed=Math.max(0,unit.sv||0);
+  const sprint=speed>4.2;
+  const selection=selectNativeHeroWW2Weapon(unit,rig);
+  const heading=unit.aimT==null?0:
+    Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
+  // Avoid looking directly down the bore (the old gun collapsed to an
+  // unrecognizable black vertical line). Show the barrel and magazine.
+  w.root.rotation.set(aimed?-.04:sprint?.08:-.095,
+    THREE.MathUtils.clamp(heading,-.7,.7)*(aimed?.75:0)-sign*(aimed?.47:1.10),
+    sign*(aimed?.018:.015),'YXZ');
+  const center=new THREE.Vector3().addVectors(sr,sl).multiplyScalar(.5);
+  const desiredTrigger=new THREE.Vector3(
+    center.x+sign*.17,
+    center.y-(aimed?.135:.20),
+    center.z+(aimed?.31:.29)
+  );
+  // The physical trigger hand grip is the weapon's placement pivot.
+  // Compensate source model's real grip offset before solving either arm.
+  w.root.position.copy(desiredTrigger).sub(w.trigger.position.clone().applyQuaternion(w.root.quaternion));
+  w.muzzleFlash.visible=unit.kick>0;
+  vis.updateWorldMatrix(true,true);
+  const targets={right:local(w.trigger),left:local(w.support)};
+  const poles={
+    right:sr.clone().add(new THREE.Vector3(sign*.51,-.27,-.10)),
+    left:sl.clone().add(new THREE.Vector3(-sign*.48,-.27,.23))
+  };
+  for(const side of ['right','left']){
+    const a=rig.hands[side];
+    GermanRig.solve(vis,a.upper,a.elbow,a.hand,targets[side],poles[side]);
+    const orientation=w.root.quaternion.clone().multiply(rig.weaponHandQ[side]);
+    GermanRig.orient(vis,a.hand,orientation);
+  }
+  if(w.supportPalm){
+    w.support.updateWorldMatrix(true,true);
+    const localQ=w.support.getWorldQuaternion(new THREE.Quaternion()).invert();
+    w.supportPalm.quaternion.copy(localQ.multiply(
+      rig.hands.left.hand.getWorldQuaternion(new THREE.Quaternion())));
+    // The frozen source hand is accurate sculpted geometry, but the reference
+    // skeletal pose is an open grip. Adjust its palm *orientation* relative
+    // to the magazine sleeve; never deform a finger by guesswork.
+    const pose=window.__supportPalmPose||{x:0,y:.62,z:0};
+    w.supportPalm.quaternion.multiply(new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(pose.x||0,pose.y||0,pose.z||0,'XYZ')));
+    w.supportPalm.position.set(0,-.028,.10);
+    w.supportPalm.visible=(unit.wpn|0)===1;
+  }
+  vis.updateWorldMatrix(true,true);
+  const rightError=rig.hands.right.hand.getWorldPosition(new THREE.Vector3())
+    .distanceTo(w.trigger.getWorldPosition(new THREE.Vector3()));
+  const leftError=rig.hands.left.hand.getWorldPosition(new THREE.Vector3())
+    .distanceTo(w.support.getWorldPosition(new THREE.Vector3()));
+  rig.weaponDiagnostics={
+    ready:true,rightError,leftError,
+    poseUpdates:(rig.weaponDiagnostics.poseUpdates||0)+1,
+    gaitState:rig.state,aimed,sprint,
+    weaponId:selection,weaponSlot:unit.wpn,side:unit.side,
+    visible:w.root.visible,handTargets:{right:targets.right.toArray(),left:targets.left.toArray()}
+  };
+}
+
+/* Corporal's field-grey equipment. Cosmetic-only: original Quaternius
+   skeleton, native walk cycles, assault-rifle hand IK and gameplay intact. */
+function dressNativeHeroPrimitiveUniform(rig){
+  const bones=new Map();
+  rig.model.traverse(n=>{
+    if(n.isBone)bones.set(n.name,n);
+    if(!n.isSkinnedMesh)return;
+    const recolor=original=>{
+      const m=original.clone();
+      if(/MI_Superhero_Male/i.test(m.name)){
+        // Palette follows native vertex skin weights. Bare face/hands retain
+        // a skin tone, while clothing and feet are independently coloured.
+        const geom=n.geometry.clone();
+        const indices=geom.getAttribute('skinIndex');
+        const weights=geom.getAttribute('skinWeight');
+        if(!indices||!weights)throw new Error('Нет skin weights для одежды героя');
+        const skinTone=new Float32Array(indices.count);
+        const bootTone=new Float32Array(indices.count);
+        const read=[indices.getX.bind(indices),indices.getY.bind(indices),indices.getZ.bind(indices),indices.getW.bind(indices)];
+        const weight=[weights.getX.bind(weights),weights.getY.bind(weights),weights.getZ.bind(weights),weights.getW.bind(weights)];
+        for(let i=0;i<indices.count;i++){
+          for(let k=0;k<4;k++){
+            const joint=n.skeleton.bones[Math.round(read[k](i))];
+            if(!joint)continue;
+            const influence=weight[k](i);
+            if(/^(Head$|neck_|hand_|thumb_|index_|middle_|ring_|pinky_)/i.test(joint.name))skinTone[i]+=influence;
+            if(/^(foot_|ball_)/i.test(joint.name))bootTone[i]+=influence;
+          }
+        }
+        geom.setAttribute('heroSkinTone',new THREE.BufferAttribute(skinTone,1));
+        geom.setAttribute('heroBootTone',new THREE.BufferAttribute(bootTone,1));
+        n.geometry=geom;
+        m.color.setHex(0xffffff);
+        m.vertexColors=false;
+        m.map=null;
+        m.roughness=1;
+        m.metalness=0;
+        if(m.emissive)m.emissive.setHex(0x000000);
+        m.onBeforeCompile=shader=>{
+          shader.vertexShader='attribute float heroSkinTone; attribute float heroBootTone; varying float vHeroSkinTone; varying float vHeroBootTone;\n'+shader.vertexShader;
+          shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvHeroSkinTone=heroSkinTone; vHeroBootTone=heroBootTone;');
+          shader.fragmentShader='varying float vHeroSkinTone; varying float vHeroBootTone;\n'+shader.fragmentShader;
+          shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+            vec3 fieldGrey=vec3(.18,.21,.22);
+            vec3 exposedSkin=vec3(.64,.45,.32);
+            vec3 bootLeather=vec3(.045,.05,.052);
+            diffuseColor.rgb=mix(fieldGrey,exposedSkin,smoothstep(.20,.75,vHeroSkinTone));
+            diffuseColor.rgb=mix(diffuseColor.rgb,bootLeather,smoothstep(.16,.70,vHeroBootTone));`);
+        };
+        m.customProgramCacheKey=()=> 'native-hero-field-skin-boots-v2';
+      }
+      return m;
+    };
+    n.material=Array.isArray(n.material)?n.material.map(recolor):recolor(n.material);
+    n.castShadow=true;n.receiveShadow=true;
+  });
+  for(const name of ['Head','spine_03','calf_l','calf_r','foot_l','foot_r'])
+    if(!bones.has(name))throw new Error('Не найдена кость формы: '+name);
+  const steel=new THREE.MeshLambertMaterial({color:0x434a4b});
+  const cloth=new THREE.MeshLambertMaterial({color:0x505954});
+  const leather=new THREE.MeshLambertMaterial({color:0x483c32});
+  const webbing=new THREE.MeshLambertMaterial({color:0x676858});
+  const dark=new THREE.MeshLambertMaterial({color:0x292f31});
+  const add=(group,geo,material,x,y,z)=>{
+    const mesh=new THREE.Mesh(geo,material);
+    mesh.position.set(x,y,z);
+    mesh.castShadow=true;mesh.receiveShadow=true;
+    group.add(mesh);return mesh;
+  };
+  const helmet=new THREE.Group();
+  helmet.name='CorporalFieldHelmet';
+  const shell=add(helmet,new THREE.SphereGeometry(1,20,12),steel,0,.20,0);
+  shell.scale.set(.255,.17,.265);
+  const rim=add(helmet,new THREE.SphereGeometry(1,20,8),steel,0,.072,.015);
+  rim.scale.set(.305,.035,.305);
+  const rear=add(helmet,new THREE.SphereGeometry(1,16,8),steel,0,.058,-.19);
+  rear.scale.set(.25,.03,.14);
+  for(const sign of [-1,1]){
+    const rivet=add(helmet,new THREE.SphereGeometry(.018,8,6),dark,sign*.245,.113,.01);
+    rivet.scale.set(1,.65,1);
+  }
+  const strapPoints=[
+    [-.235,.10,.02],[-.17,-.075,.085],[0,-.12,.155],
+    [.17,-.075,.085],[.235,.10,.02]
+  ].map(p=>new THREE.Vector3(...p));
+  const strap=add(helmet,new THREE.TubeGeometry(
+    new THREE.CatmullRomCurve3(strapPoints),16,.008,5,false),leather,0,0,0);
+  strap.castShadow=false;
+  const gear=new THREE.Group();gear.name='CorporalFieldWebbing';
+  for(const sign of [-1,1]){
+    const sling=add(gear,new THREE.BoxGeometry(.06,.40,.028),webbing,sign*.14,-.13,.19);
+    sling.rotation.z=sign*.38;
+    add(gear,new THREE.BoxGeometry(.15,.17,.10),leather,sign*.16,-.39,.21);
+    add(gear,new THREE.BoxGeometry(.15,.035,.115),webbing,sign*.16,-.32,.21);
+    const epaulette=add(gear,new THREE.BoxGeometry(.22,.038,.14),cloth,sign*.23,.055,.01);
+    epaulette.rotation.z=sign*.1;
+  }
+  add(gear,new THREE.BoxGeometry(.47,.072,.08),leather,0,-.47,.135);
+  add(gear,new THREE.BoxGeometry(.062,.068,.018),steel,0,-.47,.19);
+  add(gear,new THREE.BoxGeometry(.36,.31,.14),cloth,0,-.23,-.19);
+  add(gear,new THREE.BoxGeometry(.38,.045,.15),leather,0,-.15,-.23);
+  const boots={},shoes={};
+  for(const sign of ['l','r']){
+    const boot=add(rig.visual,new THREE.CylinderGeometry(.108,.114,1,12),dark,0,0,0);
+    boot.name='CorporalFieldBoot-'+sign;
+    boots[sign]=boot;
+    const shoe=add(rig.visual,new THREE.SphereGeometry(1,14,10),dark,0,0,0);
+    shoe.name='CorporalFieldShoe-'+sign;
+    shoe.scale.set(.145,.11,.25);
+    shoes[sign]=shoe;
+  }
+  // Small collar gives the smooth base model a uniform neckline.
+  for(const sign of [-1,1]){
+    const lapel=add(gear,new THREE.BoxGeometry(.1,.19,.035),cloth,sign*.085,.075,.16);
+    lapel.rotation.z=-sign*.22;
+  }
+  rig.visual.add(helmet,gear);
+  rig.fieldUniform={bones,helmet,gear,boots,shoes};
+  updateNativeHeroFieldUniform(rig);
+}
+function updateNativeHeroPrimitiveUniform(rig){
+  const suit=rig.fieldUniform;if(!suit)return;
+  const vis=rig.visual,bones=suit.bones;
+  vis.updateWorldMatrix(true,true);
+  const position=name=>vis.worldToLocal(bones.get(name).getWorldPosition(new THREE.Vector3()));
+  const rotation=name=>{
+    const worldQ=bones.get(name).getWorldQuaternion(new THREE.Quaternion());
+    return vis.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(worldQ);
+  };
+  suit.helmet.position.copy(position('Head'));
+  suit.helmet.quaternion.copy(rotation('Head'));
+  suit.gear.position.copy(position('spine_03'));
+  suit.gear.quaternion.copy(rotation('spine_03'));
+  for(const side of ['l','r']){
+    const foot=position('foot_'+side),calf=position('calf_'+side);
+    const displacement=calf.sub(foot);
+    const length=displacement.length();
+    const boot=suit.boots[side];
+    if(length<.05){boot.visible=false;suit.shoes[side].visible=false;continue;}
+    boot.visible=true;
+    boot.position.copy(foot).addScaledVector(displacement,.43);
+    boot.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),displacement.normalize());
+    boot.scale.set(1,length*.77,1);
+    const shoe=suit.shoes[side];
+    shoe.visible=true;
+    shoe.position.copy(foot).add(new THREE.Vector3(0,-.03,.11));
+  }
+}
+
+
+// --- WWII donor wardrobe: an already bundled and credited Panzergrenadier GLB.
+// Its original skinned WW2 jacket, trousers, belt, pockets and web gear replace
+// the previous hard-edged procedural boxes. The native Quaternius clip mixer
+// and rifle IK remain untouched; a separate outfit skeleton only follows pose.
+// This is intentionally a preview until visual acceptance on mobile Safari.
+
+
+// Bake the original Quaternius LEFT palm/fingers into a small rigid weapon
+// attachment. The WW2 donor's separately rigged sleeve can swallow its own
+// supporting hand; changing only the IK wrist position cannot fix that.
+function createNativeSupportPalm(rig){
+  if(!rig.weapon?.support||!rig.hands?.left?.hand)return null;
+  const handBone=rig.hands.left.hand;
+  rig.model.updateWorldMatrix(true,true);
+  handBone.updateWorldMatrix(true,true);
+  const inverse=handBone.matrixWorld.clone().invert();
+  const positions=[],vertex=new THREE.Vector3();
+  const isLeftHand=name=>/^(?:hand_l|(?:thumb|index|middle|ring|pinky)_(?:0?[1-3])_l)$/i.test(name);
+  for(const mesh of rig.ww2Uniform.originalMeshes){
+    const geom=mesh.geometry,idx=geom.getAttribute('skinIndex'),
+      weights=geom.getAttribute('skinWeight'),base=geom.getAttribute('position');
+    if(!idx||!weights||!base||typeof mesh.boneTransform!=='function')continue;
+    mesh.skeleton.update();
+    const weightByVertex=new Float32Array(idx.count);
+    for(let i=0;i<idx.count;i++){
+      for(let k=0;k<4;k++){
+        const id=k===0?idx.getX(i):k===1?idx.getY(i):k===2?idx.getZ(i):idx.getW(i);
+        const w=k===0?weights.getX(i):k===1?weights.getY(i):k===2?weights.getZ(i):weights.getW(i);
+        if(isLeftHand(mesh.skeleton.bones[id]?.name||''))weightByVertex[i]+=w;
+      }
+    }
+    const tris=geom.index?.array||Uint32Array.from({length:idx.count},(_,i)=>i);
+    for(let i=0;i+2<tris.length;i+=3){
+      const a=tris[i],b=tris[i+1],c=tris[i+2];
+      if(Math.min(weightByVertex[a],weightByVertex[b],weightByVertex[c])<.22||
+        Math.max(weightByVertex[a],weightByVertex[b],weightByVertex[c])<.58)continue;
+      for(const index of [a,b,c]){
+        vertex.fromBufferAttribute(base,index);
+        mesh.boneTransform(index,vertex);
+        vertex.applyMatrix4(mesh.matrixWorld).applyMatrix4(inverse);
+        positions.push(vertex.x,vertex.y,vertex.z);
+      }
+    }
+  }
+  if(positions.length<450)throw Error('Native glove mesh missing or not baked');
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  // The original GLB pose can include the actor's world translation inside
+  // the baked skin-matrix output. Rebase to the palm's actual mesh bounds,
+  // or the hand ends up ~12 world units away despite a correct IK target.
+  g.computeBoundingBox();
+  const palmCenter=g.boundingBox.getCenter(new THREE.Vector3());
+  g.translate(-palmCenter.x,-palmCenter.y,-palmCenter.z);
+  g.computeBoundingBox();
+  g.computeVertexNormals();
+  const skin=new THREE.MeshStandardMaterial({
+    name:'QuaterniusRealSupportPalm',color:0x543b29,
+    roughness:.93,metalness:0,side:THREE.DoubleSide
+  });
+  const mesh=new THREE.Mesh(g,skin);
+  mesh.name='NativeQuaterniusSupportPalm';
+  mesh.scale.setScalar(.67);
+  mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;
+  rig.weapon.support.add(mesh);
+  rig.weapon.supportPalm=mesh;
+  rig.weapon.supportPalmTriangles=positions.length/9;
+  return mesh;
+}
+
+function dressNativeHeroFieldUniform(rig){
+  if(new URLSearchParams(location.search).get('uniform')==='prototype'){
+    dressNativeHeroPrimitiveUniform(rig);
+    return;
+  }
+  let ww2=null;
+  try{
+    if(!germanPreview.template||!germanPreview.bounds)throw Error('Panzergrenadier donor not loaded');
+    const donor=germanSkeletonClone(germanPreview.template);
+    rig.ww2OutfitTemporary=donor;
+    donor.name='WW2PanzergrenadierClothing';
+    const box=germanPreview.bounds,h=box.max.y-box.min.y;
+    if(h<=.1)throw Error('Invalid WW2 donor bounds');
+    const scale=2.55/h;
+    donor.scale.setScalar(scale);
+    donor.position.set(-(box.min.x+box.max.x)*scale*.5,-box.min.y*scale,-(box.min.z+box.max.z)*scale*.5);
+    rig.visual.add(donor);
+    const originalMeshes=[],donorMeshes=[];
+    rig.model.traverse(n=>{if(n.isSkinnedMesh)originalMeshes.push(n);});
+    donor.traverse(n=>{
+      if(!n.isSkinnedMesh)return;
+      const mat=n.material,name=mat&&mat.name||'';
+      const type=/helmet|scrim/i.test(name)?'headgear':/ammopouches/i.test(name)?'pouches':'garment';
+      const german=soldierMaterial(mat,'hero',0x4a5450);
+      const british=soldierMaterial(mat,'khaki',0xa28d69);
+      if(type==='pouches'){
+        german.color.setHex(0xddd0b9);
+        british.color.setHex(0xe3d7b9);
+      }
+      donorMeshes.push({mesh:n,type,german,british});
+      n.material=german;
+      n.visible=type!=='headgear';
+      n.castShadow=true;n.receiveShadow=true;n.frustumCulled=false;
+    });
+    if(!donorMeshes.some(p=>p.type==='garment'))throw Error('WW2 uniform mesh missing');
+    const nativeBones=new Map(),garmentBones=new Map();
+    rig.model.traverse(n=>{if(n.isBone)nativeBones.set(n.name,n);});
+    donor.traverse(n=>{
+      if(!n.isBone)return;
+      garmentBones.set(n.name.replace(/_\d+$/,'').replace(/^mixamorig[:_]?/i,''),n);
+    });
+    const map={
+      Hips:'pelvis',Spine:'spine_01',Spine1:'spine_02',Spine2:'spine_03',
+      Neck:'neck_01',Head:'Head',
+      LeftShoulder:'clavicle_l',LeftArm:'upperarm_l',LeftForeArm:'lowerarm_l',LeftHand:'hand_l',
+      RightShoulder:'clavicle_r',RightArm:'upperarm_r',RightForeArm:'lowerarm_r',RightHand:'hand_r',
+      LeftUpLeg:'thigh_l',LeftLeg:'calf_l',LeftFoot:'foot_l',LeftToeBase:'ball_l',
+      RightUpLeg:'thigh_r',RightLeg:'calf_r',RightFoot:'foot_r',RightToeBase:'ball_r'
+    };
+    for(const side of ['Left','Right']){
+      const suffix=side==='Left'?'l':'r';
+      for(const finger of ['Thumb','Index','Middle','Ring','Pinky'])
+        for(let i=1;i<=3;i++)
+          map[side+'Hand'+finger+i]=finger.toLowerCase()+'_0'+i+'_'+suffix;
+    }
+    rig.model.updateWorldMatrix(true,true);
+    donor.updateWorldMatrix(true,true);
+    const bindings=[];
+    for(const [targetName,sourceName] of Object.entries(map)){
+      const target=garmentBones.get(targetName),source=nativeBones.get(sourceName);
+      if(!target||!source)continue;
+      bindings.push({
+        target,source,
+        sourceRestInv:source.getWorldQuaternion(new THREE.Quaternion()).invert(),
+        targetRest:target.getWorldQuaternion(new THREE.Quaternion())
+      });
+    }
+    if(bindings.length<16)throw Error('Too few compatible WW2 outfit joints: '+bindings.length+
+      '; nativeNames='+JSON.stringify([...nativeBones.keys()].slice(0,24))+
+      '; donorNames='+JSON.stringify([...garmentBones.keys()].slice(0,24))+
+      '; rawDonor='+JSON.stringify([...garmentBones.values()].slice(0,10).map(n=>n.name)));
+    const donorHands={
+      right:{upper:garmentBones.get('RightArm'),elbow:garmentBones.get('RightForeArm'),hand:garmentBones.get('RightHand')},
+      left:{upper:garmentBones.get('LeftArm'),elbow:garmentBones.get('LeftForeArm'),hand:garmentBones.get('LeftHand')}
+    };
+    if(Object.values(donorHands).some(h=>!h.upper||!h.elbow||!h.hand))
+      throw new Error('WW2 uniform sleeve/hand joints missing');
+    const donorFingers=[];
+    for(const [name,bone] of garmentBones){
+      const match=name.match(/^(Left|Right)Hand(Thumb|Index|Middle|Ring|Pinky)([123])$/);
+      if(match)donorFingers.push({bone,name,digit:match[2],segment:Number(match[3])});
+    }
+    ww2={donor,bindings,donorMeshes,originalMeshes,side:null,modelType:'existing-panzergrenadier',
+      headwear:'none',headBone:garmentBones.get('Head'),donorHands,donorFingers,matchedBones:bindings.length};
+    rig.ww2Uniform=ww2;
+    rig.ww2OutfitTemporary=null;
+    for(const mesh of originalMeshes)mesh.visible=false; // preserve animation skeleton
+    try{createNativeSupportPalm(rig);}catch(error){console.warn('Support palm fallback:',error);}
+    updateNativeHeroFieldUniform(rig);
+    loadNativeHeroSideCap(rig);
+  }catch(error){
+    rig.ww2UniformError=String(error&&error.stack||error);
+    console.warn('WW2 wardrobe fallback (original native skeleton unaffected):',error);
+    if(ww2?.donor)rig.visual.remove(ww2.donor);
+    if(rig.ww2Uniform)rig.visual.remove(rig.ww2Uniform.donor);
+    if(rig.ww2OutfitTemporary)rig.visual.remove(rig.ww2OutfitTemporary);
+    rig.ww2OutfitTemporary=null;
+    rig.ww2Uniform=null;
+    rig.model.traverse(n=>{if(n.isSkinnedMesh)n.visible=true;});
+    dressNativeHeroPrimitiveUniform(rig);
+    // The rejected pot-shaped helmet must never return as fallback.
+    rig.fieldUniform.helmet.visible=false;
+  }
+}
+function updateNativeHeroFieldUniform(rig){
+  const uniform=rig.ww2Uniform;
+  if(!uniform){
+    updateNativeHeroPrimitiveUniform(rig);
+    return;
+  }
+  const side=(P&&P.side)==='red'?'red':'blue';
+  if(uniform.side!==side){
+    uniform.side=side;
+    if(uniform.cap)uniform.cap.visible=side==='red';
+    for(const item of uniform.donorMeshes){
+      item.mesh.material=side==='red'?item.german:item.british;
+      // Original WWII M42 helmet is deliberately NOT substituted for M43.
+      item.mesh.visible=item.type==='garment'||(item.type==='pouches'&&side==='red');
+    }
+  }
+  // Re-target the already tested Quaternius anatomical pose to the secondary
+  // clothing skin, without modifying a single native bone / clip / rifle IK.
+  rig.model.updateWorldMatrix(true,true);
+  uniform.donor.updateWorldMatrix(true,true);
+  const sourceQ=new THREE.Quaternion(),targetQ=new THREE.Quaternion(),parentQ=new THREE.Quaternion();
+  for(const binding of uniform.bindings){
+    binding.source.getWorldQuaternion(sourceQ);
+    targetQ.copy(sourceQ).multiply(binding.sourceRestInv).multiply(binding.targetRest);
+    binding.target.parent.getWorldQuaternion(parentQ).invert();
+    binding.target.quaternion.copy(parentQ.multiply(targetQ));
+    binding.target.updateWorldMatrix(false,true);
+  }
+  // The WW2 uniform is SKINNED TO A SEPARATE MIXAMO SKELETON.
+  // Matching rotations alone cannot place its wrists on the rifle: the two
+  // skeletons have different upper-arm lengths and bind-space pivots.
+  // Follow the accepted Quaternius IK with a separate visual-only sleeve IK.
+  if(uniform.donorHands&&rig.weapon){
+    const vis=rig.visual,w=rig.weapon,arms=uniform.donorHands;
+    vis.updateWorldMatrix(true,true);
+    // Preserve each donor palm's intended retargeted orientation BEFORE IK
+    // repositions the elbow. Otherwise a solved hand ends up palm-up.
+    const invSpaceQ=vis.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const handLocalQ={
+      right:invSpaceQ.clone().multiply(arms.right.hand.getWorldQuaternion(new THREE.Quaternion())),
+      left:invSpaceQ.clone().multiply(arms.left.hand.getWorldQuaternion(new THREE.Quaternion()))
+    };
+    const local=bone=>vis.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
+    const right=local(arms.right.upper),left=local(arms.left.upper);
+    const sign=Math.sign(right.x-left.x)||-1;
+    const pairs=[
+      ['right',w.trigger,right.clone().add(new THREE.Vector3(sign*.47,-.28,-.04))],
+      ['left',w.support,left.clone().add(new THREE.Vector3(-sign*.50,-.29,.18))]
+    ];
+    const errors={};
+    for(const [side,grip,pole] of pairs){
+      const arm=arms[side],goal=local(grip);
+      GermanRig.solve(vis,arm.upper,arm.elbow,arm.hand,goal,pole);
+      // Restore the intended weapon-aligned palm rotation after changing
+      // the upper arm and forearm; leaves the solved wrist position intact.
+      GermanRig.orient(vis,arm.hand,handLocalQ[side]);
+      errors[side]=arm.hand.getWorldPosition(new THREE.Vector3()).distanceTo(grip.getWorldPosition(new THREE.Vector3()));
+    }
+    // Hand bones reach the rifle but open fingers still look like "offering"
+    // the gun on flat palms. Curl digits over the grips after pose retarget:
+    // every mixer frame resets to native animation, so there is no drift.
+    const grasp=new THREE.Quaternion(),axis=new THREE.Vector3(1,0,0);
+    for(const entry of uniform.donorFingers){
+      const angle=entry.digit==='Thumb'?
+        (entry.segment===1?-.32:entry.segment===2?-.38:-.23):
+        (entry.segment===1?-.57:entry.segment===2?-.74:-.56);
+      entry.bone.quaternion.multiply(grasp.setFromAxisAngle(axis,angle));
+      entry.bone.updateWorldMatrix(false,true);
+    }
+    uniform.visualGripErrors=errors;
+    if(rig.weaponDiagnostics){
+      rig.weaponDiagnostics.visualFingerBones=uniform.donorFingers.length;
+      rig.weaponDiagnostics.visibleRightError=errors.right;
+      rig.weaponDiagnostics.visibleLeftError=errors.left;
+    }
+  }
+  if(uniform.cap&&uniform.headBone){
+    const cap=uniform.cap,head=uniform.headBone,space=rig.visual;
+    space.updateWorldMatrix(true,true);
+    cap.position.copy(space.worldToLocal(head.getWorldPosition(new THREE.Vector3())));
+    const localQ=space.getWorldQuaternion(new THREE.Quaternion()).invert();
+    cap.quaternion.copy(localQ.multiply(head.getWorldQuaternion(new THREE.Quaternion())));
+    // Source geometry already includes its scalp/ridge height.
+    // Donor head pivot is much lower than the visible hairline. Raise the
+    // sidecap from eyebrow level onto the crown.
+    cap.position.y+=.115;
+    cap.position.add(new THREE.Vector3(0,0,.028).applyQuaternion(cap.quaternion));
+  }
+}
+
+
+function loadNativeHeroSideCap(rig){
+  const u=rig.ww2Uniform;
+  if(!u||!u.headBone)return;
+  if(new URLSearchParams(location.search).get('headwear')==='none')return;
+  const url=new URL('../assets/ww2-headwear/field-grey-sidecap.glb',location.href).href;
+  new THREE.GLTFLoader().load(url,gltf=>{
+    if(rig.ww2Uniform!==u)return;
+    const cap=gltf.scene;
+    cap.name='WW2_Feldgrau_SideCap_NoVisor';
+    // Original side-cap mesh uses a head-local coordinate frame, NOT
+    // the bottom of a helmet band. No large M43 vertical offset.
+    cap.scale.set(1.48,1.37,1.44);
+    cap.traverse(n=>{
+      if(!n.isMesh)return;
+      n.castShadow=true;n.receiveShadow=true;
+      const m=n.material.clone();
+      m.color.setHex(0x4b5850);m.roughness=.98;n.material=m;
+    });
+    rig.visual.add(cap);
+    u.cap=cap;u.headwear='Feldgrau sidecap (unmarked)';
+    cap.visible=u.side==='red';
+    updateNativeHeroFieldUniform(rig);
+  },undefined,error=>{
+    console.warn('Sidecap unavailable: uncovered head fallback',error);
+    u.headwearError=String(error?.message||error);
+  });
+}
+
+function nativeHeroLoad(){
+  const oldMode=new URLSearchParams(location.search).get('rig')==='original';
+  if(oldMode){nativeHeroLabel('СТАРЫЙ СКЕЛЕТ: выбран для сравнения. Новая модель отключена.');return;}
+  if(germanPreview.nativeHeroRequested)return;
+  germanPreview.nativeHeroRequested=true;
+  if(typeof THREE.GLTFLoader!=='function'){nativeHeroLabel('ОШИБКА: нет загрузчика GLTFLoader. Используется старая модель.');return;}
+  nativeHeroLabel('СКЕЛЕТ v17: облегчённые GLB 1,5 МБ — начинаю загрузку.');
+  // Try GitHub raw first, then a pinned jsDelivr mirror. Errors are
+  // visible instead of silently falling back to the unchanged hero.
+  const nativeHeroOrigins={};
+  const loadFile=async(name)=>{
+    let lastError=null;
+    for(let i=0;i<NATIVE_HERO_ASSET_ROOTS.length;i++){
+      const url=NATIVE_HERO_ASSET_ROOTS[i]+name;
+      const loader=new THREE.GLTFLoader();
+      let timer;
+      try{
+        const gltf=await Promise.race([
+          new Promise((resolve,reject)=>loader.load(url,resolve,e=>{
+            if(e&&e.total>0){
+              const percent=Math.min(99,Math.round(e.loaded/e.total*100));
+              nativeHeroLabel('СКЕЛЕТ v17: '+name+' '+percent+'% (источник '+(i+1)+'/3)');
+            }
+          },error=>reject(error||new Error('Ошибка GLB')))),
+          new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Превышено время загрузки: '+name)),18000);})
+        ]);
+        nativeHeroOrigins[name]=(i===0?'LOCAL':i===1?'GitHub Raw':'jsDelivr');
+        return gltf;
+      }catch(e){
+        lastError=e;
+        console.warn('Native GLB origin failed',url,e);
+      }finally{clearTimeout(timer);}
+    }
+    throw new Error(name+': '+(lastError&&lastError.message||'оба источника недоступны'));
+  };
+  Promise.all([loadFile('night-striker-lite.glb'),loadFile('hero-three-clips-lite.glb')]).then(([character,library])=>{
+    const unit=P,v=unit&&unit.germanPreview;
+    if(!v||v.role!=='hero'||v.nativeRig)throw new Error('Нет подготовленного героя');
+    const model=character.scene;
+    const bones=new Set();
+    let meshCount=0;
+    model.traverse(n=>{if(n.isBone)bones.add(n.name);if(n.isSkinnedMesh)meshCount++;});
+    const required=['pelvis','thigh_l','calf_l','foot_l','thigh_r','calf_r','foot_r'];
+    if(meshCount===0||required.some(name=>!bones.has(name)))throw new Error('Не найден полный скелет Quaternius');
+    const clips=new Map((library.animations||[]).map(a=>[a.name,a]));
+    const selected={
+      idle:clips.get('Idle_Loop'),
+      jog:clips.get('Jog_Fwd_Loop'),
+      sprint:clips.get('Sprint_Loop')
+    };
+    if(Object.values(selected).some(clip=>!clip||!clip.tracks.length||!Number.isFinite(clip.duration)||clip.duration<=0)){
+      throw new Error('В библиотеке нет Idle / Jog / Sprint');
+    }
+    model.updateMatrixWorld(true);
+    const box=new THREE.Box3().setFromObject(model);
+    const height=box.max.y-box.min.y;
+    if(!Number.isFinite(height)||height<.2||height>1000)throw new Error('Неверный размер исходной модели');
+    const factor=2.55/height;
+    // Bounds are applied at the SAME visual-anchor height as the old hero.
+    // The original skeleton, its skin weights and relative bone transforms
+    // stay together. Only the whole model gets a single uniform scale.
+    const visual=new THREE.Group();visual.name='QuaterniusHeroRigDiagnostic';
+    model.scale.multiplyScalar(factor);
+    model.position.set(-(box.min.x+box.max.x)*.5*factor,-box.min.y*factor,-(box.min.z+box.max.z)*.5*factor);
+    visual.add(model);
+    // Native clips only: this avoids passing their joint transforms into
+    // the unrelated Panzergrenadier (Mixamo) skeleton entirely.
+    const mixer=new THREE.AnimationMixer(model);
+    const actions={};
+    for(const [key,clip] of Object.entries(selected)){
+      // Game simulation owns locomotion position; a GLB must not drive a root
+      // object across the map. Keep local hip motion for natural foot plants.
+      const safe=clip.clone();
+      safe.tracks=safe.tracks.filter(t=>!/\.scale$/.test(t.name)&&
+        !/(?:^|[./])root(?:\]|\.|_)?(?:position)?\.position$/.test(t.name));
+      if(safe.tracks.length<6)throw new Error('Недостаточно скелетных каналов: '+clip.name);
+      actions[key]=mixer.clipAction(safe);
+    }
+    actions.idle.play();
+    const oldFigureVisible=v.figure.visible;
+    const oldIdentityVisible=v.identity.root.visible;
+    const oldWeaponVisible=v.weapon.root.visible;
+    try{
+      v.anchor.add(visual);
+      v.nativeRig={visual,model,mixer,actions,state:'idle',previous:{oldFigureVisible,oldIdentityVisible,oldWeaponVisible}};
+      // Visual-only replacement; the old rig stays available as an instant
+      // fallback. No army mesh/skeleton or gameplay unit is touched.
+      v.figure.visible=false;
+      v.identity.root.visible=false;
+      v.weapon.root.visible=false;
+      initNativeHeroWeapon(v,v.nativeRig);
+      dressNativeHeroFieldUniform(v.nativeRig);
+      // Green badge plus geometric marker: the native visual swap is
+      // unambiguous, even when the costume looks similar from the RTS camera.
+      const marker=new THREE.Mesh(
+        new THREE.TorusGeometry(.32,.055,6,16),
+        new THREE.MeshBasicMaterial({color:0x00ffbc,depthTest:false})
+      );
+      marker.name='NativeRigDiagnosticMarker';
+      marker.rotation.x=Math.PI/2;
+      marker.position.set(0,2.92,0);
+      marker.renderOrder=120;
+      if(new URLSearchParams(location.search).has('rigdebug'))visual.add(marker);
+      nativeHeroLabel('НОВЫЙ СКЕЛЕТ v17: АКТИВЕН ✓ '+nativeHeroOrigins['night-striker-lite.glb']+' + '+nativeHeroOrigins['hero-three-clips-lite.glb']+'. Полевая форма.');
+      console.info('Quaternius native hero rig ready',{
+        skeletonBones:bones.size,skinnedMeshes:meshCount,clips:Object.keys(actions)
+      });
+    }catch(e){
+      v.figure.visible=oldFigureVisible;v.identity.root.visible=oldIdentityVisible;
+      v.weapon.root.visible=oldWeaponVisible;
+      v.nativeRig=null;
+      v.anchor.remove(visual);
+      throw e;
+    }
+  }).catch(e=>{
+    console.warn('Native hero rig fallback to original:',e);
+    nativeHeroLabel('ОШИБКА СКЕЛЕТА v17: прежний герой. Причина: '+e.message);
+  });
+}
+function animateNativeHeroRig(unit,v,dt){
+  const r=v.nativeRig;
+  if(!r)return false;
+  const speed=Math.max(0,Number.isFinite(unit.sv)?unit.sv:0);
+  const next=speed<.28?'idle':speed<4.2?'jog':'sprint';
+  if(r.state!==next){
+    const old=r.actions[r.state],action=r.actions[next];
+    old.fadeOut(.16);
+    action.reset().fadeIn(.16).play();
+    r.state=next;
+  }
+  r.mixer.update(THREE.MathUtils.clamp(Number.isFinite(dt)?dt:0,0,.08));
+  updateNativeHeroWeapon(unit,v,r,dt);
+  updateNativeHeroFieldUniform(r);
+  unit.g.position.set(unit.x,0,unit.z);
+  unit.g.rotation.x=0;unit.g.rotation.z=0;
+  if(speed<.6&&unit.aim>0&&unit.aimT!=null){
+    const yaw=Math.atan2(Math.sin(unit.aimT-unit.g.rotation.y),Math.cos(unit.aimT-unit.g.rotation.y));
+    unit.g.rotation.y+=yaw*(1-Math.exp(-Math.max(0,dt)*7));
+  }
+  v.legacy.visible=false;v.anchor.visible=true;
+  return true;
+}
 function loadGermanSoldierPreview(){
   if(typeof THREE.GLTFLoader!=='function'){germanPreviewLabel('Модель недоступна — исходные бойцы');return;}
   try{
@@ -325,6 +1161,7 @@ function loadGermanSoldierPreview(){
         germanPreview.template=figure;germanPreview.bounds=bounds;
         const queue=[P,...U,...germanPreview.pending];germanPreview.pending.length=0;
         for(const u of queue)if(u.hp>0)attachGermanSoldier(u);
+        nativeHeroLoad();
         refreshGermanPreviewLabel();
       }catch(e){console.error(e);germanPreviewLabel('Ошибка модели — исходные бойцы');}
     },e=>{console.error(e);germanPreviewLabel('Ошибка загрузки — исходные бойцы');});

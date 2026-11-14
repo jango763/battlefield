@@ -1,0 +1,22 @@
+{
+  "source": "Kenton-GMI/muster-ww2",
+  "source_commit": "7d2fa86ebc3b999eaf085831cdcd5dccefea63d4",
+  "derived_from": "src/assets/soviet/infantry/pilotka.ts",
+  "license": "MIT",
+  "treatment": "unmarked field-grey sidecap; original Soviet star mesh omitted; design references German M34 Schiffchen",
+  "vertices": 3999,
+  "triangles": 7000,
+  "bounds": {
+    "min": [
+      -0.07864894717931747,
+      0.05505267158150673,
+      -0.11620954424142838
+    ],
+    "max": [
+      0.07553929835557938,
+      0.15542462468147278,
+      0.0992063581943512
+    ]
+  },
+  "bytes": 139308
+}

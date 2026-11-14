@@ -1,0 +1,118 @@
+name: Bake licensed WW2 primary weapons
+on:
+  push:
+    branches: [feature/ww2-weapons-hand-ik-20261114]
+    paths:
+      - .github/workflows/build-ww2-weapons.yml
+permissions:
+  contents: write
+jobs:
+  bake:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch fixed MIT weapon geometry source
+        run: |
+          git clone --quiet https://github.com/Kenton-GMI/muster-ww2.git /tmp/muster-ww2
+          cd /tmp/muster-ww2
+          git checkout --quiet 7d2fa86ebc3b999eaf085831cdcd5dccefea63d4
+          npm ci --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund tsx
+      - name: Bake 6 3D models preserving true weapon grip coordinates
+        shell: bash
+        run: |
+          # Headless export: skip the tiny Bren receiver lettering; its helper needs browser canvas.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/muster-ww2/src/assets/uk/weapons/bren-mk2/body.ts')
+          s=p.read_text()
+          a=s.index('    // stamped marking on the right side of the body')
+          b=s.index('    // rear face plate',a)
+          p.write_text(s[:a]+'    // Tiny decal omitted in the browser-friendly GLB bake.\\n'+s[b:])
+          PY
+          cat > /tmp/muster-ww2/export-weapons.ts <<'JS'
+          import fs from 'node:fs';
+          import * as THREE from 'three';
+          import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
+          import {buildKar98k} from './src/assets/germany/weapons/kar98k.model';
+          import {buildMp40} from './src/assets/germany/weapons/mp40.model';
+          import {buildMg42} from './src/assets/germany/weapons/mg42.model';
+          import {buildLeeEnfieldNo4} from './src/assets/uk/weapons/lee-enfield-no4.model';
+          import {buildStenMk2} from './src/assets/uk/weapons/sten-mk2.model';
+          import {buildBrenMk2} from './src/assets/uk/weapons/bren-mk2.model';
+          class NodeFileReader {
+            result:any=null;onload:any=null;onloadend:any=null;onerror:any=null;
+            async readAsArrayBuffer(blob:Blob){try{this.result=await blob.arrayBuffer();this.onload?.({target:this});this.onloadend?.({target:this});}catch(e){this.onerror?.(e)}}
+            async readAsDataURL(blob:Blob){try{this.result='data:'+blob.type+';base64,'+Buffer.from(await blob.arrayBuffer()).toString('base64');this.onload?.({target:this});this.onloadend?.({target:this});}catch(e){this.onerror?.(e)}}
+          }
+          (globalThis as any).FileReader=NodeFileReader;
+          const builders=[
+            ['de-kar98k',()=>buildKar98k({detail:'low'})],
+            ['de-mp40',()=>buildMp40({stock:'extended',magazine:true})],
+            ['de-mg42',()=>buildMg42({detail:'low',bipod:'folded',drum:true})],
+            ['uk-lee-enfield',()=>buildLeeEnfieldNo4({detail:'low'})],
+            ['uk-sten',()=>buildStenMk2({detail:'low',magazine:true})],
+            ['uk-bren',()=>buildBrenMk2({detail:'low',bipod:'folded'})],
+          ] as const;
+          const dest=process.env.GITHUB_WORKSPACE+'/assets/ww2-weapons';
+          fs.mkdirSync(dest,{recursive:true});
+          const manifest:any={source:'https://github.com/Kenton-GMI/muster-ww2',commit:'7d2fa86ebc3b999eaf085831cdcd5dccefea63d4',license:'MIT',weapons:{}};
+          for(const [id,build] of builders){
+            const w=build(),obj=w.object;
+            obj.name='ww2-'+id;
+            let meshes=0,triangles=0;
+            obj.traverse((o:any)=>{
+              if(!o.isMesh)return;
+              meshes++;
+              triangles+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;
+              const old=o.material;
+              const mat=Array.isArray(old)?old[0]:old;
+              const color=mat&&mat.color?.isColor?mat.color.clone():new THREE.Color(0x48473f);
+              o.material=new THREE.MeshStandardMaterial({name:(mat?.name||id).replace(/[^A-Za-z0-9_-]/g,'_'),color,roughness:0.87,metalness:0.07,side:THREE.DoubleSide});
+              o.castShadow=true;
+            });
+            if(meshes<3||triangles>200000)throw new Error('Invalid/too heavy weapon '+id+' meshes='+meshes+' triangles='+triangles);
+            const exporter=new GLTFExporter();
+            const data=await exporter.parseAsync(obj,{binary:true,trs:true,onlyVisible:true});
+            const bytes=Buffer.from(data as ArrayBuffer);
+            if(bytes.toString('ascii',0,4)!=='glTF')throw Error('GLB conversion failed: '+id);
+            fs.writeFileSync(dest+'/'+id+'.glb',bytes);
+            const vec=(x:any)=>x?.toArray?.()||null;
+            manifest.weapons[id]={
+              file:id+'.glb',meshes,triangles,bytes:bytes.length,
+              trigger:vec(w.grips.trigger.position),
+              support:vec(w.grips.support.position),
+              triggerAxis:vec(w.grips.trigger.axis),
+              supportAxis:vec(w.grips.support.axis),
+              triggerPalm:vec(w.grips.trigger.palm),
+              supportPalm:vec(w.grips.support.palm),
+              muzzle:vec(w.muzzle),
+              shoulder:vec(w.shoulder)
+            };
+            console.log('Baked',id,meshes,triangles,bytes.length,'grips',JSON.stringify(manifest.weapons[id].trigger),JSON.stringify(manifest.weapons[id].support));
+          }
+          fs.writeFileSync(dest+'/manifest.json',JSON.stringify(manifest,null,2));
+          JS
+          cd /tmp/muster-ww2
+          ./node_modules/.bin/tsx export-weapons.ts
+      - name: License notice
+        run: |
+          cp /tmp/muster-ww2/LICENSE assets/ww2-weapons/LICENSE.txt
+          cat > assets/ww2-weapons/SOURCE.md <<'EOT'
+          # WW2 primary arms — Muster
+          Source: https://github.com/Kenton-GMI/muster-ww2
+          Pinned original commit: 7d2fa86ebc3b999eaf085831cdcd5dccefea63d4
+          Copyright (c) 2026 Kenton Wang
+          MIT License (see LICENSE.txt)
+          Six static GLB assets were baked from original procedural TS mesh builders.
+          Grip, muzzle, and butt positions preserved separately in manifest.json.
+          The shooter stats, hit detection and ballistics are not adapted from this source.
+          EOT
+      - name: Commit generated models to isolated branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/ww2-weapons/
+          git commit -m 'assets: bake 6 MIT WW2 weapon GLBs with native grip metadata' || exit 0
+          git push origin HEAD:refs/heads/feature/ww2-weapons-hand-ik-20261114
