@@ -1,0 +1,40 @@
+name: Stage 4 British hero visual QA
+on:
+  push:
+    branches: [feature/stage4-british-hero-20261114]
+    paths:
+      - 'preview/german-v5.js'
+      - 'preview/formation-replenishment-v3.html'
+      - 'tools/infantry-v2/test-stage2-startup.cjs'
+      - 'tools/infantry-v2/test-stage4-british-hero.cjs'
+      - '.github/workflows/check-stage4-british-hero.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  british-hero:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify JS, visual isolation and old startup regressions
+        run: |
+          node tools/infantry-v2/test-stage2-startup.cjs
+          node tools/infantry-v2/test-stage4-british-hero.cjs
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs
+      - name: Prepare desktop/mobile Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage4-qa playwright@1.58.2
+          /tmp/stage4-qa/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify UK hero load, side-specific gear, webbing motion and two-hand weapon
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/stage4-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-stage4-british-hero.cjs --browser
+      - name: Save desktop and mobile UK hero previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage4-british-hero-previews
+          path: /tmp/stage4-british-*.png
+          if-no-files-found: warn
