@@ -544,7 +544,7 @@ function updateNativeHeroWeapon(unit,v,rig,dt){
     // The frozen source hand is accurate sculpted geometry, but the reference
     // skeletal pose is an open grip. Adjust its palm *orientation* relative
     // to the magazine sleeve; never deform a finger by guesswork.
-    const pose=window.__supportPalmPose||{x:0,y:0,z:0};
+    const pose=window.__supportPalmPose||{x:0,y:.62,z:0};
     w.supportPalm.quaternion.multiply(new THREE.Quaternion().setFromEuler(
       new THREE.Euler(pose.x||0,pose.y||0,pose.z||0,'XYZ')));
     w.supportPalm.position.set(0,-.028,.10);
@@ -770,7 +770,7 @@ function createNativeSupportPalm(rig){
   g.computeBoundingBox();
   g.computeVertexNormals();
   const skin=new THREE.MeshStandardMaterial({
-    name:'QuaterniusRealSupportPalm',color:0x674b34,
+    name:'QuaterniusRealSupportPalm',color:0x543b29,
     roughness:.93,metalness:0,side:THREE.DoubleSide
   });
   const mesh=new THREE.Mesh(g,skin);
