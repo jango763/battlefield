@@ -27,6 +27,23 @@ const heroStartupGate=(()=>{
     get phase(){return phase;},
     ready(){return finish('native','Герой готов');},
     fallback(reason){
+      if(phase!=='loading')return false;
+      // A slow weapon may time out AFTER the native hero was installed but
+      // BEFORE its approved WW2 GLB appeared. Roll back the entire temporary
+      // native visual, not merely the loading cover. Otherwise another model
+      // switch would occur after the fallback became visible.
+      try{
+        const v=P?.germanPreview,r=v?.nativeRig;
+        if(r&&!r.armyUnit){
+          r.mixer?.stopAllAction();
+          if(r.visual?.parent)r.visual.parent.remove(r.visual);
+          v.nativeRig=null;
+          v.figure.visible=r.previous.oldFigureVisible;
+          v.weapon.root.visible=r.previous.oldWeaponVisible;
+          v.identity.root.visible=r.previous.oldIdentityVisible;
+          r.weapon=null; // cancel pending async weapon attachments
+        }
+      }catch(error){console.warn('Hero fallback visual cleanup:',error);}
       const changed=finish('fallback','Резервная модель');
       if(changed)console.warn('Hero start fallback:',reason);
       return changed;
