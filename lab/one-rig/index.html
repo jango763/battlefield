@@ -53,7 +53,7 @@ a{color:#d7e9a3}
 <body>
 <header>
  <h1>Единый скелет · эксперимент r187</h1>
- <p class="muted">Проверяем перенос существующей формы Panzergrenadier на один скелет Quaternius. Справа исходная двухскелетная версия, слева — опытная односкелетная.</p>
+ <p class="muted">Проверяем перенос существующей формы Panzergrenadier на один скелет Quaternius. Справа исходная двухскелетная версия, слева — один исходный скелет формы с перенесёнными анимациями Quaternius.</p>
 </header>
 <section class="controls" aria-label="Управление лабораторией">
  <label>Сторона
@@ -86,12 +86,12 @@ a{color:#d7e9a3}
  <button id="aim" aria-pressed="false">Прицеливание</button>
  <button id="handsCam">Крупно: кисти</button>
  <button id="focusDual">Крупно: форма</button>
- <button id="focusSingle">Крупно: единый скелет</button>
+ <button id="focusSingle">Крупно: ретаргет</button>
  <button id="resetCam">Оба персонажа</button>
 </section>
 <main id="viewport">
  <div class="legend">
-  <div><strong>Слева · один скелет + форма</strong>Военная одежда переназначена на кости Quaternius: без второго Mixamo-скелета.</div>
+  <div><strong>Слева · один скелет + форма</strong>Оригинальные веса и кости формы сохранены, а анимации Quaternius перенесены на них.</div>
   <div><strong>Справа · два скелета</strong>Та же анимация плюс военная форма на отдельном Mixamo-скелете.</div>
  </div>
  <div id="busy" role="status">Загрузка Three.js r187 и оригинальных моделей…</div>
@@ -100,7 +100,7 @@ a{color:#d7e9a3}
  <section>
   <h2>Результат исследования</h2>
   <p class="muted" id="message" role="status">Проверяется возможность загрузить наши GLB без старого движка.</p>
-  <p class="warning muted">Это эксперимент, не готовая модель. Переназначение весов может дать искажения: проверяем кисти, суставы, анимацию и силуэт.</p>
+  <p class="warning muted">Это лабораторный эксперимент. Проверяем анимацию, суставы, кисти, хват и исходный силуэт формы.</p>
   <p class="muted">Жёлтый — точка хвата; бирюзовый — центр видимой геометрии кисти; красный — сустав запястья. Камеру можно вращать мышью или пальцем.</p>
  </section>
  <section>
