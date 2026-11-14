@@ -28,6 +28,8 @@ function wehrmachtArmyEligible(unit,v){
   // Normal gameplay keeps the accepted German rollout. The UK native army
   // pilot is deliberately opt-in and never replaces German rigs by default.
   const side=wehrmachtRollout.mode==='british'?'blue':'red';
+  const inspect=new URLSearchParams(location.search).get('inspect');
+  if(side==='blue'&&inspect==='british'&&!unit.britishPilot)return false;
   return unit.kind!=='p'&&unit.t===side&&
     (v.role==='infantry'||v.role==='captain'||v.role==='engineer');
 }
@@ -54,7 +56,8 @@ function releaseNativeArmyVisual(unit,v){
       if(!n.isMesh)return;
       if(n.geometry&&object===rig.ww2Uniform?.beret)n.geometry.dispose();
       if(n.geometry&&object===rig.ww2Uniform?.cap&&
-        n.name!=='ArmyM43_MIT_GLB'&&object.name!=='ArmyM43_MIT_GLB')n.geometry.dispose();
+        object.name!=='ArmyM43_MIT_GLB'&&
+        object.name!=='BritishFieldDishHelmet_PreviewGLB')n.geometry.dispose();
       const mats=Array.isArray(n.material)?n.material:[n.material];
       for(const mat of mats)mat?.dispose();
     });
