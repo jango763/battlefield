@@ -60,6 +60,7 @@ if(process.argv.includes('--browser')){
           const blue=mk('blue',false,false);
           blue.x=P.x+3;blue.z=P.z+5;blue.g.position.set(blue.x,0,blue.z);
           animateGermanSoldier(blue,1/60);
+          const uniformCorrect=active.every(u=>u.germanPreview.nativeRig?.ww2Uniform?.side==='red');
           const left=active[0];
           const count=germanPreview.armyNativeInstalled;
           left.x=P.x+150;left.z=P.z+150;left.g.position.set(left.x,0,left.z);
@@ -70,7 +71,7 @@ if(process.argv.includes('--browser')){
             active:active.length,roles,
             skeletonsIndependent:skeletons.every((set,i)=>set.length>=60&&set.every(node=>
               skeletons.every((other,j)=>i===j||!other.includes(node)))),
-            uniformCorrect:active.every(u=>u.germanPreview.nativeRig.ww2Uniform.side==='red'),
+            uniformCorrect,
             blueUnchanged:!blue.germanPreview?.nativeRig,
             released,afterRelease:germanPreview.armyNativeInstalled,
             preservedPosition:Math.abs(left.g.position.x-left.x)<1e-6
