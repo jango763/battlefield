@@ -89,11 +89,17 @@ jobs:
                       capVisible:u.cap?.visible,oldGunVisible:w.fallback.visible,
                       source:!!w.ww2Manifest,
                       trigger:w.trigger.position.toArray(),
-                      support:w.support.position.toArray()};
+                      support:w.support.position.toArray(),
+                      supportPalmVisible:!!w.supportPalm?.visible,
+                      supportPalmError:w.supportPalm?
+                        new THREE.Box3().setFromObject(w.supportPalm).getCenter(new THREE.Vector3())
+                          .distanceTo(w.support.getWorldPosition(new THREE.Vector3())):null};
                   });
                   report.factions[side].push(out);
                   if(slot<4&&out.key!==keys[slot])report.failures.push('incorrect model '+side+' '+slot+': '+out.key);
                   if(slot<4&&out.oldGunVisible)report.failures.push('obsolete test gun visible '+side+' '+slot);
+                  if(slot===1&&(!out.supportPalmVisible||out.supportPalmError>.22))
+                    report.failures.push('visible sculpted support palm missing or displaced '+side+': '+JSON.stringify(out));
                   if(slot>=4&&out.key!=='launcher-prototype')report.failures.push('launcher fallback '+side+' '+slot);
                   if(side==='red'&&!out.capVisible||side==='blue'&&out.capVisible)report.failures.push('incorrect faction headwear');
                   if(out.diag.leftError>.12||out.diag.rightError>.12)report.failures.push('hands not on actual grips '+side+' '+slot);
