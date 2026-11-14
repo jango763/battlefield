@@ -58,7 +58,26 @@ if(process.argv.includes('--browser')){
         assert(stats.models.every(x=>x.height>1.2&&x.height<2.5&&x.materials>20),'Invalid model dimensions');
         assert.equal(stats.errors.length,0,'GLB load errors');
         assert(!errors.length,'Uncaught browser errors: '+JSON.stringify(errors));
-        await page.screenshot({path:'/tmp/muster-gallery-'+device.name+'.png'});
+        const screenshot=await page.screenshot({
+          path:'/tmp/muster-gallery-'+device.name+'.png',
+          type:'png'
+        });
+        const jpeg=await page.screenshot({type:'jpeg',quality:58});
+        console.log('MUSTER_GALLERY_SCREENSHOT_'+device.name.toUpperCase().replace('-','_'),
+          jpeg.toString('base64'));
+        if(device.name==='desktop'){
+          const bones=await page.evaluate(()=>{
+            const r=P.germanPreview?.nativeRig,records=[];
+            r?.model?.traverse(n=>{
+              if(n.isBone){
+                const pos=n.getWorldPosition(new THREE.Vector3());
+                records.push({name:n.name,x:pos.x,y:pos.y,z:pos.z});
+              }
+            });
+            return records;
+          });
+          console.log('MUSTER_NATIVE_RIG_BONES',JSON.stringify(bones));
+        }
         console.log('MUSTER_BROWSER_PASS',device.name,JSON.stringify(stats));
         await context.close();
       }
