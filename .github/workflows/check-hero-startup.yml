@@ -22,9 +22,13 @@ jobs:
           node --check tools/infantry-v2/test-hero-startup.cjs
           node tools/infantry-v2/test-hero-startup.cjs
           node tools/infantry-v2/test-clean-core.cjs
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs
+          node tools/infantry-v2/test-british-pilot.cjs
       - name: Install Chromium for Safari-size and desktop tests
         run: |
           npm install --no-audit --no-fund --prefix /tmp/hero-startup-qa playwright@1.58.2
+          npm install --no-audit --no-fund --prefix /tmp/british-pilot playwright@1.58.2
+          npm install --no-audit --no-fund --prefix /tmp/wehrmacht-qa playwright@1.58.2
           /tmp/hero-startup-qa/node_modules/.bin/playwright install chromium
       - name: Check first-frame mask, final native model and permanent fallback
         shell: bash
@@ -32,6 +36,8 @@ jobs:
           python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/hero-startup-http.log 2>&1 &
           sleep 2
           node tools/infantry-v2/test-hero-startup.cjs --browser
+          node tools/infantry-v2/test-wehrmacht-rollout.cjs --browser
+          node tools/infantry-v2/test-british-pilot.cjs --browser
       - name: Keep rendered verification screenshots
         if: always()
         uses: actions/upload-artifact@v4
