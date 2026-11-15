@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Battlefield — оригинальный WW2 Panzergrenadier</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif}*{box-sizing:border-box}body,html{height:100%;margin:0;background:#141917;color:#f1f2ec;overflow:hidden}
+#render{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+header{position:absolute;top:0;left:0;right:0;background:linear-gradient(#101713ed,#10171300);padding:18px 18px 40px;pointer-events:none}
+h1{font-size:19px;line-height:1.2;letter-spacing:.015em;margin:0 0 6px;font-weight:700}
+header p{margin:0;font-size:13px;color:#bac7b8}
+#info{position:absolute;top:84px;left:18px;max-width:min(350px,calc(100% - 36px));font-size:12px;background:#162018d9;border:1px solid #586b58;border-radius:9px;padding:10px 12px;line-height:1.5}
+#actions{position:absolute;bottom:max(env(safe-area-inset-bottom),16px);left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:calc(100% - 18px)}
+button{font:600 13px system-ui,sans-serif;padding:12px 14px;border:1px solid #73826f;border-radius:9px;color:#f8f9f1;background:#27392d;cursor:pointer;min-width:68px}
+button:active,button[aria-pressed=true]{background:#526c52;border-color:#c0d5bc}
+#credit{position:absolute;right:14px;top:18px;color:#9faf9d;font-size:11px;text-align:right}
+#credit a{color:#c7dbbd}
+@media(max-width:540px){header{padding:14px 12px 36px}h1{font-size:16px}header p{font-size:11px}#info{top:69px;left:12px;font-size:11px}#credit{top:auto;bottom:76px;left:0;right:0;text-align:center;font-size:10px}button{padding:11px;min-width:65px}}
+</style></head>
+<body>
+<canvas id="render" aria-label="Трёхмерный немецкий солдат; вращайте пальцем"></canvas>
+<header><h1>Немецкий Panzergrenadier · оригинал</h1><p>Никаких новых деталей формы · только исходная 3D-модель и её материалы</p></header>
+<div id="info" role="status">Загрузка оригинальной модели…</div>
+<div id="credit">Модель: britdawgmasterfunk · CC BY 4.0<br><a href="https://sketchfab.com/3d-models/ww2-panzergrenadier-2k-cc0-6a104431bcb8400080b79446ec019696" target="_blank" rel="noopener noreferrer">Источник и автор</a></div>
+<div id="actions" role="group" aria-label="Ракурс просмотра">
+<button data-view="front" aria-pressed="false">Спереди</button>
+<button data-view="quarter" aria-pressed="true">Под углом</button>
+<button data-view="side" aria-pressed="false">Сбоку</button>
+<button data-view="back" aria-pressed="false">Сзади</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="./viewer.js"></script>
+</body></html>
