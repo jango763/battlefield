@@ -21,6 +21,7 @@
     .controls-row button{appearance:none;background:#344235;color:#f2f2e8;border:1px solid #697967;border-radius:7px;padding:9px 10px;font:600 12px system-ui,-apple-system,sans-serif;cursor:pointer;touch-action:manipulation}
     .controls-row button[aria-pressed="true"]{background:#ccd4b4;color:#203122;border-color:#f1f4de}
     .controls-row button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+    .controls-row a.combat-run-link{display:inline-flex;align-items:center;color:#f2f2e8;background:#344235;border:1px solid #697967;border-radius:7px;padding:9px 10px;font:600 12px system-ui;text-decoration:none}
     @media(max-width:430px){#controls{padding:6px 8px;left:12px;right:12px;width:auto}.controls-row button{padding:8px 9px;font-size:11px}}
     #credit{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 64px);left:12px;right:12px;font-size:11px;text-align:center;color:#b8c5b4}
     #credit a{color:#d4dfc6}
@@ -41,7 +42,7 @@
     <div class="controls-row" role="group" aria-label="Положение бойца">
       <button type="button" data-pose="ready" aria-pressed="true">Наготове</button>
       <button type="button" data-pose="aim" aria-pressed="false">Прицел</button>
-      <button type="button" data-pose="walk" aria-pressed="false">Шаг (тест)</button>
+      <a class="combat-run-link" href="./animstudio-preview/index.html">Бег — 3D-анимации</a>
       <button type="button" data-pose="fire" aria-pressed="false">Стрельба (тест)</button>
     </div>
     <div class="controls-title">* Panzerschreck пока процедурный макет, не утверждённая GLB-модель.</div>
