@@ -2,7 +2,7 @@ name: Wehrmacht 90-bone wardrobe
 on:
   push:
     branches:
-      - rig/wehrmacht90-wardrobe-20261115
+      - rig/wehrmacht90-tailored-m40-20261115
   workflow_dispatch:
 jobs:
   outfit:
