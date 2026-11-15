@@ -290,9 +290,9 @@
       // Right shoulder stays fixed relative to chest; the weapon is not attached
       // to a swinging wrist, avoiding a feedback loop for the left support hand.
       const stockOffset = weaponId === 'de-panzerschreck'
-        ? (running ? new B.Vector3(.10, -.13, .10)
-          : pose === 'ready' ? new B.Vector3(.15, -.015, .06)
-          : new B.Vector3(.085, .025, .05))
+        ? (running ? new B.Vector3(.10,-.13,.10)
+          : pose === 'ready' ? new B.Vector3(.075,-.095,.055)
+          : new B.Vector3(.050,-.090,.035))
         : (running ? new B.Vector3(.045, -.18, -.025)
           : new B.Vector3(.038, -.07, .115));
       const stock = right.shoulder.getAbsolutePosition()
