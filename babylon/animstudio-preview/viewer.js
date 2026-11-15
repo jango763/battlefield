@@ -209,7 +209,9 @@
       else if(Number.isFinite(d.rightGripMeters)&&Number.isFinite(d.leftGripMeters))
         status.textContent=state.clip+' · хват R '+Math.round(d.rightGripMeters*100)+
           ' см / L '+Math.round(d.leftGripMeters*100)+' см · '+
-          (d.geometricPass?'IK OK':'проверить хват');
+          (state.weapon==='Panzerschreck'?'прототип — руки доработать'
+            : d.geometricPass&&d.rightElbowDegrees>=20&&d.leftElbowDegrees>=20
+              ?'хват и локти OK':'проверить руки');
     });
   }catch(e){reportError(e);}
 })();
