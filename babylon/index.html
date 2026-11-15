@@ -54,34 +54,6 @@ button:disabled{opacity:.5;cursor:default}
 @media(max-width:760px){.brief-layout{display:block;padding:8px}.brief-content{margin-top:10px;padding:12px}.brief-map{max-height:none}.brief-head h2{font-size:18px}.brief-content h3{font-size:15px}#enter-game{position:sticky;bottom:calc(env(safe-area-inset-bottom) + 7px);z-index:2}}
 
 
-/* Persistent map briefing: never disappears until player deliberately presses Start. */
-#map-briefing{position:fixed;inset:0;z-index:30;overflow:auto;background:linear-gradient(145deg,#151a17,#253125);color:#f4efd8;padding:18px max(12px,calc((100vw - 1220px)/2));padding-top:calc(env(safe-area-inset-top) + 12px);padding-bottom:calc(env(safe-area-inset-bottom) + 20px)}
-#map-briefing[hidden]{display:none!important}
-#map-briefing h2{font-size:24px;margin:4px 0 10px;color:#f7e4b6}
-#map-briefing .brief-sub{font-size:13px;color:#d3d7bf;margin-bottom:16px}
-#map-briefing .brief-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(290px,390px);gap:16px;align-items:start}
-#map-briefing .brief-map{display:block;width:100%;max-height:calc(100dvh - 110px);object-fit:contain;border:1px solid #7a7560;border-radius:7px;background:#121611}
-#map-briefing .brief-map-link{display:block;text-decoration:none;color:#e3cc8e;font-size:12px;margin-top:5px}
-#map-briefing .brief-rules{background:#263227;border:1px solid #6d7764;border-radius:10px;padding:14px}
-#map-briefing .brief-rules h3{font-size:15px;margin:0 0 8px}
-#map-briefing .brief-rules p{font-size:13px;line-height:1.5;margin:0 0 10px}
-#map-briefing .brief-rules table{border-collapse:collapse;width:100%;font-size:13px;margin-bottom:12px}
-#map-briefing .brief-rules td,#map-briefing .brief-rules th{text-align:left;padding:7px 5px;border-bottom:1px solid #596554}
-#map-briefing .gold-total{color:#ffe3a0;font-weight:700}
-#map-briefing #begin-game{display:block;width:100%;padding:14px;font-size:16px;background:#cbd69b;color:#26331f;border:0}
-#map-briefing #begin-game:disabled{opacity:.45}
-#map-briefing #map-load-status{font-size:12px;color:#ddd9af;margin:10px 0 6px}
-#map-briefing .brief-small{font-size:11px!important;color:#b9c2b2}
-@media(max-width:760px){
- #map-briefing{padding:12px;padding-top:calc(env(safe-area-inset-top) + 8px);padding-bottom:calc(env(safe-area-inset-bottom) + 12px)}
- #map-briefing h2{font-size:19px;margin-bottom:6px}
- #map-briefing .brief-sub{margin-bottom:9px}
- #map-briefing .brief-grid{grid-template-columns:minmax(0,1fr);gap:10px}
- #map-briefing .brief-map{max-height:50dvh}
- #map-briefing .brief-rules{padding:10px}
- #map-briefing .brief-rules p{font-size:12px}
- #map-briefing #begin-game{position:sticky;bottom:0}
-}
 
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
@@ -107,6 +79,12 @@ button:disabled{opacity:.5;cursor:default}
   <aside class="brief-content">
    <h3>🇬🇧 Британцы 🔵 против немцев 🔴</h3><p><b>12 против 12.</b> Южная синяя база — британская; северная красная — немецкая.</p>
    <p>У каждой стороны главная база и две фермы. Пятая, самая богатая, находится строго в центре. Три ДОТа держат центр, ещё по два прикрывают подходы к базам. Разбитая колонна из трёх БТР служит ориентиром и укрытием.</p>
+   <p style="font-weight:700;color:#ffe39f;border:1px solid #b8954a;border-radius:8px;padding:10px">
+    <span aria-label="центральная точка закрыта">🔒 ЦЕНТР ЗАКРЫТ В НАЧАЛЕ БОЯ.</span>
+    После гибели первого бота с любой стороны начинается обратный отсчёт 05:00.
+    По истечении пяти минут центральная ферма открывается для захвата. Гибель героя не запускает таймер.
+    Во время паузы отсчёт останавливается.
+   </p>
    <h3>Золото — правила первого проекта</h3>
    <table><thead><tr><th>Событие</th><th>Золото</th></tr></thead>
    <tbody>
@@ -114,7 +92,7 @@ button:disabled{opacity:.5;cursor:default}
     <tr><td>Личные деньги героя</td><td>150</td></tr>
     <tr><td>Захват точки за 5 секунд</td><td>+50</td></tr>
     <tr><td>Обычная ферма / 5 секунд</td><td>+25</td></tr>
-    <tr><td>Богатая ферма / 5 секунд</td><td>+125</td></tr>
+    <tr><td>Богатая ферма / 5 секунд (после открытия)</td><td>+125</td></tr>
     <tr><td>Уничтожение бойца</td><td>+15</td></tr>
     <tr><td>Уничтожение бронированного</td><td>+30</td></tr>
    </tbody></table>
@@ -126,34 +104,6 @@ button:disabled{opacity:.5;cursor:default}
  </div>
 </div>
 
-<section id="map-briefing" aria-labelledby="brief-heading">
-  <h2 id="brief-heading">BATTLEFIELD · ПЕРЕКРЁСТОК</h2>
-  <div class="brief-sub">Чертёж поля боя 300×300 · 12 британцев (синие) против 12 немцев (Вермахт)</div>
-  <div class="brief-grid">
-    <div>
-      <img class="brief-map" src="./map-briefing.svg" alt="Схема карты Перекрёсток: синяя британская база на юге, красная немецкая база на севере; по две обычные фермы с каждой стороны, богатая золотая ферма в центре, семь ДОТов и три сожжённых БТР." loading="eager">
-      <a class="brief-map-link" href="./map-briefing.svg" target="_blank" rel="noopener noreferrer">Увеличить и прочитать карту полностью</a>
-    </div>
-    <div class="brief-rules">
-      <h3>БИТВА ЗА ЗОЛОТО</h3>
-      <p><strong>Британцы — синие</strong>, <strong>немцы — красные</strong>. В каждой армии 12 бойцов. При смене стороны герой заменяет одного бота, а прежняя команда получает нового — баланс 12×12 сохраняется.</p>
-      <table aria-label="Доход золотых ферм">
-      <thead><tr><th>Объект</th><th>Золото</th></tr></thead>
-      <tbody>
-      <tr><td>Каждая из 4 обычных ферм</td><td>+25 / 5 с</td></tr>
-      <tr><td><strong>Центральная ферма</strong></td><td class="gold-total">+125 / 5 с</td></tr>
-      <tr><td>Захват фермы</td><td>5 с → +50</td></tr>
-      <tr><td>Убийство обычного бойца</td><td>+15</td></tr>
-      <tr><td>Убийство бронированного</td><td>+30</td></tr>
-      </tbody></table>
-      <p><strong>Стартовая казна:</strong> по 560 золотых у каждой армии. Личный кошелёк героя — 150. Золото тратится на оружие, боеприпасы и развитие обороны.</p>
-      <p><strong>Задача:</strong> захватывать фермы, удерживать центральную богатую ферму и защищать собственную базу. Контроль центра приносит в пять раз больше золота, чем контроль одной обычной фермы.</p>
-      <p class="brief-small">Схема соответствует утверждённому расположению объектов. Оригинальный художественный чертёж хранится в библиотеке Battlefield; эта версия адаптирована для чтения в игре.</p>
-      <div id="map-load-status" role="status">Загрузка бойцов… Чертёж можно изучать без ограничения времени.</div>
-      <button id="begin-game" type="button" disabled>Загружаем игру…</button>
-    </div>
-  </div>
-</section>
 <canvas id="view" aria-label="Основная игра Battlefield. Коснитесь земли, чтобы приказать герою двигаться."></canvas>
 <header id="heading"><h1>Капрал на линии фронта</h1>
 <small>Battlefield · Babylon.js · управление героем и отрядом</small></header>
