@@ -331,7 +331,12 @@ function setup(scenarioName){
  if(destinationMark)destinationMark.isVisible=false;
  state.scenario=scenario;state.atBase=true;state.focus=null;
  const [ours,theirs]=SCENARIOS[scenario];
- economy=goldRules.create();
+ economy=goldRules.create({onEvent:event=>{
+  if(event.type==='central-countdown-start')
+   alertStatus('Первый бот погиб! До открытия центральной фермы — 05:00.');
+  if(event.type==='central-open')
+   alertStatus('ЦЕНТРАЛЬНАЯ ФЕРМА ОТКРЫТА! Захватите её ради большого золота.');
+ }});
  lastEconomyBlue=economy.treasury.blue;
  battle=combat.createBattle({funds:goldRules.START_TREASURY,prices:PRICES});
  allies=[];enemies=[];
@@ -378,9 +383,13 @@ function drawShot({unit,target,result}){
   for(const hit of result.hits){
    if(hit.hp>0)continue;
    const victim=[...allies,...enemies].find(u=>u.id===hit.id);
-   if(victim&&!victim.alive)
+   if(victim&&!victim.alive){
+    // A hero dying must not start the countdown. Either army's first
+    // dead BOT starts exactly one five-minute game-time timer.
+    economy.reportBotDeath(victim);
     economy.kill(unit.economyTeam,{team:victim.economyTeam},
      {heroKill:unit.isHero,armoured:false});
+   }
   }
  }
  const source=actors.get(unit),targetView=actors.get(target);
@@ -461,6 +470,11 @@ function drawHud(){
  const inventory=hero.weapon==='Kar98k'?null:hero.inventory[hero.weapon];
  const funds=battle.getFunds();
  const econ=economy?.summary();
+ const central=econ?.central;
+ const timerLabel=central?.open?'ОТКРЫТА':
+  central?.started?'Откроется через '+String(Math.floor((central.remainingSeconds+1e-8)/60)).padStart(2,'0')+
+   ':'+String(Math.ceil(central.remainingSeconds%60)).padStart(2,'0'):
+   'ЗАКРЫТА — ждём гибель первого бота';
  $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
  $('supply').disabled=!atBase||!hero.alive;
  $('reload-manual').disabled=!hero.alive||hero.weapon==='Kar98k'||
@@ -477,6 +491,7 @@ function drawHud(){
   (hero.reloadRemaining>0?'\nПерезарядка: '+hero.reloadRemaining.toFixed(1)+' c':'')+
   '\nБританцы 🔵: '+funds+' · Немцы 🔴: '+(econ?.treasury.red??'—')+
   '\nФермы: '+(econ?.owners.blue.length||0)+' синих · '+(econ?.owners.red.length||0)+' красных'+
+  '\nЦентр: '+timerLabel+
   (paid?'\nЗапас: '+paid:'')+
   '\nСтрой: '+(fieldOrders?.snapshot().mode==='semicircle'?'боевой полукруг':'черепаха')+
   '\nВыстрелы героя: '+hero.shots+' · поражено: '+hero.kills+
@@ -584,7 +599,9 @@ function frame(){
  if(state.ready&&controller){
   if(!gamePausedForBriefing){
    controller.update(dt);
-   if(economy){
+   // Stop economic and unlock clocks while the actual battle is paused
+   // (not merely when the map briefing is dismissed).
+   if(economy&&controller.snapshot().active){
     economy.update(dt,[...allies,...enemies]);
     // Only newly earned income enters the combat treasury. Purchases
     // deduct from BOTH treasuries, preventing an accidental money refund.
