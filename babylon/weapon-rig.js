@@ -313,7 +313,8 @@
     // Kar98k master-pose authoring studio. Isolated from gameplay and all
     // default previews: applies ONLY with ?gripStudio=1. Corrected hand and
     // finger poses can be saved as JSON for Blender-based animation authoring.
-    const gripStudio=new URLSearchParams(window.location.search).get('gripStudio')==='1';
+    const params=new URLSearchParams(window.location.search);
+    const gripStudio=params.get('gripStudio')==='1'||params.get('combatDemo')==='1';
     // Two fully independent hands. Right grips Kar98k wrist/trigger, left
     // supports forestock. The butt remains fixed to the RIGHT shoulder.
     // Existing v1 flat keys are migrated through legacyAliases in the API.
