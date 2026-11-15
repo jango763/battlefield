@@ -11,7 +11,12 @@
 })(typeof window!=='undefined'?window:null,function(){
 'use strict';
 const SIZE=300;
+// Blue = British; Red = German Wehrmacht. Names are presentation labels.
 const TEAM_BLUE='blue',TEAM_RED='red';
+const FACTIONS=Object.freeze({
+ blue:Object.freeze({name:'Британцы',color:'#4b9cc2',side:'ЮГ'}),
+ red:Object.freeze({name:'Немцы',color:'#cd6558',side:'СЕВЕР'})
+});
 const CAPTURE_SECONDS=5;
 const CAPTURE_BONUS=50;
 const INCOME_INTERVAL=5;
@@ -75,9 +80,10 @@ function create({onEvent=()=>{},centreMultiplier=CENTRAL_MULTIPLIER}={}){
  function processFarm(p,dt,units){
   let blue=false,red=false;
   for(const u of units){
-   if(!u||u.alive===false||u.hp<=0||!validTeam(u.team))continue;
-   if(Math.hypot(u.x-p.x,u.z-p.z)>=9)continue;
-   if(u.team===TEAM_BLUE)blue=true;else red=true;
+   if(!u||u.alive===false||u.hp<=0)continue;
+   const side=validTeam(u.economyTeam)?u.economyTeam:u.team;
+   if(!validTeam(side)||Math.hypot(u.x-p.x,u.z-p.z)>=9)continue;
+   if(side===TEAM_BLUE)blue=true;else red=true;
    if(blue&&red)break;
   }
   const candidate=blue&&!red?TEAM_BLUE:red&&!blue?TEAM_RED:null;
@@ -112,9 +118,11 @@ function create({onEvent=()=>{},centreMultiplier=CENTRAL_MULTIPLIER}={}){
   for(const p of farms)if(p.owner)rate[p.owner]+=.25*p.weight;
   // Original game gave each regular bot its own savings proportional to controlled mines.
   for(const u of units)
-   if(u&&u.alive!==false&&u.hp>0&&validTeam(u.team)&&!u.engineer&&!u.commander&&
-      !u.isHero&&u.id!=='hero')
-    u.gold=(u.gold||0)+rate[u.team]*dt;
+   if(u&&u.alive!==false&&u.hp>0&&!u.engineer&&!u.commander&&
+      !u.isHero&&u.id!=='hero'){
+    const side=validTeam(u.economyTeam)?u.economyTeam:u.team;
+    if(validTeam(side))u.gold=(u.gold||0)+rate[side]*dt;
+   }
  }
  function changeHeroSide(team){
   if(!validTeam(team))throw Error('Invalid hero team');
@@ -131,7 +139,7 @@ function create({onEvent=()=>{},centreMultiplier=CENTRAL_MULTIPLIER}={}){
  }
  return {update,pay,earn,kill,changeHeroSide,summary,farms,treasury,hero};
 }
-return {create,MAP,FARMS,SIZE,TEAM_BLUE,TEAM_RED,
+return {create,MAP,FARMS,SIZE,FACTIONS,TEAM_BLUE,TEAM_RED,
  CAPTURE_SECONDS,CAPTURE_BONUS,INCOME_INTERVAL,FARM_INCOME,
  CENTRAL_MULTIPLIER,START_TREASURY,START_HERO_WALLET,
  KILL_REWARD,ARMOURED_KILL_REWARD};
