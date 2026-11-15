@@ -30,6 +30,13 @@ let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
 let actors=new Map(),fx=[],scenario='duel',atBase=true;
 let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 function alertStatus(message){$('event').textContent=message}
+// Controls remain available even when initial glTF/IK loading fails.
+$('retry').addEventListener('click',()=>location.reload());
+$('hud-toggle').addEventListener('click',()=>{
+ const panel=$('panel'),closed=panel.classList.toggle('closed');
+ $('hud-toggle').setAttribute('aria-pressed',String(!closed));
+ $('hud-toggle').textContent=closed?'Меню':'Скрыть';
+});
 function position(unit,y=0){
  return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y,unit.z*UNIT_SCALE);
 }
@@ -396,7 +403,7 @@ function drawHud(){
  const snap=controller.snapshot();
  const inventory=hero.weapon==='Kar98k'?null:hero.inventory[hero.weapon];
  const funds=battle.getFunds();
- $('fight').textContent=atBase?'▶ Начать бой':'◀ Вернуться на базу';
+ $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
  $('supply').disabled=!atBase||!hero.alive;
  $('reload-manual').disabled=!hero.alive||hero.weapon==='Kar98k'||
   hero.reloadRemaining>0||!hero.inventory[hero.weapon]?.reserve||
@@ -467,10 +474,10 @@ function registerUI(){
   if(atBase){
    const result=controller.start();
    if(!result.ok){alertStatus('Бой не начат: '+result.reason);return;}
-   atBase=false;state.atBase=false;alertStatus('Отряды вступили в бой.');
+   atBase=false;state.atBase=false;alertStatus('Продолжаем бой. Коснитесь земли для движения героя.');
   }else{
    controller.stop();atBase=true;state.atBase=true;
-   alertStatus('Бой приостановлен. Доступно снаряжение и пополнение БК.');
+   alertStatus('Пауза: доступна смена оружия и пополнение БК.');
   }
   drawHud();
  });
@@ -494,12 +501,6 @@ function registerUI(){
   $('order-attack').setAttribute('aria-pressed','true');
   alertStatus('Атака: коснитесь противника для выбора цели.');
  });
- $('hud-toggle').addEventListener('click',()=>{
-  const panel=$('panel'),closed=panel.classList.toggle('closed');
-  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
-  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
- });
- $('retry').addEventListener('click',()=>location.reload());
  $('reload-manual').addEventListener('click',()=>{
   const r=battle.startReload(findActor());
   alertStatus(r.ok?'Перезарядка началась: '+r.seconds+' с.':
