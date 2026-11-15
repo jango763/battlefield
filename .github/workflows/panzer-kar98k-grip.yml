@@ -1,0 +1,51 @@
+name: Kar98k on original Panzergrenadier
+on:
+  push:
+    branches:
+      - preview/panzer-kar98k-grip-20261115
+    paths:
+      - .github/workflows/panzer-kar98k-grip.yml
+      - lab/original-panzergrenadier/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kar98k-fit-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify existing untouched original soldier and source weapon assets
+        shell: bash
+        run: |
+          test -s lab/original-panzergrenadier/panzergrenadier-original.glb
+          test -s assets/ww2-weapons/de-kar98k.glb
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,struct
+          for name in ('lab/original-panzergrenadier/panzergrenadier-original.glb','assets/ww2-weapons/de-kar98k.glb'):
+            b=Path(name).read_bytes()
+            assert b[:4]==b'glTF'
+            assert struct.unpack_from('<I',b,8)[0]==len(b)
+            n=struct.unpack_from('<I',b,12)[0]
+            j=json.loads(b[20:20+n])
+            print(name,'meshes:',len(j.get('meshes',[])),'skins:',[len(s.get('joints',[])) for s in j.get('skins',[])])
+          PY
+      - name: Install browser
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/karfit-pw playwright@1.58.2
+          /tmp/karfit-pw/node_modules/.bin/playwright install chromium
+      - name: Check both hands and create screenshots
+        shell: bash
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/karfit-server.log 2>&1 &
+          sleep 2
+          node lab/original-panzergrenadier/test-weapon-fit.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: original-german-kar98k-fitted-screenshots
+          path: kar98k-fit-results/
+          if-no-files-found: ignore
