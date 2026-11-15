@@ -1,0 +1,7 @@
+Exact unmodified source: https://github.com/Kenton-GMI/muster-ww2
+Pinned commit: 7d2fa86ebc3b999eaf085831cdcd5dccefea63d4
+MIT (c) 2026 Kenton Wang; see https://github.com/Kenton-GMI/muster-ww2/blob/main/LICENSE
+Model: germany/rifleman (fully built M40 German rifleman with original Kar98k).
+Viewer: source project's original src/harness/main.ts, no custom uniform, no original Battlefield prototype.
+The source generates a STATIC posed model; it has not been retargeted to our 90-bone animation rig.
+Example: index.html?asset=germany/rifleman&views=q-front,front,q-rear&cols=3&w=1500&h=900&detail=low
