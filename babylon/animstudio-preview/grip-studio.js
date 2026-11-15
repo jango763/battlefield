@@ -19,7 +19,7 @@ function make(tag,value,cls){
 }
 content.appendChild(make('div','Приклад остаётся у правого плеча. Левую кисть можно передвигать вдоль цевья. Каждый палец сгибается и поворачивается отдельно.','note'));
 const actions=make('div',undefined,'buttons');
-actions.innerHTML='<button type="button" id="master-aim">Прицел</button><button type="button" id="master-run">Бег</button><button type="button" id="master-full">Весь боец</button><button type="button" id="master-reset">Сброс всего</button>';
+actions.innerHTML='<button type="button" id="master-aim">Прицел</button><button type="button" id="master-run">Бег</button><button type="button" id="master-full">Весь боец</button><button type="button" id="master-user-preset">Мой хват Kar98k</button><button type="button" id="master-reset">Сброс всего</button>';
 content.appendChild(actions);
 const controls={};
 const digits=[['Thumb','Большой'],['Index','Указательный'],
@@ -109,6 +109,22 @@ addButton(exportRow,'master-import','Применить JSON',()=>{
 const editor=document.createElement('textarea');editor.id='master-json';
 editor.setAttribute('aria-label','Настройки обеих кистей и отдельных пальцев в JSON');
 content.appendChild(editor);
+async function applyUserPreset(){
+ const s=sceneState();
+ if(!s?.masterPoseEnabled)throw Error('Риг ещё не загружен');
+ const response=await fetch('./presets/kar98k-user-v2.json');
+ if(!response.ok)throw Error('Не найден сохранённый профиль Kar98k: '+response.status);
+ const data=await response.json();
+ if(data.model!=='approved-panzergrenadier'||data.weapon!=='Kar98k'||
+    data.version!==2||!data.profile||Object.keys(data.profile).length!==32)
+   throw Error('Сохранённый профиль повреждён');
+ s.setMasterPose(data.profile);
+ const actual=s.getMasterPose();
+ for(const [key,value] of Object.entries(data.profile))
+   if(Math.abs(actual[key]-value)>1e-9)throw Error('Не совпадает параметр '+key);
+ refresh();
+ return {loaded:true,count:Object.keys(data.profile).length,profile:actual};
+}
 function focusHand(side){
  const s=sceneState();if(!s?.masterPoseEnabled)return;
  const position=s.weaponRig[side+'HandFocus'];
@@ -148,8 +164,16 @@ const timer=setInterval(async()=>{
    document.getElementById('master-reset').onclick=()=>{s.resetMasterPose();refresh()};
    window.__BATTLEFIELD_GRIP_STUDIO__={
     ready:true,update:s.setMasterPose,read:s.getMasterPose,
-    reset:s.resetMasterPose,resetHand:s.resetMasterHandPose,refresh,focusHand
+    reset:s.resetMasterPose,resetHand:s.resetMasterHandPose,
+    refresh,focusHand,applyUserPreset
    };
+   const loadPreset=async()=>{
+     try{return await applyUserPreset()}
+     catch(e){metrics.textContent='Ошибка профиля: '+e.message;throw e}
+   };
+   document.getElementById('master-user-preset').onclick=()=>loadPreset().catch(console.error);
+   if(new URLSearchParams(location.search).get('gripPreset')==='user')
+     await loadPreset();
    setInterval(refresh,950);
   }catch(e){metrics.textContent='Ошибка студии: '+e.message;console.error(e)}
  }else if(++attempts>200){clearInterval(timer);metrics.textContent='Не удалось загрузить бойца'}
