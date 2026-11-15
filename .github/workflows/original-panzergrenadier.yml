@@ -5,6 +5,7 @@ on:
       - preview/original-panzergrenadier-20261115
     paths:
       - .github/workflows/original-panzergrenadier.yml
+      - lab/original-panzergrenadier/extract_existing_glb.py
   workflow_dispatch:
 
 permissions:
