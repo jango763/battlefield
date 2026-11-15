@@ -23,10 +23,10 @@ const SCENARIOS={duel:[1,1],assault:[1,4],squads:[4,4]};
 const CLIP_POSES={ready:'Hold',aim:'Aim',fire:'Fire',run:'Run'};
 const CLIP_IDS=Object.keys(META).flatMap(w=>Object.values(CLIP_POSES).map(p=>w+'_'+p));
 const state={ready:false, loading:true, error:null, models:0, clips:0,
- scenario:'squads',atBase:true,selected:'Kar98k',focus:null, fps:0};
+ scenario:'duel',atBase:true,selected:'Kar98k',focus:null, fps:0};
 window.__BATTLEFIELD_SQUAD_RANGE__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
-let actors=new Map(),fx=[],scenario='squads',atBase=true;
+let actors=new Map(),fx=[],scenario='duel',atBase=true;
 let statusAt=0,starting=false;
 function alertStatus(message){$('event').textContent=message}
 function position(unit,y=0){
@@ -134,40 +134,77 @@ function unitVisual(index,entries){
   inactive:true,marker,hpBack,hpFill,healthMaterial:hpMat,
   hitEffect:0,animationChanges:0,weaponError:null};
 }
-async function loadUnits(){
- $('loading').textContent='Читаю GLB с 16 анимациями и 65-костным скелетом…';
- asset=await B.SceneLoader.LoadAssetContainerAsync('',
-  './animstudio-preview/models/','all-combat-run.glb',scene);
- if(asset.animationGroups.length<16)
-  throw Error('В GLB отсутствуют 16 согласованных боевых анимаций');
- for(let i=0;i<8;i++){
-  $('loading').textContent='Создаю солдат и индивидуальные анимации: '+(i+1)+'/8';
-  // Explicit clone is required to keep skinned animation/IK independent.
-  // Keep original Mixamo joint names in each separate clone for IK lookup.
-  // Babylon allows duplicate names; our rig uses the clone-local hierarchy.
+const SCENE_SLOTS={
+ duel:[0,4],assault:[0,4,5,6,7],
+ squads:[0,1,2,3,4,5,6,7]
+};
+async function ensureUnits(scenarioName){
+ const slots=SCENE_SLOTS[scenarioName];
+ if(!slots)throw Error('Неизвестный режим отряда: '+scenarioName);
+ if(!asset){
+  $('loading').textContent='Загружаю анимированного немецкого стрелка…';
+  asset=await B.SceneLoader.LoadAssetContainerAsync('',
+   './animstudio-preview/models/','all-combat-run.glb',scene);
+  if(asset.animationGroups.length<16)
+   throw Error('В GLB отсутствуют 16 согласованных боевых анимаций');
+ }
+ for(const i of slots){
+  if(views[i])continue;
+  $('loading').textContent='Загружаю бойцов: '+state.models+'/'+slots.length+
+   ' · создание №'+(i+1);
+  // Preserve exact Mixamo joint names in clone-local hierarchies for IK.
   const entries=asset.instantiateModelsToScene(
-   name=>name,false,{doNotInstantiate:true});
+    name=>name,false,{doNotInstantiate:true});
   const view=unitVisual(i,entries);
-  // Reject shared skeletons or animation targets before equipping weapons.
-  for(const prev of views){
+  // A shared skeleton or shared track would animate two actors at once.
+  for(const prev of views.filter(Boolean)){
    if(prev.imported.skeletons[0]===view.imported.skeletons[0])
-    throw Error('Ошибка клонирования: бойцы используют один скелет');
+    throw Error('У бойцов общий скелет: клонирование отклонено');
    const clipA=prev.clips.get('Kar98k_Run');
    const clipB=view.clips.get('Kar98k_Run');
-   if(clipA===clipB||
+   if(clipA===clipB ||
       clipA.targetedAnimations[0]?.target===clipB.targetedAnimations[0]?.target)
-    throw Error('Ошибка клонирования: у бойцов общий анимационный контроллер');
+    throw Error('У бойцов общая анимация бега');
   }
-  views.push(view);
   const rig={};
-  await window.BattlefieldWeaponRig.create({scene,imported:view.imported,
-   root:view.root,state:rig,animationDriven:true,bindUI:false,
-   acceptExportSockets:true,weaponRoot:'../assets/ww2-weapons/'});
-  view.rig=rig;
-  if(!rig.weaponRigReady)throw Error('Не готов двухручный IK у бойца '+(i+1));
-  view.anchor.setEnabled(false);
-  state.models++;
-  state.clips+=16;
+  try{
+   await window.BattlefieldWeaponRig.create({
+    scene,imported:view.imported,root:view.root,state:rig,
+    animationDriven:true,bindUI:false,acceptExportSockets:true,
+    weaponRoot:'../assets/ww2-weapons/'
+   });
+   if(!rig.weaponRigReady)
+    throw Error('Не готов двухручный IK у бойца №'+(i+1));
+   view.rig=rig;view.anchor.setEnabled(false);
+   views[i]=view;state.models++;state.clips+=16;
+  }catch(error){
+   // Dispose unfinished actor, instead of retaining a broken rig in the scene.
+   view.anchor.dispose(false,false);
+   entries.dispose();
+   throw error;
+  }
+  // Allow browser to paint loading progress on mobile between clones.
+  await new Promise(resolve=>requestAnimationFrame(resolve));
+ }
+ $('loading').textContent='Готово: '+state.models+
+  ' анимированных бойцов · выберите режим и нажмите «Начать бой»';
+}
+async function chooseScenario(name){
+ if(starting||!state.ready)return;
+ starting=true;
+ for(const button of document.querySelectorAll('button'))button.disabled=true;
+ try{
+  await ensureUnits(name);
+  setup(name);
+ }catch(error){
+  state.error=String(error?.stack||error);
+  $('loading').textContent='Не удалось добавить отряд: '+(error?.message||error);
+  alertStatus('Большой отряд не загрузился. Режим 1 на 1 по-прежнему доступен.');
+  console.error('Squad load',error);
+ }finally{
+  starting=false;
+  for(const button of document.querySelectorAll('button'))button.disabled=false;
+  drawHud();
  }
 }
 function stopAnimations(view){
@@ -230,11 +267,11 @@ function setup(scenarioName){
  });
  actors=new Map();
  for(let i=0;i<4;i++){
-  assignView(views[i],allies[i]||null);
+  if(views[i])assignView(views[i],allies[i]||null);
   if(allies[i])actors.set(allies[i],views[i]);
  }
  for(let i=0;i<4;i++){
-  assignView(views[i+4],enemies[i]||null);
+  if(views[i+4])assignView(views[i+4],enemies[i]||null);
   if(enemies[i])actors.set(enemies[i],views[i+4]);
  }
  for(const button of document.querySelectorAll('[data-scenario]'))
@@ -380,7 +417,7 @@ function resupplyHero(){
 }
 function registerUI(){
  document.querySelectorAll('[data-scenario]').forEach(button=>
-  button.addEventListener('click',()=>setup(button.dataset.scenario)));
+  button.addEventListener('click',()=>chooseScenario(button.dataset.scenario)));
  document.querySelectorAll('[data-weapon]').forEach(button=>
   button.addEventListener('click',()=>chooseGun(button.dataset.weapon)));
  $('fight').addEventListener('click',()=>{
@@ -409,7 +446,7 @@ function frame(){
  const dt=Math.max(0,Math.min(.05,engine.getDeltaTime()/1000));
  if(state.ready&&controller){
   controller.update(dt);
-  for(const view of views)if(view.unit)syncVisual(view);
+  for(const view of views)if(view?.unit)syncVisual(view);
   const now=performance.now();
   if(now-statusAt>220){statusAt=now;drawHud();}
  }
@@ -421,13 +458,13 @@ function frame(){
 }
 try{
  createWorld();
- await loadUnits();
+ await ensureUnits('duel'); // Two actors first, not eight blocking the entire UI.
  state.loading=false;state.ready=true;
  for(const el of document.querySelectorAll('button'))el.disabled=false;
  registerUI();
- setup('squads');
- $('loading').textContent='Готово · '+state.models+
-  ' солдат с независимыми скелетами · '+state.clips+' клипов';
+ setup('duel');
+ $('loading').textContent='Бой 1 на 1 готов · '+state.models+
+  ' бойца. Режимы 1×4 и 4×4 загрузятся по выбору.';
 }catch(error){
  state.loading=false;state.error=String(error?.stack||error);
  $('loading').textContent='Ошибка: '+(error?.message||error);
