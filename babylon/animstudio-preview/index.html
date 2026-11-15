@@ -21,6 +21,8 @@ h1{font-size:19px;margin:0 0 3px;font-weight:760}small{font-size:12px;color:#d1d
 #info{margin-top:11px;color:#c9d3c4;font-size:12px;line-height:1.45;min-height:2.8em}
 #status{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 16px);left:12px;right:12px;text-align:center;pointer-events:none;font-size:12px;background:#233025d8;color:#e5ebde;border:1px solid #596c58;border-radius:9px;padding:10px;max-width:580px;margin:auto}
 #error{color:#ffb3a3;font-weight:700}
+#viewmode{position:fixed;z-index:6;top:calc(env(safe-area-inset-top) + 72px);left:16px;background:#b3c493;color:#19251b;border:1px solid #f0f3d4;border-radius:9px;padding:10px 12px;font:700 12px system-ui;box-shadow:0 5px 18px #0008}
+body.full-body #panel{display:none}
 #credits{font-size:10px;position:fixed;bottom:calc(env(safe-area-inset-bottom) + 65px);left:14px;color:#a5b3a3;max-width:45%;text-shadow:0 1px 2px #000}
 a{color:#dae3b8}
 @media(max-width:600px){
@@ -30,11 +32,12 @@ a{color:#dae3b8}
  .choice button{font-size:11px;padding:9px 2px;min-height:43px}
  #actions{margin-top:9px}#playall{margin-top:8px;padding:8px}
  #info{margin-top:6px;min-height:0;font-size:11px}
- #credits{top:calc(env(safe-area-inset-top) + 57px);bottom:auto;left:16px}
+ #credits{top:calc(env(safe-area-inset-top) + 120px);bottom:auto;left:16px;max-width:80%}
 }
 </style>
 </head>
 <body>
+<button id="viewmode" type="button" aria-pressed="false">Весь боец</button>
 <canvas id="canvas" aria-label="Интерактивный просмотр анимаций солдата"></canvas>
 <header id="caption"><h1>Battlefield · 16 анимаций</h1><small>Babylon.js · один утверждённый солдат · четыре типа оружия</small></header>
 <section id="panel" aria-label="Выбор анимации">
@@ -50,7 +53,7 @@ a{color:#dae3b8}
 <button type="button" data-pose="Hold" aria-pressed="true">На изготовку</button>
 <button type="button" data-pose="Aim" aria-pressed="false">Прицел</button>
 <button type="button" data-pose="Fire" aria-pressed="false">Стрельба</button>
-<button type="button" data-pose="Walk" aria-pressed="false">Ходьба</button>
+<button type="button" data-pose="Run" aria-pressed="false">Бег</button>
 </div></div>
 <button id="playall" type="button" aria-pressed="false">▶ Показать все 16 по очереди</button>
 <div id="info">Нажимайте на оружие и позу. Вращайте бойца пальцем или мышью.</div>
