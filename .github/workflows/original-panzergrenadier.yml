@@ -1,0 +1,47 @@
+name: Original Panzergrenadier source viewer
+on:
+  push:
+    branches:
+      - preview/original-panzergrenadier-20261115
+    paths:
+      - .github/workflows/original-panzergrenadier.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract-preview-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Extract exact GLB from existing game source
+        run: |
+          python3 lab/original-panzergrenadier/extract_existing_glb.py
+          test -s lab/original-panzergrenadier/panzergrenadier-original.glb
+          git status --short | head
+      - name: Chromium browser test
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/panzer-pw playwright@1.58.2
+          /tmp/panzer-pw/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/panzer-http.log 2>&1 &
+          sleep 2
+          node lab/original-panzergrenadier/test-viewer.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: original-panzergrenadier-screenshots
+          path: panzer-test-results/
+          if-no-files-found: ignore
+      - name: Publish original unchanged model to preview branch
+        if: success()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lab/original-panzergrenadier/panzergrenadier-original.glb
+          git commit -m 'Publish original embedded German Panzergrenadier model for visual review' || true
+          git push origin HEAD:preview/original-panzergrenadier-20261115
