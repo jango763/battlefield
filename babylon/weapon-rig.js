@@ -233,7 +233,9 @@
       fore: joint('LeftForeArm'), hand: joint('LeftHand')
     };
     const chest = joint('Spine2');
-    if (!chest || Object.values(right).some(x => !x) || Object.values(left).some(x => !x))
+    const hips=joint('Hips');
+    const neck=joint('Neck');
+    if (!hips || !neck || !chest || Object.values(right).some(x => !x) || Object.values(left).some(x => !x))
       throw Error('Panzergrenadier: linked arm joints not found; model remains unmodified.');
     if (!skeleton || (skeleton.bones.length !== 65 &&
       !(acceptExportSockets && skeleton.bones.length >= 65 && skeleton.bones.length <= 72)))
@@ -293,6 +295,27 @@
     };
     const report = state.weaponRig;
 
+    // Model-authored anatomical forward, not the Spin2 bone's LOCAL Z.
+    // This Mixamo rig faces +Z in its bind pose. Shoulder left-minus-right
+    // is +X and neck-minus-hips is +Y. Construct a right-handed body basis
+    // every frame so gun barrel +Z really points FORWARD while running.
+    // The old chest rotation inherits arbitrary joint axes and made MP40
+    // point diagonally down/sideways, despite numerically correct grip IK.
+    function bodyFacingFrame() {
+      refresh(neck);refresh(hips);refresh(left.upper);refresh(right.upper);
+      let x=left.upper.getAbsolutePosition().subtract(right.upper.getAbsolutePosition());
+      if(x.lengthSquared()<1e-6)return {q:worldRotation(chest),forward:rotated(B.Axis.Z,worldRotation(chest))};
+      x.normalize();
+      let y=neck.getAbsolutePosition().subtract(hips.getAbsolutePosition());
+      y.subtractInPlace(x.scale(B.Vector3.Dot(y,x)));
+      if(y.lengthSquared()<1e-6)y=B.Axis.Y.clone();
+      y.normalize();
+      const z=B.Vector3.Cross(x,y).normalize();
+      y=B.Vector3.Cross(z,x).normalize();
+      const m=B.Matrix.Identity();
+      B.Matrix.FromXYZAxesToRef(x,y,z,m);
+      return {q:B.Quaternion.FromRotationMatrix(m).normalize(),forward:z};
+    }
     function update() {
       if (!meta) return;
       const now = performance.now();
@@ -306,7 +329,8 @@
       const breathing = running || firing ? .004 * Math.sin(t * 1.45) : 0;
       const bob = running ? .014 * Math.sin(t * 13) : 0;
       const recoil = firing ? .025 * Math.max(0, Math.sin(t * 18)) : 0;
-      const chestQ = worldRotation(chest);
+      const bodyFrame=bodyFacingFrame();
+      const chestQ=bodyFrame.q;
       const angles = (weaponId === 'de-panzerschreck' ? {
         // The rocket tube is shoulder-borne when aiming, lower while moving.
         ready: [-.16, -.04, -.01],
@@ -321,6 +345,8 @@
       })[pose];
       const localQ = B.Quaternion.FromEulerAngles(angles[0], angles[1], angles[2]);
       const gunQ = chestQ.multiply(localQ).normalize();
+      report.forwardDot=+B.Vector3.Dot(
+        rotated(B.Axis.Z,gunQ).normalize(),bodyFrame.forward).toFixed(3);
       // When running, rifle/SMG/LMG is carried LOWER and CLOSER to the torso;
       // it is NOT held at shoulder-height as if firing while sprinting.
       // Right shoulder stays fixed relative to chest; the weapon is not attached
