@@ -298,8 +298,13 @@
       const leftFinger = rotated(B.Axis.Y, leftQ).normalize();
       const trigger = pivot.position.add(rotated(v(meta.trigger), gunQ));
       const support = pivot.position.add(rotated(v(meta.support), gunQ));
-      const rightGoal = trigger.subtract(rightFinger.scale(.065));
-      const leftGoal = support.subtract(leftFinger.scale(.065));
+      // The former 6.5 cm wrist offset lifted the pistol hand ABOVE its grip,
+      // exposing a hollow sleeve cuff and hanging the fingers in midair.
+      // Grip geometry: the right wrist sits just behind the trigger housing;
+      // support hand is cupped beneath the handguard/receiver.
+      const rightPalmReach = .028, leftPalmReach = .045;
+      const rightGoal = trigger.subtract(rightFinger.scale(rightPalmReach));
+      const leftGoal = support.subtract(leftFinger.scale(leftPalmReach));
       report.leftReachMeters = +(
         B.Vector3.Distance(left.upper.getAbsolutePosition(), left.fore.getAbsolutePosition()) +
         B.Vector3.Distance(left.fore.getAbsolutePosition(), left.hand.getAbsolutePosition())
@@ -332,9 +337,9 @@
       setHandRotation(left.hand, leftQ);
       flexFingers('Right'); flexFingers('Left');
       report.rightGripMeters = +B.Vector3.Distance(right.hand.getAbsolutePosition()
-        .add(rightFinger.scale(.065)), trigger).toFixed(4);
+        .add(rightFinger.scale(rightPalmReach)), trigger).toFixed(4);
       report.leftGripMeters = +B.Vector3.Distance(left.hand.getAbsolutePosition()
-        .add(leftFinger.scale(.065)), support).toFixed(4);
+        .add(leftFinger.scale(leftPalmReach)), support).toFixed(4);
       report.handFocus = B.Vector3.Lerp(
         right.hand.getAbsolutePosition(),left.hand.getAbsolutePosition(),.5).asArray();
       report.geometricPass = report.rightGripMeters < .075 && report.leftGripMeters < .075;
