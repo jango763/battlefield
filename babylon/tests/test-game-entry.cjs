@@ -7,7 +7,7 @@ const file = name => fs.readFileSync(path.join(dir, name), 'utf8');
 const html=file('index.html'), app=file('game.js'), rig=file('approved-soldier.html');
 for(const name of [
  'weapon-rig.js','combat-balance-core.js','combat-presentation-core.js',
- 'squad-combat-core.js','field-orders-core.js','game.js'
+ 'squad-combat-core.js','field-orders-core.js','world-300.js','game.js'
 ])assert(html.includes('src="./'+name+'"'), 'Missing main game module: '+name);
 assert(html.indexOf('field-orders-core.js')<html.indexOf('game.js'));
 assert(html.includes('id="view"')&&html.includes('id="retry"'));
@@ -15,8 +15,12 @@ assert(html.includes('id="order-move"')&&html.includes('id="order-attack"'));
 assert(html.includes('data-scenario="squads"'));
 assert(html.includes('data-weapon="MG42"'));
 assert(app.includes('window.__BATTLEFIELD_GAME__'));
-assert(app.includes('ground.isPickable=true'));
+assert(app.includes('terrain=world.ground'));
 assert(app.includes('fieldOrders.setDestination(x,z)'));
+assert(app.includes('const SCENARIOS={duel:[1,1],assault:[1,4],squads:[12,12]}'));
+assert(app.includes("setup('squads')"), 'Main game must start with full 12v12 logic');
+assert(app.includes("world.loadOriginalBTR()"), 'Load legacy BTR GLB on main map');
+assert(app.includes("respawnTimers"), 'Long match requires respawn before center opens');
 assert(app.includes('driveAllies:dt=>fieldOrders.update(dt)'));
 assert(app.includes("await ensureUnits('duel')"),'Initial mobile boot must not block on 8 GLBs');
 assert(/B\.SceneLoader\.LoadAssetContainerAsync\(\s*'\.\/animstudio-preview\/models\/',\s*'all-combat-run\.glb',\s*scene\)/.test(app),
