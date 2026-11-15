@@ -26,6 +26,50 @@ function soldier(id,team,x,z){const root=new B.TransformNode(id,scene);root.posi
  root.getChildMeshes().forEach(m=>m.metadata={unit});return unit;}
 for(let i=0;i<4;i++)state.units.push(soldier('brit-'+i,'ally',-8+(i%2)*1.2,2+Math.floor(i/2)*1.3));
 for(let i=0;i<4;i++)state.enemies.push(soldier('german-'+i,'enemy',8+(i%2)*1.5,-3+Math.floor(i/2)*1.5));
+// Stage 2: one real rigged soldier, isolated from the squad combat simulation.
+// The other seven placeholders remain available if asset loading fails.
+async function installAnimatedHero(unit){
+ const base=new URL('../assets/native-hero-quaternius/',import.meta.url);
+ const imported=await B.SceneLoader.ImportMeshAsync('','',new URL('night-striker-lite.glb',base).href,scene);
+ const rig=new B.TransformNode(unit.id+'-rig',scene);
+ for(const node of imported.meshes.filter(m=>!m.parent))node.parent=rig;
+ const bounds=imported.meshes.filter(m=>m.getBoundingInfo&&m.getTotalVertices()>0).map(m=>m.getBoundingInfo().boundingBox);
+ let lo=Infinity,hi=-Infinity;
+ for(const b of bounds){lo=Math.min(lo,b.minimumWorld.y);hi=Math.max(hi,b.maximumWorld.y);}
+ if(Number.isFinite(hi-lo)&&hi-lo>.01)rig.scaling.scaleInPlace(1.8/(hi-lo));
+ rig.parent=unit.root;
+ const clips=await B.SceneLoader.LoadAssetContainerAsync('',new URL('hero-three-clips-lite.glb',base).href,scene);
+ const normalize=name=>String(name||'').replace(/^mixamorig[:_]?/i,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
+ const targets=new Map();
+ for(const node of [...imported.transformNodes,...imported.meshes,...imported.skeletons.flatMap(sk=>sk.bones)]){
+  const key=normalize(node.name);if(key&&!targets.has(key))targets.set(key,node);
+ }
+ const groups={};const counts={};
+ for(const [mode,name] of Object.entries({idle:'Idle_Loop',jog:'Jog_Fwd_Loop',sprint:'Sprint_Loop'})){
+  const source=clips.animationGroups.find(g=>g.name===name||g.name.includes(name));
+  if(!source)continue;
+  const group=new B.AnimationGroup(unit.id+'-'+mode,scene);let count=0;
+  for(const track of source.targetedAnimations){
+   const target=targets.get(normalize(track.target?.name));
+   if(target){group.addTargetedAnimation(track.animation.clone(),target);count++;}
+  }
+  if(count){group.normalize();groups[mode]=group;counts[mode]=count;}else group.dispose();
+ }
+ if(!groups.idle||!groups.jog)throw Error('Rig animation mapping incomplete: '+JSON.stringify(counts));
+ unit.body.setEnabled(false);unit.head.setEnabled(false);unit.weapon.setEnabled(false);
+ unit.visualRig=rig;unit.animations=groups;unit.activeAnimation=null;
+ unit.animationTracks=counts;
+ const play=mode=>{if(unit.activeAnimation===mode)return;for(const group of Object.values(groups))group.stop();groups[mode]?.start(true);unit.activeAnimation=mode;};
+ unit.updateVisual=()=>play(unit.target?'jog':'idle');
+ play('idle');
+ // Loaded clip containers are only used as animation sources; their scene
+ // nodes are not added, preventing a second visible character.
+ state.heroRig={loaded:true,bones:imported.skeletons.reduce((n,sk)=>n+sk.bones.length,0),tracks:counts};
+}
+installAnimatedHero(state.units[0]).catch(error=>{
+ state.errors.push('Hero rig: '+String(error));state.heroRig={loaded:false,error:String(error)};
+ console.error('Animated hero failed; procedural soldier remains',error);
+});
 const marker=B.MeshBuilder.CreateTorus('destination',{diameter:.7,thickness:.06,tessellation:16},scene);marker.position.y=.07;marker.isVisible=false;marker.material=material('marker','#e9d487');
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 function free(x,z){if(Math.abs(x)>20||Math.abs(z)>20)return false;return !obstacles.some(o=>Math.abs(x-o.x)<o.w/2+.36&&Math.abs(z-o.z)<o.d/2+.36);}
@@ -47,8 +91,9 @@ document.getElementById('select').onclick=()=>{state.selected=!state.selected;do
 for(const mode of ['move','attack'])document.getElementById(mode).onclick=()=>{state.mode=mode;for(const m of ['move','attack'])document.getElementById(m).setAttribute('aria-pressed',String(m===mode));};
 document.getElementById('reset').onclick=()=>location.reload();
 let last=performance.now();engine.runRenderLoop(()=>{const now=performance.now(),dt=Math.min((now-last)/1000,.05);last=now;
- for(const u of [...state.units,...state.enemies])if(u.alive)moveUnit(u,dt);
+ for(const u of [...state.units,...state.enemies])if(u.alive){moveUnit(u,dt);u.updateVisual?.();}
  for(const u of state.units)fight(u,state.enemies,dt);for(const u of state.enemies)fight(u,state.units,dt);
  status.textContent='Британцы '+state.units.filter(u=>u.alive).length+'/4 · Немцы '+state.enemies.filter(u=>u.alive).length+'/4 · Выстрелы '+state.shots+' · FPS '+Math.round(engine.getFps());
+ if(state.heroRig&&!state.heroRig.loaded)status.textContent+=' · Модель: резервная';
  scene.render();});
 window.addEventListener('resize',()=>engine.resize());state.ready=true;
