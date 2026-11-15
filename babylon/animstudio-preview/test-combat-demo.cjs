@@ -27,9 +27,10 @@ const fs=require('node:fs'),path=require('node:path');
      throw Error('Combat scene did not preserve approved Kar98k '+JSON.stringify(initial));
    await page.screenshot({path:path.join(out,device.name+'-initial.png')});
    await page.click('#combat-play');
-   await page.waitForFunction(()=>window.__BATTLEFIELD_COMBAT_DEMO__?.state?.phase==='lower',
-     null,{timeout:35000});
-   await page.waitForTimeout(200);
+   await page.waitForFunction(()=>{
+     const d=window.__BATTLEFIELD_COMBAT_DEMO__,v=window.__BATTLEFIELD_ANIMATIONS__;
+     return d?.state?.phase==='lower' && v?.weaponRig?.combatCrouchStrength>.55;
+   },null,{timeout:35000});
    const lower=await page.evaluate(()=>{
      const v=window.__BATTLEFIELD_ANIMATIONS__,d=window.__BATTLEFIELD_COMBAT_DEMO__;
      return {stance:v.weaponRig.combatCrouchStrength,knees:v.sampleKnees(),state:d.state};
