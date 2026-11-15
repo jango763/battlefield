@@ -1,0 +1,19 @@
+name: Inspect exact source cap GLB geometry
+on:
+  push:
+    branches:
+      - rig/wehrmacht90-tailored-m40-20261115
+    paths:
+      - .github/workflows/cap-geometry-check.yml
+  workflow_dispatch:
+jobs:
+  caps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cap-glb-geometry
+          path: |
+            assets/ww2-headwear/m43-field-cap.glb
+            assets/ww2-headwear/field-grey-sidecap.glb
