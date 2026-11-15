@@ -1,60 +1,84 @@
 <!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#202722">
-  <title>Battlefield · Babylon.js · немецкий стрелок</title>
-  <style>
-    *{box-sizing:border-box}
-    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#202722;color:#f5f3e8;font:14px system-ui,-apple-system,Segoe UI,sans-serif}
-    #renderCanvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
-    #title{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:16px;right:16px;pointer-events:none;text-shadow:0 2px 8px #0008}
-    h1{font-size:17px;margin:0 0 5px;font-weight:700}
-    #subtitle{font-size:12px;color:#d5dfd2}
-    #status{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);left:12px;right:12px;text-align:center;font-size:12px;color:#e6eadf;background:#243026bd;padding:8px 10px;border:1px solid #57675b;border-radius:9px}
-    #status[data-ready="true"]{opacity:.65}
-    #error{position:fixed;top:90px;left:12px;right:12px;text-align:center;color:#ffd1bd;display:none}
-    #controls{position:fixed;top:calc(env(safe-area-inset-top,0px) + 65px);left:auto;right:12px;width:min(560px,calc(100% - 24px));z-index:3;background:#202b22d9;border:1px solid #60705b;border-radius:12px;padding:8px 10px;box-shadow:0 6px 25px #0004;backdrop-filter:blur(9px)}
-    .controls-title{font-size:11px;color:#cdd7c7;margin:4px 2px 6px;letter-spacing:.02em}
-    .controls-row{display:flex;flex-wrap:wrap;gap:6px}
-    .controls-row button{appearance:none;background:#344235;color:#f2f2e8;border:1px solid #697967;border-radius:7px;padding:9px 10px;font:600 12px system-ui,-apple-system,sans-serif;cursor:pointer;touch-action:manipulation}
-    .controls-row button[aria-pressed="true"]{background:#ccd4b4;color:#203122;border-color:#f1f4de}
-    .controls-row button:focus-visible{outline:2px solid #fff;outline-offset:2px}
-    .controls-row a.combat-run-link{display:inline-flex;align-items:center;color:#f2f2e8;background:#344235;border:1px solid #697967;border-radius:7px;padding:9px 10px;font:600 12px system-ui;text-decoration:none}
-    @media(max-width:430px){#controls{padding:6px 8px;left:12px;right:12px;width:auto}.controls-row button{padding:8px 9px;font-size:11px}}
-    #credit{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 64px);left:12px;right:12px;font-size:11px;text-align:center;color:#b8c5b4}
-    #credit a{color:#d4dfc6}
-  </style>
+<html lang="ru"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1e2a21">
+<title>Капрал на линии фронта — Battlefield · Babylon.js</title>
+<style>
+:root{color-scheme:dark;background:#17221b;color:#f0f3e6;font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden}
+#view{width:100%;height:100%;display:block;touch-action:none;outline:none}
+#heading{position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:12px;right:65px;z-index:4;pointer-events:none;text-shadow:0 2px 7px #000d}
+h1{font-size:17px;margin:0 0 3px}#heading small{font-size:11px;color:#d9e2d0}
+#hud-toggle{position:fixed;top:calc(env(safe-area-inset-top) + 9px);right:10px;z-index:9;border:1px solid #869579;border-radius:8px;padding:9px 11px;background:#304334;color:#f4f4e7;font:700 12px system-ui;touch-action:manipulation}
+#panel{position:fixed;z-index:8;top:calc(env(safe-area-inset-top) + 62px);right:10px;width:min(360px,calc(100vw - 20px));padding:11px;border:1px solid #6a7c66;border-radius:12px;background:#1d2d22ed;box-shadow:0 6px 28px #0009;max-height:calc(100dvh - 112px);overflow-y:auto}
+#panel.closed{display:none}
+h2{margin:0 0 6px;font-size:13px;color:#e8eed6}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+button{cursor:pointer;touch-action:manipulation;border:1px solid #849881;border-radius:7px;padding:10px 8px;font:650 12px system-ui;color:#f4f4e8;background:#3b543e;flex:1}
+button[aria-pressed=true]{color:#1b2e22;background:#d1dfa8}
+button:disabled{opacity:.5;cursor:default}
+#loading{font-size:12px;color:#e5e7cd;margin-bottom:8px}
+#readout{background:#2a4231;border-radius:7px;padding:8px;white-space:pre-line;font-size:12px;line-height:1.45;font-variant-numeric:tabular-nums}
+#event{font-size:12px;color:#f4e29a;min-height:30px;margin:7px 0;line-height:1.4}
+#reload{height:6px;background:#3a503d;border-radius:6px;overflow:hidden;margin:7px 0}
+#reload-fill{height:100%;width:0%;background:#d8c489}
+.note{font-size:10px;line-height:1.5;color:#b5c6b5}
+#footer{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom) + 8px);z-index:3;background:#1b2c20ce;border:1px solid #4f6550;border-radius:7px;padding:8px;text-align:center;pointer-events:none;font-size:11px}
+#failure{display:none;position:fixed;inset:30% 6%;z-index:12;background:#321f1df0;border:1px solid #b88c7d;padding:18px;border-radius:12px;color:#fff}
+#failure strong{display:block;margin-bottom:9px}#failure button{margin-top:9px}
+@media(max-width:700px){
+ h1{font-size:15px}#heading small{font-size:10px}
+ #panel{top:auto;bottom:calc(env(safe-area-inset-bottom) + 44px);left:7px;right:7px;width:auto;max-height:43dvh;padding:8px 10px}
+ button{font-size:11px;padding:8px 6px}#readout{font-size:11px;padding:7px}.row{margin-bottom:6px}
+ #footer{font-size:10px;padding:5px}
+}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./weapon-rig.js"></script>
+<script src="./combat-balance-core.js"></script>
+<script src="./combat-presentation-core.js"></script>
+<script src="./squad-combat-core.js"></script>
+<script src="./field-orders-core.js"></script>
 </head>
 <body>
-  <canvas id="renderCanvas" aria-label="Немецкий солдат в 3D. Вращайте пальцем для просмотра."></canvas>
-  <div id="title"><h1>Battlefield · Babylon.js</h1><div id="subtitle">Утверждённый солдат · оружие и двухручный IK</div></div>
-  <div id="controls" aria-label="Арсенал и проверка боевых поз">
-    <div class="controls-title">Оружие (Panzerfaust исключён)</div>
-    <div class="controls-row" role="group" aria-label="Выбор оружия">
-      <button type="button" data-weapon="de-kar98k" aria-pressed="true">Kar98k</button>
-      <button type="button" data-weapon="de-mp40" aria-pressed="false">MP40</button>
-      <button type="button" data-weapon="de-mg42" aria-pressed="false">MG42</button>
-      <button type="button" data-weapon="de-panzerschreck" aria-pressed="false">Panzerschreck*</button>
-    </div>
-    <div class="controls-title">Проверка удержания оружия</div>
-    <div class="controls-row" role="group" aria-label="Положение бойца">
-      <button type="button" data-pose="ready" aria-pressed="true">Наготове</button>
-      <button type="button" data-pose="aim" aria-pressed="false">Прицел</button>
-      <a class="combat-run-link" href="./animstudio-preview/index.html">Бег — 3D-анимации</a>
-      <a class="combat-run-link" href="./combat-range.html">Полигон · баланс оружия</a>
-      <a class="combat-run-link" href="./squad-combat.html">Отряды · 4 против 4</a>
-      <button type="button" data-pose="fire" aria-pressed="false">Стрельба (тест)</button>
-    </div>
-    <div class="controls-title">* Panzerschreck пока процедурный макет, не утверждённая GLB-модель.</div>
-  </div>
-  <div id="error" role="alert"></div>
-  <div id="credit">WW2 Panzergrenadier 2k · britdawgmasterfunk · CC BY 4.0 · <a href="https://sketchfab.com/3d-models/ww2-panzergrenadier-2k-cc0-6a104431bcb8400080b79446ec019696" target="_blank" rel="noopener noreferrer">Автор модели</a></div>
-  <div id="status" role="status">Загрузка персонажа…</div>
-  <script src="https://cdn.babylonjs.com/babylon.js"></script>
-  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
-  <script src="./weapon-rig.js"></script>
-  <script src="./main.js"></script>
+<canvas id="view" aria-label="Основная игра Battlefield. Коснитесь земли, чтобы приказать герою двигаться."></canvas>
+<header id="heading"><h1>Капрал на линии фронта</h1>
+<small>Battlefield · Babylon.js · управление героем и отрядом</small></header>
+<button id="hud-toggle" type="button" aria-pressed="true" aria-controls="panel">Меню</button>
+<section id="panel" aria-label="Управление игрой">
+<div id="loading" role="status">Загружаю бойцов и оружие…</div>
+<h2>Приказы</h2>
+<div class="row">
+<button id="order-move" aria-pressed="true" disabled>Движение</button>
+<button id="order-attack" aria-pressed="false" disabled>Атака</button>
+<button id="fight" disabled>▶ Играть</button>
+</div>
+<h2>Подкрепление</h2>
+<div class="row">
+<button data-scenario="duel" aria-pressed="true" disabled>Герой</button>
+<button data-scenario="squads" aria-pressed="false" disabled>Отряд 4×4</button>
+</div>
+<h2>Оружие героя</h2>
+<div class="row">
+<button data-weapon="Kar98k" aria-pressed="true" disabled>Kar98k</button>
+<button data-weapon="MP40" aria-pressed="false" disabled>MP40</button>
+<button data-weapon="MG42" aria-pressed="false" disabled>MG42</button>
+<button data-weapon="Panzerschreck" aria-pressed="false" disabled>Панцирь</button>
+</div>
+<div class="row">
+<button id="supply" disabled>Пополнить БК</button>
+<button id="reload-manual" disabled>Перезарядить</button>
+<button id="reset" disabled>Новый бой</button>
+</div>
+<div id="reload"><div id="reload-fill"></div></div>
+<div id="readout" role="status">Подготовка сцены…</div>
+<div id="event" role="status">Коснитесь земли для движения, противника — для атаки.</div>
+<p class="note">Отряд следует за героем и самостоятельно стреляет. «Отряд 4×4» добавляет бойцов в эту же игру. Снаряжение можно покупать при остановленном бое. Пока без окончательной карты, зданий и анимации рук при перезарядке.</p>
+</section>
+<div id="footer">Нажмите на землю — бежать туда · на врага — выбрать цель · меню — свернуть панель</div>
+<div id="failure" role="alert"><strong>Игра не загрузилась</strong><div id="failure-text">Проверьте подключение.</div><button id="retry">Повторить загрузку</button></div>
+<script src="./game.js"></script>
 </body>
 </html>
