@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Validate Babylon JavaScript module syntax
+        run: node --input-type=module --check < lab/babylon/app.js
       - name: Validate GLB skeleton, animations and MP40 manifest
         run: node lab/babylon/verify-assets.mjs\n      - run: npm install --no-save --no-package-lock playwright
       - run: npx playwright install --with-deps chromium
