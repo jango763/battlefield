@@ -5,7 +5,7 @@ test('Original 90-bone UE5 source animation actually changes bone rotations',asy
  const errors=[];page.on('pageerror',e=>errors.push(String(e)));
  await page.goto('http://127.0.0.1:8765/lab/ue5-reference/index.html',{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__rifle90?.ready||window.__rifle90?.error,null,{timeout:110000});
- const state=await page.evaluate(()=>window.__rifle90);
+ const state=await page.evaluate(()=>({ready:window.__rifle90.ready,error:window.__rifle90.error,boneCount:window.__rifle90.boneCount,matched:window.__rifle90.matched}));
  expect(state.error||null).toBeNull();
  expect(state.ready).toBe(true);
  expect(state.boneCount).toBe(90);
