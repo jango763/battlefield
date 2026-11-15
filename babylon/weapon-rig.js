@@ -120,11 +120,21 @@
     const b=arm.hand.getAbsolutePosition().subtract(arm.fore.getAbsolutePosition()).normalize();
     return Math.round((180 - Math.acos(B.Scalar.Clamp(B.Vector3.Dot(a,b),-1,1))*180/Math.PI)*10)/10;
   }
-  function setHandRotation(hand, worldQ) {
+  function setHandRotation(hand, worldQ, bindLocal) {
     refresh(hand.parent);
     const qParent = hand.parent ? worldRotation(hand.parent) : B.Quaternion.Identity();
-    hand.rotationQuaternion = qParent.conjugate().multiply(worldQ).normalize();
+    const desired = qParent.conjugate().multiply(worldQ).normalize();
+    // A global palm frame could demand 140-180deg of wrist twist. Forcing this
+    // into the original Mixamo wrist showed an empty-looking sleeve cuff.
+    // Preserve the artist's rest wrist and limit correction to ~55 degrees.
+    const dot = Math.abs(bindLocal.x*desired.x+bindLocal.y*desired.y+
+      bindLocal.z*desired.z+bindLocal.w*desired.w);
+    const theta = 2*Math.acos(B.Scalar.Clamp(dot,0,1));
+    const maxWrist = 55*Math.PI/180;
+    const blend = theta>maxWrist ? maxWrist/theta : 1;
+    hand.rotationQuaternion = B.Quaternion.Slerp(bindLocal,desired,blend).normalize();
     refresh(hand);
+    return Math.round(Math.min(theta,maxWrist)*180/Math.PI*10)/10;
   }
   function proceduralRocket(scene, parent) {
     const meshes = [], mats = [];
@@ -333,13 +343,17 @@
       }
       report.rightElbowDegrees = elbowBend(right);
       report.leftElbowDegrees = elbowBend(left);
-      setHandRotation(right.hand, rightQ);
-      setHandRotation(left.hand, leftQ);
+      report.rightWristDegrees=setHandRotation(right.hand,rightQ,rest.get(right.hand));
+      report.leftWristDegrees=setHandRotation(left.hand,leftQ,rest.get(left.hand));
       flexFingers('Right'); flexFingers('Left');
+      // Report REAL post-constraint palm directions, not an unattained ideal
+      // target; this prevents a false geometric "IK OK" for twisted hands.
+      const rPalm=rotated(B.Axis.Y,worldRotation(right.hand)).normalize();
+      const lPalm=rotated(B.Axis.Y,worldRotation(left.hand)).normalize();
       report.rightGripMeters = +B.Vector3.Distance(right.hand.getAbsolutePosition()
-        .add(rightFinger.scale(rightPalmReach)), trigger).toFixed(4);
+        .add(rPalm.scale(rightPalmReach)), trigger).toFixed(4);
       report.leftGripMeters = +B.Vector3.Distance(left.hand.getAbsolutePosition()
-        .add(leftFinger.scale(leftPalmReach)), support).toFixed(4);
+        .add(lPalm.scale(leftPalmReach)), support).toFixed(4);
       report.handFocus = B.Vector3.Lerp(
         right.hand.getAbsolutePosition(),left.hand.getAbsolutePosition(),.5).asArray();
       report.geometricPass = report.rightGripMeters < .075 && report.leftGripMeters < .075;
