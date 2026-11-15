@@ -1,0 +1,35 @@
+name: Verify Kar98k buttplate on right shoulder
+on:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths:
+      - 'babylon/weapon-rig.js'
+      - 'babylon/animstudio-preview/test-kar98k-shoulder.cjs'
+      - '.github/workflows/kar98k-shoulder-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shoulder:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install browser
+        run: |
+          node --check babylon/weapon-rig.js
+          node --check babylon/animstudio-preview/test-kar98k-shoulder.cjs
+          npm install --no-audit --no-fund --prefix /tmp/animstudio-viewer-qa playwright@1.58.2
+          /tmp/animstudio-viewer-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/kar98k-shoulder-http.log 2>&1 &
+          sleep 2
+      - name: Validate buttplate in 4 states on desktop and iPhone
+        run: node babylon/animstudio-preview/test-kar98k-shoulder.cjs
+      - name: Save right shoulder closeups
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kar98k-right-shoulder-buttplate-closeups
+          path: babylon/animstudio-preview/kar98k-stock-qa/
+          if-no-files-found: ignore
+          retention-days: 21
