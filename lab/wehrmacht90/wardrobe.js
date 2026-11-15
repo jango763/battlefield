@@ -34,7 +34,7 @@ function makeWool(scene,model){
  const areas=Object.fromEntries(clothNames.map(x=>[x,0]));
  const choose=(x,y,z)=>{
   const a=Math.abs(x);
-  if(y<.335)return 'leather';
+  if(y<.40)return 'leather';
   if(y>1.69)return 'hair';
   if(y>1.47)return 'skin';
   if(y>1.4&&a<.072)return 'skin';
@@ -219,7 +219,7 @@ function buildTailoredM40(scene,body){
  // regions; no new joints and no duplicate hand or head meshes.
  const identify=(x,y,z)=>{
   const ax=Math.abs(x);
-  if(y<.335)return 'boots';
+  if(y<.40)return 'boots';
   if(y>1.48)return 'skin';
   if(y<.83&&ax>.183&&y>.73)return 'skin'; // only exposed palms, not forearms
   if(y<.77)return 'pants';
@@ -260,7 +260,18 @@ function buildTailoredM40(scene,body){
   shell.setVerticesData(B.VertexBuffer.PositionKind,inflated,false);
   shell.setIndices(kept);
   shell.material=cloth[kind];
-  shell.useVertexColors=false;
+  if(kind==='boots'){
+   const colors=new Float32Array(vcount*4);
+   const hide=B.Color3.FromHexString(palette.leather),match=B.Color3.FromHexString(palette.trousers);
+   for(let i=0;i<vcount;i++){
+    const y=pos[i*3+1],fade=B.Scalar.Clamp((y-.29)/.11,0,1);
+    const c=B.Color3.Lerp(hide,match,fade),j=i*4;
+    colors[j]=c.r;colors[j+1]=c.g;colors[j+2]=c.b;colors[j+3]=1;
+   }
+   shell.setVerticesData(B.VertexBuffer.ColorKind,colors,false,4);
+   cloth[kind].albedoColor=B.Color3.White();
+   shell.useVertexColors=true;
+  }else shell.useVertexColors=false;
   shell.hasVertexAlpha=false;
   shell.isPickable=false;
   shell.receiveShadows=true;
