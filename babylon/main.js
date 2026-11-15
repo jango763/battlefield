@@ -1,5 +1,4 @@
-/* Battlefield reboot, stage 1: Babylon.js + approved original Panzergrenadier.
-   Intentionally no map, no gameplay, no weapons, no animation or mesh modifications. */
+/* Battlefield Babylon foundation: approved Panzergrenadier + separate non-destructive weapon IK layer. */
 (async function () {
   'use strict';
 
@@ -105,14 +104,16 @@
     state.materialCount = distinctMaterials.size;
     state.animationCount = (imported.animationGroups||[]).length;
     state.heightMeters = 1.8;
+    if (state.skeletonBones < 60 || state.skinnedMeshes < 4)
+      throw new Error('Вместо утверждённого 65-костного бойца загружен другой ресурс');
+    if (!window.BattlefieldWeaponRig) throw new Error('Модуль оружия не загружен');
+    await window.BattlefieldWeaponRig.create({scene, imported, root, state});
     state.loaded = true;
     state.ready = true;
     status.dataset.ready = 'true';
-    status.textContent = 'Готово · вращайте пальцем · приближайте двумя пальцами';
+    status.textContent = 'Готово · 4 варианта · выбирайте оружие и позу';
     state.camera = {radius:camera.radius, target:camera.target.asArray()};
 
-    if (state.skeletonBones < 60 || state.skinnedMeshes < 4)
-      throw new Error('Вместо утверждённого 65-костного бойца загружен другой ресурс');
   } catch(e) {
     fail(e);
   }
