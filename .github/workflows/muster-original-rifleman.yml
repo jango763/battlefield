@@ -29,7 +29,7 @@ jobs:
           cd /tmp/muster-original
           git checkout 7d2fa86ebc3b999eaf085831cdcd5dccefea63d4
           test -f src/assets/germany/rifleman.asset.ts
-          grep -q "buildInfantry('rifleman'" src/assets/germany/rifleman.asset.ts
+          grep -q "infantryBuild('rifleman'" src/assets/germany/rifleman.asset.ts
           echo "PINNED_SOURCE=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
       - name: Compile ORIGINAL rifleman viewer with no model alterations
         shell: bash
