@@ -279,6 +279,8 @@
     const controlled = [...Object.values(right), ...Object.values(left), ...fingers];
     const rest = new Map(controlled.map(n => [n, n.rotationQuaternion?.clone() ||
       B.Quaternion.FromEulerAngles(n.rotation.x, n.rotation.y, n.rotation.z)]));
+    const gripDebug = typeof window!=='undefined'
+      ? new URLSearchParams(window.location.search).get('gripDebug') : null;
     function flexFingers(side) {
       // The approved Mixamo model's finger phalanges run along local +Y.
       // Curl around joint-local Z and tuck the THUMB around a separate X axis.
@@ -291,8 +293,14 @@
           : digit === 'Index' ? [-.53,-.75,-.45]
           : [-.67,-.90,-.52];
         segments.forEach((node,i)=>{
-          const bend = B.Quaternion.RotationAxis(B.Axis.Z,amount[i]);
-          const tuck = digit === 'Thumb'
+          // Temporary URL-only research control; no extra visible gameplay UI.
+          // Compare source rest, stronger flexion, reverse and alternate axis
+          // without changing the approved soldier's skinned geometry.
+          const multiplier=gripDebug==='neutral'?0:gripDebug==='firm'?1.55:1;
+          const sign=gripDebug==='reverse'?-1:1;
+          const curlAxis=gripDebug==='axisX'?B.Axis.X:B.Axis.Z;
+          const bend=B.Quaternion.RotationAxis(curlAxis,amount[i]*multiplier*sign);
+          const tuck=digit==='Thumb' && gripDebug!=='neutral'
             ? B.Quaternion.RotationAxis(B.Axis.X,(rightHand?-.30:.30)*(i===0?1:.50))
             : B.Quaternion.Identity();
           node.rotationQuaternion=rest.get(node).multiply(tuck).multiply(bend).normalize();
