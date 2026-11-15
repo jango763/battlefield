@@ -1,0 +1,66 @@
+name: Retire duplicate Babylon experiment branches
+on:
+  push:
+    branches:
+      - next/babylon-game-foundation-20261115
+    paths:
+      - .github/workflows/retire-babylon-experiments.yml
+
+permissions:
+  contents: write
+
+jobs:
+  tidy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Validate the single Babylon foundation BEFORE deleting duplicates
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s babylon/index.html
+          test -s babylon/main.js
+          test -s assets/soldiers/german.glb
+          test -s babylon/prototypes/combat.js
+          test -s babylon/prototypes/armory.js
+          test -s babylon/tools/rebuild-original-model.py
+          node --check babylon/main.js
+          node babylon/tests/verify-assets.mjs
+          python3 - <<'PY'
+          import json,struct,pathlib
+          b=pathlib.Path('assets/soldiers/german.glb').read_bytes()
+          assert b[:4]==b'glTF' and struct.unpack_from('<I',b,8)[0]==len(b)
+          n=struct.unpack_from('<I',b,12)[0]
+          j=json.loads(b[20:20+n])
+          assert len(j['skins'][0]['joints'])==65
+          assert len(j['meshes'])==5
+          print('APPROVED_ORIGINAL_PANZERGRENADIER_OK')
+          PY
+      - name: Delete ONLY two obsolete Babylon branches; never main
+        shell: bash
+        run: |
+          set -euo pipefail
+          for old in lab/babylon-fast-prototype-20261114 engine/babylon-soldier-20261115; do
+            case "$old" in
+              lab/babylon-fast-prototype-20261114|engine/babylon-soldier-20261115) ;;
+              *) echo "Invalid ref $old"; exit 1 ;;
+            esac
+            if git ls-remote --exit-code --heads origin "refs/heads/$old" >/dev/null 2>&1; then
+              git push origin --delete "$old"
+              echo "DELETED_DUPLICATE $old"
+            else
+              echo "ALREADY_ABSENT $old"
+            fi
+          done
+      - name: Remove one-shot cleanup workflow itself
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/retire-babylon-experiments.yml
+          git commit -m 'Finish Babylon consolidation: remove temporary branch cleanup action'
+          git push origin HEAD:next/babylon-game-foundation-20261115
