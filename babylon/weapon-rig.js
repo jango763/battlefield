@@ -478,11 +478,12 @@
           master.rightOffsetY,master.rightOffsetZ),gunQ));
       // Aiming moves the left hand toward the receiver/launcher control,
       // preventing a fully locked support elbow while keeping the muzzle stable.
-      const supportPoint=(pose==='aim'||pose==='fire')
-        ? (weaponId==='de-kar98k'?[0,.04,.055]
-          : weaponId==='de-panzerschreck'?[0,-.135,-.09]
-          : meta.support)
-        : meta.support;
+      const supportPoint=weaponId==='de-kar98k'
+        ? (running?[0,.04,.015]
+          : pose==='aim'||pose==='fire'?[0,.04,.055]:meta.support)
+        : (pose==='aim'||pose==='fire')
+          ? (weaponId==='de-panzerschreck'?[0,-.135,-.09]:meta.support)
+          : meta.support;
       const support=pivot.position.add(rotated(v(supportPoint),gunQ));
       if(gripStudio&&weaponId==='de-kar98k')
         support.addInPlace(rotated(new B.Vector3(0,0,master.supportOffsetZ),gunQ));
