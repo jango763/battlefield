@@ -177,6 +177,22 @@ async function start(){
    left:leftHand?Number(B.Vector3.Distance(positionOf(leftHand),supportWorld).toFixed(3)):null
   };
   state.weaponSocket={parent:grip.parent?.name||null,triggerAtRightHand:state.gripDistances.right};
+  // Machine-readable acceptance checks. Never call a pose successful merely
+  // because the button was pressed or the animation group stopped.
+  if(state.animation==='combat'){
+   const shoulder=rightUpper&&positionOf(rightUpper);
+   const right=rightHand&&positionOf(rightHand);
+   const left=leftHand&&positionOf(leftHand);
+   const gunMuzzle=weaponRoot.metadata?.muzzle&&B.Vector3.TransformCoordinates(toVec(weaponRoot.metadata.muzzle),weaponRoot.getWorldMatrix());
+   const shoulderHeight=shoulder?.y??null;
+   const rightRaised=shoulderHeight!==null&&right?.y>=shoulderHeight-.25;
+   const leftSupport=Number.isFinite(state.gripDistances.left)&&state.gripDistances.left<.12;
+   const muzzleAboveGrip=gunMuzzle?gunMuzzle.y-trigger.y: null;
+   state.combatAcceptance={rightRaised,leftSupport,muzzleAboveGrip,
+    passed:rightRaised&&leftSupport&&muzzleAboveGrip!==null&&muzzleAboveGrip>-.20,
+    note:'Geometric checks only; visual anatomy still requires validation'};
+  }
+
  }
  async function equipWeapon(id){
   const generation=++weaponGeneration;
@@ -192,7 +208,7 @@ async function start(){
    if(!rightHand||typeof rightHand.getAbsolutePosition!=='function')throw Error('Правая кисть не найдена как TransformNode; крепление оружия остановлено');
    grip=new B.TransformNode('rightHandWeaponSocket',scene);grip.parent=rightHand;
    weaponRoot=new B.TransformNode('weaponTrigger',scene);weaponRoot.parent=grip;
-   weaponRoot.metadata={support:meta.support,trigger:meta.trigger};
+   weaponRoot.metadata={support:meta.support,trigger:meta.trigger,muzzle:meta.muzzle};
    for(const mesh of weaponContainer.meshes.filter(m=>!m.parent))mesh.parent=weaponRoot;
    for(const node of weaponContainer.transformNodes.filter(n=>!n.parent))node.parent=weaponRoot;
    state.weaponAttached=true;combatPoseSolved=false;updateWeaponPose();
