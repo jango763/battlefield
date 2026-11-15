@@ -77,18 +77,21 @@ const {chromium} = require('/tmp/animstudio-qa/node_modules/playwright');
       await call('attach_prop',{prop:spec.asset,name:spec.id,socket:'Weapon_R',
         pos:[0,0,0],rot:[0,0,0],scale:1});
       await call('update_prop',{name:spec.id,support:spec.support});
-      const result={id:spec.id,prototype:!!spec.prototype,clips:[],misses:[]};
+      const result={id:spec.id,prototype:!!spec.prototype,locomotion:'run',clips:[],misses:[]};
       if(!spec.prototype){
         for(const action of ['hold','aim','fire']){
           const c=await call('weapon_animation',{action,prop:spec.id});
           result.clips.push(c.clip);
           if(c.out_of_reach?.length)result.misses.push({clip:c.clip,frames:c.out_of_reach});
         }
-        const walk=spec.id+'_Walk';
-        await call('generate_motion',{type:'walk',name:walk,cycles:1,params:{armSwing:0.25,plant:true}});
-        const held=await call('weapon_animation',{action:'hold_in_clip',clip:walk,prop:spec.id});
-        result.clips.push(walk);
-        if(held.out_of_reach?.length)result.misses.push({clip:walk,frames:held.out_of_reach});
+        // Combat doctrine: every soldier MOVES AT A RUN, no walking gait.
+        // Real run generation (not time-compressed walk); feet planted and weapon on the arm layer.
+        const run=spec.id+'_Run';
+        await call('generate_motion',{type:'run',name:run,cycles:1,
+          params:{armSwing:0.08,plant:true,lean:0.10,kneeLift:0.35}});
+        const held=await call('weapon_animation',{action:'hold_in_clip',clip:run,prop:spec.id});
+        result.clips.push(run);
+        if(held.out_of_reach?.length)result.misses.push({clip:run,frames:held.out_of_reach});
       }else{
         // Anti-tank launcher deliberately keys a shoulder-mounted pose instead
         // of treating the Panzerschreck as a shoulder-stock rifle.
@@ -108,13 +111,15 @@ const {chromium} = require('/tmp/animstudio-qa/node_modules/playwright');
           result.clips.push(clip);
           if(ik.out_of_reach?.length)result.misses.push({clip,frames:ik.out_of_reach});
         }
-        const walk=spec.id+'_Walk';
-        await call('generate_motion',{type:'walk',name:walk,cycles:1,params:{armSwing:0.25,plant:true}});
-        const ik=await call('key_weapon_pose',{clip:walk,prop:spec.id,support:true,
+        const run=spec.id+'_Run';
+        await call('generate_motion',{type:'run',name:run,cycles:1,
+          params:{armSwing:0.06,plant:true,lean:0.12,kneeLift:0.35}});
+        // Put the heavy shoulder-borne launcher in both hands throughout a running gait.
+        const ik=await call('key_weapon_pose',{clip:run,prop:spec.id,support:true,
           poses:[{frame:0,main:[-.14,-.07,.12],support:[-.08,-.12,.30]},
             {frame:30,main:[-.14,-.07,.12],support:[-.08,-.12,.30]}]});
-        result.clips.push(walk);
-        if(ik.out_of_reach?.length)result.misses.push({clip:walk,frames:ik.out_of_reach});
+        result.clips.push(run);
+        if(ik.out_of_reach?.length)result.misses.push({clip:run,frames:ik.out_of_reach});
       }
       const glb=await call('export_glb',{name:'Battlefield_'+spec.id,
         which:'mine',content:'model',engine:'any',root_motion:'inplace',fps:30,reduce:0,sidecar:true});
@@ -136,7 +141,8 @@ const {chromium} = require('/tmp/animstudio-qa/node_modules/playwright');
     fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify(summary,null,2));
     const failures=summary.weapons.flatMap(x=>x.misses.map(y=>({gun:x.id,...y})));
     console.log('ANIMSTUDIO_FINAL',JSON.stringify({guns:summary.weapons.length,clips:summary.weapons.reduce((n,x)=>n+x.clips.length,0),ikFlags:failures.length,failures}));
-    if(summary.weapons.length!==4||summary.weapons.some(x=>x.clips.length!==4))throw Error('Missing weapon animations');
+    if(summary.weapons.length!==4||summary.weapons.some(x=>x.clips.length!==4||!x.clips.includes(x.id+'_Run')||x.clips.some(c=>c.endsWith('_Walk'))))
+      throw Error('Missing weapon animations or combat run');
     for(const w of summary.weapons){
       if(!fs.existsSync(path.join(output,'Battlefield_'+w.id+'.glb')))throw Error('No export for '+w.id);
     }
