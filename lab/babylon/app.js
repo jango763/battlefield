@@ -172,7 +172,7 @@ async function start(){
    const rightRaised=!!rightUpper&&rightHand&&positionOf(rightHand).y>=positionOf(rightUpper).y-.25;
    const leftSupport=leftDistance<.12;
    const rightGrip=rightDistance<.12;
-   const muzzleForward=muzzleWorld.z>trigger.z+.15;
+   // Compare muzzle direction against the torso's forward axis, not global Z.\n   const torsoForward=B.Vector3.TransformNormal(B.Axis.Z,chest.getWorldMatrix()).normalize();\n   const muzzleForward=B.Vector3.Dot(muzzleWorld.subtract(trigger).normalize(),torsoForward)>.5;
    const buttNearShoulder=!!rightUpper&&B.Vector3.Distance(shoulderWorld,positionOf(rightUpper))<.65;
    state.combatAcceptance={rightRaised,leftSupport,rightGrip,muzzleForward,buttNearShoulder,
     passed:!!(rightRaised&&leftSupport&&rightGrip&&muzzleForward&&buttNearShoulder),
@@ -214,7 +214,7 @@ async function start(){
   log('Babylon.js | meshes: '+state.meshes+' | skeletons: '+state.skeletons+' | tracks: '+JSON.stringify(counts)+'\nAnimation: '+mode+' | '+(mode==='combat'?'torso mount + dual-arm CCD prototype':remapped[mode]?'active':'НЕ ПРИВЯЗАНА — требуется адаптация')+'\nSource groups: '+state.groups.join(', '));
  }
  for(const btn of document.querySelectorAll('[data-clip]'))btn.addEventListener('click',()=>select(btn.dataset.clip));
- select('idle');await equipWeapon(weaponSelect.value);state.ready=true;state.scene=scene;state.engineInstance=engine;
+ select('idle');await equipWeapon(weaponSelect.value);\n if(state.weaponError||!state.weaponAttached)throw Error('Initial weapon failed: '+state.weaponError);\n state.ready=true;state.scene=scene;state.engineInstance=engine;
  engine.runRenderLoop(()=>{try{updateWeaponPose();}catch(e){state.poseError=String(e);status.textContent='ОШИБКА БОЕВОЙ ПОЗЫ: '+state.poseError;console.error('Combat pose',e);}scene.render();state.fps=Math.round(engine.getFps());});
  window.addEventListener('resize',()=>engine.resize());
 }
