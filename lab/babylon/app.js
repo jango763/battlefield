@@ -110,26 +110,41 @@ async function start(){
  const toVec=a=>new B.Vector3(...a);
  const positionOf=node=>node?.getAbsolutePosition?.()||B.Vector3.Zero();
  // Experimental static two-hand grip: solve only once after the idle pose freezes.
+ // Cyclic-coordinate descent in world space. Recompute all ancestor matrices
+ // after every change; otherwise subsequent joints use stale world transforms.
+ function refreshChain(node){
+  const ancestors=[];
+  for(let n=node;n;n=n.parent)ancestors.unshift(n);
+  for(const n of ancestors)n.computeWorldMatrix?.(true);
+ }
  function aimJoint(joint,hand,target){
   if(!joint||!hand||!joint.parent)return;
-  joint.computeWorldMatrix(true);hand.computeWorldMatrix(true);
+  refreshChain(joint);refreshChain(hand);
   const pivot=joint.getAbsolutePosition();
-  const from=hand.getAbsolutePosition().subtract(pivot).normalize();
-  const to=target.subtract(pivot).normalize();
-  const axis=B.Vector3.Cross(from,to);
-  const length=axis.length();
-  if(length<1e-5)return;
-  const angle=Math.min(Math.atan2(length,B.Vector3.Dot(from,to)),.24);
+  const from=hand.getAbsolutePosition().subtract(pivot);
+  const to=target.subtract(pivot);
+  if(from.lengthSquared()<1e-8||to.lengthSquared()<1e-8)return;
+  from.normalize();to.normalize();
+  const cross=B.Vector3.Cross(from,to),sin=cross.length();
+  if(sin<1e-6)return;
+  const angle=Math.min(Math.atan2(sin,B.Vector3.Dot(from,to)),.20);
   const parentRotation=new B.Quaternion();
-  joint.parent.computeWorldMatrix(true).decompose(undefined,parentRotation,undefined);
-  const localAxis=B.Vector3.TransformNormal(axis.scale(1/length),B.Matrix.FromQuaternion(parentRotation.conjugate())).normalize();
-  const q=B.Quaternion.RotationAxis(localAxis,angle);
-  const original=joint.rotationQuaternion||B.Quaternion.FromEulerAngles(joint.rotation.x,joint.rotation.y,joint.rotation.z);
-  joint.rotationQuaternion=q.multiply(original).normalize();
+  joint.parent.getWorldMatrix().decompose(undefined,parentRotation,undefined);
+  const localAxis=B.Vector3.TransformNormal(cross.scale(1/sin),
+   B.Matrix.FromQuaternion(parentRotation.conjugate())).normalize();
+  const delta=B.Quaternion.RotationAxis(localAxis,angle);
+  const original=joint.rotationQuaternion?.clone()||
+   B.Quaternion.FromEulerAngles(joint.rotation.x,joint.rotation.y,joint.rotation.z);
+  joint.rotationQuaternion=delta.multiply(original).normalize();
+  refreshChain(hand);
  }
  function poseArm(upper,lower,hand,target){
   if(!upper||!lower||!hand)return;
-  for(let i=0;i<8;i++){aimJoint(lower,hand,target);aimJoint(upper,hand,target);}
+  for(let i=0;i<18;i++){
+   aimJoint(lower,hand,target);aimJoint(upper,hand,target);
+   refreshChain(hand);
+   if(B.Vector3.DistanceSquared(hand.getAbsolutePosition(),target)<.0004)break;
+  }
  }
  let combatPoseSolved=false;
  const combatArmNodes=[rightUpper,rightLower,leftUpper,leftLower].filter(n=>n?.rotationQuaternion);
