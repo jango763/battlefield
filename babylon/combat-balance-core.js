@@ -221,7 +221,7 @@
           emit('kill', { attacker: attacker.id, victim: unit.id, weapon });
         }
       };
-      let lethal = false;
+      let lethal = false, impact = null;
       if (weapon === 'MG42') target.suppressed = Math.max(target.suppressed, w.suppressSeconds);
       if (weapon === 'Panzerschreck') {
         const near = Array.isArray(targets) ? targets : units;
@@ -230,6 +230,7 @@
         const miss = w.blastRadius * 1.5;
         const x = target.x + (hit ? 0 : Math.cos(angle) * miss);
         const z = target.z + (hit ? 0 : Math.sin(angle) * miss);
+        impact = { x, z }; // Match visible blast with actual AoE damage origin.
         for (const enemy of near) {
           if (!units.includes(enemy) || enemy.team === attacker.team || !enemy.alive) continue;
           const radius = Math.hypot(enemy.x - x, enemy.z - z);
@@ -242,7 +243,7 @@
         damageTarget(target, lethal ? target.hp : w.damage);
       }
       const result = { ok: true, weapon, distance: d, probability, hit, hits, lethal,
-        ammo: totalAmmo(attacker, weapon) };
+        impact, ammo: totalAmmo(attacker, weapon) };
       emit('shot', { attacker: attacker.id, target: target.id, ...result });
       if (weapon !== 'Kar98k') {
         const slot = attacker.inventory[weapon];
