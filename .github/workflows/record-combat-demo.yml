@@ -1,0 +1,33 @@
+name: Record Babylon stop-fire combat demo
+on:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths:
+      - 'babylon/animstudio-preview/record-combat-demo.cjs'
+      - '.github/workflows/record-combat-demo.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  video:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare browser and encoder
+        run: |
+          command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y ffmpeg)
+          npm install --no-audit --no-fund --prefix /tmp/animstudio-viewer-qa playwright@1.58.2
+          /tmp/animstudio-viewer-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/combat-video-server.log 2>&1 &
+          sleep 2
+      - name: Record real animated rifle and launcher stop-to-fire previews
+        run: node babylon/animstudio-preview/record-combat-demo.cjs
+      - name: Save MP4
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: babylon-kar98k-panzerschreck-stop-fire-mp4
+          path: babylon/animstudio-preview/combat-qa/Battlefield-Kar98k-Panzerschreck-Combat-Cycle.mp4
+          retention-days: 21
+          if-no-files-found: ignore
