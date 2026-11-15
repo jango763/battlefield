@@ -32,8 +32,8 @@ const fs = require('node:fs');
        weaponQA.push({gun,pose,right:d.rightGripMeters,left:d.leftGripMeters,error:d.error,pass:d.geometricPass});
        if(d.error || !Number.isFinite(d.rightGripMeters) || !Number.isFinite(d.leftGripMeters))
          throw Error('Weapon IK runtime failed: '+JSON.stringify({gun,pose,d}));
-       if(d.rightGripMeters > .15 || d.leftGripMeters > .15)
-         throw Error('Weapon IK exceeded 15 cm: '+JSON.stringify({gun,pose,d}));
+       if(!d.geometricPass || d.rightGripMeters > .075 || d.leftGripMeters > .075)
+         throw Error('Weapon IK exceeded 7.5 cm: +JSON.stringify({gun,pose,d}));
        if(pose === 'aim') await page.screenshot({
          path:'babylon-qa-results/babylon-'+o.name+'-'+gun+'.png'
        });
