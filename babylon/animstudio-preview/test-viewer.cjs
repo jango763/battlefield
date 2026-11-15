@@ -31,9 +31,16 @@ const path=require('node:path');
           const s=await page.evaluate(()=>({
             clip:window.__BATTLEFIELD_ANIMATIONS__.clip,
             error:window.__BATTLEFIELD_ANIMATIONS__.error,
-            loaded:Object.keys(window.__BATTLEFIELD_ANIMATIONS__.weapons)
+            loaded:Object.keys(window.__BATTLEFIELD_ANIMATIONS__.weapons),
+            corrected:window.__BATTLEFIELD_ANIMATIONS__.correctiveIK,
+            right:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.rightGripMeters,
+            left:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.leftGripMeters,
+            pass:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.geometricPass,
+            rigError:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.error
           }));
           if(s.clip!==gun+'_'+pose||s.error||!s.loaded.includes(gun))throw Error(env.name+' mismatched clip '+JSON.stringify(s));
+          if(!s.corrected||s.rigError||!s.pass||!Number.isFinite(s.right)||!Number.isFinite(s.left)||s.right>.075||s.left>.075)
+            throw Error(env.name+' IK grip FAILED '+gun+' '+pose+' '+JSON.stringify(s));
           await page.screenshot({path:path.join(out,env.name+'-'+gun+'-'+pose+'.png')});
           result.push(s.clip);
         }
