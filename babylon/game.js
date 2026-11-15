@@ -53,7 +53,7 @@ enterButton.addEventListener('click',()=>{
  gameStarted=true;gamePausedForBriefing=false;
  briefing.hidden=true;briefing.setAttribute('aria-hidden','true');
  atBase=false;state.atBase=false;
- alertStatus('Бой начался: британцы 🔵 против немцев 🔴. Касайтесь земли, чтобы управлять героем.');
+ alertStatus('Бой начался: британцы 🔵 против Вермахта 🔴. Касайтесь земли, чтобы управлять героем.');
  drawHud();
 });
 function position(unit,y=0){
@@ -490,7 +490,7 @@ function drawHud(){
   '\nГерой: '+Math.round(hero.hp)+'/100 HP · оружие: '+hero.weapon+
   (inventory?' · '+inventory.loaded+'+'+inventory.reserve+' патр.':' · ∞ патронов')+
   (hero.reloadRemaining>0?'\nПерезарядка: '+hero.reloadRemaining.toFixed(1)+' c':'')+
-  '\nБританцы 🔵: '+funds+' · Немцы 🔴: '+(econ?.treasury.red??'—')+
+  '\nБританцы 🔵: '+funds+' · Вермахт 🔴: '+(econ?.treasury.red??'—')+
   '\nФермы: '+(econ?.owners.blue.length||0)+' синих · '+(econ?.owners.red.length||0)+' красных'+
   '\nЦентр: '+timerLabel+
   (paid?'\nЗапас: '+paid:'')+
