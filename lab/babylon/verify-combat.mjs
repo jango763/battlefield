@@ -17,10 +17,10 @@ try {
   const state=await page.evaluate(()=>({mode:window.__babylonLab.animation,pose:window.__babylonLab.combatPoseStatus,accept:window.__babylonLab.combatAcceptance,error:window.__babylonLab.poseError,weapon:window.__babylonLab.weaponAttached}));
   console.log(mode,JSON.stringify(state));
   if(state.mode!==mode||state.error||!state.weapon)throw Error('Broken mode '+mode+': '+JSON.stringify(state));
-  if(mode==='combat'&&!state.accept?.passed)throw Error('Combat grip failed geometric gate: '+JSON.stringify(state));
+  if(mode==='combat'){\n   await page.screenshot({path:'combat-inspection.png'});\n   if(!state.accept?.passed)throw Error('Combat grip failed geometric gate: '+JSON.stringify(state));\n  }
  }
  if(errors.length)throw Error('Browser errors: '+errors.join(' | '));
- console.log('PASS: six mode transitions and combat geometry');
+ console.log('PASS: six mode transitions and combat geometry; screenshot: combat-inspection.png');
 } catch(error){
  await page.screenshot({path:'combat-failure.png',fullPage:true}).catch(()=>{});
  console.error('FAIL:',error);
