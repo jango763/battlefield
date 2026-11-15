@@ -40,11 +40,13 @@
   function makeHandOrientation(axis, palm, weaponQ) {
     const y = rotated(v(axis), weaponQ).normalize();
     const p = rotated(v(palm), weaponQ);
-    let z = p.subtract(y.scale(B.Vector3.Dot(y, p)));
-    if (z.lengthSquared() < 1e-8) z = B.Vector3.Cross(y, B.Axis.X);
-    z.normalize();
-    const x = B.Vector3.Cross(y, z).normalize();
-    z = B.Vector3.Cross(x, y).normalize();
+    // Mixamo wrist basis: +Y points toward fingers, +X is the palm normal,
+    // +Z runs across the knuckles. Prior +Z=palm mapping exposed open hands.
+    let x = p.subtract(y.scale(B.Vector3.Dot(y, p)));
+    if (x.lengthSquared() < 1e-8) x = B.Vector3.Cross(y, B.Axis.Z);
+    x.normalize();
+    const z = B.Vector3.Cross(x, y).normalize();
+    x = B.Vector3.Cross(y, z).normalize();
     const mat = B.Matrix.Identity();
     B.Matrix.FromXYZAxesToRef(x, y, z, mat);
     return B.Quaternion.FromRotationMatrix(mat).normalize();
@@ -153,9 +155,34 @@
       throw Error('Unexpected soldier skeleton; refusing to retarget');
 
     // Pose reset is imperative until approved locomotion clips exist for this GLB.
-    const controlled = [...Object.values(right), ...Object.values(left)];
+    const fingerRoots = {};
+    const fingers = [];
+    for (const side of ['Right', 'Left']) {
+      fingerRoots[side] = {};
+      for (const digit of ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky']) {
+        fingerRoots[side][digit] = [];
+        for (const segment of [1, 2, 3]) {
+          const node = joint(side + 'Hand' + digit + segment);
+          if (node) { fingerRoots[side][digit].push(node); fingers.push(node); }
+        }
+      }
+    }
+    const controlled = [...Object.values(right), ...Object.values(left), ...fingers];
     const rest = new Map(controlled.map(n => [n, n.rotationQuaternion?.clone() ||
       B.Quaternion.FromEulerAngles(n.rotation.x, n.rotation.y, n.rotation.z)]));
+    function flexFingers(side) {
+      // Finger segment rotations only; no extra meshes or duplicated hands.
+      for (const digit of ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky']) {
+        const segments = fingerRoots[side][digit];
+        const amount = digit === 'Thumb' ? [-.25, -.22, -.10] :
+          digit === 'Index' && side === 'Right' ? [-.35, -.35, -.18] :
+          [-.67, -.68, -.35];
+        segments.forEach((node, i) => {
+          const curl = B.Quaternion.RotationAxis(B.Axis.Z, amount[i]);
+          node.rotationQuaternion = rest.get(node).multiply(curl).normalize();
+        });
+      }
+    }
     const response = await fetch('../assets/ww2-weapons/manifest.json');
     if (!response.ok) throw Error('Weapon manifest HTTP ' + response.status);
     const manifest = await response.json();
@@ -224,6 +251,7 @@
       report.leftIKMeters = +solveArm(left, leftGoal).toFixed(4);
       setHandRotation(right.hand, rightQ);
       setHandRotation(left.hand, leftQ);
+      flexFingers('Right'); flexFingers('Left');
       report.rightGripMeters = +B.Vector3.Distance(right.hand.getAbsolutePosition()
         .add(rightFinger.scale(.065)), trigger).toFixed(4);
       report.leftGripMeters = +B.Vector3.Distance(left.hand.getAbsolutePosition()
