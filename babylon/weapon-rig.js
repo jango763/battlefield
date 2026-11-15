@@ -533,6 +533,8 @@
       const stockWorld=pivot.position.add(rotated(v(meta.shoulder),gunQ));
       report.stockRightShoulderMeters=+B.Vector3.Distance(
         stockWorld,right.upper.getAbsolutePosition()).toFixed(4);
+      report.stockWorldPosition=kar98k?stockWorld.asArray():null;
+      report.stockSocketWorldPosition=kar98k?rifleShoulderSocket.asArray():null;
       report.stockToSocketMeters=kar98k
         ?+B.Vector3.Distance(stockWorld,rifleShoulderSocket).toFixed(5):null;
       report.stockOnRightShoulder=kar98k?
