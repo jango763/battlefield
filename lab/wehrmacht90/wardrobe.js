@@ -139,12 +139,16 @@ async function loadCap(scene,name,tracker){
   low=B.Vector3.Minimize(low,b.minimumWorld);hi=B.Vector3.Maximize(hi,b.maximumWorld);
  }
  const extent=hi.subtract(low),center=low.add(hi).scale(.5);
- const capWidth=name==='m43-field-cap'?.217:.209;
+ const isM43=name==='m43-field-cap';
+ const capWidth=isM43?.201:.203;
  const scalar=capWidth/extent.x;
- // Head pivot is at ~1.525m in the reference skeleton. The native cap
- // geometry has its own height; align its lowest point ~0.16m above head joint.
- pivot.scaling.setAll(scalar);
- pivot.position.set(-center.x*scalar,(name==='m43-field-cap'?.110:.095)-low.y*scalar,-center.z*scalar+.010);
+ // The M43 mesh measures 0.09m high and includes a real 0.15m forward peak.
+ // Lower and squash its crown slightly, and move the peak forward to the brow.
+ const yScale=scalar*(isM43?.73:1);
+ pivot.scaling.set(scalar,yScale,scalar);
+ const front=isM43?.034:.015;
+ const headBand=isM43?.095:.089;
+ pivot.position.set(-center.x*scalar,headBand-low.y*yScale,-center.z*scalar+front);
  const group=new B.TransformNode('M40-'+name+'-track',scene);
  group.parent=tracker.node;
  pivot.parent=group;
