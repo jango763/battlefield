@@ -22,7 +22,7 @@
   ];
   const v = a => new B.Vector3(a[0], a[1], a[2]);
   const canonical = n => String(n || '').replace(/^mixamorig[:_]?/i, '')
-    .replace(/_\d+$/, '').replace(/[^a-z]/gi, '').toLowerCase();
+    .replace(/_\d+$/, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
   const matrixFromQuat = q => { const m = B.Matrix.Identity(); B.Matrix.FromQuaternionToRef(q, m); return m; };
   const rotated = (vec, q) => B.Vector3.TransformNormal(vec, matrixFromQuat(q));
   function worldRotation(node) {
