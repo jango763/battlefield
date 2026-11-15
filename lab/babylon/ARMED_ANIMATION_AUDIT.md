@@ -27,3 +27,15 @@
 - No bone inversions, four hands, detached weapons, or loading glitches.
 - Switching Idle/Combat/Jog/Sprint works repeatedly on iPhone Safari.
 - Do not merge into main game without passing the above.
+
+
+## Binary GLB inspection (verified, not inferred)
+Read both GLBs directly from the Battlefield branch as base64 and decoded their embedded glTF JSON.
+- `night-striker-lite.glb`: **65 skin joints** (single skin), including `spine_01/02/03`, `clavicle_l/r`, `upperarm_l/r`, `lowerarm_l/r`, `hand_l/r`, finger joints.
+- Arm hierarchy is `spine_03 -> clavicle_r -> upperarm_r -> lowerarm_r -> hand_r` and the equivalent left chain.
+- `hero-three-clips-lite.glb`: exactly **3 animations**, `Idle_Loop`, `Jog_Fwd_Loop`, `Sprint_Loop`, **195 glTF channels each**. There is no combat clip in this file.
+- The external rifle package uses a **90-bone UE5 rig** and `Gun` attached to `spine_05`; our rig has **65 joints** and ends its spine at `spine_03`. Thus name-based retargeting of its combat clip will not work unchanged.
+- The current Babylon implementation applies shoulder rotations around local X without validating rest-axis orientation. User screenshot shows arms swept backward; do not repeat this strategy.
+
+### Safe next implementation
+A proper `Combat_Hold_MP40` animation must be authored or licensed and retargeted for the 65-joint rig, with a verified grip and support-hand pose. Do not publish another unvalidated shoulder-axis tweak as a fix.
