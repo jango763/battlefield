@@ -242,7 +242,8 @@
       rig: 'Mixamo linked glTF nodes + 2-hand IK + elbow poles + grip fingers', pose, weapon: null,
       animationDriven,
       rightGripMeters: null, leftGripMeters: null,
-      preliminaryGeometryOnly: true, experimentalFourthAsset: true
+      preliminaryGeometryOnly: true, experimentalFourthAsset: true,
+      fingerJoints: fingers.length, anatomicalElbowPoles: true
     };
     const report = state.weaponRig;
 
