@@ -112,23 +112,21 @@ async function start(){
  }
  function updateWeaponPose(){
   if(!weaponRoot||!grip)return;
-  // Use a stable chest socket rather than a swinging animated hand.
-  // Weapon's original trigger is at its local origin; +Z points down barrel.
-  const mode=state.animation;
-  const isSprint=mode==='sprint';
-  const combat=mode==='combat';
-  grip.position.set(combat?.12:.24,combat?-.10:(isSprint?-.24:-.16),combat?.28:(isSprint?.24:.36));
+  // The trigger is the weapon origin (see manifest). Keep it at the right-hand
+  // socket, rather than using an unverified chest-relative offset.
+  grip.position.set(0,0,0);
   grip.rotationQuaternion=null;
-  grip.rotation.set(combat?-1.15:(isSprint?.19:.04),combat?0:(isSprint?-.19:-.08),combat?0:(isSprint?-.15:0));
-  // Record grip-point errors for next IK pass without mutating working animations.
+  // Weapon forward is +Z in its GLB. This is a provisional local orientation;
+  // the two-hand combat pose still needs a verified animation.
+  grip.rotation.set(-Math.PI/2,0,0);
   const trigger=weaponRoot.getAbsolutePosition();
   const support=toVec(weaponRoot.metadata?.support||[0,0,.25]);
   const supportWorld=B.Vector3.TransformCoordinates(support,weaponRoot.getWorldMatrix());
-  if(combat){poseArm(rightUpper,rightLower,rightHand,trigger);poseArm(leftUpper,leftLower,leftHand,supportWorld);}
   state.gripDistances={
    right:rightHand?Number(B.Vector3.Distance(positionOf(rightHand),trigger).toFixed(3)):null,
    left:leftHand?Number(B.Vector3.Distance(positionOf(leftHand),supportWorld).toFixed(3)):null
   };
+  state.weaponSocket={parent:grip.parent?.name||null,triggerAtRightHand:state.gripDistances.right};
  }
  async function equipWeapon(id){
   const generation=++weaponGeneration;
@@ -141,8 +139,8 @@ async function start(){
    if(grip){grip.dispose(false,false);grip=null;weaponRoot=null;}
    if(weaponContainer){weaponContainer.dispose();weaponContainer=null;}
    weaponContainer=incoming;weaponContainer.addAllToScene();
-   if(!chest)throw Error('Грудная кость не найдена: '+modelTargets.map(n=>n.name).filter(n=>/spine|chest/i.test(n)).join(', '));
-   grip=new B.TransformNode('chestWeaponSocket',scene);grip.parent=chest;
+   if(!rightHand||typeof rightHand.getAbsolutePosition!=='function')throw Error('Правая кисть не найдена как TransformNode; крепление оружия остановлено');
+   grip=new B.TransformNode('rightHandWeaponSocket',scene);grip.parent=rightHand;
    weaponRoot=new B.TransformNode('weaponTrigger',scene);weaponRoot.parent=grip;
    weaponRoot.metadata={support:meta.support,trigger:meta.trigger};
    for(const mesh of weaponContainer.meshes.filter(m=>!m.parent))mesh.parent=weaponRoot;
