@@ -252,6 +252,7 @@
       // MG42's original +0.505m grip exceeds this character's left-arm reach.
       const nextMeta = baseMeta && { ...baseMeta, support:
         id === 'de-kar98k' ? [0, .04, .27] :
+        id === 'de-mp40' ? [0, .027, .19] :
         id === 'de-mg42' ? [0, .074, .28] : baseMeta.support };
       if (!nextMeta) throw Error('Weapon manifest missing ' + id);
       let incoming = null;
