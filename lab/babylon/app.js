@@ -111,6 +111,21 @@ async function start(){
   for(let i=0;i<8;i++){aimJoint(lower,hand,target);aimJoint(upper,hand,target);}
  }
  let combatPoseSolved=false;
+ const combatArmNodes=[rightUpper,rightLower,leftUpper,leftLower].filter(n=>n?.rotationQuaternion);
+ const combatRest=new Map();
+ function resetCombatArms(){for(const [node,q] of combatRest){node.rotationQuaternion=q.clone();}combatRest.clear();}
+ function raiseCombatArms(){
+  // An explicit upper-body pose is required: IK alone cannot raise a gun
+  // parented to a hanging wrist. Apply it once, after freezing idle.
+  for(const node of combatArmNodes)combatRest.set(node,node.rotationQuaternion.clone());
+  for(const [node,angle] of [[rightUpper,-.75],[leftUpper,-.70],[rightLower,-.35],[leftLower,-.45]]){
+   if(!node?.rotationQuaternion)continue;
+   const delta=B.Quaternion.RotationAxis(B.Axis.X,angle);
+   node.rotationQuaternion.multiplyInPlace(delta).normalize();
+  }
+  state.combatPoseStatus='Upper-body pose applied; support IK pending';
+ }
+
  function updateWeaponPose(){
   if(!weaponRoot||!grip)return;
   // The trigger is the weapon origin (see manifest). Keep it at the right-hand
@@ -166,9 +181,9 @@ async function start(){
  weaponSelect.addEventListener('change',()=>equipWeapon(weaponSelect.value));
  state.equipWeapon=equipWeapon;
  function select(mode){
-  state.animation=mode;combatPoseSolved=false;
+  resetCombatArms();state.animation=mode;combatPoseSolved=false;
   for(const group of Object.values(remapped))group.stop();
-  if(mode==='combat'&&remapped.idle){remapped.idle.start(true,1,remapped.idle.from,remapped.idle.to,false);remapped.idle.goToFrame(remapped.idle.from);remapped.idle.pause();}
+  if(mode==='combat'&&remapped.idle){remapped.idle.start(true,1,remapped.idle.from,remapped.idle.to,false);remapped.idle.goToFrame(remapped.idle.from);remapped.idle.pause();raiseCombatArms();}
   else if(remapped[mode])remapped[mode].start(true,1,remapped[mode].from,remapped[mode].to,false);
   for(const btn of document.querySelectorAll('[data-clip]'))btn.setAttribute('aria-pressed',String(btn.dataset.clip===mode));
   log('Babylon.js | meshes: '+state.meshes+' | skeletons: '+state.skeletons+' | tracks: '+JSON.stringify(counts)+'\nAnimation: '+mode+' | '+(mode==='combat'?'static inspection pose; grip not yet solved':remapped[mode]?'active':'НЕ ПРИВЯЗАНА — требуется адаптация')+'\nSource groups: '+state.groups.join(', '));
