@@ -192,6 +192,11 @@ async function start(){
   if(state.animation==='combat'&&!combatPoseSolved){
    try{solveCombatGrip();combatPoseSolved=true;state.poseError=null;}catch(error){combatPoseSolved=true;state.poseError=String(error);state.combatPoseStatus='IK failed: '+state.poseError;}
   }
+  // Fail visibly rather than presenting an unsolved chest-mounted weapon.
+  const combatVisible=state.animation==='combat'&&!state.poseError;
+  if(weaponContainer)for(const mesh of weaponContainer.meshes){
+   if(mesh.getTotalVertices?.()>0)mesh.setEnabled(combatVisible);
+  }
   const trigger=weaponRoot.getAbsolutePosition();
   const supportWorld=B.Vector3.TransformCoordinates(toVec(weaponRoot.metadata.support),weaponRoot.getWorldMatrix());
   const muzzleWorld=B.Vector3.TransformCoordinates(toVec(weaponRoot.metadata.muzzle),weaponRoot.getWorldMatrix());
@@ -213,7 +218,9 @@ async function start(){
    state.combatAcceptance={rightRaised,leftSupport,rightGrip,muzzleForward,buttNearShoulder,elbowBendOk,ikConverged,ikResidual:state.ikResidual,elbowAngles:state.elbowAngles,
     passed:!!(rightRaised&&leftSupport&&rightGrip&&muzzleForward&&buttNearShoulder&&elbowBendOk&&ikConverged),
     note:'Geometric gate only. Hand rotations and mesh deformation require visual verification'};
-  }else state.combatAcceptance=null;
+   state.debugText='Grip R '+state.gripDistances.right+' L '+state.gripDistances.left+
+    ' | elbows '+JSON.stringify(state.elbowAngles)+' | '+(state.combatAcceptance.passed?'PASS':'FAIL');
+  }else{state.combatAcceptance=null;state.debugText='Оружие скрыто вне боевой стойки';}
  }
 
  async function equipWeapon(id){
@@ -246,7 +253,10 @@ async function start(){
    grip.rotationQuaternion=null;grip.rotation.set(0,0,0);
    for(const mesh of weaponContainer.meshes.filter(m=>!m.parent))mesh.parent=weaponRoot;
    for(const node of weaponContainer.transformNodes.filter(n=>!n.parent))node.parent=weaponRoot;
-   state.weaponAttached=true;combatPoseSolved=false;updateWeaponPose();
+   state.weaponAttached=true;combatPoseSolved=false;
+   // A torso socket must not display a rifle in the non-combat idle animation.
+   // Only show it after the combat pose has actually been solved.
+   updateWeaponPose();
   }catch(e){state.weaponError=String(e);console.error('Weapon load',e);}
   select(state.animation);
  }
@@ -265,7 +275,8 @@ async function start(){
  select('idle');await equipWeapon(weaponSelect.value);
  if(state.weaponError||!state.weaponAttached)throw Error('Initial weapon failed: '+state.weaponError);
  state.ready=true;state.scene=scene;state.engineInstance=engine;
- engine.runRenderLoop(()=>{try{updateWeaponPose();}catch(e){state.poseError=String(e);status.textContent='ОШИБКА БОЕВОЙ ПОЗЫ: '+state.poseError;console.error('Combat pose',e);}scene.render();state.fps=Math.round(engine.getFps());});
+ engine.runRenderLoop(()=>{try{updateWeaponPose();}catch(e){state.poseError=String(e);status.textContent='ОШИБКА БОЕВОЙ ПОЗЫ: '+state.poseError;console.error('Combat pose',e);}scene.render();state.fps=Math.round(engine.getFps());
+  if(state.animation==='combat')status.textContent='Боевая стойка: '+(state.poseError||state.debugText||'ожидание')+'\\n'+(state.combatPoseStatus||'');});
  window.addEventListener('resize',()=>engine.resize());
 }
 start().catch(err=>{state.error=String(err?.stack||err);log('ОШИБКА: '+state.error);console.error(err);});
