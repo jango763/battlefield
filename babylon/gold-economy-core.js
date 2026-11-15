@@ -15,7 +15,7 @@ const SIZE=300;
 const TEAM_BLUE='blue',TEAM_RED='red';
 const FACTIONS=Object.freeze({
  blue:Object.freeze({name:'Британцы',color:'#4b9cc2',side:'ЮГ'}),
- red:Object.freeze({name:'Немцы',color:'#cd6558',side:'СЕВЕР'})
+ red:Object.freeze({name:'Вермахт',color:'#cd6558',side:'СЕВЕР'})
 });
 const CAPTURE_SECONDS=5;
 const CAPTURE_BONUS=50;
