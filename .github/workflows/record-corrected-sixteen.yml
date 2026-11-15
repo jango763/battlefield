@@ -2,7 +2,10 @@ name: Record corrected sixteen Babylon animations
 on:
   push:
     branches: ['next/babylon-game-foundation-20261115']
-    paths: ['.github/workflows/record-corrected-sixteen.yml', 'babylon/animstudio-preview/record-video.cjs']
+    paths:
+      - '.github/workflows/record-corrected-sixteen.yml'
+      - 'babylon/animstudio-preview/record-video.cjs'
+      - 'babylon/animstudio-preview/models/all-combat-run.glb'
   workflow_dispatch:
 permissions:
   contents: read
