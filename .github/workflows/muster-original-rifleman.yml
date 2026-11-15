@@ -1,0 +1,82 @@
+name: Preview original Muster rifleman
+on:
+  push:
+    branches:
+      - preview/muster-original-rifleman-20261115
+    paths:
+      - .github/workflows/muster-original-rifleman.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-original-rifleman:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch original MIT soldier project
+        shell: bash
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/Kenton-GMI/muster-ww2.git /tmp/muster-original
+          cd /tmp/muster-original
+          git checkout 7d2fa86ebc3b999eaf085831cdcd5dccefea63d4
+          test -f src/assets/germany/rifleman.asset.ts
+          grep -q "buildInfantry('rifleman'" src/assets/germany/rifleman.asset.ts
+          echo "PINNED_SOURCE=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Compile ORIGINAL rifleman viewer with no model alterations
+        shell: bash
+        run: |
+          cd /tmp/muster-original
+          npm install --no-audit --no-fund
+          npx vite build --base=./
+          test -s dist/harness.html
+          test -d dist/assets
+          mkdir -p "$GITHUB_WORKSPACE/lab/muster-rifleman"
+          cp -a dist/. "$GITHUB_WORKSPACE/lab/muster-rifleman/"
+          cp dist/harness.html "$GITHUB_WORKSPACE/lab/muster-rifleman/index.html"
+          cat > "$GITHUB_WORKSPACE/lab/muster-rifleman/SOURCE.txt" <<'TEXT'
+          Exact unmodified source: https://github.com/Kenton-GMI/muster-ww2
+          Pinned commit: 7d2fa86ebc3b999eaf085831cdcd5dccefea63d4
+          MIT (c) 2026 Kenton Wang; see https://github.com/Kenton-GMI/muster-ww2/blob/main/LICENSE
+          Model: germany/rifleman (fully built M40 German rifleman with original Kar98k).
+          Viewer: source project's original src/harness/main.ts, no custom uniform, no original Battlefield prototype.
+          The source generates a STATIC posed model; it has not been retargeted to our 90-bone animation rig.
+          Example: index.html?asset=germany/rifleman&views=q-front,front,q-rear&cols=3&w=1500&h=900&detail=low
+          TEXT
+          du -sh "$GITHUB_WORKSPACE/lab/muster-rifleman"
+      - name: Install headless browser
+        shell: bash
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          npm install --no-save --no-audit --no-fund @playwright/test
+          npx playwright install --with-deps chromium
+      - name: Browser test original rifleman and screenshot
+        shell: bash
+        run: |
+          mkdir -p test-results
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory lab/muster-rifleman >/tmp/muster-http.log 2>&1 &
+          sleep 2
+          npx playwright test lab/muster-rifleman-check.spec.cjs --reporter=line --workers=1
+      - name: Upload original-model verification screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-muster-rifleman-preview
+          path: test-results/
+          if-no-files-found: ignore
+      - name: Commit generated standalone preview to isolated branch
+        if: success()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lab/muster-rifleman
+          git commit -m "Publish source-authentic static Muster rifleman preview" || echo "No files changed"
+          git push origin HEAD:preview/muster-original-rifleman-20261115
