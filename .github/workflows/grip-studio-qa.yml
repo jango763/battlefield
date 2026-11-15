@@ -1,0 +1,36 @@
+name: Kar98k master grip studio QA
+on:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths:
+      - 'babylon/animstudio-preview/grip-studio.js'
+      - 'babylon/animstudio-preview/test-grip-studio.cjs'
+      - '.github/workflows/grip-studio-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install browser and check scripts
+        run: |
+          node --check babylon/weapon-rig.js
+          node --check babylon/animstudio-preview/grip-studio.js
+          node --check babylon/animstudio-preview/test-grip-studio.cjs
+          npm install --no-audit --no-fund --prefix /tmp/animstudio-viewer-qa playwright@1.58.2
+          /tmp/animstudio-viewer-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8758 --bind 127.0.0.1 > /tmp/grip-studio-server.log 2>&1 &
+          sleep 2
+      - name: Verify master hand pose editor on desktop and iPhone viewport
+        run: node babylon/animstudio-preview/test-grip-studio.cjs
+      - name: Upload before-after hand images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kar98k-master-grip-baseline-edited-qa
+          path: babylon/animstudio-preview/master-qa/
+          if-no-files-found: ignore
+          retention-days: 21
