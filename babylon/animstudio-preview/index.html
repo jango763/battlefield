@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17211d">
+<title>Battlefield — 16 анимаций оружия</title>
+<style>
+:root{color-scheme:dark;--bg:#16201b;--panel:#202d25;--stroke:#506250;--type:#f1f4e9;--muted:#b6c8b7;--accent:#d2d6a6}
+*{box-sizing:border-box}html,body{padding:0;margin:0;height:100%;overflow:hidden;background:var(--bg);font:14px system-ui,-apple-system,Segoe UI,sans-serif;color:var(--type)}
+canvas{width:100%;height:100%;display:block;outline:none;touch-action:none}
+#caption{position:fixed;top:calc(env(safe-area-inset-top) + 14px);left:16px;right:16px;pointer-events:none;text-shadow:0 1px 8px #000b}
+h1{font-size:19px;margin:0 0 3px;font-weight:760}small{font-size:12px;color:#d1dbcf}
+#panel{position:fixed;right:12px;top:calc(env(safe-area-inset-top) + 72px);width:min(355px,calc(100% - 24px));background:#1b2821ee;border:1px solid var(--stroke);border-radius:12px;padding:14px;box-shadow:0 8px 35px #0007;backdrop-filter:blur(12px)}
+.heading{font-weight:650;font-size:12px;color:var(--muted);letter-spacing:.04em;margin:0 0 7px}
+.choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.choice button{padding:11px 6px;appearance:none;background:#304037;color:#f4f2e6;border:1px solid #586b5b;border-radius:8px;font:650 13px system-ui;cursor:pointer;touch-action:manipulation}
+.choice button[aria-pressed=true]{background:var(--accent);color:#18251b;border-color:#e5e9bf}
+#actions{margin-top:12px}#playall{width:100%;margin-top:12px;background:#465d43;color:#fff;border:1px solid #849779;font:650 13px system-ui;border-radius:9px;padding:10px}
+#playall[aria-pressed=true]{background:#b7c992;color:#152218}
+#info{margin-top:11px;color:#c9d3c4;font-size:12px;line-height:1.45;min-height:2.8em}
+#status{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 16px);left:12px;right:12px;text-align:center;pointer-events:none;font-size:12px;background:#233025d8;color:#e5ebde;border:1px solid #596c58;border-radius:9px;padding:10px;max-width:580px;margin:auto}
+#error{color:#ffb3a3;font-weight:700}
+#credits{font-size:10px;position:fixed;bottom:calc(env(safe-area-inset-bottom) + 65px);left:14px;color:#a5b3a3;max-width:45%;text-shadow:0 1px 2px #000}
+a{color:#dae3b8}
+@media(max-width:600px){
+ #caption h1{font-size:17px}
+ #panel{top:auto;bottom:calc(env(safe-area-inset-bottom) + 74px);left:12px;right:12px;width:auto;padding:10px 12px}
+ .choice{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+ .choice button{font-size:11px;padding:9px 2px;min-height:43px}
+ #actions{margin-top:9px}#playall{margin-top:8px;padding:8px}
+ #info{margin-top:6px;min-height:0;font-size:11px}
+ #credits{top:calc(env(safe-area-inset-top) + 57px);bottom:auto;left:16px}
+}
+</style>
+</head>
+<body>
+<canvas id="canvas" aria-label="Интерактивный просмотр анимаций солдата"></canvas>
+<header id="caption"><h1>Battlefield · 16 анимаций</h1><small>Babylon.js · один утверждённый солдат · четыре типа оружия</small></header>
+<section id="panel" aria-label="Выбор анимации">
+<div class="heading">ОРУЖИЕ</div>
+<div class="choice" id="weapons">
+<button type="button" data-weapon="Kar98k" aria-pressed="true">Kar98k</button>
+<button type="button" data-weapon="MP40" aria-pressed="false">MP40</button>
+<button type="button" data-weapon="MG42" aria-pressed="false">MG42</button>
+<button type="button" data-weapon="Panzerschreck" aria-pressed="false">PzSchreck*</button>
+</div>
+<div id="actions"><div class="heading">АНИМАЦИЯ</div>
+<div class="choice" id="poses">
+<button type="button" data-pose="Hold" aria-pressed="true">На изготовку</button>
+<button type="button" data-pose="Aim" aria-pressed="false">Прицел</button>
+<button type="button" data-pose="Fire" aria-pressed="false">Стрельба</button>
+<button type="button" data-pose="Walk" aria-pressed="false">Ходьба</button>
+</div></div>
+<button id="playall" type="button" aria-pressed="false">▶ Показать все 16 по очереди</button>
+<div id="info">Нажимайте на оружие и позу. Вращайте бойца пальцем или мышью.</div>
+</section>
+<div id="credits">* Panzerschreck — предварительный макет. Экспорт AnimStudio, ещё не окончательная игровая анимация.</div>
+<div id="status">Загружаю модель и анимации… <span id="error"></span></div>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./viewer.js"></script>
+</body></html>
