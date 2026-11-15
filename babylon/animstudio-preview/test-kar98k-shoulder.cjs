@@ -37,6 +37,9 @@ const fs=require('node:fs'),path=require('node:path');
         throw Error('KAR98K_STOCK_DETACHED '+JSON.stringify(measured));
       if(!Number.isFinite(measured.leftGrip)||!Number.isFinite(measured.rightGrip))
         throw Error('Invalid wrists: '+JSON.stringify(measured));
+      if(measured.elbows[0]<20||measured.elbows[1]<20||
+        measured.leftGrip>.075||measured.rightGrip>.075)
+        throw Error('KAR98K_HANDS_WRONG_POSE '+JSON.stringify(measured));
       // Show full body from right side and directly behind the butt.
       await page.evaluate(()=>{
         const s=window.__BATTLEFIELD_ANIMATIONS__;
