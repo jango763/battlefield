@@ -257,6 +257,35 @@
     const chest = joint('Spine2');
     const hips=joint('Hips');
     const neck=joint('Neck');
+    // The combat demo uses an independent lower-body stance overlay. The
+    // approved hand-pose JSON is never modified by this procedural layer.
+    const poseLegs={
+      leftThigh:joint('LeftUpLeg'),rightThigh:joint('RightUpLeg'),
+      leftKnee:joint('LeftLeg'),rightKnee:joint('RightLeg'),
+      spine:joint('Spine')
+    };
+    const originalRootY=root.position.y;
+    const applyCombatStance=()=>{
+      const data=state.combatPose;
+      const w=B.Scalar.Clamp(Number(data?.crouch)||0,0,1);
+      if(!data?.active){root.position.y=originalRootY;return;}
+      // Low marksman stance: staggered knees and a short forward lean.
+      // Blend is driven by animation phase frames (not by a CSS camera trick).
+      root.position.y=originalRootY-.12*w;
+      const bends={
+        leftThigh:[.42,0,.13],rightThigh:[-.44,0,-.12],
+        leftKnee:[-.88,0,0],rightKnee:[.82,0,0],
+        spine:[.20,0,0]
+      };
+      for(const [name,angles] of Object.entries(bends)){
+        const node=poseLegs[name];
+        if(!node||!node.rotationQuaternion)continue;
+        const adjust=B.Quaternion.FromEulerAngles(
+          angles[0]*w,angles[1]*w,angles[2]*w);
+        node.rotationQuaternion=node.rotationQuaternion.multiply(adjust).normalize();
+        refresh(node);
+      }
+    };
     if (!hips || !neck || !chest || Object.values(right).some(x => !x) || Object.values(left).some(x => !x))
       throw Error('Panzergrenadier: linked arm joints not found; model remains unmodified.');
     if (!skeleton || (skeleton.bones.length !== 65 &&
@@ -443,6 +472,7 @@
       if (!animationDriven && !needsPose && now - lastSolveTime < 65) return;
       needsPose = false; lastSolveTime = now;
       for (const [node, q] of rest) node.rotationQuaternion = q.clone();
+      applyCombatStance();
       refresh(chest); refresh(right.shoulder); refresh(left.shoulder);
       const t = performance.now() * .001;
       const running = pose === 'run', firing = pose === 'fire';
@@ -503,7 +533,24 @@
       const leftQ=leftBaseQ.multiply(handEdit('left')).normalize();
       const rightFinger=rotated(localHandForward('Right'),rightQ).normalize();
       const leftFinger=rotated(localHandForward('Left'),leftQ).normalize();
-      const trigger = pivot.position.add(rotated(v(meta.trigger),gunQ));
+      const trigger=pivot.position.add(rotated(v(meta.trigger),gunQ));
+      // Frame-keyed right-hand bolt operation is a temporary grip offset,
+      // not an edit to the approved Kar98k master profile. The rifle stays
+      // anchored to the right shoulder through all phases.
+      const bolt=weaponId==='de-kar98k'&&state.combatPose?.active
+        ?B.Scalar.Clamp(Number(state.combatPose.boltProgress)||0,0,1):0;
+      if(bolt>0){
+        const keyed=[[0,0,0,0],[.12,.038,.045,-.012],
+          [.30,.038,.055,-.12],[.70,.038,.055,-.12],
+          [.92,.038,.045,-.012],[1,0,0,0]];
+        let offset=keyed.at(-1).slice(1);
+        for(let i=1;i<keyed.length;i++)if(bolt<=keyed[i][0]){
+          const a=keyed[i-1],b=keyed[i],t=(bolt-a[0])/(b[0]-a[0]);
+          offset=a.slice(1).map((v,j)=>v+(b[j+1]-v)*t);break;
+        }
+        trigger.addInPlace(rotated(new B.Vector3(...offset),gunQ));
+        report.boltHandOffsetMeters=+Math.hypot(...offset).toFixed(4);
+      }else report.boltHandOffsetMeters=0;
       if(gripStudio&&weaponId==='de-kar98k')
         trigger.addInPlace(rotated(new B.Vector3(master.rightOffsetX,
           master.rightOffsetY,master.rightOffsetZ),gunQ));
@@ -610,6 +657,8 @@
         .add(rPalm.scale(rightPalmReach)), trigger).toFixed(4);
       report.leftGripMeters = +B.Vector3.Distance(left.hand.getAbsolutePosition()
         .add(lPalm.scale(leftPalmReach)), support).toFixed(4);
+      report.combatCrouchStrength=state.combatPose?.active
+        ?+(Number(state.combatPose.crouch)||0).toFixed(3):0;
       report.masterPoseEditor=gripStudio;
       report.masterPose=gripStudio?{...master}:null;
       report.anatomicalHandCalibration=anatomicalDebug &&
