@@ -1,0 +1,40 @@
+name: Babylon real combat scene 2 weapons
+on:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths:
+      - 'babylon/animstudio-preview/combat-demo.js'
+      - 'babylon/animstudio-preview/combat-cycle-core.js'
+      - 'babylon/animstudio-preview/test-combat-demo.cjs'
+      - 'babylon/animstudio-preview/viewer.js'
+      - '.github/workflows/combat-demo-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check code and run software WebGL Chromium
+        run: |
+          node --check babylon/weapon-rig.js
+          node --check babylon/animstudio-preview/viewer.js
+          node --check babylon/animstudio-preview/combat-demo.js
+          node --check babylon/animstudio-preview/combat-cycle-core.js
+          node --check babylon/animstudio-preview/test-combat-demo.cjs
+          npm install --no-audit --no-fund --prefix /tmp/animstudio-viewer-qa playwright@1.58.2
+          /tmp/animstudio-viewer-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8758 --bind 127.0.0.1 > /tmp/combat-server.log 2>&1 &
+          sleep 2
+      - name: Verify stop shot bolt crouch rifle and standing launcher on desktop and iPhone
+        run: node babylon/animstudio-preview/test-combat-demo.cjs
+      - name: Upload screenshots of actual soldier with 2 combat sequences
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: babylon-stop-to-fire-combat-screenshots
+          path: babylon/animstudio-preview/combat-qa/
+          retention-days: 21
+          if-no-files-found: ignore
