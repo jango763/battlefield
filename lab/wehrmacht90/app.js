@@ -1,3 +1,4 @@
+import {installWehrmachtOutfit} from './wardrobe.js';
 // Battlefield · independent reference viewer using the source author's REAL 90-joint rig.
 // No binary assets are redistributed. The GLBs are fetched directly from the source repo.
 // Revision: start the rendering loop immediately, check GLB headers, surface download errors,
@@ -181,6 +182,21 @@ async function main(){
   if(!B.SceneLoader.IsPluginForExtensionAvailable('.glb'))throw Error('GLB-плагин Babylon не загружен');
   const model=await loadModel(scene);
   marker.setEnabled(false);retry.hidden=true;
+  try{
+   const kit=await installWehrmachtOutfit(scene,model);
+   state.wardrobe={ready:true,selected:kit.selected,capMeshCounts:Object.fromEntries(Object.entries(kit.caps).map(([name,cap])=>[name,cap.meshCount])),
+    coloredVertices:kit.wool.vertices,patchAreas:kit.wool.areas,kitParts:kit.kit.pieces,errors:kit.errors};
+   const sync=()=>{state.wardrobe.selected=kit.selected;};
+   for(const button of document.querySelectorAll('[data-headwear]')){
+    button.onclick=()=>{try{kit.setHeadwear(button.dataset.headwear);sync();
+     for(const b of document.querySelectorAll('[data-headwear]'))b.setAttribute('aria-pressed',String(b.dataset.headwear===kit.selected));
+     report('Головной убор: '+kit.selected);
+    }catch(e){state.wardrobe.errors.push(String(e));report(String(e));}};
+    button.disabled=!kit.caps[button.dataset.headwear];
+   }
+   sync();
+   report('Форма M40 и головной убор '+kit.selected+' добавлены. Проверяем анимации…');
+  }catch(e){state.wardrobe={ready:false,error:String(e)};console.error('Wardrobe',e);report('Не удалось надеть форму: '+String(e));}
   await loadAnimations(scene,model);
  }catch(e){fail(e);}
 }
