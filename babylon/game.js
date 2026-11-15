@@ -11,6 +11,7 @@ const tactics=window.BattlefieldSquadController;
 const presentation=window.BattlefieldCombatPresentation;
 const orders=window.BattlefieldFieldOrders;
 const goldRules=window.BattlefieldGoldEconomy;
+const worldBuilder=window.BattlefieldWorld300;
 const briefing=$('battlefield-brief'),enterButton=$('enter-game'),briefingProgress=$('brief-progress');
 const canvas=$('view');
 // Retry and menu work even if CDN scripts or the 3D model failed to load.
@@ -20,7 +21,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -33,15 +34,15 @@ const META={Kar98k:'de-kar98k',MP40:'de-mp40',MG42:'de-mg42',
  Panzerschreck:'de-panzerschreck'};
 const PRICES={MP40:{weapon:100,magazine:15},MG42:{weapon:240,magazine:40},
  Panzerschreck:{weapon:350,magazine:70}};
-const UNIT_SCALE=.11,BASE_X=-5.8;
-const SCENARIOS={duel:[1,1],assault:[1,4],squads:[4,4]};
+const UNIT_SCALE=1,BASE_X=-150,BASE_Z=-150;
+const SCENARIOS={duel:[1,1],assault:[1,4],squads:[12,12]};
 const CLIP_POSES={ready:'Hold',aim:'Aim',fire:'Fire',run:'Run'};
 const CLIP_IDS=Object.keys(META).flatMap(w=>Object.values(CLIP_POSES).map(p=>w+'_'+p));
 const state={ready:false, loading:true, error:null, models:0, clips:0,
- scenario:'duel',atBase:true,selected:'Kar98k',focus:null, fps:0};
+ scenario:'squads',atBase:true,selected:'Kar98k',focus:null, fps:0};
 window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
-let actors=new Map(),fx=[],scenario='duel',atBase=true;
+let actors=new Map(),fx=[],scenario='squads',atBase=true,world=null;
 let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 let weaponQueue=[],weaponWorker=false;
 let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
@@ -57,7 +58,7 @@ enterButton.addEventListener('click',()=>{
  drawHud();
 });
 function position(unit,y=0){
- return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y,unit.z*UNIT_SCALE);
+ return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y,BASE_Z+unit.z*UNIT_SCALE);
 }
 function color(hex){return B.Color3.FromHexString(hex)}
 function createWorld(){
@@ -72,26 +73,17 @@ function createWorld(){
  hemi.intensity=1.35;
  const sun=new B.DirectionalLight('sun',new B.Vector3(-.5,-1,.3),scene);
  sun.intensity=1.55;sun.diffuse=new B.Color3(1,.94,.83);
- const ground=B.MeshBuilder.CreateGround('battlefield-ground',{width:36,height:22},scene);
- terrain=ground;
- const mat=new B.StandardMaterial('earth',scene);
- mat.diffuseColor=new B.Color3(.29,.34,.27);ground.material=mat;
- ground.isPickable=true;
+ world=worldBuilder.create(scene,B,goldRules.MAP);
+ terrain=world.ground;
  destinationMark=B.MeshBuilder.CreateTorus('destination-marker',{diameter:.75,thickness:.055,tessellation:16},scene);
  destinationMark.rotation.x=Math.PI/2;destinationMark.position.y=.055;
  destinationMark.isVisible=false;destinationMark.isPickable=false;
  const markMaterial=new B.StandardMaterial('destination-mat',scene);
  markMaterial.emissiveColor=color('#eed58b');destinationMark.material=markMaterial;
- for(let i=0;i<=100;i+=20){
-  const m=B.MeshBuilder.CreateBox('distance-'+i,{width:.024,height:.012,depth:13},scene);
-  m.position.set(BASE_X+i*UNIT_SCALE,.010,0);
-  const mm=new B.StandardMaterial('distance-mark-'+i,scene);
-  mm.emissiveColor=new B.Color3(.34,.41,.30);
-  m.material=mm;m.isPickable=false;
- }
- camera=new B.ArcRotateCamera('camera',Math.PI*.52,1.05,19,
-  new B.Vector3(-.4,.45,0),scene);
- camera.lowerRadiusLimit=6;camera.upperRadiusLimit=30;
+
+ camera=new B.ArcRotateCamera('camera',Math.PI*.52,1.05,33,
+  new B.Vector3(0,.7,-108),scene);
+ camera.lowerRadiusLimit=15;camera.upperRadiusLimit=145;
  camera.lowerBetaLimit=.2;camera.upperBetaLimit=1.5;
  camera.wheelDeltaPercentage=.018;camera.pinchDeltaPercentage=.018;
  camera.attachControl(canvas,true);
@@ -116,11 +108,11 @@ function createWorld(){
     alertStatus('Выберите врага. Для движения нажмите «Движение».');
     return;
    }
-   const x=(point.x-BASE_X)/UNIT_SCALE,z=point.z/UNIT_SCALE;
+   const x=(point.x-BASE_X)/UNIT_SCALE,z=(point.z-BASE_Z)/UNIT_SCALE;
    const move=fieldOrders.setDestination(x,z);
    if(move.ok){
     destinationMark.position.set(BASE_X+move.destination.x*UNIT_SCALE,.06,
-     move.destination.z*UNIT_SCALE);
+     BASE_Z+move.destination.z*UNIT_SCALE);
     destinationMark.isVisible=true;
     if(gameStarted&&!controller.snapshot().active&&!controller.snapshot().done){
      controller.start();atBase=false;state.atBase=false;
@@ -168,7 +160,7 @@ function unitVisual(index,entries){
  const marker=B.MeshBuilder.CreateDisc('squad-ring-'+index,{radius:.47,tessellation:24},scene);
  marker.parent=anchor;marker.rotation.x=Math.PI/2;marker.position.y=.025;
  const ringMat=new B.StandardMaterial('squad-ring-mat-'+index,scene);
- ringMat.emissiveColor=color(index<4?'#75d08f':'#e98668');ringMat.alpha=.75;
+ ringMat.emissiveColor=color(index<12?'#77bcea':'#e98668');ringMat.alpha=.75;
  marker.material=ringMat;marker.isPickable=false;
  const hpBack=B.MeshBuilder.CreatePlane('health-bg-'+index,{width:.8,height:.085},scene);
  hpBack.parent=anchor;hpBack.billboardMode=B.Mesh.BILLBOARDMODE_ALL;
@@ -180,7 +172,7 @@ function unitVisual(index,entries){
  hpFill.parent=anchor;hpFill.billboardMode=B.Mesh.BILLBOARDMODE_ALL;
  hpFill.position.y=2.081;hpFill.position.z=-.01;
  const hpMat=new B.StandardMaterial('hp-mat-'+index,scene);
- hpMat.emissiveColor=color(index<4?'#8bdaa0':'#e78f6b');
+ hpMat.emissiveColor=color(index<12?'#8bdaa0':'#e78f6b');
  hpMat.disableLighting=true;hpFill.material=hpMat;hpFill.isPickable=false;
  for(const mesh of drawable)mesh.metadata={...(mesh.metadata||{}),squadSlot:index};
  return {index,anchor,root,entries,clips,imported:{
@@ -190,8 +182,8 @@ function unitVisual(index,entries){
   hitEffect:0,animationChanges:0,weaponError:null};
 }
 const SCENE_SLOTS={
- duel:[0,4],assault:[0,4,5,6,7],
- squads:[0,1,2,3,4,5,6,7]
+ duel:[0,12],assault:[0,12,13,14,15],
+ squads:Array.from({length:24},(_,i)=>i)
 };
 async function ensureUnits(scenarioName){
  const slots=SCENE_SLOTS[scenarioName];
@@ -227,6 +219,8 @@ async function ensureUnits(scenarioName){
   view.anchor.setEnabled(false);
   views[i]=view;state.models++;state.clips+=16;
   weaponQueue.push(view);
+  const unit=i<12?allies[i]:enemies[i-12];
+  if(state.ready&&unit){assignView(view,unit);actors.set(unit,view);}
   // Allow browser to paint loading progress on mobile between clones.
   await new Promise(resolve=>requestAnimationFrame(resolve));
  }
