@@ -296,7 +296,7 @@
           // Temporary URL-only research control; no extra visible gameplay UI.
           // Compare source rest, stronger flexion, reverse and alternate axis
           // without changing the approved soldier's skinned geometry.
-          const multiplier=gripDebug==='neutral'?0:gripDebug==='firm'?1.55:1;
+          const multiplier=gripDebug==='neutral'?0:gripDebug==='classic'?1:1.55;
           const sign=gripDebug==='reverse'?-1:1;
           const curlAxis=gripDebug==='axisX'?B.Axis.X:B.Axis.Z;
           const bend=B.Quaternion.RotationAxis(curlAxis,amount[i]*multiplier*sign);
