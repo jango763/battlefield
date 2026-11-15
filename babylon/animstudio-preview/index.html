@@ -23,6 +23,7 @@ h1{font-size:19px;margin:0 0 3px;font-weight:760}small{font-size:12px;color:#d1d
 #error{color:#ffb3a3;font-weight:700}
 #viewmode{position:fixed;z-index:6;top:calc(env(safe-area-inset-top) + 72px);left:16px;background:#b3c493;color:#19251b;border:1px solid #f0f3d4;border-radius:9px;padding:10px 12px;font:700 12px system-ui;box-shadow:0 5px 18px #0008}
 body.full-body #panel{display:none}
+#handsmode{position:fixed;z-index:6;top:calc(env(safe-area-inset-top) + 116px);left:16px;background:#344b39;color:#f0f5ec;border:1px solid #7d997e;border-radius:9px;padding:9px 10px;font:700 12px system-ui;box-shadow:0 5px 18px #0008}
 #credits{font-size:10px;position:fixed;bottom:calc(env(safe-area-inset-bottom) + 65px);left:14px;color:#a5b3a3;max-width:45%;text-shadow:0 1px 2px #000}
 a{color:#dae3b8}
 @media(max-width:600px){
@@ -38,6 +39,7 @@ a{color:#dae3b8}
 </head>
 <body>
 <button id="viewmode" type="button" aria-pressed="false">Весь боец</button>
+<button id="handsmode" type="button" aria-pressed="false">Кисти крупно</button>
 <canvas id="canvas" aria-label="Интерактивный просмотр анимаций солдата"></canvas>
 <header id="caption"><h1>Battlefield · 16 анимаций</h1><small>Babylon.js · один утверждённый солдат · четыре типа оружия</small></header>
 <section id="panel" aria-label="Выбор анимации">
