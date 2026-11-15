@@ -11,6 +11,7 @@
   const info=document.querySelector('#info');
   const allButton=document.querySelector('#playall');
   const viewmodeButton=document.querySelector('#viewmode');
+  const handsmodeButton=document.querySelector('#handsmode');
   const variants={Kar98k:'de-kar98k',MP40:'de-mp40',MG42:'de-mg42',Panzerschreck:'de-panzerschreck'};
   const poseMap={Hold:'ready',Aim:'aim',Fire:'fire',Run:'run'};
   const poses=['Hold','Aim','Fire','Run'];
@@ -90,6 +91,25 @@
     stopAuto();show(state.weapon,el.dataset.pose).catch(reportError);
   }));
   allButton.addEventListener('click',()=>state.playAll().catch(reportError));
+  handsmodeButton.addEventListener('click',()=>{
+    state.handsClose=!state.handsClose;
+    if(state.handsClose){
+      state.fullBody=true;
+      document.body.classList.add('full-body');
+      const focus=state.weaponRig?.handFocus;
+      if(Array.isArray(focus)&&focus.length===3&&camera){
+        camera.setTarget(new B.Vector3(...focus));
+        camera.radius=1.20;
+      }
+    } else {
+      state.fullBody=false;
+      document.body.classList.remove('full-body');
+      if(camera){camera.setTarget(new B.Vector3(0,.94,0));camera.radius=3.0;}
+    }
+    handsmodeButton.setAttribute('aria-pressed',String(state.handsClose));
+    handsmodeButton.textContent=state.handsClose?'Показать меню':'Кисти крупно';
+    viewmodeButton.textContent=state.fullBody?'Показать меню':'Весь боец';
+  });
   viewmodeButton.addEventListener('click',()=>{
     state.fullBody=!state.fullBody;
     document.body.classList.toggle('full-body',state.fullBody);
