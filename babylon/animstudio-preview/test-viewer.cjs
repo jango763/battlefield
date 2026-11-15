@@ -23,9 +23,11 @@ const path=require('node:path');
         bones:window.__BATTLEFIELD_ANIMATIONS__.skeletonBones
       }));
       if(!state.loaded||state.error||state.clips.length<16)throw Error(env.name+' load failed: '+JSON.stringify(state)+' errors '+failures.join(','));
+      if(!state.clips.includes('Kar98k_Run') || state.clips.some(n=>/_Walk$/.test(n)))
+        throw Error('Combat motion must be running, not walking: '+JSON.stringify(state.clips));
       const result=[];
       for(const gun of ['Kar98k','MP40','MG42','Panzerschreck']){
-        for(const pose of ['Hold','Aim','Fire','Walk']){
+        for(const pose of ['Hold','Aim','Fire','Run']){
           await page.evaluate(async([w,p])=>await window.__BATTLEFIELD_ANIMATIONS__.show(w,p),[gun,pose]);
           await page.waitForTimeout(180);
           const s=await page.evaluate(()=>({
