@@ -144,5 +144,5 @@ export function buildTailoredKit(scene,chestTracker){
  add(curvedBand(scene,root,'M40-contour-leather-waistbelt',-.30,.047,m.belt));
  add(panel(scene,root,'M40-belt-buckle',{x:0,y:-.30,w:.070,h:.046,z:.179,edge:.015,bulge:0},m.metal));
  add(panel(scene,root,'M40-belt-buckle-slot',{x:0,y:-.30,w:.038,h:.025,z:.2,edge:.012,bulge:0},m.belt));
- return {pieces:made.length,meshes:made,variant:'M40 stitched panels + four box-pleated pockets'};
+ return {root,pieces:made.length,meshes:made,variant:'M40 stitched panels + four box-pleated pockets'};
 }
