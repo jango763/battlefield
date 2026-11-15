@@ -448,9 +448,17 @@
           : new B.Vector3(.050,-.090,.035))
         : (running ? new B.Vector3(.045, -.18, -.025)
           : new B.Vector3(.038, -.07, .115));
-      const stock = right.shoulder.getAbsolutePosition()
-        .add(rotated(stockOffset, chestQ))
-        .add(rotated(new B.Vector3(0, breathing + bob, -recoil), chestQ));
+      // Kar98k: the buttplate MUST touch the RIGHT shoulder pocket.
+      // Use the world-space upper-arm shoulder joint as the anatomical anchor,
+      // not the clavicle root: the old stockOffset put the butt in front of
+      // the torso. Keep the butt fixed there through Hold/Aim/Fire/Run.
+      const kar98k=weaponId==='de-kar98k';
+      const rifleShoulderSocket=right.upper.getAbsolutePosition().add(rotated(
+        new B.Vector3(.055,-.075,-.030),chestQ));
+      const stock=kar98k?rifleShoulderSocket.clone():
+        right.shoulder.getAbsolutePosition()
+          .add(rotated(stockOffset,chestQ))
+          .add(rotated(new B.Vector3(0,breathing+bob,-recoil),chestQ));
       pivot.rotationQuaternion.copyFrom(gunQ);
       pivot.position.copyFrom(stock.subtract(rotated(v(meta.shoulder), gunQ)));
       refresh(pivot);
@@ -494,7 +502,9 @@
         const span = B.Vector3.Distance(shoulderPos, palmAim);
         const preferred = armLength *
           (weaponId==='de-panzerschreck' ? .86 : .89); // flexed elbows without overreach
-        if (span > preferred && span > 1e-6) {
+        if (!kar98k && span > preferred && span > 1e-6) {
+          // Never translate the Kar98k after the butt is seated: sliding
+          // the entire rifle toward the left arm would detach its stock.
           const correction = shoulderPos.subtract(palmAim).scale((span - preferred) / span);
           const maxOffset = weaponId==='de-panzerschreck' ? .20 : .18;
           // Moving a prop closer beats stretching or faking limb lengths.
@@ -517,6 +527,17 @@
       // exposing a hollow sleeve cuff and hanging the fingers in midair.
       // Grip geometry: the right wrist sits just behind the trigger housing;
       // support hand is cupped beneath the handguard/receiver.
+      // Measure stock contact AFTER optional whole-weapon correction.
+      // Contact is the actual GLB stock marker in world coordinates;
+      // measuring the intended anchor alone would give a false "PASS".
+      const stockWorld=pivot.position.add(rotated(v(meta.shoulder),gunQ));
+      report.stockRightShoulderMeters=+B.Vector3.Distance(
+        stockWorld,right.upper.getAbsolutePosition()).toFixed(4);
+      report.stockToSocketMeters=kar98k
+        ?+B.Vector3.Distance(stockWorld,rifleShoulderSocket).toFixed(5):null;
+      report.stockOnRightShoulder=kar98k?
+        report.stockToSocketMeters<.008 && report.stockRightShoulderMeters<.12:null;
+      report.kar98kButtFixed=kar98k;
       const rightPalmReach = .028, leftPalmReach = .045;
       const rightGoal = trigger.subtract(rightFinger.scale(rightPalmReach));
       const leftGoal = support.subtract(leftFinger.scale(leftPalmReach));
