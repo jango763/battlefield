@@ -135,65 +135,51 @@ async function start(){
  const combatArmNodes=[rightUpper,rightLower,leftUpper,leftLower].filter(n=>n?.rotationQuaternion);
  const combatRest=new Map();
  function resetCombatArms(){for(const [node,q] of combatRest){node.rotationQuaternion=q.clone();}combatRest.clear();}
+ // New prototype: torso-mounted gun and dual-arm CCD. The gun no longer
+ // inherits the idle animation's dangling wrist transform.
  function raiseCombatArms(){
-  // An explicit upper-body pose is required: IK alone cannot raise a gun
-  // parented to a hanging wrist. Apply it once, after freezing idle.
   for(const node of combatArmNodes)combatRest.set(node,node.rotationQuaternion.clone());
-  for(const [node,angle] of [[rightUpper,-.75],[leftUpper,-.70],[rightLower,-.35],[leftLower,-.45]]){
-   if(!node?.rotationQuaternion)continue;
-   const delta=B.Quaternion.RotationAxis(B.Axis.X,angle);
-   node.rotationQuaternion.multiplyInPlace(delta).normalize();
+  state.combatPoseStatus='Torso-mounted weapon; dual-arm CCD pending';
+ }
+ function solveCombatGrip(){
+  if(!weaponRoot||!rightUpper||!rightLower||!rightHand||!leftUpper||!leftLower||!leftHand)return;
+  const trigger=weaponRoot.getAbsolutePosition();
+  const support=B.Vector3.TransformCoordinates(toVec(weaponRoot.metadata.support),weaponRoot.getWorldMatrix());
+  // Two end effectors, each with its own independent shoulder/elbow chain.
+  // The gun is parented to chest, not either hand: no feedback loop.
+  for(let i=0;i<18;i++){
+   poseArm(rightUpper,rightLower,rightHand,trigger);
+   poseArm(leftUpper,leftLower,leftHand,support);
   }
-  state.combatPoseStatus='Upper-body pose applied; support IK pending';
+  state.combatPoseStatus='Torso-mounted MP40; both hand positions solved with CCD';
  }
 
  function updateWeaponPose(){
   if(!weaponRoot||!grip)return;
-  // The trigger is the weapon origin (see manifest). Keep it at the right-hand
-  // socket, rather than using an unverified chest-relative offset.
-  grip.position.set(0,0,0);
-  grip.rotationQuaternion=null;
-  // Weapon forward is +Z in its GLB. This is a provisional local orientation;
-  // the two-hand combat pose still needs a verified animation.
-  // Do not roll the magazine upward: weapon local +Z is the barrel direction.
-  grip.rotation.set(0,0,0);
-  const trigger=weaponRoot.getAbsolutePosition();
-  const support=toVec(weaponRoot.metadata?.support||[0,0,.25]);
-  const supportWorld=B.Vector3.TransformCoordinates(support,weaponRoot.getWorldMatrix());
   if(state.animation==='combat'&&!combatPoseSolved){
    combatPoseSolved=true;
-   try{
-    if(rightHand&&leftUpper&&leftLower&&leftHand){
-     // The weapon is parented to the right hand, so right-hand IK would
-     // chase its own child and introduce an unstable feedback loop.
-     // Solve the free (support) arm toward the actual foregrip point.
-     poseArm(leftUpper,leftLower,leftHand,supportWorld);
-     state.combatPoseStatus='Left support-hand IK attempted; right hand is weapon anchor';
-    }else state.combatPoseStatus='IK skipped: arm joints unavailable';
-   }catch(error){state.combatPoseStatus='IK failed: '+String(error);}
+   try{solveCombatGrip();}catch(error){state.poseError=String(error);state.combatPoseStatus='IK failed: '+state.poseError;}
   }
-  state.gripDistances={
-   right:rightHand?Number(B.Vector3.Distance(positionOf(rightHand),trigger).toFixed(3)):null,
-   left:leftHand?Number(B.Vector3.Distance(positionOf(leftHand),supportWorld).toFixed(3)):null
-  };
+  const trigger=weaponRoot.getAbsolutePosition();
+  const supportWorld=B.Vector3.TransformCoordinates(toVec(weaponRoot.metadata.support),weaponRoot.getWorldMatrix());
+  const muzzleWorld=B.Vector3.TransformCoordinates(toVec(weaponRoot.metadata.muzzle),weaponRoot.getWorldMatrix());
+  const shoulderWorld=B.Vector3.TransformCoordinates(toVec(weaponRoot.metadata.shoulder),weaponRoot.getWorldMatrix());
+  const rightDistance=rightHand?B.Vector3.Distance(positionOf(rightHand),trigger):Infinity;
+  const leftDistance=leftHand?B.Vector3.Distance(positionOf(leftHand),supportWorld):Infinity;
+  state.gripDistances={right:Number(rightDistance.toFixed(3)),left:Number(leftDistance.toFixed(3))};
   state.weaponSocket={parent:grip.parent?.name||null,triggerAtRightHand:state.gripDistances.right};
-  // Machine-readable acceptance checks. Never call a pose successful merely
-  // because the button was pressed or the animation group stopped.
   if(state.animation==='combat'){
-   const shoulder=rightUpper&&positionOf(rightUpper);
-   const right=rightHand&&positionOf(rightHand);
-   const left=leftHand&&positionOf(leftHand);
-   const gunMuzzle=weaponRoot.metadata?.muzzle&&B.Vector3.TransformCoordinates(toVec(weaponRoot.metadata.muzzle),weaponRoot.getWorldMatrix());
-   const shoulderHeight=shoulder?.y??null;
-   const rightRaised=shoulderHeight!==null&&right?.y>=shoulderHeight-.25;
-   const leftSupport=Number.isFinite(state.gripDistances.left)&&state.gripDistances.left<.12;
-   const muzzleAboveGrip=gunMuzzle?gunMuzzle.y-trigger.y: null;
-   state.combatAcceptance={rightRaised,leftSupport,muzzleAboveGrip,
-    passed:rightRaised&&leftSupport&&muzzleAboveGrip!==null&&muzzleAboveGrip>-.20,
-    note:'Geometric checks only; visual anatomy still requires validation'};
-  }
-
+   const rightRaised=!!rightUpper&&rightHand&&positionOf(rightHand).y>=positionOf(rightUpper).y-.25;
+   const leftSupport=leftDistance<.12;
+   const rightGrip=rightDistance<.12;
+   const muzzleForward=muzzleWorld.z>trigger.z+.15;
+   const buttNearShoulder=!!rightUpper&&B.Vector3.Distance(shoulderWorld,positionOf(rightUpper))<.65;
+   state.combatAcceptance={rightRaised,leftSupport,rightGrip,muzzleForward,buttNearShoulder,
+    passed:!!(rightRaised&&leftSupport&&rightGrip&&muzzleForward&&buttNearShoulder),
+    note:'Geometric gate only. Hand rotations and mesh deformation require visual verification'};
+  }else state.combatAcceptance=null;
  }
+
  async function equipWeapon(id){
   const generation=++weaponGeneration;
   state.weapon=id;state.weaponError=null;state.weaponAttached=false;
@@ -205,10 +191,10 @@ async function start(){
    if(grip){grip.dispose(false,false);grip=null;weaponRoot=null;}
    if(weaponContainer){weaponContainer.dispose();weaponContainer=null;}
    weaponContainer=incoming;weaponContainer.addAllToScene();
-   if(!rightHand||typeof rightHand.getAbsolutePosition!=='function')throw Error('Правая кисть не найдена как TransformNode; крепление оружия остановлено');
-   grip=new B.TransformNode('rightHandWeaponSocket',scene);grip.parent=rightHand;
+   if(!chest||!rightHand||!leftHand)throw Error('Torso or hand transforms missing; cannot mount weapon');
+   grip=new B.TransformNode('chestWeaponSocket',scene);grip.parent=chest;
    weaponRoot=new B.TransformNode('weaponTrigger',scene);weaponRoot.parent=grip;
-   weaponRoot.metadata={support:meta.support,trigger:meta.trigger,muzzle:meta.muzzle};
+   weaponRoot.metadata={support:meta.support,trigger:meta.trigger,muzzle:meta.muzzle,shoulder:meta.shoulder};\n   grip.position.set(0,-.10,.33);\n   grip.rotationQuaternion=null;grip.rotation.set(0,0,0);
    for(const mesh of weaponContainer.meshes.filter(m=>!m.parent))mesh.parent=weaponRoot;
    for(const node of weaponContainer.transformNodes.filter(n=>!n.parent))node.parent=weaponRoot;
    state.weaponAttached=true;combatPoseSolved=false;updateWeaponPose();
@@ -223,7 +209,7 @@ async function start(){
   if(mode==='combat'&&remapped.idle){remapped.idle.start(true,1,remapped.idle.from,remapped.idle.to,false);remapped.idle.goToFrame(remapped.idle.from);remapped.idle.pause();raiseCombatArms();}
   else if(remapped[mode])remapped[mode].start(true,1,remapped[mode].from,remapped[mode].to,false);
   for(const btn of document.querySelectorAll('[data-clip]'))btn.setAttribute('aria-pressed',String(btn.dataset.clip===mode));
-  log('Babylon.js | meshes: '+state.meshes+' | skeletons: '+state.skeletons+' | tracks: '+JSON.stringify(counts)+'\nAnimation: '+mode+' | '+(mode==='combat'?'static inspection pose; grip not yet solved':remapped[mode]?'active':'НЕ ПРИВЯЗАНА — требуется адаптация')+'\nSource groups: '+state.groups.join(', '));
+  log('Babylon.js | meshes: '+state.meshes+' | skeletons: '+state.skeletons+' | tracks: '+JSON.stringify(counts)+'\nAnimation: '+mode+' | '+(mode==='combat'?'torso mount + dual-arm CCD prototype':remapped[mode]?'active':'НЕ ПРИВЯЗАНА — требуется адаптация')+'\nSource groups: '+state.groups.join(', '));
  }
  for(const btn of document.querySelectorAll('[data-clip]'))btn.addEventListener('click',()=>select(btn.dataset.clip));
  select('idle');await equipWeapon(weaponSelect.value);state.ready=true;state.scene=scene;state.engineInstance=engine;
