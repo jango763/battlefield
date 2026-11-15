@@ -19,7 +19,9 @@ const fs=require('node:fs');
     const d=await page.evaluate(()=>{
       const s=window.__BATTLEFIELD_ANIMATIONS__,r=s.weaponRig;
       return {gun:s.weapon,pose:s.pose,right:r.rightGripMeters,left:r.leftGripMeters,
-        rightElbow:r.rightElbowDegrees,leftElbow:r.leftElbowDegrees,error:r.error,
+        rightElbow:r.rightElbowDegrees,leftElbow:r.leftElbowDegrees,
+        reach:r.leftReachMeters,goal:r.leftGoalFromShoulderMeters,
+        wristR:r.rightWristDegrees,wristL:r.leftWristDegrees,error:r.error,
         fingers:r.fingerJoints,pass:r.geometricPass};
     });
     results.push(d);console.log('HAND_QUALITY',JSON.stringify(d));
