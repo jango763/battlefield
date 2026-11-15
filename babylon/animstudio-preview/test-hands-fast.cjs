@@ -21,7 +21,9 @@ const fs=require('node:fs');
       return {gun:s.weapon,pose:s.pose,right:r.rightGripMeters,left:r.leftGripMeters,
         rightElbow:r.rightElbowDegrees,leftElbow:r.leftElbowDegrees,
         reach:r.leftReachMeters,goal:r.leftGoalFromShoulderMeters,
-        wristR:r.rightWristDegrees,wristL:r.leftWristDegrees,error:r.error,
+        wristR:r.rightWristDegrees,wristL:r.leftWristDegrees,
+        forward:r.forwardDot,shift:r.weaponReachCorrectionMeters,
+        rawReach:r.weaponOriginalReachRatio,solver:r.solver,error:r.error,
         fingers:r.fingerJoints,pass:r.geometricPass};
     });
     results.push(d);console.log('HAND_QUALITY',JSON.stringify(d));
@@ -34,8 +36,12 @@ const fs=require('node:fs');
   }
   // Require the fourth weapon's IK to pass too, while keeping the 3D prop
   // labelled as a provisional artist model.
-  const bad=results.filter(x=>x.error||!x.pass||x.rightElbow<20||x.leftElbow<20||
-    (x.gun==='Panzerschreck'&&(x.goal/x.reach)>.92));
+  const bad=results.filter(x=>x.error||!x.pass||
+    x.rightElbow<20||x.leftElbow<20||
+    x.goal/x.reach>.95||
+    !Number.isFinite(x.forward)||x.forward<.82||
+    x.solver!=='analytical-two-bone-with-pole'||
+    x.wristR>55.01||x.wristL>55.01);
   if(bad.length)throw Error('FOUR_WEAPONS_ARM_QUALITY_FAILED '+JSON.stringify(bad));
   if(errors.length)throw Error('Console errors '+JSON.stringify(errors));
   console.log('FOUR_WEAPONS_ARM_IK_PASS__PANZERSCHRECK_MODEL_STILL_PROTOTYPE');
