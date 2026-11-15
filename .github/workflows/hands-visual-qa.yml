@@ -1,0 +1,36 @@
+name: Hand posture visual QA - 4 weapons
+on:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths:
+      - 'babylon/weapon-rig.js'
+      - 'babylon/animstudio-preview/viewer.js'
+      - 'babylon/animstudio-preview/test-hands-fast.cjs'
+      - '.github/workflows/hands-visual-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hands:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install browser
+        run: |
+          node --check babylon/weapon-rig.js
+          node --check babylon/animstudio-preview/test-hands-fast.cjs
+          npm install --no-audit --no-fund --prefix /tmp/animstudio-viewer-qa playwright@1.58.2
+          /tmp/animstudio-viewer-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8758 --bind 127.0.0.1 > /tmp/hands-http.log 2>&1 &
+          sleep 2
+      - name: Test wrists, fingers and natural elbows
+        run: node babylon/animstudio-preview/test-hands-fast.cjs
+      - name: Save close-up screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: four-weapons-hands-closeups
+          path: babylon/animstudio-preview/hand-qa/
+          retention-days: 30
+          if-no-files-found: ignore
