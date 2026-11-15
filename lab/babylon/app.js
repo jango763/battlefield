@@ -162,10 +162,10 @@ async function start(){
   const support=B.Vector3.TransformCoordinates(toVec(weaponRoot.metadata.support),weaponRoot.getWorldMatrix());
   // Two end effectors, each with its own independent shoulder/elbow chain.
   // The gun is parented to chest, not either hand: no feedback loop.
-  for(let i=0;i<18;i++){
-   poseArm(rightUpper,rightLower,rightHand,trigger);
-   poseArm(leftUpper,leftLower,leftHand,support);
-  }
+  poseArm(rightUpper,rightLower,rightHand,trigger);
+  poseArm(leftUpper,leftLower,leftHand,support);
+  // Re-evaluate world transforms after both IK chains converge.
+  refreshChain(rightHand);refreshChain(leftHand);
   const elbowAngle=(upper,lower,hand)=>{
    refreshChain(hand);
    const elbow=lower.getAbsolutePosition();
@@ -196,7 +196,9 @@ async function start(){
    const rightRaised=!!rightUpper&&rightHand&&positionOf(rightHand).y>=positionOf(rightUpper).y-.25;
    const leftSupport=leftDistance<.12;
    const rightGrip=rightDistance<.12;
-   // Compare muzzle direction against the torso's forward axis, not global Z.\n   const torsoForward=B.Vector3.TransformNormal(B.Axis.Z,chest.getWorldMatrix()).normalize();\n   const muzzleForward=B.Vector3.Dot(muzzleWorld.subtract(trigger).normalize(),torsoForward)>.5;
+   // Compare muzzle direction against the torso's forward axis, not global Z.
+   const torsoForward=B.Vector3.TransformNormal(B.Axis.Z,chest.getWorldMatrix()).normalize();
+   const muzzleForward=B.Vector3.Dot(muzzleWorld.subtract(trigger).normalize(),torsoForward)>.5;
    const buttNearShoulder=!!rightUpper&&B.Vector3.Distance(shoulderWorld,positionOf(rightUpper))<.65;
    const elbowBendOk=!!state.elbowAngles&&Object.values(state.elbowAngles).every(deg=>deg>35&&deg<165);
    state.combatAcceptance={rightRaised,leftSupport,rightGrip,muzzleForward,buttNearShoulder,elbowBendOk,elbowAngles:state.elbowAngles,
