@@ -11,13 +11,13 @@
 const SPECS=Object.freeze({
  Kar98k:Object.freeze({range:100,damage:75,criticalChance:.25,unlimited:true,
   accuracy:[[0,.90],[20,.85],[40,.70],[60,.50],[80,.30],[100,1/7]],canFireMoving:false}),
- MP40:Object.freeze({range:60,damage:24,magazine:32,packs:5,reloadMs:2500,
+ MP40:Object.freeze({range:60,damage:24,magazine:32,packs:5,reloadMs:2500,reloadMoving:true,
   accuracy:[[0,.75],[20,.75],[40,.55],[60,.25]],canFireMoving:true,movingFactor:.65}),
- MG42:Object.freeze({range:80,damage:45,magazine:100,packs:4,reloadMs:7500,
+ MG42:Object.freeze({range:80,damage:45,magazine:100,packs:4,reloadMs:7500,reloadMoving:false,
   accuracy:[[0,.65],[20,.65],[40,.60],[60,.55],[80,.35]],canFireMoving:true,movingFactor:.55,
   causesSuppression:true}),
  Panzerschreck:Object.freeze({range:100,explosionDamage:120,magazine:1,packs:4,
-  reloadMs:9000,canFireMoving:false,explosive:true})
+  reloadMs:9000,reloadMoving:false,canFireMoving:false,explosive:true})
 });
 function validName(name){if(!Object.prototype.hasOwnProperty.call(SPECS,name))throw Error('Unknown weapon '+name)}
 function finiteNumber(value){return typeof value==='number'&&Number.isFinite(value)}
@@ -106,7 +106,7 @@ function beginReload(unit,now,{moving=false}={}){
  const stock=unit.special;if(!stock)return {ok:false,reason:'not-equipped'};
  const s=SPECS[stock.weapon];
  if(unit.reloading)return {ok:false,reason:'already-reloading'};
- if(moving&&!s.canFireMoving)return {ok:false,reason:'must-stop'};
+ if(moving&&!s.reloadMoving)return {ok:false,reason:'must-stop'};
  if(stock.loaded>=s.magazine)return {ok:false,reason:'magazine-full'};
  if(stock.reserve===0)return {ok:false,reason:'no-reserve-ammo'};
  if(!finiteNumber(now))throw Error('Invalid time');
