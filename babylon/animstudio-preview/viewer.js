@@ -142,6 +142,30 @@
     state.meshCount=drawable.length;
     state.locomotion='run';
     state.skeletonBones=Math.max(...imported.skeletons.map(x=>x.bones.length));
+    // Anatomical review guard: a grip-only IK PASS does not make a run correct.
+    // Measure both knee flexion angles in the world-space linked joint chain.
+    const normalizeBoneName=n=>String(n||'').replace(/^mixamorig[:_]?/i,'')
+      .replace(/_\d+$/,'').toLowerCase();
+    const skeletonJoints=imported.skeletons.flatMap(s=>s.bones).map(b=>({
+      name:normalizeBoneName(b.name),node:b.getTransformNode?.()
+    }));
+    const namedJoint=n=>skeletonJoints.find(b=>b.name===n.toLowerCase())?.node;
+    const legs=Object.fromEntries(['Left','Right'].map(side=>[side,[
+      namedJoint(side+'UpLeg'),namedJoint(side+'Leg'),namedJoint(side+'Foot')
+    ]]));
+    if(Object.values(legs).some(chain=>chain.some(n=>!n)))
+      throw Error('Missing linked Mixamo thigh/knee/ankle nodes for run validation');
+    state.sampleKnees=()=>{
+      const kneeFlex=chain=>{
+        const [hip,knee,foot]=chain;
+        // Use the animated skeleton, not the weapon's geometry.
+        const a=hip.getAbsolutePosition().subtract(knee.getAbsolutePosition()).normalize();
+        const b=foot.getAbsolutePosition().subtract(knee.getAbsolutePosition()).normalize();
+        return Math.round((180-Math.acos(B.Scalar.Clamp(B.Vector3.Dot(a,b),-1,1))*180/Math.PI)*10)/10;
+      };
+      return {left:kneeFlex(legs.Left),right:kneeFlex(legs.Right)};
+    };
+
     if(state.clips.filter(n=>/^(Kar98k|MP40|MG42|Panzerschreck)_(Hold|Aim|Fire|Run)$/.test(n)).length!==16)
       throw Error('Проверка обнаружила не 16 анимаций');
     if(!window.BattlefieldWeaponRig)throw Error('Не загружен корректирующий IK-модуль');
