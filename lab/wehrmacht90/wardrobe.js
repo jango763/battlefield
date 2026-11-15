@@ -146,8 +146,8 @@ async function loadCap(scene,name,tracker){
  // Lower and squash its crown slightly, and move the peak forward to the brow.
  const yScale=scalar*(isM43?.73:1);
  pivot.scaling.set(scalar,yScale,scalar);
- const front=isM43?.034:.015;
- const headBand=isM43?.095:.089;
+ const front=isM43?.027:.015;
+ const headBand=isM43?.162:.089;
  pivot.position.set(-center.x*scalar,headBand-low.y*yScale,-center.z*scalar+front);
  const group=new B.TransformNode('M40-'+name+'-track',scene);
  group.parent=tracker.node;
