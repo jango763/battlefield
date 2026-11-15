@@ -292,7 +292,7 @@
       const stockOffset = weaponId === 'de-panzerschreck'
         ? (running ? new B.Vector3(.10, -.13, .10)
           : pose === 'ready' ? new B.Vector3(.15, -.015, .06)
-          : new B.Vector3(.16, .025, .05))
+          : new B.Vector3(.085, .025, .05))
         : (running ? new B.Vector3(.045, -.18, -.025)
           : new B.Vector3(.038, -.07, .115));
       const stock = right.shoulder.getAbsolutePosition()
@@ -307,7 +307,14 @@
       const rightFinger = rotated(B.Axis.Y, rightQ).normalize();
       const leftFinger = rotated(B.Axis.Y, leftQ).normalize();
       const trigger = pivot.position.add(rotated(v(meta.trigger), gunQ));
-      const support = pivot.position.add(rotated(v(meta.support), gunQ));
+      // Aiming moves the left hand toward the receiver/launcher control,
+      // preventing a fully locked support elbow while keeping the muzzle stable.
+      const supportPoint=(pose==='aim'||pose==='fire')
+        ? (weaponId==='de-kar98k'?[0,.04,.055]
+          : weaponId==='de-panzerschreck'?[0,-.135,-.09]
+          : meta.support)
+        : meta.support;
+      const support = pivot.position.add(rotated(v(supportPoint), gunQ));
       // The former 6.5 cm wrist offset lifted the pistol hand ABOVE its grip,
       // exposing a hollow sleeve cuff and hanging the fingers in midair.
       // Grip geometry: the right wrist sits just behind the trigger housing;
