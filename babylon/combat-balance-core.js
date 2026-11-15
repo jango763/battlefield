@@ -254,9 +254,17 @@
       }
       return result;
     }
+    // Optional external economy integration. Safe additive API for campaign gold;
+    // existing weapon-balance callers are unchanged.
+    function grantFunds(amount){
+      if(!Number.isFinite(amount)||amount<0)throw Error('Invalid funds grant');
+      treasury+=amount;
+      emit('funds-grant',{amount,funds:treasury});
+      return treasury;
+    }
     return {
       units, events, addUnit, buyWeapon, switchWeapon, resupply, totalAmmo,
-      fire, tick, startReload, getFunds: () => treasury
+      fire, tick, startReload, grantFunds, getFunds: () => treasury
     };
   }
   return { WEAPONS, hitChance, createBattle };
