@@ -17,16 +17,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate GLB skeleton, animations and MP40 manifest\n        run: node lab/babylon/verify-assets.mjs\n      - run: npm install --no-save --no-package-lock playwright
+      - name: Validate GLB skeleton, animations and MP40 manifest
+        run: node lab/babylon/verify-assets.mjs\n      - run: npm install --no-save --no-package-lock playwright
       - run: npx playwright install --with-deps chromium
       - name: Start static server
         run: python3 -m http.server 8765 > /tmp/battlefield-server.log 2>&1 &
       - name: Test Babylon animation modes and combat grip
         run: node lab/babylon/verify-combat.mjs
-      - name: Upload failure screenshot
-        if: failure()
+      - name: Upload combat inspection and failure screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: combat-failure
-          path: combat-failure.png
+          name: combat-inspection
+          path: |\n            combat-inspection.png\n            combat-failure.png
           if-no-files-found: ignore
