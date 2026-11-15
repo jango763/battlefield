@@ -20,6 +20,8 @@ for(const cfg of [{name:'desktop',width:1200,height:850},{name:'mobile',width:39
   expect(state.wardrobe.garment.parts.pants.triangles).toBeGreaterThan(400);
   expect(state.wardrobe.garment.parts.coat.bones).toBe(90);
   expect(state.wardrobe.garment.parts.pants.bones).toBe(90);
+  expect(state.wardrobe.garment.parts.boots.bones).toBe(90);
+  expect(state.wardrobe.garment.parts.boots.triangles).toBeGreaterThan(200);
   expect(state.wardrobe.garment.loft.joints).toBe(90);
   expect(state.wardrobe.garment.loft.triangles).toBeGreaterThan(300);
   expect(state.wardrobe.errors).toEqual([]);
