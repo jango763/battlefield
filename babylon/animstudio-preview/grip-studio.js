@@ -143,10 +143,17 @@ function refresh(){
   c.slider.value=String(v[key]);c.out.textContent=format(v[key],c.unit,c.step);
  }
  const r=s.weaponRig;
- metrics.textContent='Хват: правая '+Math.round((r.rightGripMeters||0)*1000)+
-  ' мм · левая '+Math.round((r.leftGripMeters||0)*1000)+
+ const rightMM=Math.round((r.rightGripMeters||0)*1000);
+ const leftMM=Math.round((r.leftGripMeters||0)*1000);
+ const warning=(leftMM>75||rightMM>75)
+   ?' ⚠ ВНЕ ДОПУСКА: '+(leftMM>75?'левая кисть':'правая кисть')+
+    ' не держит оружие. Подвинь её ближе к точке хвата.'
+   :'';
+ metrics.textContent='Хват: правая '+rightMM+
+  ' мм · левая '+leftMM+
   ' мм; левый локоть '+(r.leftElbowDegrees??'—')+
-  '°; приклад у правого плеча: '+(r.stockOnRightShoulder?'да':'проверить');
+  '°; приклад у правого плеча: '+(r.stockOnRightShoulder?'да':'проверить')+
+  warning;
 }
 let attempts=0;
 const timer=setInterval(async()=>{
