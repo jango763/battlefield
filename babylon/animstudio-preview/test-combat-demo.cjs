@@ -78,13 +78,31 @@ const fs=require('node:fs'),path=require('node:path');
    }));
    if(rocketAim.crouch>.2)throw Error('Rocket wrongly forced into rifle crouch '+JSON.stringify(rocketAim));
    await page.screenshot({path:path.join(out,device.name+'-rocket-aim.png')});
-   await page.waitForFunction(()=>window.__BATTLEFIELD_COMBAT_DEMO__?.done===true,
+   await page.waitForFunction(()=>window.__BATTLEFIELD_COMBAT_DEMO__?.state?.phase==='reload'
+     && window.__BATTLEFIELD_COMBAT_DEMO__.state.reloadProgress>.3
+     && window.__BATTLEFIELD_ANIMATIONS__?.weaponRig?.reloadGestureActive,
      null,{timeout:35000});
+   const loading=await page.evaluate(()=>{
+     const d=window.__BATTLEFIELD_COMBAT_DEMO__,v=window.__BATTLEFIELD_ANIMATIONS__;
+     return {phase:d.state.phase,speed:d.state.speed,moving:d.state.moving,
+       seconds:d.state.reloadSeconds,ammo:d.state.ammoRemaining,
+       reloadProgress:d.state.reloadProgress,hand:v.weaponRig.reloadHandOffsetMeters};
+   });
+   if(loading.phase!=='reload'||loading.seconds!==9||loading.ammo!==0||
+     loading.speed>.06||loading.moving||loading.hand<.005)
+     throw Error('Panzerschreck did not reload for 9 seconds at rest '+JSON.stringify(loading));
+   await page.screenshot({path:path.join(out,device.name+'-rocket-reload.png')});
+   await page.waitForFunction(()=>window.__BATTLEFIELD_COMBAT_DEMO__?.done===true,
+     null,{timeout:45000});
    const rocket=await page.evaluate(()=>{
      const d=window.__BATTLEFIELD_COMBAT_DEMO__;return {state:d.state,events:d.events,errors:d.errors};
    });
    if(rocket.errors.length||rocket.state.fired!==1||rocket.state.boltCount!==0||
-     rocket.state.shotsOnMove!==0||rocket.events.some(x=>x.name.startsWith('bolt-')))
+     rocket.state.shotsOnMove!==0||rocket.state.reloadCount!==1||
+     rocket.state.ammoRemaining!==1||
+     rocket.events.some(x=>x.name.startsWith('bolt-'))||
+     rocket.events.filter(x=>x.name==='reload-start').length!==1||
+     rocket.events.filter(x=>x.name==='reload-complete').length!==1)
      throw Error('Rocket combat wrong '+JSON.stringify(rocket));
    if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
    console.log('BABYLON_COMBAT_PREVIEW_PASS '+JSON.stringify({
