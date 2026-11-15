@@ -20,7 +20,9 @@ const {chromium}=require('/tmp/animstudio-viewer-qa/node_modules/playwright');
             ratio: r.leftGoalFromShoulderMeters / r.leftReachMeters,
             elbow:r.leftElbowDegrees,grip:r.leftGripMeters,
             rElbow:r.rightElbowDegrees,rGrip:r.rightGripMeters,
-            rWrist:r.rightWristDegrees,lWrist:r.leftWristDegrees};
+            rWrist:r.rightWristDegrees,lWrist:r.leftWristDegrees,
+            rocketShift:r.rocketRepositionMeters,
+            originalRatio:r.rocketOriginalReachRatio,geomPass:r.geometricPass};
         },phase);
         console.log('ROCKET_DIAG '+JSON.stringify({phase,...m}));
       }
