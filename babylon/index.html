@@ -64,6 +64,7 @@ button:disabled{opacity:.5;cursor:default}
 <script src="./squad-combat-core.js"></script>
 <script src="./field-orders-core.js"></script>
 <script src="./gold-economy-core.js"></script>
+<script src="./world-300.js"></script>
 </head>
 <body>
 <div id="battlefield-brief" role="dialog" aria-label="Заставка и правила карты Перекрёсток" aria-modal="true">
@@ -118,8 +119,8 @@ button:disabled{opacity:.5;cursor:default}
 </div>
 <h2>Подкрепление</h2>
 <div class="row">
-<button data-scenario="duel" aria-pressed="true" disabled>Герой</button>
-<button data-scenario="squads" aria-pressed="false" disabled>Отряд 4×4</button>
+<button data-scenario="duel" aria-pressed="false" disabled>Дуэль (тест)</button>
+<button data-scenario="squads" aria-pressed="true" disabled>Битва 12×12</button>
 </div>
 <h2>Оружие героя</h2>
 <div class="row">
@@ -136,9 +137,10 @@ button:disabled{opacity:.5;cursor:default}
 <div id="reload"><div id="reload-fill"></div></div>
 <div id="readout" role="status">Подготовка сцены…</div>
 <div id="event" role="status">Коснитесь земли для движения, противника — для атаки.</div>
-<p class="note">Синие — британцы, красные — Вермахт. Отряд следует за героем и самостоятельно стреляет. «Отряд 4×4» добавляет бойцов в эту же игру. Снаряжение можно покупать при остановленном бое. Пока без окончательной карты, зданий и анимации рук при перезарядке.</p>
+<p class="note"><a href="https://sketchfab.com/3d-models/cartoon-dieselpunk-armored-cars-polygonal-style-cd1e044d046841aa846cce9edee0fa3e" target="_blank" rel="noopener noreferrer" style="color:#e5d49c">Подбитая техника: Tykryk, CC BY 4.0</a></p>
+<p class="note">🔵 Британцы против 🔴 Вермахта. Карта 300×300 с пятью золотыми фермами, семью ДОТами и тремя подбитыми БТР. После старта дополнительные 3D-бойцы появляются постепенно. Пока обе команды используют утверждённую немецкую модель, британская модель ещё в работе. Снаряжение — в режиме паузы; полноценная анимация перезарядки и обход препятствий ещё не готовы.</p>
 </section>
-<div id="footer">Нажмите на землю — бежать туда · на врага — выбрать цель · меню — свернуть панель</div>
+<div id="footer">Коснитесь земли — приказ герою · коснитесь противника — выбрать цель · камера — двумя пальцами</div>
 <div id="failure" role="alert"><strong>Игра не загрузилась</strong><div id="failure-text">Проверьте подключение.</div><button id="retry">Повторить загрузку</button></div>
 <script src="./gold-economy-core.js"></script>
 <script src="./game.js"></script>
