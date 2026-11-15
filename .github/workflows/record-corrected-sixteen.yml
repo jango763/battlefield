@@ -6,6 +6,7 @@ on:
       - '.github/workflows/record-corrected-sixteen.yml'
       - 'babylon/animstudio-preview/record-video.cjs'
       - 'babylon/animstudio-preview/models/all-combat-run.glb'
+      - 'babylon/weapon-rig.js'
   workflow_dispatch:
 permissions:
   contents: read
