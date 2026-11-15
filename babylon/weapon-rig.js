@@ -281,6 +281,46 @@
       B.Quaternion.FromEulerAngles(n.rotation.x, n.rotation.y, n.rotation.z)]));
     const gripDebug = typeof window!=='undefined'
       ? new URLSearchParams(window.location.search).get('gripDebug') : null;
+    // Experimental anatomical wrist-basis calibration: glTF/Mixamo wrist
+    // local +Y is not guaranteed to point down the fingers. Infer axes from
+    // actual approved skinned joint positions IN BIND POSE instead.
+    // This is opt-in for A/B review only until visual acceptance.
+    const anatomicalDebug=new URLSearchParams(window.location.search)
+      .get('handBasis')==='anatomy';
+    function measureHandBasis(side,arm) {
+      const knuckleI=fingerRoots[side].Index[0],knuckleP=fingerRoots[side].Pinky[0];
+      const finger2=fingerRoots[side].Index[1];
+      if(!knuckleI||!knuckleP||!finger2)return null;
+      refresh(knuckleI);refresh(knuckleP);refresh(finger2);refresh(arm.hand);
+      const wrist=arm.hand.getAbsolutePosition();
+      let y=finger2.getAbsolutePosition().subtract(wrist).normalize();
+      let z=knuckleP.getAbsolutePosition().subtract(knuckleI.getAbsolutePosition());
+      z.subtractInPlace(y.scale(B.Vector3.Dot(z,y)));
+      if(z.lengthSquared()<1e-7||y.lengthSquared()<1e-7)return null;
+      z.normalize();
+      const x=B.Vector3.Cross(y,z).normalize();
+      z=B.Vector3.Cross(x,y).normalize();
+      const qHand=worldRotation(arm.hand);
+      const localInv=qHand.conjugate();
+      const ml=B.Matrix.Identity();
+      B.Matrix.FromXYZAxesToRef(rotated(x,localInv),rotated(y,localInv),
+        rotated(z,localInv),ml);
+      return {quat:B.Quaternion.FromRotationMatrix(ml).normalize(),
+        localForward:rotated(y,localInv).normalize(),
+        localNormal:rotated(x,localInv).normalize()};
+    }
+    const anatomicalBases={
+      Right:measureHandBasis('Right',right),
+      Left:measureHandBasis('Left',left)
+    };
+    function desiredHandFrame(side,axis,palm,gunQ) {
+      const target=makeHandOrientation(axis,palm,gunQ);
+      const basis=anatomicalDebug?anatomicalBases[side]:null;
+      return basis?target.multiply(basis.quat.conjugate()).normalize():target;
+    }
+    const localHandForward=side=>anatomicalDebug&&anatomicalBases[side]
+      ?anatomicalBases[side].localForward:B.Axis.Y;
+
     function flexFingers(side) {
       // The approved Mixamo model's finger phalanges run along local +Y.
       // Curl around joint-local Z and tuck the THUMB around a separate X axis.
@@ -394,10 +434,10 @@
       pivot.position.copyFrom(stock.subtract(rotated(v(meta.shoulder), gunQ)));
       refresh(pivot);
 
-      const rightQ = makeHandOrientation(meta.triggerAxis, meta.triggerPalm, gunQ);
-      const leftQ = makeHandOrientation(meta.supportAxis, meta.supportPalm, gunQ);
-      const rightFinger = rotated(B.Axis.Y, rightQ).normalize();
-      const leftFinger = rotated(B.Axis.Y, leftQ).normalize();
+      const rightQ=desiredHandFrame('Right',meta.triggerAxis,meta.triggerPalm,gunQ);
+      const leftQ=desiredHandFrame('Left',meta.supportAxis,meta.supportPalm,gunQ);
+      const rightFinger=rotated(localHandForward('Right'),rightQ).normalize();
+      const leftFinger=rotated(localHandForward('Left'),leftQ).normalize();
       const trigger = pivot.position.add(rotated(v(meta.trigger), gunQ));
       // Aiming moves the left hand toward the receiver/launcher control,
       // preventing a fully locked support elbow while keeping the muzzle stable.
@@ -473,8 +513,8 @@
       flexFingers('Right'); flexFingers('Left');
       // Report REAL post-constraint palm directions, not an unattained ideal
       // target; this prevents a false geometric "IK OK" for twisted hands.
-      const rPalm=rotated(B.Axis.Y,worldRotation(right.hand)).normalize();
-      const lPalm=rotated(B.Axis.Y,worldRotation(left.hand)).normalize();
+      const rPalm=rotated(localHandForward('Right'),worldRotation(right.hand)).normalize();
+      const lPalm=rotated(localHandForward('Left'),worldRotation(left.hand)).normalize();
       const aimError=(a,b)=>+(Math.acos(B.Scalar.Clamp(B.Vector3.Dot(a,b),-1,1))*
         180/Math.PI).toFixed(1);
       report.rightFingerDirectionErrorDegrees=aimError(rPalm,rightFinger);
@@ -483,6 +523,8 @@
         .add(rPalm.scale(rightPalmReach)), trigger).toFixed(4);
       report.leftGripMeters = +B.Vector3.Distance(left.hand.getAbsolutePosition()
         .add(lPalm.scale(leftPalmReach)), support).toFixed(4);
+      report.anatomicalHandCalibration=anatomicalDebug &&
+        !!anatomicalBases.Right && !!anatomicalBases.Left;
       report.handFocus = B.Vector3.Lerp(
         right.hand.getAbsolutePosition(),left.hand.getAbsolutePosition(),.5).asArray();
       report.geometricPass = report.rightGripMeters < .075 && report.leftGripMeters < .075;
