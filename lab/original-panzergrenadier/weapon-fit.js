@@ -7,7 +7,7 @@ const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 function world(bone){return bone.getWorldPosition(V())}
 function getBone(figure,name){
  const found=[];
- figure.traverse(n=>{if(n.isBone&&(n.name===name||new RegExp('^(?:mixamorig)?'+name+'_\\d+.test(n.name)))found.push(n)});
+ figure.traverse(n=>{if(n.isBone&&(n.name===name||new RegExp('^(?:mixamorig)?'+name+'_\\d+$','i').test(n.name)))found.push(n)});
  return found[0]||null;
 }
 function aimChildAt(bone,child,targetWorld){
