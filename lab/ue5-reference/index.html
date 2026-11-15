@@ -4,11 +4,13 @@
 *{box-sizing:border-box}html,body{margin:0;background:#151e18;color:#e9efdf;font:14px system-ui}header{padding:12px 16px;background:#27372b}h1{font-size:19px;margin:0}p{font-size:12px;color:#bbcab5;margin:5px 0}.controls{padding:10px;display:flex;gap:7px;flex-wrap:wrap;background:#1b281f}button{padding:11px 14px;border:1px solid #758e75;border-radius:7px;background:#415c42;color:white;font:inherit}button[aria-pressed=true]{background:#bbd298;color:#1c2a20}#view{width:100%;height:62vh;min-height:355px;display:block;touch-action:none}#status{margin:0;padding:13px 15px;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,monospace}.disclaimer{padding:6px 15px 18px;color:#b8c7b8;max-width:980px}
 a{color:#bedd9d}
 </style>
-<script src="https://cdn.babylonjs.com/babylon.js"></script><script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="https://cdn.babylonjs.com/v9.0.0/babylon.js"></script><script src="https://cdn.babylonjs.com/v9.0.0/loaders/babylonjs.loaders.min.js"></script>
 </head><body>
 <header><h1>Battlefield · Референс рабочего рига</h1><p>Исходная модель и авторские анимации ar-rifle-demo · 90 костей UE5 · независимая сцена Babylon.js</p></header>
 <div class="controls"><button data-clip="rifle-idle" aria-pressed="true">Стояние с оружием</button><button data-clip="rifle-walk-f">Тактический шаг</button><button data-clip="rifle-jog-f">Бег</button><button data-clip="rifle-sprint">Спринт</button><button data-clip="rifle-aim-level">Прицеливание</button><button data-clip="rifle-hold-high">Высокая готовность</button></div>
-<canvas id="view"></canvas><pre id="status" role="status">Загрузка исходной 90-костной модели…</pre>
+<canvas id="view"></canvas><pre id="status" role="status">Проверяем Babylon.js и GLB…</pre>
+<div class="controls"><button id="retry" hidden>Повторить загрузку</button>
+<a href="https://github.com/duolahypercho/ar-rifle-demo/tree/main/public/characters" target="_blank" rel="noopener">Источник GLB</a></div>
 <div class="disclaimer">Это проверка <b>другого, оригинального 90-костного персонажа</b>, не переделка нашей модели 65→95. Модель и анимации загружаются напрямую из <a href="https://github.com/duolahypercho/ar-rifle-demo">открытого исходного репозитория</a>, не копируются в Battlefield. Жесты выполняют родные 30 FPS клипы, без нашего IK-кода. Вращай камеру для проверки рук и плеч.</div>
 <script type="module" src="./app.js"></script>
 </body></html>
