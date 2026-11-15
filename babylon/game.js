@@ -46,6 +46,7 @@ let actors=new Map(),fx=[],scenario='squads',atBase=true,world=null;
 let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 let weaponQueue=[],weaponWorker=false;
 let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
+const respawnTimers=new Map(),RESPAWN_SECONDS=28;
 function alertStatus(message){$('event').textContent=message}
 enterButton.addEventListener('click',()=>{
  if(!state.ready||gameStarted)return;
@@ -80,6 +81,10 @@ function createWorld(){
  sun.intensity=1.55;sun.diffuse=new B.Color3(1,.94,.83);
  world=worldBuilder.create(scene,B,goldRules.MAP);
  terrain=world.ground;
+ void world.loadOriginalBTR().then(info=>{
+  if(info.ok)console.info('Loaded '+info.loaded+' original wrecked armored cars (Tykryk / CC BY 4.0)');
+  else console.warn('Vehicle asset fallback in use',info.error);
+ });
  destinationMark=B.MeshBuilder.CreateTorus('destination-marker',{diameter:.75,thickness:.055,tessellation:16},scene);
  destinationMark.rotation.x=Math.PI/2;destinationMark.position.y=.055;
  destinationMark.isVisible=false;destinationMark.isPickable=false;
@@ -326,6 +331,7 @@ function setup(scenarioName){
  if(!state.ready)return;
  if(!SCENARIOS[scenarioName])throw Error('Unknown scenario');
  controller?.stop();
+ respawnTimers.clear();
  scenario=scenarioName;atBase=true;
  if(destinationMark)destinationMark.isVisible=false;
  state.scenario=scenario;state.atBase=true;state.focus=null;
@@ -352,12 +358,12 @@ function setup(scenarioName){
   id:i===0?'hero':'британец-'+(i+1),team:'свои',...alliesXY[i]}));
  for(let i=0;i<theirs;i++)enemies.push(battle.addUnit({
   id:'вермахт-'+(i+1),team:'враг',...enemiesXY[i]}));
- for(const u of allies){u.economyTeam='blue';u.isHero=u===allies[0];}
- for(const u of enemies)u.economyTeam='red';
+ for(const u of allies){u.economyTeam='blue';u.isHero=u===allies[0];u.spawn={x:u.x,z:u.z};}
+ for(const u of enemies){u.economyTeam='red';u.spawn={x:u.x,z:u.z};}
  fieldOrders=orders.create({hero:allies[0],allies,enemies,onArrive:()=>{
   if(destinationMark)destinationMark.isVisible=false;
  }});
- controller=tactics.create({battle,allies,enemies,driveAllies:dt=>fieldOrders.update(dt),
+ controller=tactics.create({battle,allies,enemies,driveAllies:dt=>fieldOrders.update(dt),endWhenEliminated:scenario!=='squads',
   onShot:drawShot,
   onFinish:result=>alertStatus(result.winner==='allies'?
    'Победа! Отряд удержал позицию. Нажмите «Новый бой» для продолжения.':
@@ -437,6 +443,7 @@ function syncVisual(view){
   stopAnimations(view);
   return;
  }
+ view.anchor.setEnabled(true);view.marker.setEnabled(true);
  view.hpBack.setEnabled(true);view.hpFill.setEnabled(true);
  const nextHP=Math.max(0,unit.hp/unit.maxHp);
  view.hpFill.scaling.x=Math.max(.001,nextHP);
@@ -601,11 +608,30 @@ function registerUI(){
   drawHud();
  });
 }
+function updateReinforcements(dt){
+ if(scenario!=='squads'||!gameStarted||!controller?.snapshot().active)return;
+ for(const unit of [...allies,...enemies]){
+  if(unit.alive){respawnTimers.delete(unit);continue;}
+  if(!respawnTimers.has(unit))respawnTimers.set(unit,RESPAWN_SECONDS);
+  const left=respawnTimers.get(unit)-dt;
+  if(left>0){respawnTimers.set(unit,left);continue;}
+  respawnTimers.delete(unit);
+  unit.alive=true;unit.hp=unit.maxHp;
+  unit.x=unit.spawn.x;unit.z=unit.spawn.z;
+  unit.cooldown=0;unit.reloadRemaining=0;unit.reloadWeapon=null;unit.suppressed=0;
+  unit.weapon='Kar98k';unit.gold=0;
+  if(unit.isHero)fieldOrders?.clearDestination();
+  const view=actors.get(unit);
+  if(view){view.anchor.setEnabled(true);view.marker.setEnabled(true);
+   view.hpBack.setEnabled(true);view.hpFill.setEnabled(true);view.lastPose=null;}
+ }
+}
 function frame(){
  const dt=Math.max(0,Math.min(.05,engine.getDeltaTime()/1000));
  if(state.ready&&controller){
   if(!gamePausedForBriefing){
    controller.update(dt);
+   updateReinforcements(dt);
    // Stop economic and unlock clocks while the actual battle is paused
    // (not merely when the map briefing is dismissed).
    if(economy&&controller.snapshot().active){
