@@ -89,6 +89,42 @@
     }
     return B.Vector3.Distance(arm.hand.getAbsolutePosition(), target);
   }
+  // Analytic two-bone IK: positions elbow in a pole-controlled plane using
+  // the law of cosines. Unlike CCD, it does not jerk the clavicle or gradually
+  // push the elbow through the torso. Works with glTF-linked TransformNodes.
+  // The optional pole is a world-space point to the SIDE of the body.
+  function solveTwoBone(arm, target, pole) {
+    refresh(arm.hand);
+    const shoulder=arm.upper.getAbsolutePosition();
+    const elbow=arm.fore.getAbsolutePosition();
+    const wrist=arm.hand.getAbsolutePosition();
+    const upperLen=B.Vector3.Distance(shoulder,elbow);
+    const foreLen=B.Vector3.Distance(elbow,wrist);
+    const span=upperLen+foreLen;
+    const toTarget=target.subtract(shoulder);
+    const actual=toTarget.length();
+    if(upperLen<.025||foreLen<.025||actual<.00001||!Number.isFinite(actual))
+      return solveArm(arm,target);
+    const reach=B.Scalar.Clamp(actual,Math.abs(upperLen-foreLen)+.0005,span-.001);
+    const d=toTarget.scale(1/actual);
+    const along=(reach*reach+upperLen*upperLen-foreLen*foreLen)/(2*reach);
+    const crossLen=Math.sqrt(Math.max(0,upperLen*upperLen-along*along));
+    let poleSide=pole.subtract(shoulder);
+    poleSide.subtractInPlace(d.scale(B.Vector3.Dot(poleSide,d)));
+    if(poleSide.lengthSquared()<.00001){
+      poleSide=elbow.subtract(shoulder);
+      poleSide.subtractInPlace(d.scale(B.Vector3.Dot(poleSide,d)));
+    }
+    if(poleSide.lengthSquared()<.00001)
+      poleSide=B.Vector3.Cross(d,Math.abs(d.y)<.9?B.Axis.Y:B.Axis.X);
+    poleSide.normalize();
+    const wantedElbow=shoulder.add(d.scale(along)).add(poleSide.scale(crossLen));
+    alignJoint(arm.upper,arm.fore,wantedElbow,Math.PI);
+    refresh(arm.hand);
+    alignJoint(arm.fore,arm.hand,target,Math.PI);
+    refresh(arm.hand);
+    return B.Vector3.Distance(arm.hand.getAbsolutePosition(),target);
+  }
   // Elbow pole stabilisation after CCD. Rotation about the shoulder-to-wrist
   // axis leaves the wrist at its IK target but keeps elbows out of the torso.
   // This works on linked TransformNodes, not the non-authoritative glTF bones.
@@ -355,26 +391,15 @@
       ).toFixed(4);
       report.leftGoalFromShoulderMeters =
         +B.Vector3.Distance(left.upper.getAbsolutePosition(), leftGoal).toFixed(4);
-      report.rightIKMeters = +solveArm(right, rightGoal).toFixed(4);
-      report.leftIKMeters = +solveArm(left, leftGoal).toFixed(4);
-      // Right/left bend outward and slightly forward, not through the abdomen.
-      // Pole targets follow the chest while the real run animation moves the torso.
-      const rightPole = right.upper.getAbsolutePosition().add(rotated(
-        new B.Vector3(-.30,-.24,.14), chestQ));
-      const leftPole = left.upper.getAbsolutePosition().add(rotated(
-        new B.Vector3(.30,-.24,.20), chestQ));
-      stabiliseElbow(right,rightPole);
-      stabiliseElbow(left,leftPole);
-      // A pole adjustment may move a skinned wrist slightly in this imported rig.
-      // Re-pin wrist targets without moving the corrected elbow poles/clavicle.
-      for (const [arm,goal] of [[right,rightGoal],[left,leftGoal]]) {
-        for (let retry=0;retry<5;retry++) {
-          refresh(arm.hand);
-          if(B.Vector3.DistanceSquared(arm.hand.getAbsolutePosition(),goal)<.000144)break;
-          alignJoint(arm.fore,arm.hand,goal,.15);
-          alignJoint(arm.upper,arm.hand,goal,.09);
-        }
-      }
+      // Both elbows use an explicit pole target in the torso's frame.
+      // Forwards/backwards motion of the gun no longer twists the clavicles.
+      const rightPole=right.upper.getAbsolutePosition().add(rotated(
+        new B.Vector3(-.33,-.28,.22),chestQ));
+      const leftPole=left.upper.getAbsolutePosition().add(rotated(
+        new B.Vector3(.33,-.28,.22),chestQ));
+      report.rightIKMeters=+solveTwoBone(right,rightGoal,rightPole).toFixed(4);
+      report.leftIKMeters=+solveTwoBone(left,leftGoal,leftPole).toFixed(4);
+      report.solver='analytical-two-bone-with-pole';
       report.rightElbowDegrees = elbowBend(right);
       report.leftElbowDegrees = elbowBend(left);
       report.rightWristDegrees=setHandRotation(right.hand,rightQ,rest.get(right.hand));
