@@ -15,9 +15,9 @@ const RUN_AND_GUN=new Set(['MP40','MG42']);
 // Authored gameplay reload durations at 30 fps:
 // MP40 2.5 s, MG42 7.5 s, shoulder launcher Panzerschreck 9 s.
 const RELOAD=Object.freeze({
- MP40:Object.freeze({frames:75,seconds:2.5,capacity:32,mayMove:true}),
- MG42:Object.freeze({frames:225,seconds:7.5,capacity:50,mayMove:false}),
- Panzerschreck:Object.freeze({frames:270,seconds:9,capacity:1,mayMove:false})
+ MP40:Object.freeze({frames:75,seconds:2.5,capacity:32,containers:5,mayMove:true}),
+ MG42:Object.freeze({frames:225,seconds:7.5,capacity:100,containers:4,mayMove:false}),
+ Panzerschreck:Object.freeze({frames:270,seconds:9,capacity:1,containers:4,mayMove:false})
 });
 const stages={
  Kar98k:[
@@ -79,8 +79,12 @@ for(const key of Object.keys(stages))Object.freeze(stages[key]);
 function clamp(x,a,b){return Math.min(b,Math.max(a,x))}
 function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
   measureSpeed=null,requestStop=()=>{},speedEpsilon=.06,
-  runSpeed=3.4,deceleration=9,fps=FPS}={}){
+  runSpeed=3.4,deceleration=9,fps=FPS,supply=null,unitId=null}={}){
  if(!stages[weapon])throw Error('Unknown firearm '+weapon);
+ const linked=supply!==null;
+ if(linked&&(!supply.snapshot||!supply.fire||!supply.beginReload||
+    !supply.tick||unitId===null))throw Error('Supply interface or soldier ID missing');
+ function inventory(){return linked?supply.snapshot(unitId).inventory[weapon]:null;}
  const timeline=stages[weapon],s={
    weapon,phase:'idle',clip:'Hold',phaseFrame:0,progress:0,
    moving:false,speed:0,crouch:0,boltProgress:0,reloading:false,
@@ -89,14 +93,32 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
    reloadSeconds:RELOAD[weapon]?.seconds||0,
    ammoCapacity:RELOAD[weapon]?.capacity??null,
    ammoRemaining:RELOAD[weapon]?.capacity??null,
+   reserveContainers:RELOAD[weapon]?.containers-1??0,
    fired:0,boltLocked:weapon==='Panzerschreck',
    boltCount:0,shotsOnMove:0,movingShots:0,history:[],markers:[],done:false,
    running:false,requestedStop:false
  };
+ if(linked){
+   const bag=inventory();
+   if(RELOAD[weapon]&&!bag)throw Error('Soldier has not purchased '+weapon);
+   if(bag){s.ammoRemaining=bag.loaded;s.reserveContainers=bag.spareContainers;}
+ }
+ function syncAmmo(){
+   if(!linked)return;
+   const bag=inventory();
+   if(bag){s.ammoRemaining=bag.loaded;s.reserveContainers=bag.spareContainers;}
+ }
  let phaseIndex=-1,phaseFrame=0,markerSeen=new Set(),sequenceId=0;
  function copy(){return {...s,history:s.history.map(x=>({...x})),markers:s.markers.map(x=>({...x}))}}
  function log(kind,fields={}){s.history.push({kind,phase:s.phase,...fields})}
  function transition(index){
+   if(index<timeline.length&&timeline[index].id==='reload'&&
+      RELOAD[weapon]&&s.reserveContainers<=0){
+     s.phase='outOfAmmo';s.clip='Hold';s.phaseFrame=0;s.progress=1;
+     s.reloading=false;s.moving=false;s.speed=0;s.running=false;s.done=true;
+     log('outOfAmmo',{fired:s.fired});
+     onStage(copy());return;
+   }
    if(index===timeline.length){
      s.phase='complete';s.clip='Hold';s.phaseFrame=0;s.progress=1;
      s.crouch=0;s.moving=false;s.speed=0;s.done=true;s.running=false;
@@ -117,6 +139,10 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
    if(stage.id==='bolt'&&weapon!=='Kar98k')throw Error('Only Kar98k cycles a bolt');
    if(stage.id==='reload'&&!RELOAD[weapon])
      throw Error('Weapon cannot enter reload phase');
+   if(stage.id==='reload'&&linked){
+     const r=supply.beginReload(unitId);
+     if(!r.ok)throw Error('Supply reload rejected: '+r.reason);
+   }
    log('phase',{frame:0});
    onStage(copy());
  }
@@ -137,8 +163,12 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
        if(!s.markers.some(x=>x.name==='stop-confirmed'))
          throw Error('Shot without stopped pose');
      }
+     if(linked){
+       const result=supply.fire(unitId);
+       if(!result.ok||result.weapon!==weapon)throw Error('Supply shot rejected: '+result.reason);
+       syncAmmo();
+     }else if(RELOAD[weapon])s.ammoRemaining--;
      s.fired++;
-     if(RELOAD[weapon])s.ammoRemaining--;
      if(weapon==='Kar98k')s.boltLocked=false;
    }
    if(name==='reload-start'){
@@ -152,7 +182,14 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
        throw Error('Reload-complete marker without active reload');
      if(s.reloadElapsedFrames<RELOAD[weapon].frames-1e-6)
        throw Error('Reload finished before required duration');
-     s.ammoRemaining=RELOAD[weapon].capacity;
+     if(linked){
+       syncAmmo();
+       if(s.ammoRemaining!==RELOAD[weapon].capacity)
+         throw Error('Reload animation ended before supply completed');
+     }else{
+       s.ammoRemaining=RELOAD[weapon].capacity;
+       s.reserveContainers--;
+     }
      s.reloadCount++;
      s.reloading=false;
    }
@@ -165,8 +202,19 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
    s.running=true;s.done=false;s.moving=true;s.speed=runSpeed;s.crouch=0;
    s.boltProgress=0;s.fired=0;s.boltCount=0;s.shotsOnMove=0;s.movingShots=0;
    s.reloading=false;s.reloadCount=0;s.reloadProgress=0;s.reloadElapsedFrames=0;
-   s.ammoRemaining=RELOAD[weapon]?.capacity??null;s.markers=[];s.history=[];
+   syncAmmo();s.markers=[];s.history=[];
    s.boltLocked=true;s.requestedStop=false;
+   if(RELOAD[weapon]&&s.ammoRemaining===0){
+     if(s.reserveContainers===0){
+       s.phase='outOfAmmo';s.running=false;s.done=true;
+       onStage(copy());return copy();
+     }
+     // Restart at the reload segment only after a cancelled reload;
+     // all shot markers are blocked until the full animation has elapsed.
+     if(weapon==='MP40'){transition(timeline.findIndex(x=>x.id==='reload'));}
+     else{ s.speed=0;s.moving=false;transition(timeline.findIndex(x=>x.id==='reload')); }
+     return copy();
+   }
    transition(0);
    return copy();
  }
@@ -185,6 +233,7 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
      const before=phaseFrame;
      phaseFrame+=take;frames-=take;
      const seconds=take/fps;
+     if(stage.id==='reload'&&linked)supply.tick(seconds);
      if(stage.travel){
        s.speed=typeof measureSpeed==='function'
          ?Math.max(0,Number(measureSpeed())||0):runSpeed;
@@ -223,7 +272,10 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
          if(!s.markers.some(m=>m.name==='stop-confirmed'))
            emit('stop-confirmed',stage.frames);
        }
-       transition(phaseIndex+1);
+       // Continue firing until the *actual* magazine/belt is empty;
+       // do not waste 27 MP40 rounds or 90 MG42 rounds per short demo burst.
+       transition(stage.id==='runFire'&&s.ammoRemaining>0?
+         phaseIndex:phaseIndex+1);
      }
    }
    return copy();
