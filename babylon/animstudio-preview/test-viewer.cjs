@@ -45,23 +45,37 @@ const path=require('node:path');
             throw Error(env.name+' IK grip FAILED '+gun+' '+pose+' '+JSON.stringify(s));
           await page.screenshot({path:path.join(out,env.name+'-'+gun+'-'+pose+'.png')});
           if(pose==='Run'){
-            const samples=[];
-            for(let frame=0;frame<12;frame++){
-              await page.waitForTimeout(55);
-              const knee=await page.evaluate(()=>window.__BATTLEFIELD_ANIMATIONS__.sampleKnees());
-              if(!Number.isFinite(knee.left)||!Number.isFinite(knee.right))
-                throw Error('Non-finite knee angle '+gun+' '+JSON.stringify(knee));
-              samples.push(knee);
-              if([2,5,8].includes(frame))
-                await page.screenshot({path:path.join(out,env.name+'-'+gun+'-Run-phase'+frame+'.png')});
-            }
+            // Seek to the exact keyframes, independent of headless WebGL frame rate.
+            // Timed snapshots sometimes sampled only one leg's stance phase.
+            const samples=await page.evaluate(()=>{
+              const state=window.__BATTLEFIELD_ANIMATIONS__;
+              const clip=state.scene.animationGroups.find(g=>g.name===state.clip);
+              clip.pause();
+              const result=[];
+              for(let i=0;i<=30;i++){
+                clip.goToFrame(clip.from+(clip.to-clip.from)*i/30);
+                result.push(state.sampleKnees());
+              }
+              clip.play(true);
+              return result;
+            });
+            if(samples.some(m=>!Number.isFinite(m.left)||!Number.isFinite(m.right)))
+              throw Error('Non-finite knee angle '+gun+' '+JSON.stringify(samples));
             const maxLeft=Math.max(...samples.map(x=>x.left));
             const maxRight=Math.max(...samples.map(x=>x.right));
             console.log('TACTICAL_RUN_KNEES '+JSON.stringify({env:env.name,gun,
               leftDeg:maxLeft,rightDeg:maxRight,samples}));
-            // 0.35 degree kneeLift yielded a straight-legged march; protect against regression.
-            if(maxLeft<30||maxRight<30)
+            if(maxLeft<35||maxRight<35)
               throw Error('GOOSE_STEP_REGRESSION '+env.name+' '+gun+' '+maxLeft+' '+maxRight);
+            for(const phase of [3,9,16]){
+              await page.evaluate(k=>{
+                const state=window.__BATTLEFIELD_ANIMATIONS__;
+                const clip=state.scene.animationGroups.find(g=>g.name===state.clip);
+                clip.pause();
+                clip.goToFrame(clip.from+(clip.to-clip.from)*k/20);
+              },phase);
+              await page.screenshot({path:path.join(out,env.name+'-'+gun+'-Run-phase'+phase+'.png')});
+            }
           }
           result.push(s.clip);
         }
