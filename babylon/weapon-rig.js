@@ -529,7 +529,16 @@
         run: [.33, -.05, -.025],
         fire: [.012, 0, 0]
       })[pose];
-      const localQ = B.Quaternion.FromEulerAngles(angles[0], angles[1], angles[2]);
+      // During mobile shooting, legs KEEP the Run clip. Only the upper-body
+      // aim and recoil are adjusted; no gait or approved rifle grip changes.
+      const runAndGun=state.combatPose?.active&&
+        (weaponId==='de-mp40'||weaponId==='de-mg42')&&
+        state.combatPose.stage==='runFire';
+      const pulse=runAndGun
+        ?B.Scalar.Clamp(Number(state.combatPose.recoilPulse)||0,0,1):0;
+      const localQ=B.Quaternion.FromEulerAngles(
+        runAndGun?.12+.035*pulse:angles[0],
+        runAndGun?-.025:angles[1],runAndGun?-.015:angles[2]);
       const gunQ = chestQ.multiply(localQ).normalize();
       report.forwardDot=+B.Vector3.Dot(
         rotated(B.Axis.Z,gunQ).normalize(),bodyFrame.forward).toFixed(3);
@@ -599,6 +608,36 @@
           ? (weaponId==='de-panzerschreck'?[0,-.135,-.09]:meta.support)
           : meta.support;
       const support=pivot.position.add(rotated(v(supportPoint),gunQ));
+      // Preview-only reload gesture: move the support hand between fore-end
+      // and MP40 magazine / MG42 receiver at authored timeline landmarks.
+      // We do NOT pretend that real magazine / feed-cover GLB animation is
+      // complete; a dedicated asset/clip is still required for final art.
+      const reloadActive=state.combatPose?.active&&
+        state.combatPose.stage==='reload'&&
+        (weaponId==='de-mp40'||weaponId==='de-mg42');
+      const reloadT=reloadActive
+        ?B.Scalar.Clamp(Number(state.combatPose.reloadProgress)||0,0,1):0;
+      let handShift=new B.Vector3(0,0,0);
+      if(reloadActive){
+        const marks=weaponId==='de-mp40'
+          ?[[0,0,0,0],[.16,-.015,-.045,-.10],
+            [.40,-.02,-.095,-.115],[.65,-.01,-.075,-.08],
+            [.88,0,-.035,-.03],[1,0,0,0]]
+          :[[0,0,0,0],[.12,-.015,.06,-.075],
+            [.35,-.02,.10,-.07],[.67,-.035,.07,-.055],
+            [.89,-.015,.045,-.025],[1,0,0,0]];
+        for(let i=1;i<marks.length;i++)if(reloadT<=marks[i][0]){
+          const prev=marks[i-1],next=marks[i];
+          const u=(reloadT-prev[0])/(next[0]-prev[0]);
+          const v=u*u*(3-2*u);
+          handShift=new B.Vector3(
+            ...[1,2,3].map(k=>prev[k]+(next[k]-prev[k])*v));
+          break;
+        }
+        support.addInPlace(rotated(handShift,gunQ));
+      }
+      report.reloadHandOffsetMeters=+handShift.length().toFixed(4);
+      report.reloadGestureActive=!!reloadActive;
       if(studioPose)
         support.addInPlace(rotated(new B.Vector3(master.leftOffsetX,
           master.leftOffsetY,master.leftOffsetZ),gunQ));
@@ -695,6 +734,7 @@
         .add(rPalm.scale(rightPalmReach)), trigger).toFixed(4);
       report.leftGripMeters = +B.Vector3.Distance(left.hand.getAbsolutePosition()
         .add(lPalm.scale(leftPalmReach)), support).toFixed(4);
+      report.movingFireOverlay=!!runAndGun;
       report.combatCrouchStrength=state.combatPose?.active
         ?+(Number(state.combatPose.crouch)||0).toFixed(3):0;
       report.masterPoseEditor=gripStudio;
