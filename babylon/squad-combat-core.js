@@ -10,7 +10,7 @@
 'use strict';
 const SPEED=18; // game-distance units per second, temporary range tuning.
 const ENGAGE=Object.freeze({Kar98k:42,MP40:23,MG42:39,Panzerschreck:52});
-function create({battle,allies,enemies,onShot=()=>{},onFinish=()=>{},driveAllies=null}){
+function create({battle,allies,enemies,onShot=()=>{},onFinish=()=>{},driveAllies=null,endWhenEliminated=true}){
  if(!battle||!Array.isArray(allies)||!Array.isArray(enemies))throw Error('Invalid teams');
  if(!allies.length||!enemies.length)throw Error('At least one soldier per team required');
  const members=[...allies,...enemies];
@@ -90,7 +90,7 @@ function create({battle,allies,enemies,onShot=()=>{},onFinish=()=>{},driveAllies
      onShot({unit,target,result:response,moving:moving.get(unit),elapsed});
    }
    const allyAlive=allies.some(u=>u.alive),enemyAlive=enemies.some(u=>u.alive);
-   if(!allyAlive||!enemyAlive){
+   if(endWhenEliminated&&(!allyAlive||!enemyAlive)){
      done=true;active=false;ending=allyAlive?'allies':enemyAlive?'enemies':'draw';
      onFinish({winner:ending,elapsed});
    }
