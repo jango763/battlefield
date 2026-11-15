@@ -162,7 +162,7 @@ async function start(){
   state.combatPoseStatus='Torso-mounted weapon; dual-arm CCD pending';
  }
  function solveCombatGrip(){
-  if(!weaponRoot||!rightUpper||!rightLower||!rightHand||!leftUpper||!leftLower||!leftHand)return;
+  if(!weaponRoot||!rightUpper||!rightLower||!rightHand||!leftUpper||!leftLower||!leftHand)throw Error('Combat IK missing weapon or arm joints');
   const trigger=weaponRoot.getAbsolutePosition();
   const support=B.Vector3.TransformCoordinates(toVec(weaponRoot.metadata.support),weaponRoot.getWorldMatrix());
   // Two end effectors, each with its own independent shoulder/elbow chain.
@@ -190,8 +190,7 @@ async function start(){
  function updateWeaponPose(){
   if(!weaponRoot||!grip)return;
   if(state.animation==='combat'&&!combatPoseSolved){
-   combatPoseSolved=true;
-   try{solveCombatGrip();}catch(error){state.poseError=String(error);state.combatPoseStatus='IK failed: '+state.poseError;}
+   try{solveCombatGrip();combatPoseSolved=true;state.poseError=null;}catch(error){combatPoseSolved=true;state.poseError=String(error);state.combatPoseStatus='IK failed: '+state.poseError;}
   }
   const trigger=weaponRoot.getAbsolutePosition();
   const supportWorld=B.Vector3.TransformCoordinates(toVec(weaponRoot.metadata.support),weaponRoot.getWorldMatrix());
@@ -232,7 +231,18 @@ async function start(){
    grip=new B.TransformNode('chestWeaponSocket',scene);grip.parent=chest;
    weaponRoot=new B.TransformNode('weaponTrigger',scene);weaponRoot.parent=grip;
    weaponRoot.metadata={support:meta.support,trigger:meta.trigger,muzzle:meta.muzzle,shoulder:meta.shoulder};
-   grip.position.set(0,-.10,.33);
+   // Weapon origin is its trigger; keep the stock outside the torso.
+   // Derive its location from the actual shoulder joint instead of an
+   // arbitrary chest-local offset (which varies with character scaling).
+   refreshChain(chest);refreshChain(rightUpper);
+   const shoulderLocal=B.Vector3.TransformCoordinates(rightUpper.getAbsolutePosition(),
+    chest.getWorldMatrix().clone().invert());
+   const stock=toVec(meta.shoulder);
+   grip.position.copyFrom(shoulderLocal.subtract(stock));
+   // A small outward offset prevents the receiver intersecting the torso.
+   grip.position.z+=.08;
+   state.weaponMount={shoulderLocal:shoulderLocal.asArray(),stock:stock.asArray(),
+    socket:grip.position.asArray()};
    grip.rotationQuaternion=null;grip.rotation.set(0,0,0);
    for(const mesh of weaponContainer.meshes.filter(m=>!m.parent))mesh.parent=weaponRoot;
    for(const node of weaponContainer.transformNodes.filter(n=>!n.parent))node.parent=weaponRoot;
@@ -245,6 +255,7 @@ async function start(){
  function select(mode){
   resetCombatArms();state.animation=mode;combatPoseSolved=false;
   for(const group of Object.values(remapped))group.stop();
+  if(mode==='combat'&&!remapped.idle){state.poseError='Idle animation unavailable for combat pose';}
   if(mode==='combat'&&remapped.idle){remapped.idle.start(true,1,remapped.idle.from,remapped.idle.to,false);remapped.idle.goToFrame(remapped.idle.from);remapped.idle.pause();raiseCombatArms();}
   else if(remapped[mode])remapped[mode].start(true,1,remapped[mode].from,remapped[mode].to,false);
   for(const btn of document.querySelectorAll('[data-clip]'))btn.setAttribute('aria-pressed',String(btn.dataset.clip===mode));
