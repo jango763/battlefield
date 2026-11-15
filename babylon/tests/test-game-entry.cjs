@@ -25,7 +25,13 @@ assert(!app.includes("LoadAssetContainerAsync('',\n   './animstudio-preview/mode
  'Regression: Invalid four-argument LoadAssetContainerAsync call');
 assert(app.includes('void processWeaponQueue()'), 'Weapon IK should not block the playable scene');
 
-assert(app.includes("const firstBattle=controller.start()"));
+assert(app.includes("enterButton.addEventListener('click'"), 'Game must start manually after reading briefing');
+assert(app.includes("const r=controller.start();"), 'Start button must activate the battle');
+assert(html.includes('src="./gold-economy-core.js"'), 'Gold core must load before game');
+assert(html.includes('id="battlefield-brief"')&&!html.includes('id="map-briefing"'), 'Use exactly one startup map briefing');
+assert(html.includes('После гибели первого бота с любой стороны'), 'Briefing must mention first bot death rule');
+assert(app.includes('economy.reportBotDeath(victim)'), 'First dead bot must trigger countdown');
+assert(app.includes('central.remainingSeconds'), 'Countdown must be visible in gameplay HUD');
 assert(app.includes("if(!B||!combat||!tactics||!presentation||!orders"));
 assert(app.includes("$('failure').style.display='block'"));
 assert(!html.includes('combat-range.js'),'Main route accidentally points to old firing range');
