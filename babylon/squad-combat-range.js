@@ -44,7 +44,7 @@ function createWorld(){
  const hemi=new B.HemisphericLight('ambient',new B.Vector3(0,1,0),scene);
  hemi.intensity=1.35;
  const sun=new B.DirectionalLight('sun',new B.Vector3(-.5,-1,.3),scene);
- sun.intensity=1.55;sun.diffuseColor=new B.Color3(1,.94,.83);
+ sun.intensity=1.55;sun.diffuse=new B.Color3(1,.94,.83);
  const ground=B.MeshBuilder.CreateGround('range-ground',{width:36,height:22},scene);
  const mat=new B.StandardMaterial('earth',scene);
  mat.diffuseColor=new B.Color3(.29,.34,.27);ground.material=mat;
@@ -143,8 +143,10 @@ async function loadUnits(){
  for(let i=0;i<8;i++){
   $('loading').textContent='Создаю солдат и индивидуальные анимации: '+(i+1)+'/8';
   // Explicit clone is required to keep skinned animation/IK independent.
+  // Keep original Mixamo joint names in each separate clone for IK lookup.
+  // Babylon allows duplicate names; our rig uses the clone-local hierarchy.
   const entries=asset.instantiateModelsToScene(
-   name=>'squad-'+i+'-'+name,false,{doNotInstantiate:true});
+   name=>name,false,{doNotInstantiate:true});
   const view=unitVisual(i,entries);
   views.push(view);
   const rig={};
@@ -193,10 +195,7 @@ function assignView(view,unit){
  stopAnimations(view);
  setClip(view,'ready');
  view.rig.combatPose={active:false,stage:'ready',crouch:0,recoilPulse:0};
- view.rig.equipWeapon(META.Kar98k).catch(error=>{
-  view.weaponError=String(error);
-  alertStatus('Ошибка оружия у бойца '+(view.index+1)+': '+error);
- });
+ // Approved rig starts with Kar98k loaded; avoid duplicate requests.
 }
 function setup(scenarioName){
  if(!state.ready)return;
@@ -290,6 +289,7 @@ function syncVisual(view){
  }
  if(unit.weapon!==view.weapon){
   view.weapon=unit.weapon;
+  view.lastPose=null; // Force matching animation after fallback.
   view.rig.equipWeapon(META[unit.weapon]).catch(error=>{
    view.weaponError=String(error);
    alertStatus('Оружие не загрузилось: '+error);
