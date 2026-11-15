@@ -288,27 +288,40 @@
     // Two fully independent hands. Right grips Kar98k wrist/trigger, left
     // supports forestock. The butt remains fixed to the RIGHT shoulder.
     // Existing v1 flat keys are migrated through legacyAliases in the API.
+    const fingerDigits=['Thumb','Index','Middle','Ring','Pinky'];
+    const fingerDefaults={Thumb:1.05,Index:.75,Middle:1.55,Ring:1.55,Pinky:1.55};
     const masterDefaults=Object.freeze({
       rightPitch:0,rightYaw:0,rightRoll:0,
       rightOffsetX:0,rightOffsetY:0,rightOffsetZ:0,
-      rightFingerCurl:1.55,rightIndexCurl:.75,rightThumbCurl:1.05,
       leftPitch:0,leftYaw:0,leftRoll:0,
-      leftOffsetX:0,leftOffsetY:0,leftOffsetZ:0,
-      leftFingerCurl:1.55,leftIndexCurl:1.55,leftThumbCurl:1.05
+      leftOffsetX:0,leftOffsetY:0,leftOffsetZ:.08,
+      ...Object.fromEntries(['right','left'].flatMap(side=>
+        fingerDigits.flatMap(digit=>[
+          [side+digit+'Curl',side==='left'&&digit==='Index'?1.55:fingerDefaults[digit]],
+          [side+digit+'Spread',0]
+        ])))
     });
     const master={...masterDefaults};
     const masterKeys=Object.keys(masterDefaults);
     const masterRanges={
-      rightPitch:[-80,80],rightYaw:[-80,80],rightRoll:[-120,120],
-      rightOffsetX:[-.07,.07],rightOffsetY:[-.07,.07],rightOffsetZ:[-.07,.07],
-      rightFingerCurl:[0,2.6],rightIndexCurl:[0,2.5],rightThumbCurl:[0,2.5],
-      leftPitch:[-80,80],leftYaw:[-80,80],leftRoll:[-120,120],
-      leftOffsetX:[-.07,.07],leftOffsetY:[-.07,.07],leftOffsetZ:[-.12,.12],
-      leftFingerCurl:[0,2.6],leftIndexCurl:[0,2.5],leftThumbCurl:[0,2.5]
+      ...Object.fromEntries(['right','left'].flatMap(side=>[
+        [side+'Pitch',[-80,80]],[side+'Yaw',[-80,80]],[side+'Roll',[-120,120]],
+        [side+'OffsetX',[-.12,.12]],[side+'OffsetY',[-.12,.12]],
+        [side+'OffsetZ',side==='left'?[-.15,.38]:[-.12,.12]]
+      ])),
+      ...Object.fromEntries(['right','left'].flatMap(side=>
+        fingerDigits.flatMap(digit=>[
+          [side+digit+'Curl',[0,2.6]],
+          [side+digit+'Spread',[-45,45]]
+        ])))
     };
+    // Import pre-v2 studio JSON without changing the left-hand controls.
     const legacyAliases={
-      fingerCurl:'rightFingerCurl',indexCurl:'rightIndexCurl',
-      thumbCurl:'rightThumbCurl',supportOffsetZ:'leftOffsetZ'
+      fingerCurl:['rightMiddleCurl','rightRingCurl','rightPinkyCurl'],
+      rightFingerCurl:['rightMiddleCurl','rightRingCurl','rightPinkyCurl'],
+      leftFingerCurl:['leftMiddleCurl','leftRingCurl','leftPinkyCurl'],
+      indexCurl:['rightIndexCurl'],thumbCurl:['rightThumbCurl'],
+      supportOffsetZ:['leftOffsetZ']
     };
 
     // Experimental anatomical wrist-basis calibration: glTF/Mixamo wrist
@@ -366,17 +379,21 @@
           // Temporary URL-only research control; no extra visible gameplay UI.
           // Compare source rest, stronger flexion, reverse and alternate axis
           // without changing the approved soldier's skinned geometry.
+          // Each finger has its OWN curl and sideways rotation. The latter
+          // affects only the proximal phalanx (segment 1), not its neighbours.
+          const sideKey=rightHand?'right':'left';
           const multiplier=gripStudio
-            ? master[(rightHand?'right':'left')+
-              (digit==='Thumb'?'ThumbCurl':digit==='Index'?'IndexCurl':'FingerCurl')]
-            : gripDebug==='neutral'?0:gripDebug==='classic'?1:1.55;
+            ?master[sideKey+digit+'Curl']
+            :gripDebug==='neutral'?0:gripDebug==='classic'?1:1.55;
+          const spread=gripStudio?master[sideKey+digit+'Spread']*Math.PI/180:0;
           const sign=gripDebug==='reverse'?-1:1;
           const curlAxis=gripDebug==='axisX'?B.Axis.X:B.Axis.Z;
           const bend=B.Quaternion.RotationAxis(curlAxis,amount[i]*multiplier*sign);
-          const tuck=digit==='Thumb' && gripDebug!=='neutral'
-            ? B.Quaternion.RotationAxis(B.Axis.X,(rightHand?-.30:.30)*(i===0?1:.50))
-            : B.Quaternion.Identity();
-          node.rotationQuaternion=rest.get(node).multiply(tuck).multiply(bend).normalize();
+          const fan=i===0 ?B.Quaternion.RotationAxis(B.Axis.X,spread) :B.Quaternion.Identity();
+          const tuck=digit==='Thumb'&&gripDebug!=='neutral'
+            ?B.Quaternion.RotationAxis(B.Axis.X,(rightHand?-.30:.30)*(i===0?1:.50))
+            :B.Quaternion.Identity();
+          node.rotationQuaternion=rest.get(node).multiply(tuck).multiply(fan).multiply(bend).normalize();
         });
       }
     }
@@ -679,13 +696,15 @@
         throw Error('Invalid master-pose patch');
       const next={...master};
       for(const [rawKey,rawValue] of Object.entries(patch)){
-        const key=legacyAliases[rawKey]||rawKey;
-        if(!Object.prototype.hasOwnProperty.call(masterRanges,key))
-          throw Error('Unknown master-pose key '+rawKey);
+        const keys=legacyAliases[rawKey]||[rawKey];
         const val=Number(rawValue);
         if(!Number.isFinite(val))throw Error('Invalid finite value for '+rawKey);
-        const [lo,hi]=masterRanges[key];
-        next[key]=B.Scalar.Clamp(val,lo,hi);
+        for(const key of keys){
+          if(!Object.prototype.hasOwnProperty.call(masterRanges,key))
+            throw Error('Unknown master-pose key '+rawKey);
+          const [lo,hi]=masterRanges[key];
+          next[key]=B.Scalar.Clamp(val,lo,hi);
+        }
       }
       Object.assign(master,next);
       needsPose=true;update();
