@@ -113,6 +113,18 @@
     status.dataset.ready = 'true';
     status.textContent = 'Готово · 4 варианта · выбирайте оружие и позу';
     state.camera = {radius:camera.radius, target:camera.target.asArray()};
+    // Compact on-screen acceptance diagnostic for mobile users.
+    let lastHud = 0;
+    scene.onAfterRenderObservable.add(() => {
+      if (!state.weaponRigReady || performance.now() - lastHud < 750) return;
+      lastHud = performance.now();
+      const d = state.weaponRig;
+      const r = Number.isFinite(d.rightGripMeters) ? Math.round(d.rightGripMeters * 100) : '?';
+      const l = Number.isFinite(d.leftGripMeters) ? Math.round(d.leftGripMeters * 100) : '?';
+      status.textContent = d.error ? ('IK ошибка: ' + d.error)
+        : ('Хват R ' + r + ' см · L ' + l + ' см · ' +
+          (d.geometricPass ? 'геометрия OK' : 'требуется подгонка'));
+    });
 
   } catch(e) {
     fail(e);
