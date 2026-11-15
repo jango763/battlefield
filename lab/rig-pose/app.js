@@ -127,10 +127,15 @@ async function boot(){
    const score=residual[0]+residual[1]+penalty;
    if(!best||score<best.score)best={score,quats:armNodes.map(quaternionOf),targets:[rightGoal,leftGoal],residual,elbowAngles};
   }
-  posed=best.quats;setQuats(rest);
+  posed=best.quats;
+  const rotationDegrees=posed.map((q,i)=>{
+   const r=rest[i],dot=Math.abs(q.x*r.x+q.y*r.y+q.z*r.z+q.w*r.w);
+   return +(2*Math.acos(B.Scalar.Clamp(dot,-1,1))*180/Math.PI).toFixed(1);
+  });
+  setQuats(rest);
   best.targets.forEach((p,i)=>markers[i].position.copyFrom(p));
   const passes=best.residual.every(d=>d<.08)&&best.elbowAngles.every(d=>d>=40&&d<=155);
-  state.pose={passes,distances:best.residual.map(n=>+n.toFixed(3)),elbows:best.elbowAngles.map(n=>+n.toFixed(1)),
+  state.pose={passes,animated:rotationDegrees.some(deg=>deg>5),rotationDegrees,distances:best.residual.map(n=>+n.toFixed(3)),elbows:best.elbowAngles.map(n=>+n.toFixed(1)),
    result:passes?'Цели достигнуты':'ТРЕБУЕТ ПРОВЕРКИ / КОРРЕКЦИИ',note:'Тест геометрии; положение кистей следует осмотреть визуально'};
   return best;
  }
