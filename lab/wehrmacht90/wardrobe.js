@@ -2,7 +2,7 @@
 // Source references: Kenton-GMI/muster-ww2 (MIT), see SOURCES.md.
 // This is a rigid-accessory + skinned-body material prototype, NOT finished re-rigging.
 const B=window.BABYLON;
-const palette={tunic:'#5a5c4a',trousers:'#57594b',leather:'#26221e',canvas:'#6b6852',metal:'#8f9185',
+const palette={tunic:'#41493e',trousers:'#444b40',leather:'#26221e',canvas:'#625f4f',metal:'#87877b',
   skin:'#c39279',hair:'#3b2c20',piping:'#c9c5b2',litzen:'#8e8f86'};
 const asColor=s=>B.Color3.FromHexString(s);
 function material(scene,name,color,roughness=.86,metallic=0){
@@ -149,12 +149,62 @@ async function loadCap(scene,name,tracker){
  for(const m of mesh)m.isPickable=false;
  return {root:group,meshCount:mesh.length,size:extent.asArray(),scale:scalar};
 }
+// Smooth, tapered cloth sleeve segments follow the real 90-bone shoulder/elbow/wrist
+// positions. They add no skin joints and never duplicate the hands.
+function installSleeves(scene,model){
+ const wool=material(scene,'sleeve-wool',palette.tunic,.94);
+ const cuff=material(scene,'wrist-cuff','#323a31',.96);
+ const specs=[];
+ for(const side of ['l','r']){
+  const arm=getJoint(model,'upperarm_'+side);
+  const elbow=getJoint(model,'lowerarm_'+side);
+  const wrist=getJoint(model,'hand_'+side);
+  if(!arm||!elbow||!wrist)throw Error('Missing '+side+' arm bones for sleeves');
+  const sections=[
+   {from:arm,to:elbow,top:.180,bottom:.146,label:'upper',material:wool},
+   {from:elbow,to:wrist,top:.150,bottom:.106,label:'lower',material:wool}
+  ];
+  for(const seg of sections){
+   const mesh=B.MeshBuilder.CreateCylinder('M40-sleeve-'+side+'-'+seg.label,
+    {height:1,diameterTop:seg.top,diameterBottom:seg.bottom,tessellation:14,subdivisions:5},scene);
+   mesh.material=seg.material;
+   mesh.rotationQuaternion=B.Quaternion.Identity();
+   mesh.isPickable=false;
+   specs.push({...seg,mesh});
+  }
+  const ring=B.MeshBuilder.CreateCylinder('M40-cuff-'+side,
+   {height:1,diameterTop:.119,diameterBottom:.113,tessellation:14},scene);
+  ring.material=cuff;ring.rotationQuaternion=B.Quaternion.Identity();ring.isPickable=false;
+  specs.push({from:elbow,to:wrist,top:.119,bottom:.113,label:'cuff',mesh:ring,at:.93,length:.08});
+ }
+ function pose(seg){
+  seg.from.computeWorldMatrix(true);seg.to.computeWorldMatrix(true);
+  const first=seg.from.getAbsolutePosition(),last=seg.to.getAbsolutePosition();
+  const difference=last.subtract(first),length=difference.length();
+  if(length<1e-5){seg.mesh.setEnabled(false);return;}
+  seg.mesh.setEnabled(true);
+  const dir=difference.scale(1/length);
+  const cross=B.Vector3.Cross(B.Axis.Y,dir),dot=B.Scalar.Clamp(B.Vector3.Dot(B.Axis.Y,dir),-1,1);
+  let rotation;
+  if(cross.lengthSquared()<1e-9)
+   rotation=dot<0?B.Quaternion.RotationAxis(B.Axis.Z,Math.PI):B.Quaternion.Identity();
+  else rotation=B.Quaternion.RotationAxis(cross.normalize(),Math.acos(dot));
+  seg.mesh.rotationQuaternion=rotation;
+  const along=seg.at??.5;
+  seg.mesh.position.copyFrom(first.add(last.subtract(first).scale(along)));
+  seg.mesh.scaling.y=seg.length??length*1.055;
+ }
+ const update=()=>specs.forEach(pose);
+ update();
+ return {update,parts:specs.length};
+}
 export async function installWehrmachtOutfit(scene,model,onUpdate){
  const wool=makeWool(scene,model);
  const chest=getJoint(model,'spine_05'),head=getJoint(model,'head');
  if(!chest||!head)throw Error('90-joint model does not expose chest/head transform nodes');
  const chestTracker=createTracker(scene,chest),headTracker=createTracker(scene,head);
  const kit=decorateM40(scene,chestTracker);
+ const sleeves=installSleeves(scene,model);
  const caps={};
  const errors=[];
  for(const [id,file] of Object.entries({m43:'m43-field-cap',sidecap:'field-grey-sidecap'})){
@@ -169,8 +219,8 @@ export async function installWehrmachtOutfit(scene,model,onUpdate){
  };
  if(caps.m43)setHeadwear('m43');
  else if(caps.sidecap)setHeadwear('sidecap');
- const update=()=>{chestTracker.update();headTracker.update();onUpdate?.();};
+ const update=()=>{chestTracker.update();headTracker.update();sleeves.update();onUpdate?.();};
  const subscription=scene.onBeforeRenderObservable.add(update);
- return {wool,kit,caps,errors,get selected(){return selected},setHeadwear,update,
+ return {wool,kit,caps,errors,sleeves:sleeves.parts,get selected(){return selected},setHeadwear,update,
   release:()=>scene.onBeforeRenderObservable.remove(subscription)};
 }
