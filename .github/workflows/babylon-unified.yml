@@ -22,6 +22,7 @@ jobs:
         run: |
           test -s assets/soldiers/german.glb
           node --check babylon/main.js
+          node --check babylon/weapon-rig.js
           node --input-type=module --check < babylon/prototypes/combat.js
           node --input-type=module --check < babylon/prototypes/armory.js
           node babylon/tests/verify-assets.mjs
