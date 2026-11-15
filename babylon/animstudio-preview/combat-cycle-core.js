@@ -256,7 +256,11 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
      for(const m of stage.markers){
        const key=m.name+'@'+m.frame;
        if(before<m.frame&&phaseFrame>=m.frame&&!markerSeen.has(key)){
-         markerSeen.add(key);emit(m.name,m.frame);
+         markerSeen.add(key);
+         // A burst's remaining keyframes are silent once the last cartridge
+         // is spent. The following reload uses a real spare magazine.
+         if(m.name==='shot'&&RELOAD[weapon]&&s.ammoRemaining<=0)continue;
+         emit(m.name,m.frame);
        }
      }
      if(phaseFrame+1e-7>=stage.frames){
