@@ -12,6 +12,11 @@
 'use strict';
 const FPS=30;
 const RUN_AND_GUN=new Set(['MP40','MG42']);
+// Durations are animation frames at 30 fps: MP40 = 2.5 s; MG42 = 7.5 s.
+const RELOAD=Object.freeze({
+ MP40:Object.freeze({frames:75,seconds:2.5,capacity:32,mayMove:true}),
+ MG42:Object.freeze({frames:225,seconds:7.5,capacity:50,mayMove:false})
+});
 const stages={
  Kar98k:[
   {id:'run',clip:'Run',frames:36,travel:true,stance:0,markers:[]},
@@ -34,6 +39,10 @@ const stages={
   {id:'runFire',clip:'Run',frames:67,travel:true,stance:0,markers:[
    {frame:10,name:'shot'},{frame:19,name:'shot'},{frame:28,name:'shot'},
    {frame:43,name:'shot'},{frame:52,name:'shot'}]},
+  // Tactical reload preview after a burst; also used when magazine is empty.
+  // Run animation stays active while changing the MP40 magazine.
+  {id:'reload',clip:'Run',frames:RELOAD.MP40.frames,travel:true,stance:0,
+   markers:[{frame:1,name:'reload-start'},{frame:75,name:'reload-complete'}]},
   {id:'resume',clip:'Run',frames:25,travel:true,stance:0,markers:[]}
  ],
  MG42:[
@@ -43,6 +52,10 @@ const stages={
    {frame:23,name:'shot'},{frame:27,name:'shot'},
    {frame:43,name:'shot'},{frame:47,name:'shot'},{frame:51,name:'shot'},
    {frame:55,name:'shot'},{frame:59,name:'shot'}]},
+  // The heavier MG42 belt change is performed only after a full stop.
+  {id:'stop',clip:'Hold',frames:15,travel:false,stance:0,markers:[]},
+  {id:'reload',clip:'Hold',frames:RELOAD.MG42.frames,travel:false,stance:0,
+   markers:[{frame:1,name:'reload-start'},{frame:225,name:'reload-complete'}]},
   {id:'resume',clip:'Run',frames:29,travel:true,stance:0,markers:[]}
  ],
  Panzerschreck:[
@@ -63,7 +76,12 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
  if(!stages[weapon])throw Error('Unknown firearm '+weapon);
  const timeline=stages[weapon],s={
    weapon,phase:'idle',clip:'Hold',phaseFrame:0,progress:0,
-   moving:false,speed:0,crouch:0,boltProgress:0,
+   moving:false,speed:0,crouch:0,boltProgress:0,reloading:false,
+   reloadProgress:0,reloadElapsedFrames:0,reloadCount:0,
+   reloadFrames:RELOAD[weapon]?.frames||0,
+   reloadSeconds:RELOAD[weapon]?.seconds||0,
+   ammoCapacity:RELOAD[weapon]?.capacity??null,
+   ammoRemaining:RELOAD[weapon]?.capacity??null,
    fired:0,boltLocked:weapon==='Panzerschreck',
    boltCount:0,shotsOnMove:0,movingShots:0,history:[],markers:[],done:false,
    running:false,requestedStop:false
@@ -81,6 +99,8 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
    const stage=timeline[index];
    s.phase=stage.id;s.clip=stage.clip;s.phaseFrame=0;s.progress=0;
    s.moving=stage.travel;s.crouch=stage.stance;s.boltProgress=0;
+   s.reloading=stage.id==='reload';
+   s.reloadProgress=0;s.reloadElapsedFrames=0;
    if(stage.id==='stop'){s.requestedStop=true;requestStop();}
    if(stage.id==='fire'){
      if(s.speed>speedEpsilon||s.moving){s.shotsOnMove++;throw Error('Cannot shoot while moving');}
@@ -94,7 +114,9 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
  function emit(name,frame){
    const marker={name,phase:s.phase,frame,sequenceId};
    if(name==='shot'){
+     if(s.reloading)throw Error('Cannot shoot during reload');
      if(RUN_AND_GUN.has(weapon)){
+       if(s.ammoRemaining===0)throw Error('Magazine empty: reload required');
        if(s.phase!=='runFire'||!s.moving||s.speed<=speedEpsilon)
          throw Error('Moving shot requires active running velocity');
        s.movingShots++;
@@ -105,7 +127,23 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
          throw Error('Shot without stopped pose');
      }
      s.fired++;
+     if(RUN_AND_GUN.has(weapon))s.ammoRemaining--;
      if(weapon==='Kar98k')s.boltLocked=false;
+   }
+   if(name==='reload-start'){
+     if(!RELOAD[weapon]||!s.reloading)
+       throw Error('Reload marker outside firearm reload phase');
+     if(!RELOAD[weapon].mayMove&&s.speed>speedEpsilon)
+       throw Error('MG42 reload requires full stop');
+   }
+   if(name==='reload-complete'){
+     if(!RELOAD[weapon]||!s.reloading)
+       throw Error('Reload-complete marker without active reload');
+     if(s.reloadElapsedFrames<RELOAD[weapon].frames-1e-6)
+       throw Error('Reload finished before required duration');
+     s.ammoRemaining=RELOAD[weapon].capacity;
+     s.reloadCount++;
+     s.reloading=false;
    }
    if(name==='bolt-locked'){s.boltLocked=true;s.boltCount++;}
    s.markers.push(marker);log('marker',{name,frame});
@@ -114,7 +152,9 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
  function start(){
    sequenceId++;s.phase='idle';s.clip='Hold';s.progress=0;s.phaseFrame=0;
    s.running=true;s.done=false;s.moving=true;s.speed=runSpeed;s.crouch=0;
-   s.boltProgress=0;s.fired=0;s.boltCount=0;s.shotsOnMove=0;s.movingShots=0;s.markers=[];s.history=[];
+   s.boltProgress=0;s.fired=0;s.boltCount=0;s.shotsOnMove=0;s.movingShots=0;
+   s.reloading=false;s.reloadCount=0;s.reloadProgress=0;s.reloadElapsedFrames=0;
+   s.ammoRemaining=RELOAD[weapon]?.capacity??null;s.markers=[];s.history=[];
    s.boltLocked=true;s.requestedStop=false;
    transition(0);
    return copy();
@@ -148,6 +188,10 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
      else if(stage.id==='stop')s.crouch=.18*smooth(s.progress);
      else s.crouch=stage.stance;
      if(stage.id==='bolt')s.boltProgress=s.progress;
+     if(stage.id==='reload'){
+       s.reloadProgress=s.progress;
+       s.reloadElapsedFrames=phaseFrame;
+     }
      onPose(copy());
      for(const m of stage.markers){
        const key=m.name+'@'+m.frame;
@@ -177,9 +221,10 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
  function stop(){
    sequenceId++;s.running=false;s.done=false;s.phase='idle';s.clip='Hold';
    s.speed=0;s.moving=false;s.crouch=0;s.boltProgress=0;
+   s.reloading=false;s.reloadProgress=0;s.reloadElapsedFrames=0;
    onStage(copy());return copy();
  }
  return {start,update,stop,snapshot:copy,timeline,framesPerSecond:fps};
 }
-return {create,PROFILES:stages,FPS,RUN_AND_GUN};
+return {create,PROFILES:stages,FPS,RUN_AND_GUN,RELOAD};
 });
