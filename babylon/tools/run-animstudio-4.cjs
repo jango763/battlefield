@@ -85,10 +85,14 @@ const {chromium} = require('/tmp/animstudio-qa/node_modules/playwright');
           if(c.out_of_reach?.length)result.misses.push({clip:c.clip,frames:c.out_of_reach});
         }
         // Combat doctrine: every soldier MOVES AT A RUN, no walking gait.
-        // Real run generation (not time-compressed walk); feet planted and weapon on the arm layer.
+        // Real combat gait. IMPORTANT: AnimStudio uses DEGREES for stride/kneeLift/lean,
+        // and a fraction of leg length for crouch/bounce. 0.35 deg kneeLift caused
+        // straight-legged goose-stepping in the user's review; tune 86/24/13 deg.
         const run=spec.id+'_Run';
         await call('generate_motion',{type:'run',name:run,cycles:1,
-          params:{armSwing:0.08,plant:true,lean:0.10,kneeLift:0.35}});
+          params:{cycle:0.70,stride:24,kneeLift:86,kneeContact:24,footRoll:15,
+            armSwing:4,elbow:65,lean:13,crouch:0.09,bounce:0.028,
+            sway:0.007,hipTwist:5,chestCounter:4,headBob:1.5,plant:true}});
         const held=await call('weapon_animation',{action:'hold_in_clip',clip:run,prop:spec.id});
         result.clips.push(run);
         if(held.out_of_reach?.length)result.misses.push({clip:run,frames:held.out_of_reach});
@@ -113,8 +117,10 @@ const {chromium} = require('/tmp/animstudio-qa/node_modules/playwright');
         }
         const run=spec.id+'_Run';
         await call('generate_motion',{type:'run',name:run,cycles:1,
-          params:{armSwing:0.06,plant:true,lean:0.12,kneeLift:0.35}});
-        // Put the heavy shoulder-borne launcher in both hands throughout a running gait.
+          params:{cycle:0.70,stride:24,kneeLift:86,kneeContact:24,footRoll:15,
+            armSwing:4,elbow:65,lean:13,crouch:0.09,bounce:0.028,
+            sway:0.007,hipTwist:5,chestCounter:4,headBob:1.5,plant:true}});
+        // Keep the shoulder-borne launcher in both hands throughout the run.
         const ik=await call('key_weapon_pose',{clip:run,prop:spec.id,support:true,
           poses:[{frame:0,main:[-.14,-.07,.12],support:[-.08,-.12,.30]},
             {frame:30,main:[-.14,-.07,.12],support:[-.08,-.12,.30]}]});
