@@ -6,7 +6,7 @@
   const B = window.BABYLON;
   const ROCKET = {
     trigger: [0, -0.17, -0.23],
-    support: [0, -0.135, -0.10],
+    support: [0, -0.135, 0.08],
     muzzle: [0, 0, 0.82],
     shoulder: [0, -0.07, -0.48],
     triggerAxis: [0, 0.97, 0.24],
@@ -124,12 +124,14 @@
     cylinder('rear black bore', .088, .003, [0, 0, -.822], dark);
     for (const z of [-.78, -.43, .09, .77])
       cylinder('tube strengthening band', .117, .028, [0, 0, z]);
-    box('blast shield RpzB54', [.46, .34, .018], [-.055, .017, .30]);
-    box('sight window', [.072, .053, .022], [-.193, .083, .312], dark);
-    box('shield window rim upper', [.084, .009, .027], [-.193, .112, .327]);
+    // Historical RPzB 54 shield roughly 47 x 36 cm. Model a visibly lighter,
+    // non-final shield in this preview and offset it from the sight-line.
+    box('blast shield RpzB54', [.42, .30, .012], [-.075, -.045, .30]);
+    box('sight window', [.059, .043, .017], [-.178, .026, .312], dark);
+    box('shield window rim upper', [.075, .008, .018], [-.178, .053, .327]);
     box('underslung trigger housing', [.12, .115, .19], [0, -.109, -.22]);
     box('rear pistol grip', [.067, .17, .062], [0, -.23, -.23], wood);
-    box('front support handle', [.067, .15, .067], [0, -.20, -.10], wood);
+    box('front support handle', [.067, .15, .067], [0, -.20, .08], wood);
     box('rear shoulder pad', [.13, .06, .20], [0, -.098, -.48], wood);
     cylinder('front sight', .017, .035, [0, .083, .66], dark);
     return () => { for (const mesh of meshes) mesh.dispose(); for (const mat of mats) mat.dispose(); };
@@ -216,18 +218,26 @@
       const bob = walking ? .013 * Math.sin(t * 9) : 0;
       const recoil = firing ? .025 * Math.max(0, Math.sin(t * 18)) : 0;
       const chestQ = worldRotation(chest);
-      const angles = {
+      const angles = (weaponId === 'de-panzerschreck' ? {
+        // The rocket tube is shoulder-borne when aiming, lower while moving.
+        ready: [-.16, -.04, -.01],
+        aim: [.015, -.035, 0],
+        walk: [-.28, -.055, -.025],
+        fire: [.015, -.035, 0]
+      } : {
         ready: [-.095, -.02, -.020],
         aim: [.012, 0, 0],
         walk: [-.15, -.035, -.048],
         fire: [.012, 0, 0]
-      }[pose];
+      })[pose];
       const localQ = B.Quaternion.FromEulerAngles(angles[0], angles[1], angles[2]);
       const gunQ = chestQ.multiply(localQ).normalize();
       // Right shoulder stays fixed relative to chest; the weapon is not attached
       // to a swinging wrist, avoiding a feedback loop for the left support hand.
       const stockOffset = weaponId === 'de-panzerschreck'
-        ? new B.Vector3(.075, .125, .06)
+        ? (walking ? new B.Vector3(.10, -.13, .10)
+          : pose === 'ready' ? new B.Vector3(.15, -.015, .06)
+          : new B.Vector3(.16, .025, .05))
         : new B.Vector3(.038, -.07, .115);
       const stock = right.shoulder.getAbsolutePosition()
         .add(rotated(stockOffset, chestQ))
@@ -284,7 +294,8 @@
       const nextMeta = baseMeta && { ...baseMeta, support:
         id === 'de-kar98k' ? [0, .04, .27] :
         id === 'de-mp40' ? [0, .027, .19] :
-        id === 'de-mg42' ? [0, .074, .28] : baseMeta.support };
+        // The MG42 front grip near the receiver prevents a straight locked elbow.
+        id === 'de-mg42' ? [0, .074, .19] : baseMeta.support };
       if (!nextMeta) throw Error('Weapon manifest missing ' + id);
       let incoming = null;
       if (id !== 'de-panzerschreck') {
