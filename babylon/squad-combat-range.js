@@ -463,7 +463,13 @@ try{
  for(const el of document.querySelectorAll('button'))el.disabled=false;
  registerUI();
  setup('duel');
- $('loading').textContent='Бой 1 на 1 готов · '+state.models+
+ const firstBattle=controller.start();
+ if(firstBattle.ok){
+  atBase=false;state.atBase=false;
+  alertStatus('Демонстрация началась автоматически. Для покупки оружия вернитесь на базу.');
+  drawHud();
+ }
+ $('loading').textContent='Бой 1 на 1 запущен · '+state.models+
   ' бойца. Режимы 1×4 и 4×4 загрузятся по выбору.';
 }catch(error){
  state.loading=false;state.error=String(error?.stack||error);
