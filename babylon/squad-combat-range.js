@@ -148,6 +148,16 @@ async function loadUnits(){
   const entries=asset.instantiateModelsToScene(
    name=>name,false,{doNotInstantiate:true});
   const view=unitVisual(i,entries);
+  // Reject shared skeletons or animation targets before equipping weapons.
+  for(const prev of views){
+   if(prev.imported.skeletons[0]===view.imported.skeletons[0])
+    throw Error('Ошибка клонирования: бойцы используют один скелет');
+   const clipA=prev.clips.get('Kar98k_Run');
+   const clipB=view.clips.get('Kar98k_Run');
+   if(clipA===clipB||
+      clipA.targetedAnimations[0]?.target===clipB.targetedAnimations[0]?.target)
+    throw Error('Ошибка клонирования: у бойцов общий анимационный контроллер');
+  }
   views.push(view);
   const rig={};
   await window.BattlefieldWeaponRig.create({scene,imported:view.imported,
