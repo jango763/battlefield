@@ -39,6 +39,7 @@ window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
 let actors=new Map(),fx=[],scenario='duel',atBase=true;
 let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
+let weaponQueue=[],weaponWorker=false;
 function alertStatus(message){$('event').textContent=message}
 function position(unit,y=0){
  return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y,unit.z*UNIT_SCALE);
@@ -205,28 +206,48 @@ async function ensureUnits(scenarioName){
       clipA.targetedAnimations[0]?.target===clipB.targetedAnimations[0]?.target)
     throw Error('У бойцов общая анимация бега');
   }
-  const rig={};
-  try{
-   await window.BattlefieldWeaponRig.create({
-    scene,imported:view.imported,root:view.root,state:rig,
-    animationDriven:true,bindUI:false,acceptExportSockets:true,
-    weaponRoot:'../assets/ww2-weapons/'
-   });
-   if(!rig.weaponRigReady)
-    throw Error('Не готов двухручный IK у бойца №'+(i+1));
-   view.rig=rig;view.anchor.setEnabled(false);
-   views[i]=view;state.models++;state.clips+=16;
-  }catch(error){
-   // Dispose unfinished actor, instead of retaining a broken rig in the scene.
-   view.anchor.dispose(false,false);
-   entries.dispose();
-   throw error;
-  }
+  // A soldier's existing GLB + 16 clips render without weapon IK.
+  // Do not block the *entire game* on several 1.7 MB rifle loads or IK errors.
+  view.rig={combatPose:{active:false,stage:'ready',crouch:0,recoilPulse:0}};
+  view.anchor.setEnabled(false);
+  views[i]=view;state.models++;state.clips+=16;
+  weaponQueue.push(view);
   // Allow browser to paint loading progress on mobile between clones.
   await new Promise(resolve=>requestAnimationFrame(resolve));
  }
  $('loading').textContent='Готово: '+state.models+
   ' анимированных бойцов · выберите режим и нажмите «Начать бой»';
+}
+async function processWeaponQueue(){
+ if(weaponWorker||!state.ready)return;
+ weaponWorker=true;
+ try{
+  while(weaponQueue.length){
+   const view=weaponQueue.shift();
+   if(!view||!view.rig||view.rig.weaponRigReady)continue;
+   try{
+    const rig=view.rig;
+    await window.BattlefieldWeaponRig.create({
+     scene,imported:view.imported,root:view.root,state:rig,
+     animationDriven:true,bindUI:false,acceptExportSockets:true,
+     weaponRoot:'../assets/ww2-weapons/'
+    });
+    if(!rig.weaponRigReady)throw Error('Двухручный IK не подготовлен');
+    const wanted=view.unit?.weapon||view.weapon;
+    if(wanted!=='Kar98k'&&rig.equipWeapon)
+     await rig.equipWeapon(META[wanted]);
+    view.weaponError=null;
+   }catch(error){
+    // The animated approved soldier stays visible and game logic works.
+    view.weaponError=String(error?.message||error);
+    console.error('Weapon model for soldier '+(view.index+1),error);
+    if(view.index===0)
+     alertStatus('Боец загружен, но оружейный IK недоступен: '+view.weaponError);
+   }
+   // Keep the UI responsive between expensive weapon imports on mobile.
+   await new Promise(resolve=>requestAnimationFrame(resolve));
+  }
+ }finally{weaponWorker=false;}
 }
 async function chooseScenario(name){
  if(starting||!state.ready)return;
@@ -235,6 +256,7 @@ async function chooseScenario(name){
  try{
   await ensureUnits(name);
   setup(name);
+  void processWeaponQueue();
   const launch=controller.start();
   if(launch.ok){atBase=false;state.atBase=false;}
   alertStatus('Подкрепление прибыло. Нажмите на землю, чтобы управлять отрядом.');
@@ -387,10 +409,12 @@ function syncVisual(view){
  if(unit.weapon!==view.weapon){
   view.weapon=unit.weapon;
   view.lastPose=null; // Force matching animation after fallback.
-  view.rig.equipWeapon(META[unit.weapon]).catch(error=>{
-   view.weaponError=String(error);
-   alertStatus('Оружие не загрузилось: '+error);
-  });
+  if(view.rig?.equipWeapon){
+   view.rig.equipWeapon(META[unit.weapon]).catch(error=>{
+    view.weaponError=String(error);
+    alertStatus('Оружие не загрузилось: '+error);
+   });
+  }
  }
  const visual=presentation.describe(unit,{active:!!controller?.snapshot().active,
   moving:controller?.isMoving(unit),shotAge:controller?.shotAge(unit)});
@@ -447,9 +471,11 @@ async function chooseGun(weapon){
  const visual=actors.get(hero);
  if(visual){
   visual.weapon=weapon;
-  await visual.rig.equipWeapon(META[weapon]).catch(e=>{
-   visual.weaponError=String(e);alertStatus('Ошибка модели оружия: '+e);
-  });
+  if(visual.rig?.equipWeapon){
+   await visual.rig.equipWeapon(META[weapon]).catch(e=>{
+    visual.weaponError=String(e);alertStatus('Ошибка модели оружия: '+e);
+   });
+  }
   const snapshot=presentation.describe(hero);
   setClip(visual,snapshot.pose);
  }
@@ -532,6 +558,8 @@ try{
  for(const el of document.querySelectorAll('button'))el.disabled=false;
  registerUI();
  setup('duel');
+ // The first playable frame is available before armature IK/weapon loading.
+ void processWeaponQueue();
  const firstBattle=controller.start();
  if(firstBattle.ok){
   atBase=false;state.atBase=false;
