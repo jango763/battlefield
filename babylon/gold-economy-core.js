@@ -21,7 +21,8 @@ const CAPTURE_SECONDS=5;
 const CAPTURE_BONUS=50;
 const INCOME_INTERVAL=5;
 const FARM_INCOME=25;
-const CENTRAL_MULTIPLIER=5; // proposed map balancing: 125 every 5 sec.
+const CENTRAL_MULTIPLIER=5; // 125 every 5 sec after the delayed unlock.
+const CENTRAL_DELAY_SECONDS=300; // Exactly five gameplay minutes after first BOT death.
 const START_TREASURY=560;
 const START_HERO_WALLET=150;
 const KILL_REWARD=15;
@@ -59,6 +60,8 @@ function create({onEvent=()=>{},centreMultiplier=CENTRAL_MULTIPLIER}={}){
  const treasury={blue:START_TREASURY,red:START_TREASURY};
  const hero={team:TEAM_BLUE,gold:START_HERO_WALLET,kills:0};
  const events=[];
+ let centralTriggered=false,centralRemaining=null,centralOpen=false,firstBotId=null;
+ const countedDeaths=new Set();
  function emit(info){const event={...info};events.push(event);onEvent(event);return event}
  function pay(team,amount){
   if(!validTeam(team)||!Number.isFinite(amount)||amount<0)throw Error('Invalid treasury payment');
@@ -77,7 +80,33 @@ function create({onEvent=()=>{},centreMultiplier=CENTRAL_MULTIPLIER}={}){
   if(heroKill&&hero.team===killer){hero.gold+=amount;hero.kills++}
   return amount;
  }
+ function reportBotDeath(unit){
+  if(!unit||unit.alive!==false||unit.hp>0||unit.isHero||unit.id==='hero')
+   return false;
+  if(unit.id==null||countedDeaths.has(unit.id))return false;
+  countedDeaths.add(unit.id);
+  if(centralTriggered)return false;
+  centralTriggered=true;
+  firstBotId=unit.id;
+  centralRemaining=CENTRAL_DELAY_SECONDS;
+  emit({type:'central-countdown-start',firstBotId,seconds:CENTRAL_DELAY_SECONDS});
+  return true;
+ }
+ function advanceCentralClock(dt){
+  if(!centralTriggered||centralOpen)return;
+  centralRemaining=Math.max(0,centralRemaining-dt);
+  if(centralRemaining<=1e-8){
+   centralRemaining=0;centralOpen=true;
+   emit({type:'central-open',farm:'center',seconds:CENTRAL_DELAY_SECONDS,firstBotId});
+  }
+ }
  function processFarm(p,dt,units){
+  // The central resource point is locked until exactly 300 seconds of
+  // active gameplay after the first non-hero soldier's death.
+  if(p.id==='center'&&!centralOpen){
+   p.owner=null;p.capturing=null;p.progress=0;p.incomeTimer=0;
+   return;
+  }
   let blue=false,red=false;
   for(const u of units){
    if(!u||u.alive===false||u.hp<=0)continue;
@@ -113,6 +142,7 @@ function create({onEvent=()=>{},centreMultiplier=CENTRAL_MULTIPLIER}={}){
  function update(dt,units=[]){
   if(!Number.isFinite(dt)||dt<0||dt>.25)throw Error('Invalid game delta');
   if(!Array.isArray(units))throw Error('Invalid units array');
+  advanceCentralClock(dt);
   for(const p of farms)processFarm(p,dt,units);
   const rate={blue:0,red:0};
   for(const p of farms)if(p.owner)rate[p.owner]+=.25*p.weight;
@@ -132,15 +162,17 @@ function create({onEvent=()=>{},centreMultiplier=CENTRAL_MULTIPLIER}={}){
   const owners={blue:[],red:[],neutral:[]};
   for(const p of farms)owners[p.owner||'neutral'].push(p.id);
   return {treasury:{...treasury},hero:{...hero},
+   central:{open:centralOpen,started:centralTriggered,
+     remainingSeconds:centralRemaining,firstBotId,delaySeconds:CENTRAL_DELAY_SECONDS},
    farms:farms.map(p=>({...p})),owners,
    periodicGold:{blue:farms.filter(p=>p.owner==='blue').reduce((s,p)=>s+FARM_INCOME*p.weight,0),
     red:farms.filter(p=>p.owner==='red').reduce((s,p)=>s+FARM_INCOME*p.weight,0)},
    events:events.slice()};
  }
- return {update,pay,earn,kill,changeHeroSide,summary,farms,treasury,hero};
+ return {update,pay,earn,kill,reportBotDeath,changeHeroSide,summary,farms,treasury,hero};
 }
 return {create,MAP,FARMS,SIZE,FACTIONS,TEAM_BLUE,TEAM_RED,
  CAPTURE_SECONDS,CAPTURE_BONUS,INCOME_INTERVAL,FARM_INCOME,
- CENTRAL_MULTIPLIER,START_TREASURY,START_HERO_WALLET,
+ CENTRAL_MULTIPLIER,CENTRAL_DELAY_SECONDS,START_TREASURY,START_HERO_WALLET,
  KILL_REWARD,ARMOURED_KILL_REWARD};
 });
