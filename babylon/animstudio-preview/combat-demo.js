@@ -13,10 +13,12 @@ const box=document.createElement('section');
 box.id='combat-board';
 box.setAttribute('aria-label','Проверка боевого цикла');
 box.innerHTML='<h2>Battlefield · стрелковая стойка</h2>'+
- '<p>Kar98k: остановился → пригнулся → прицелился → выстрел → затвор → бег.</p>'+
+ '<p>Kar98k / Panzerschreck: остановка перед выстрелом. MP40 / MG42: очереди на бегу с перезарядкой.</p>'+
  '<div class="actions">'+
  '<button id="combat-kar" aria-pressed="true">Kar98k</button>'+
  '<button id="combat-pz" aria-pressed="false">Panzerschreck*</button>'+
+ '<button id="combat-mp" aria-pressed="false">MP40</button>'+
+ '<button id="combat-mg" aria-pressed="false">MG42</button>'+
  '<button id="combat-play">▶ Боевой цикл</button>'+
  '<button id="combat-stop">■ Стоп</button>'+
  '<button id="combat-camera">Камера: сверху</button></div>'+
@@ -33,12 +35,16 @@ const demo={ready:false,done:false,posePreserved:false,errors:[],events:[],state
 window.__BATTLEFIELD_COMBAT_DEMO__=demo;
 function renderTelemetry(st){
  const tr={idle:'Ожидание',run:'Боевой бег',stop:'Торможение',lower:'Пригнулся',
-  aim:'Прицеливание',fire:'Выстрел',bolt:'Передёргивает затвор',
+  aim:'Прицеливание',fire:'Выстрел',runFire:'Очередь на бегу',
+  reload:'Перезарядка',bolt:'Передёргивает затвор',
   recover:'Возвращается в стойку',resume:'Продолжает бег',complete:'Готово'};
  el('combat-monitor').textContent='Оружие: '+selected+' · '+(tr[st?.phase]||st?.phase||'Ожидание')+
   '\nСкорость: '+speed.toFixed(2)+' м/с · пригнулся: '+Math.round((st?.crouch||0)*100)+
-  '% · выстрелов: '+(st?.fired||0)+(selected==='Kar98k'?
-  ' · затвор: '+(st?.boltLocked?'закрыт':'открыт'):'');
+  '% · выстрелов: '+(st?.fired||0)+
+  (selected==='Kar98k'?' · затвор: '+(st?.boltLocked?'закрыт':'открыт'):'')+
+  (st?.reloadSeconds?'\nБоезапас: '+st.ammoRemaining+'/'+st.ammoCapacity+
+    ' · перезарядка '+st.reloadSeconds.toFixed(1)+' с'+
+    (st.reloading?' ('+Math.round(st.reloadProgress*100)+'%)':''):'');
  el('combat-progress').firstElementChild.style.width=Math.round((st?.progress||0)*100)+'%';
 }
 function shotFlash(){
@@ -54,7 +60,19 @@ function shotFlash(){
 function onMarker(marker,st){
  demo.events.push({name:marker.name,frame:marker.frame,phase:marker.phase,
   speed:st.speed,crouch:st.crouch});
- if(marker.name==='shot'){shotFlash();el('combat-events').textContent='ВЫСТРЕЛ · кадр '+marker.frame}
+ if(marker.name==='shot'){
+   shotFlash();
+   if(['MP40','MG42'].includes(selected)&&viewer()?.combatPose)
+     viewer().combatPose.recoilPulse=1;
+   el('combat-events').textContent=(st.moving?'НА БЕГУ · ':'')+
+     'ВЫСТРЕЛ · кадр '+marker.frame;
+ }
+ else if(marker.name==='reload-start')
+   el('combat-events').textContent='ПЕРЕЗАРЯДКА · '+st.reloadSeconds.toFixed(1)+
+     ' с · стрельба заблокирована';
+ else if(marker.name==='reload-complete')
+   el('combat-events').textContent='ПЕРЕЗАРЯЖЕНО · боезапас '+st.ammoRemaining;
+
  else if(marker.name==='stop-confirmed')el('combat-events').textContent='Остановка подтверждена · скорость 0';
  else if(marker.name.startsWith('bolt-')){
   const names={'bolt-handle-lift':'Рукоять затвора вверх',
@@ -64,7 +82,8 @@ function onMarker(marker,st){
  }
 }
 function setStage(st){
- if(st.phase==='run'||st.phase==='resume')targetSpeed=SPEED;
+ if(st.phase==='run'||st.phase==='runFire'||st.phase==='resume'||
+     (st.phase==='reload'&&selected==='MP40'))targetSpeed=SPEED;
  else targetSpeed=0;
  if(viewer()?.loaded&&viewer().weapon===selected){
   const step=machine?.timeline.find(x=>x.id===st.phase);
@@ -77,6 +96,8 @@ function setPose(st){
   v.combatPose.active=true;v.combatPose.crouch=st.crouch;
   v.combatPose.boltProgress=st.phase==='bolt'?st.boltProgress:0;
   v.combatPose.stage=st.phase;
+  v.combatPose.reloadProgress=st.phase==='reload'?st.reloadProgress:0;
+  v.combatPose.recoilPulse=v.combatPose.recoilPulse||0;
  }
  demo.state=st;renderTelemetry(st);
 }
@@ -96,7 +117,8 @@ function placeCamera(){
 async function selectWeapon(weapon){
  if(pending)return;
  pending=true;
- for(const id of ['combat-kar','combat-pz','combat-play'])el(id).disabled=true;
+ for(const id of ['combat-kar','combat-pz','combat-mp','combat-mg','combat-play'])
+  el(id).disabled=true;
  try{
   machine?.stop();active=false;selected=weapon;speed=0;targetSpeed=0;walk=0;
   if(root)root.position.x=0;
@@ -116,6 +138,8 @@ async function selectWeapon(weapon){
   machine=createMachine();
   el('combat-kar').setAttribute('aria-pressed',String(weapon==='Kar98k'));
   el('combat-pz').setAttribute('aria-pressed',String(weapon==='Panzerschreck'));
+  el('combat-mp').setAttribute('aria-pressed',String(weapon==='MP40'));
+  el('combat-mg').setAttribute('aria-pressed',String(weapon==='MG42'));
   el('combat-events').textContent='Нажми «Боевой цикл»';
   renderTelemetry(machine.snapshot());placeCamera();
   demo.ready=ready=true;demo.weapon=selected;
@@ -124,7 +148,8 @@ async function selectWeapon(weapon){
   el('combat-events').textContent='Ошибка: '+e.message;
  }finally{
   pending=false;
-  for(const id of ['combat-kar','combat-pz','combat-play'])el(id).disabled=false;
+  for(const id of ['combat-kar','combat-pz','combat-mp','combat-mg','combat-play'])
+   el(id).disabled=false;
  }
 }
 function play(){
@@ -144,6 +169,8 @@ function stop(){
 }
 el('combat-kar').onclick=()=>selectWeapon('Kar98k');
 el('combat-pz').onclick=()=>selectWeapon('Panzerschreck');
+el('combat-mp').onclick=()=>selectWeapon('MP40');
+el('combat-mg').onclick=()=>selectWeapon('MG42');
 el('combat-play').onclick=play;
 el('combat-stop').onclick=stop;
 el('combat-camera').onclick=()=>{
@@ -172,8 +199,9 @@ const timer=setInterval(async()=>{
      if(st.done){
       active=false;speed=targetSpeed=0;demo.done=true;
       v.combatPose={active:false,crouch:0,boltProgress:0,stage:'complete'};
-      el('combat-events').textContent='Цикл завершён: '+st.fired+' выстрел'+
-       (selected==='Kar98k'?' · '+st.boltCount+' цикл затвора':'');
+      el('combat-events').textContent='Цикл завершён: '+st.fired+' выстрелов'+
+       (selected==='Kar98k'?' · '+st.boltCount+' цикл затвора':'')+
+       (st.reloadCount?' · перезарядка '+st.reloadSeconds.toFixed(1)+' с':'');
      }
     }catch(e){
      demo.errors.push(String(e.stack||e));console.error('combat cycle',e);
@@ -181,6 +209,8 @@ const timer=setInterval(async()=>{
     }
     if(camera)camera.setTarget(new B.Vector3(root.position.x,.97,root.position.z));
    }
+   if(v.combatPose?.recoilPulse>0)
+    v.combatPose.recoilPulse=Math.max(0,v.combatPose.recoilPulse-dt*10);
    if(flash){
     flash.ttl-=dt;flash.mesh.scaling.setAll(Math.max(.1,flash.ttl/.11));
     if(flash.ttl<=0){flash.mesh.dispose();flash.mat.dispose();flash=null}
