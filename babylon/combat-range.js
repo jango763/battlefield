@@ -174,6 +174,11 @@
       if (!result.ok) break;
       tracer(unit, target, result.weapon, result.hit);
       if (unit === actor) {
+        // The visible GLB must follow the automatic fallback, not just the damage rules.
+        if (actor.weapon === 'Kar98k' && result.weapon !== 'Kar98k') {
+          selected = 'Kar98k';
+          changeVisualWeapon();
+        }
         const hitText = result.hits.length ?
           result.hits.map(h => h.id + ': −' + h.damage + ' HP').join(', ') :
           'промах';
