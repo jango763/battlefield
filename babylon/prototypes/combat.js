@@ -29,7 +29,7 @@ for(let i=0;i<4;i++)state.enemies.push(soldier('german-'+i,'enemy',8+(i%2)*1.5,-
 // Stage 2: one real rigged soldier, isolated from the squad combat simulation.
 // The other seven placeholders remain available if asset loading fails.
 async function installAnimatedHero(unit){
- const base=new URL('../assets/native-hero-quaternius/',import.meta.url);
+ const base=new URL('../../assets/native-hero-quaternius/',import.meta.url);
  const imported=await B.SceneLoader.ImportMeshAsync('','',new URL('night-striker-lite.glb',base).href,scene);
  const rig=new B.TransformNode(unit.id+'-rig',scene);
  for(const node of imported.meshes.filter(m=>!m.parent))node.parent=rig;

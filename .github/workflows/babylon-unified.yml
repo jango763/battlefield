@@ -1,0 +1,41 @@
+name: Unified Babylon foundation QA
+on:
+  push:
+    branches:
+      - next/babylon-game-foundation-20261115
+    paths:
+      - 'babylon/**'
+      - 'assets/soldiers/german.glb'
+      - '.github/workflows/babylon-unified.yml'
+      - 'index.html'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check model and both preserved Babylon experiments
+        shell: bash
+        run: |
+          test -s assets/soldiers/german.glb
+          node --check babylon/main.js
+          node --input-type=module --check < babylon/prototypes/combat.js
+          node --input-type=module --check < babylon/prototypes/armory.js
+          node babylon/tests/verify-assets.mjs
+      - name: Browser test on desktop and phone viewport
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/babylon-qa playwright@1.58.2
+          /tmp/babylon-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/babylon-http.log 2>&1 &
+          sleep 2
+          node babylon/test-scene.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unified-babylon-original-soldier
+          path: babylon-qa-results/
+          if-no-files-found: ignore

@@ -1,7 +1,7 @@
 // Automated Babylon soldier checks. Run: npm install --no-save playwright
-// then npx playwright install chromium; node lab/babylon/verify-combat.mjs
+// then npx playwright install chromium; node babylon/tests/verify-combat.mjs
 import { chromium } from 'playwright';
-const url=process.env.BATTLEFIELD_LAB_URL || 'http://127.0.0.1:8765/lab/babylon/index.html';
+const url=process.env.BATTLEFIELD_LAB_URL || 'http://127.0.0.1:8765/babylon/prototypes/armory.html';
 const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl']});
 const page=await browser.newPage({viewport:{width:1280,height:800}});
 const errors=[];

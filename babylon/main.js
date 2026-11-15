@@ -66,7 +66,7 @@
 
     // Read the EXACT GLB recovered from the approved old model. Do not replace textures.
     const imported = await BABYLON.SceneLoader.ImportMeshAsync(
-      '', '../lab/original-panzergrenadier/', 'panzergrenadier-original.glb', scene);
+      '', '../assets/soldiers/', 'german.glb', scene);
 
     const drawable = imported.meshes.filter(m=>m.getTotalVertices && m.getTotalVertices()>0);
     if (drawable.length < 4) throw new Error('Не все элементы оригинальной модели загружены');
