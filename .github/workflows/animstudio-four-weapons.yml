@@ -8,7 +8,7 @@ on:
       - 'babylon/tools/make-panzerschreck-glb.py'
       - '.github/workflows/animstudio-four-weapons.yml'
 permissions:
-  contents: read
+  contents: write
 jobs:
   animate:
     runs-on: ubuntu-24.04
@@ -39,3 +39,15 @@ jobs:
           path: babylon/animstudio-output/
           if-no-files-found: warn
           retention-days: 30
+      - name: Publish actual running combat GLB in Babylon preview only
+        if: success()
+        run: |
+          mkdir -p babylon/animstudio-preview/models
+          cp babylon/animstudio-output/Battlefield_Panzerschreck.glb babylon/animstudio-preview/models/all-combat-run.glb
+          test -s babylon/animstudio-preview/models/all-combat-run.glb
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add babylon/animstudio-preview/models/all-combat-run.glb
+          git commit -m 'assets(babylon): publish 16 combat poses with real run cycles'
+          git pull --rebase origin next/babylon-game-foundation-20261115
+          git push origin HEAD:next/babylon-game-foundation-20261115
