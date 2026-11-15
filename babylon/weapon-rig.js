@@ -134,7 +134,8 @@
     cylinder('front sight', .017, .035, [0, .083, .66], dark);
     return () => { for (const mesh of meshes) mesh.dispose(); for (const mat of mats) mat.dispose(); };
   }
-  async function create({ scene, imported, root, state }) {
+  async function create({ scene, imported, root, state, animationDriven = false, bindUI = true,
+    weaponRoot = '../assets/ww2-weapons/', acceptExportSockets = false }) {
     const skeleton = imported.skeletons[0];
     const linked = (skeleton?.bones || []).map(b => b.getTransformNode?.()).filter(Boolean);
     const nodes = [...imported.transformNodes, ...imported.meshes, ...linked];
@@ -151,7 +152,8 @@
     const chest = joint('Spine2');
     if (!chest || Object.values(right).some(x => !x) || Object.values(left).some(x => !x))
       throw Error('Panzergrenadier: linked arm joints not found; model remains unmodified.');
-    if (!skeleton || skeleton.bones.length !== 65)
+    if (!skeleton || (skeleton.bones.length !== 65 &&
+      !(acceptExportSockets && skeleton.bones.length >= 65 && skeleton.bones.length <= 72)))
       throw Error('Unexpected soldier skeleton; refusing to retarget');
 
     // Pose reset is imperative until approved locomotion clips exist for this GLB.
@@ -183,7 +185,7 @@
         });
       }
     }
-    const response = await fetch('../assets/ww2-weapons/manifest.json');
+    const response = await fetch(weaponRoot + 'manifest.json');
     if (!response.ok) throw Error('Weapon manifest HTTP ' + response.status);
     const manifest = await response.json();
     const pivot = new B.TransformNode('weapon-chest-stabilized-world', scene);
@@ -193,7 +195,8 @@
     let needsPose = true, lastSolveTime = 0;
     let rocketDispose = null, generation = 0;
     state.weaponRig = {
-      rig: 'Mixamo/65 linked glTF nodes', pose, weapon: null,
+      rig: 'Mixamo linked glTF nodes + real-time two-hand IK', pose, weapon: null,
+      animationDriven,
       rightGripMeters: null, leftGripMeters: null,
       preliminaryGeometryOnly: true, experimentalFourthAsset: true
     };
@@ -202,8 +205,8 @@
     function update() {
       if (!meta) return;
       const now = performance.now();
-      if (!needsPose && (pose === 'ready' || pose === 'aim')) return;
-      if (!needsPose && now - lastSolveTime < 65) return;
+      if (!animationDriven && !needsPose && (pose === 'ready' || pose === 'aim')) return;
+      if (!animationDriven && !needsPose && now - lastSolveTime < 65) return;
       needsPose = false; lastSolveTime = now;
       for (const [node, q] of rest) node.rotationQuaternion = q.clone();
       refresh(chest); refresh(right.shoulder); refresh(left.shoulder);
@@ -286,7 +289,7 @@
       let incoming = null;
       if (id !== 'de-panzerschreck') {
         incoming = await B.SceneLoader.LoadAssetContainerAsync(
-          '', '../assets/ww2-weapons/' + nextMeta.file, scene);
+          '', weaponRoot + nextMeta.file, scene);
       }
       if (token !== generation) { incoming?.dispose(); return; }
       if (container) container.dispose(); container = null;
@@ -309,12 +312,14 @@
       buttonState(); update();
       return report;
     }
-    for (const el of document.querySelectorAll('[data-weapon]'))
-      el.addEventListener('click', () => equip(el.dataset.weapon).catch(e => {
-        report.error = String(e); console.error(e);
-      }));
-    for (const el of document.querySelectorAll('[data-pose]'))
-      el.addEventListener('click', () => setPose(el.dataset.pose));
+    if (bindUI) {
+      for (const el of document.querySelectorAll('[data-weapon]'))
+        el.addEventListener('click', () => equip(el.dataset.weapon).catch(e => {
+          report.error = String(e); console.error(e);
+        }));
+      for (const el of document.querySelectorAll('[data-pose]'))
+        el.addEventListener('click', () => setPose(el.dataset.pose));
+    }
     await equip('de-kar98k');
     state.weaponVariants = WEAPONS.map(x => x[0]);
     state.weaponRigReady = true;
