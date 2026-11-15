@@ -227,18 +227,21 @@
       } : {
         ready: [-.095, -.02, -.020],
         aim: [.012, 0, 0],
-        run: [-.18, -.035, -.048],
+        run: [.33, -.05, -.025],
         fire: [.012, 0, 0]
       })[pose];
       const localQ = B.Quaternion.FromEulerAngles(angles[0], angles[1], angles[2]);
       const gunQ = chestQ.multiply(localQ).normalize();
+      // When running, rifle/SMG/LMG is carried LOWER and CLOSER to the torso;
+      // it is NOT held at shoulder-height as if firing while sprinting.
       // Right shoulder stays fixed relative to chest; the weapon is not attached
       // to a swinging wrist, avoiding a feedback loop for the left support hand.
       const stockOffset = weaponId === 'de-panzerschreck'
         ? (running ? new B.Vector3(.10, -.13, .10)
           : pose === 'ready' ? new B.Vector3(.15, -.015, .06)
           : new B.Vector3(.16, .025, .05))
-        : new B.Vector3(.038, -.07, .115);
+        : (running ? new B.Vector3(.045, -.18, -.025)
+          : new B.Vector3(.038, -.07, .115));
       const stock = right.shoulder.getAbsolutePosition()
         .add(rotated(stockOffset, chestQ))
         .add(rotated(new B.Vector3(0, breathing + bob, -recoil), chestQ));
