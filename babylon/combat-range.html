@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1b241e">
+<title>Battlefield — полигон баланса оружия · Babylon.js</title>
+<style>
+:root{color-scheme:dark;font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:#17231c;color:#f4f3e7}
+*{box-sizing:border-box}body{margin:0;overflow:hidden}
+#view{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+header{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:12px;right:12px;z-index:4;pointer-events:none;text-shadow:0 1px 8px #000}
+h1{margin:0;font-size:17px}header p{margin:4px 0;font-size:11px;color:#d2dfd0}
+#panel{position:fixed;z-index:5;right:12px;top:calc(env(safe-area-inset-top) + 69px);width:min(370px,calc(100% - 24px));padding:13px;border-radius:13px;background:#1c2a23ee;border:1px solid #718470;box-shadow:0 9px 34px #0008;max-height:calc(100dvh - 90px);overflow-y:auto}
+h2{font-size:15px;margin:0 0 7px}.sub{color:#becfbc;font-size:11px;line-height:1.4;margin:7px 0}.row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+button{font:650 12px system-ui;color:#f4f6ee;border:1px solid #809880;background:#314838;padding:10px 9px;border-radius:7px;touch-action:manipulation;cursor:pointer;flex:1}
+button[aria-pressed="true"]{background:#d1dfa6;color:#1b2a1d;border-color:#e9eed4}
+button:disabled{opacity:.4;cursor:default}
+input[type=range]{width:100%;accent-color:#bed29a}
+#telemetry{font-size:12px;line-height:1.5;white-space:pre-line;font-variant-numeric:tabular-nums;border-radius:7px;padding:10px;background:#304536}
+#events{font-size:11px;color:#f0dda0;margin:9px 0 0;min-height:32px;line-height:1.4}
+#notice{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 10px);left:12px;right:12px;max-width:600px;margin:auto;text-align:center;background:#1c2b22df;border:1px solid #657e63;border-radius:8px;padding:8px;font-size:11px;pointer-events:none}
+@media(max-width:680px){
+ header h1{font-size:15px}#panel{top:auto;bottom:calc(env(safe-area-inset-bottom) + 55px);left:8px;right:8px;width:auto;max-height:52dvh;padding:9px 11px}
+ button{padding:8px 6px;font-size:11px}h2{font-size:13px}.row{margin-bottom:6px}
+ #telemetry{padding:7px;font-size:11px}#notice{font-size:10px;padding:5px}
+}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./weapon-rig.js"></script>
+<script src="./combat-balance-core.js"></script>
+</head>
+<body>
+<canvas id="view" aria-label="3D испытательный полигон Babylon"></canvas>
+<header><h1>Battlefield · полигон баланса</h1><p>Утверждённый немецкий боец · стрельба, БК, урон · мишени технические</p></header>
+<section id="panel" aria-label="Управление испытаниями">
+<h2>1. Оружие и снабжение</h2>
+<div class="row" id="weapons">
+<button data-gun="Kar98k" aria-pressed="true">Kar98k</button>
+<button data-gun="MP40" aria-pressed="false">MP40</button>
+<button data-gun="MG42" aria-pressed="false">MG42</button>
+<button data-gun="Panzerschreck" aria-pressed="false">Панцирь</button>
+</div>
+<div class="row">
+<button id="go">В бой</button>
+<button id="supply">Пополнить БК</button>
+</div>
+<h2>2. Испытание</h2>
+<div class="row" id="scenarios">
+<button data-case="duel" aria-pressed="true">1 против 1</button>
+<button data-case="squad" aria-pressed="false">1 против 4</button>
+<button data-case="blast" aria-pressed="false">Фугас</button>
+</div>
+<label for="distance">Дистанция: <b id="distanceValue">40</b> ед.</label>
+<input id="distance" type="range" min="15" max="100" step="5" value="40">
+<div class="row"><button id="motion" aria-pressed="false">Стрелять на бегу: нет</button><button id="restart">Сброс</button></div>
+<div id="telemetry">Готовим полигон…</div>
+<div id="events">Для покупки оружия оставайтесь на базе, затем нажмите «В бой».</div>
+<p class="sub">Цены в этом полигоне условные, только для теста экономики. Урон, дальность, вместимость и время перезарядки — согласованные. Радиус взрыва и скорострельность ещё настраиваются.</p>
+</section>
+<div id="notice">Вращайте камеру пальцем. После боя вернитесь на базу и докупите боекомплект.</div>
+<script src="./combat-range.js"></script>
+</body></html>
