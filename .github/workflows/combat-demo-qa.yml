@@ -4,6 +4,7 @@ on:
     branches: ['next/babylon-game-foundation-20261115']
     paths:
       - 'babylon/animstudio-preview/combat-demo.js'
+      - 'babylon/weapon-rig.js'
       - 'babylon/animstudio-preview/combat-cycle-core.js'
       - 'babylon/animstudio-preview/test-combat-demo.cjs'
       - 'babylon/animstudio-preview/viewer.js'
