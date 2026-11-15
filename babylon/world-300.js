@@ -190,6 +190,16 @@ function create(scene,B,map){
     mesh.position.x-=center.x;
     mesh.position.z-=center.z;
     mesh.position.y-=bound.min.y;
+    // Clone and darken the original vehicle materials as in the old game.
+    // Avoid mutating shared source materials or altering the GLB asset.
+    const parts=[mesh,...(mesh.getChildMeshes?mesh.getChildMeshes():[])];
+    for(const part of parts){
+     if(!part.material||!part.material.clone)continue;
+     const burnt=part.material.clone('burnt-'+w.id+'-'+part.name);
+     if(burnt.albedoColor)burnt.albedoColor=burnt.albedoColor.scale(.42);
+     else if(burnt.diffuseColor)burnt.diffuseColor=burnt.diffuseColor.scale(.42);
+     part.material=burnt;
+    }
     const placeholder=wreckProxies.get(w.id)||[];
     for(const part of placeholder)part.dispose();
     wreckProxies.delete(w.id);
