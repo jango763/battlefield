@@ -11,6 +11,7 @@
 })(typeof window!=='undefined'?window:null,function(){
 'use strict';
 const FPS=30;
+const RUN_AND_GUN=new Set(['MP40','MG42']);
 const stages={
  Kar98k:[
   {id:'run',clip:'Run',frames:36,travel:true,stance:0,markers:[]},
@@ -25,6 +26,24 @@ const stages={
      {frame:30,name:'bolt-locked'}]},
   {id:'recover',clip:'Hold',frames:23,travel:false,stance:.18,markers:[]},
   {id:'resume',clip:'Run',frames:31,travel:true,stance:0,markers:[]}
+ ],
+ // MP40 and MG42 preserve the full RUN leg clip during firing.
+ // Shot markers are animation-frame events; recoil is an upper-body overlay.
+ MP40:[
+  {id:'run',clip:'Run',frames:28,travel:true,stance:0,markers:[]},
+  {id:'runFire',clip:'Run',frames:67,travel:true,stance:0,markers:[
+   {frame:10,name:'shot'},{frame:19,name:'shot'},{frame:28,name:'shot'},
+   {frame:43,name:'shot'},{frame:52,name:'shot'}]},
+  {id:'resume',clip:'Run',frames:25,travel:true,stance:0,markers:[]}
+ ],
+ MG42:[
+  {id:'run',clip:'Run',frames:26,travel:true,stance:0,markers:[]},
+  {id:'runFire',clip:'Run',frames:66,travel:true,stance:0,markers:[
+   {frame:11,name:'shot'},{frame:15,name:'shot'},{frame:19,name:'shot'},
+   {frame:23,name:'shot'},{frame:27,name:'shot'},
+   {frame:43,name:'shot'},{frame:47,name:'shot'},{frame:51,name:'shot'},
+   {frame:55,name:'shot'},{frame:59,name:'shot'}]},
+  {id:'resume',clip:'Run',frames:29,travel:true,stance:0,markers:[]}
  ],
  Panzerschreck:[
   {id:'run',clip:'Run',frames:35,travel:true,stance:0,markers:[]},
@@ -46,7 +65,7 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
    weapon,phase:'idle',clip:'Hold',phaseFrame:0,progress:0,
    moving:false,speed:0,crouch:0,boltProgress:0,
    fired:0,boltLocked:weapon==='Panzerschreck',
-   boltCount:0,shotsOnMove:0,history:[],markers:[],done:false,
+   boltCount:0,shotsOnMove:0,movingShots:0,history:[],markers:[],done:false,
    running:false,requestedStop:false
  };
  let phaseIndex=-1,phaseFrame=0,markerSeen=new Set(),sequenceId=0;
@@ -75,9 +94,16 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
  function emit(name,frame){
    const marker={name,phase:s.phase,frame,sequenceId};
    if(name==='shot'){
-     if(s.speed>speedEpsilon||s.moving){s.shotsOnMove++;throw Error('Shot fired while moving');}
-     if(weapon==='Kar98k'&&!s.boltLocked)throw Error('Bolt is not ready');
-     if(!s.markers.some(x=>x.name==='stop-confirmed'))throw Error('Shot without stopped pose');
+     if(RUN_AND_GUN.has(weapon)){
+       if(s.phase!=='runFire'||!s.moving||s.speed<=speedEpsilon)
+         throw Error('Moving shot requires active running velocity');
+       s.movingShots++;
+     }else{
+       if(s.speed>speedEpsilon||s.moving){s.shotsOnMove++;throw Error('Shot fired while moving');}
+       if(weapon==='Kar98k'&&!s.boltLocked)throw Error('Bolt is not ready');
+       if(!s.markers.some(x=>x.name==='stop-confirmed'))
+         throw Error('Shot without stopped pose');
+     }
      s.fired++;
      if(weapon==='Kar98k')s.boltLocked=false;
    }
@@ -88,7 +114,7 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
  function start(){
    sequenceId++;s.phase='idle';s.clip='Hold';s.progress=0;s.phaseFrame=0;
    s.running=true;s.done=false;s.moving=true;s.speed=runSpeed;s.crouch=0;
-   s.boltProgress=0;s.fired=0;s.boltCount=0;s.shotsOnMove=0;s.markers=[];s.history=[];
+   s.boltProgress=0;s.fired=0;s.boltCount=0;s.shotsOnMove=0;s.movingShots=0;s.markers=[];s.history=[];
    s.boltLocked=true;s.requestedStop=false;
    transition(0);
    return copy();
@@ -108,7 +134,7 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
      const before=phaseFrame;
      phaseFrame+=take;frames-=take;
      const seconds=take/fps;
-     if(stage.id==='run'||stage.id==='resume'){
+     if(stage.travel){
        s.speed=typeof measureSpeed==='function'
          ?Math.max(0,Number(measureSpeed())||0):runSpeed;
      }else if(typeof measureSpeed==='function'){
@@ -123,8 +149,11 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
      else s.crouch=stage.stance;
      if(stage.id==='bolt')s.boltProgress=s.progress;
      onPose(copy());
-     for(const m of stage.markers)if(before<m.frame&&phaseFrame>=m.frame&&!markerSeen.has(m.name)){
-       markerSeen.add(m.name);emit(m.name,m.frame);
+     for(const m of stage.markers){
+       const key=m.name+'@'+m.frame;
+       if(before<m.frame&&phaseFrame>=m.frame&&!markerSeen.has(key)){
+         markerSeen.add(key);emit(m.name,m.frame);
+       }
      }
      if(phaseFrame+1e-7>=stage.frames){
        if(stage.id==='stop'){
@@ -152,5 +181,5 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
  }
  return {start,update,stop,snapshot:copy,timeline,framesPerSecond:fps};
 }
-return {create,PROFILES:stages,FPS};
+return {create,PROFILES:stages,FPS,RUN_AND_GUN};
 });
