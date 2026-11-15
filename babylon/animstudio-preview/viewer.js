@@ -103,6 +103,7 @@
     engine=new B.Engine(canvas,true,{preserveDrawingBuffer:false,stencil:true,powerPreference:'high-performance'});
     engine.setHardwareScalingLevel(Math.max(1,window.devicePixelRatio/1.8));
     scene=new B.Scene(engine);
+    state.scene=scene; // test-only deterministic frame seeking (no end-user UI exposed)
     scene.useRightHandedSystem=true;
     scene.clearColor=new B.Color4(.11,.17,.15,1);
     scene.ambientColor=new B.Color3(.3,.35,.33);
