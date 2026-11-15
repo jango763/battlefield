@@ -324,6 +324,8 @@
         .add(rightFinger.scale(.065)), trigger).toFixed(4);
       report.leftGripMeters = +B.Vector3.Distance(left.hand.getAbsolutePosition()
         .add(leftFinger.scale(.065)), support).toFixed(4);
+      report.handFocus = B.Vector3.Lerp(
+        right.hand.getAbsolutePosition(),left.hand.getAbsolutePosition(),.5).asArray();
       report.geometricPass = report.rightGripMeters < .075 && report.leftGripMeters < .075;
       report.pose = pose;
     }
