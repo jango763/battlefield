@@ -1,0 +1,35 @@
+name: Rig65 skeleton + aim animation
+on:
+  push:
+    branches:
+      - rig/65bone-aim-animation-20261115
+  workflow_dispatch:
+jobs:
+  rig-animation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Structural GLB and JS checks
+        run: |
+          node lab/babylon/verify-assets.mjs
+          node --check --input-type=module < lab/rig-pose/app.js
+      - name: Install browser test runner
+        run: |
+          npm install --no-save @playwright/test
+          npx playwright install --with-deps chromium
+      - name: Browser rig pose test with screenshots
+        run: |
+          mkdir -p test-results
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/battlefield-rig-http.log 2>&1 &
+          sleep 2
+          npx playwright test lab/rig-pose/verify-pose.spec.cjs --reporter=line --workers=1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rig65-screenshots
+          path: test-results/
+          if-no-files-found: ignore
