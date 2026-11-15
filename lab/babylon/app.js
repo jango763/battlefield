@@ -126,11 +126,16 @@ async function start(){
   if(from.lengthSquared()<1e-8||to.lengthSquared()<1e-8)return;
   from.normalize();to.normalize();
   const cross=B.Vector3.Cross(from,to),sin=cross.length();
-  if(sin<1e-6)return;
+  // Nearly opposite vectors need a stable perpendicular axis, not a zero cross product.
+  if(sin<1e-6&&B.Vector3.Dot(from,to)>0)return;
+  if(sin<1e-6){
+   const reference=Math.abs(from.y)<.9?B.Axis.Y:B.Axis.X;
+   cross.copyFrom(B.Vector3.Cross(from,reference).normalize());
+  }
   const angle=Math.min(Math.atan2(sin,B.Vector3.Dot(from,to)),.20);
   const parentRotation=new B.Quaternion();
   joint.parent.getWorldMatrix().decompose(undefined,parentRotation,undefined);
-  const localAxis=B.Vector3.TransformNormal(cross.scale(1/sin),
+  const localAxis=B.Vector3.TransformNormal(cross.scale(sin<1e-6?1:1/sin),
    B.Matrix.FromQuaternion(parentRotation.conjugate())).normalize();
   const delta=B.Quaternion.RotationAxis(localAxis,angle);
   const original=joint.rotationQuaternion?.clone()||
@@ -173,6 +178,10 @@ async function start(){
    const b=hand.getAbsolutePosition().subtract(elbow).normalize();
    return Math.acos(B.Scalar.Clamp(B.Vector3.Dot(a,b),-1,1))*180/Math.PI;
   };
+  state.ikResidual={
+   right:+B.Vector3.Distance(rightHand.getAbsolutePosition(),trigger).toFixed(4),
+   left:+B.Vector3.Distance(leftHand.getAbsolutePosition(),support).toFixed(4)
+  };
   state.elbowAngles={right:+elbowAngle(rightUpper,rightLower,rightHand).toFixed(1),
    left:+elbowAngle(leftUpper,leftLower,leftHand).toFixed(1)};
   state.combatPoseStatus='Dual-hand IK with anatomical elbow diagnostics';
@@ -201,15 +210,16 @@ async function start(){
    const muzzleForward=B.Vector3.Dot(muzzleWorld.subtract(trigger).normalize(),torsoForward)>.5;
    const buttNearShoulder=!!rightUpper&&B.Vector3.Distance(shoulderWorld,positionOf(rightUpper))<.65;
    const elbowBendOk=!!state.elbowAngles&&Object.values(state.elbowAngles).every(deg=>deg>35&&deg<165);
-   state.combatAcceptance={rightRaised,leftSupport,rightGrip,muzzleForward,buttNearShoulder,elbowBendOk,elbowAngles:state.elbowAngles,
-    passed:!!(rightRaised&&leftSupport&&rightGrip&&muzzleForward&&buttNearShoulder&&elbowBendOk),
+   const ikConverged=!!state.ikResidual&&Object.values(state.ikResidual).every(d=>d<.12);
+   state.combatAcceptance={rightRaised,leftSupport,rightGrip,muzzleForward,buttNearShoulder,elbowBendOk,ikConverged,ikResidual:state.ikResidual,elbowAngles:state.elbowAngles,
+    passed:!!(rightRaised&&leftSupport&&rightGrip&&muzzleForward&&buttNearShoulder&&elbowBendOk&&ikConverged),
     note:'Geometric gate only. Hand rotations and mesh deformation require visual verification'};
   }else state.combatAcceptance=null;
  }
 
  async function equipWeapon(id){
   const generation=++weaponGeneration;
-  state.weapon=id;state.weaponError=null;state.weaponAttached=false;
+  state.weapon=id;state.weaponError=null;state.weaponAttached=false;state.ikResidual=null;state.elbowAngles=null;
   try{
    const meta=manifest.weapons[id];if(!meta)throw Error('Unknown weapon '+id);
    const url=new URL('../../assets/ww2-weapons/'+meta.file,import.meta.url);
