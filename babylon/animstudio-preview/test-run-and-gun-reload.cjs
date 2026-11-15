@@ -25,6 +25,11 @@ const fs=require('node:fs');
     await page.click('#combat-play');
     await page.waitForFunction(()=>window.__BATTLEFIELD_COMBAT_DEMO__?.state?.phase==='runFire',
       null,{timeout:20000});
+    // The state machine changes phase during scene.onBeforeRender; the IK
+    // overlay report updates on the NEXT observer pass. Do not sample the
+    // immediately preceding frame before the new gun pose is applied.
+    await page.waitForFunction(()=>window.__BATTLEFIELD_ANIMATIONS__?.weaponRig?.movingFireOverlay===true,
+      null,{timeout:7000});
     const firing=await page.evaluate(()=>{
      const d=window.__BATTLEFIELD_COMBAT_DEMO__,v=window.__BATTLEFIELD_ANIMATIONS__;
      return {phase:d.state.phase,speed:d.state.speed,moving:d.state.moving,
@@ -49,7 +54,8 @@ const fs=require('node:fs');
     if(firstReload.seconds!==expected||firstReload.phase!=='reload')
      throw Error('RELOAD_DURATION_WRONG '+JSON.stringify(firstReload));
     await page.waitForFunction(()=>window.__BATTLEFIELD_COMBAT_DEMO__?.state?.phase==='reload'
-      && window.__BATTLEFIELD_COMBAT_DEMO__.state.reloadProgress>.3,
+      && window.__BATTLEFIELD_COMBAT_DEMO__.state.reloadProgress>.3
+      && window.__BATTLEFIELD_ANIMATIONS__?.weaponRig?.reloadHandOffsetMeters>.005,
       null,{timeout:30000});
     const reload=await page.evaluate(()=>{
      const d=window.__BATTLEFIELD_COMBAT_DEMO__,v=window.__BATTLEFIELD_ANIMATIONS__;
