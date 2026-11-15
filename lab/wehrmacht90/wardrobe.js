@@ -226,8 +226,24 @@ function buildTailoredM40(scene,body){
   if(y<.97&&ax<.22)return 'pants';
   return 'coat';
  };
+ // Treat the existing skinned body as the source of sleeve topology.
+ // The volume tunic loft covers the trunk; retaining the old torso triangles
+ // creates two overlapping cloth surfaces, which hid buttons and pocket flaps.
+ const skeletonBones=body.skeleton.bones;
+ const jointIds=new Set(skeletonBones.map((bone,index)=>/^(upperarm|lowerarm|clavicle)_[lr]$/i.test(bone.name)?index:-1).filter(i=>i>=0));
+ const matrixIds=body.getVerticesData(B.VertexBuffer.MatricesIndicesKind);
+ const matrixWeights=body.getVerticesData(B.VertexBuffer.MatricesWeightsKind);
  const region=new Array(vcount);
- for(let i=0;i<vcount;i++)region[i]=identify(pos[i*3],pos[i*3+1],pos[i*3+2]);
+ for(let i=0;i<vcount;i++){
+  let kind=identify(pos[i*3],pos[i*3+1],pos[i*3+2]);
+  if(kind==='coat'&&jointIds.size&&matrixIds&&matrixWeights){
+   let armWeight=0;
+   for(let j=0;j<4;j++)if(jointIds.has(matrixIds[i*4+j]))armWeight+=matrixWeights[i*4+j];
+   // Shoulder and arm sleeves stay skinned. Torso belongs to one continuous loft.
+   if(armWeight<.28)kind='skin';
+  }
+  region[i]=kind;
+ }
  for(let i=0;i<indices.length;i+=3){
   const a=indices[i],b=indices[i+1],c=indices[i+2];
   const counts={coat:0,pants:0,boots:0};
@@ -288,6 +304,9 @@ export async function installWehrmachtOutfit(scene,model,onUpdate){
  if(!chest||!head)throw Error('90-joint model does not expose chest/head transform nodes');
  const chestTracker=createTracker(scene,chest),headTracker=createTracker(scene,head);
  const kit=buildTailoredKit(scene,chestTracker);
+ // The reference coat loft sits in front of the original body. Keep sewn
+ // buttons/flaps *in front* of the cloth rather than underneath its surface.
+ kit.root.position.z=.066;
  const sleeves=buildTailoredM40(scene,wool.body);
  const loft=loftTunic(scene,wool.body,palette.tunic);
  const caps={};
