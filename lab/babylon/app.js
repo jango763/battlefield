@@ -88,7 +88,7 @@ async function start(){
  const manifest=await fetch(new URL('../../assets/ww2-weapons/manifest.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('manifest HTTP '+r.status);return r.json();});
  const toVec=a=>new B.Vector3(...a);
  const positionOf=node=>node?.getAbsolutePosition?.()||B.Vector3.Zero();
- // Static combat pose: CCD only while the fourth button is selected.
+ // Experimental static two-hand grip: solve only once after the idle pose freezes.
  function aimJoint(joint,hand,target){
   if(!joint||!hand||!joint.parent)return;
   joint.computeWorldMatrix(true);hand.computeWorldMatrix(true);
@@ -110,6 +110,7 @@ async function start(){
   if(!upper||!lower||!hand)return;
   for(let i=0;i<8;i++){aimJoint(lower,hand,target);aimJoint(upper,hand,target);}
  }
+ let combatPoseSolved=false;
  function updateWeaponPose(){
   if(!weaponRoot||!grip)return;
   // The trigger is the weapon origin (see manifest). Keep it at the right-hand
@@ -122,6 +123,16 @@ async function start(){
   const trigger=weaponRoot.getAbsolutePosition();
   const support=toVec(weaponRoot.metadata?.support||[0,0,.25]);
   const supportWorld=B.Vector3.TransformCoordinates(support,weaponRoot.getWorldMatrix());
+  if(state.animation==='combat'&&!combatPoseSolved){
+   combatPoseSolved=true;
+   try{
+    if(rightUpper&&rightLower&&rightHand&&leftUpper&&leftLower&&leftHand){
+     poseArm(rightUpper,rightLower,rightHand,trigger);
+     poseArm(leftUpper,leftLower,leftHand,supportWorld);
+     state.combatPoseStatus='IK attempted on both arms';
+    }else state.combatPoseStatus='IK skipped: arm joints unavailable';
+   }catch(error){state.combatPoseStatus='IK failed: '+String(error);}
+  }
   state.gripDistances={
    right:rightHand?Number(B.Vector3.Distance(positionOf(rightHand),trigger).toFixed(3)):null,
    left:leftHand?Number(B.Vector3.Distance(positionOf(leftHand),supportWorld).toFixed(3)):null
@@ -152,9 +163,9 @@ async function start(){
  weaponSelect.addEventListener('change',()=>equipWeapon(weaponSelect.value));
  state.equipWeapon=equipWeapon;
  function select(mode){
-  state.animation=mode;
+  state.animation=mode;combatPoseSolved=false;
   for(const group of Object.values(remapped))group.stop();
-  if(mode==='combat'&&remapped.idle){remapped.idle.start(true,1,remapped.idle.from,remapped.idle.to,false);remapped.idle.pause();}
+  if(mode==='combat'&&remapped.idle){remapped.idle.start(true,1,remapped.idle.from,remapped.idle.to,false);remapped.idle.goToFrame(remapped.idle.from);remapped.idle.pause();}
   else if(remapped[mode])remapped[mode].start(true,1,remapped[mode].from,remapped[mode].to,false);
   for(const btn of document.querySelectorAll('[data-clip]'))btn.setAttribute('aria-pressed',String(btn.dataset.clip===mode));
   log('Babylon.js | meshes: '+state.meshes+' | skeletons: '+state.skeletons+' | tracks: '+JSON.stringify(counts)+'\nAnimation: '+mode+' | '+(mode==='combat'?'static inspection pose; grip not yet solved':remapped[mode]?'active':'НЕ ПРИВЯЗАНА — требуется адаптация')+'\nSource groups: '+state.groups.join(', '));
