@@ -85,6 +85,27 @@ async function start(){
   return state.rigAudit;
  };
  auditRig();
+ // Rig-space diagnostic: measure real local axes and world-space shoulder/hand
+ // positions before attempting any combat retargeting. This does not mutate
+ // bones or the existing three animation groups.
+ function sampleRigSpace(){
+  const names={chest,rightUpper,rightLower,rightHand,leftUpper,leftLower,leftHand};
+  const data={};
+  for(const [key,node] of Object.entries(names)){
+   if(!node?.computeWorldMatrix||!node?.getAbsolutePosition){data[key]={error:'not a transform node'};continue;}
+   node.computeWorldMatrix(true);
+   const p=node.getAbsolutePosition();
+   const world=node.getWorldMatrix();
+   const axis=x=>{const v=B.Vector3.TransformNormal(x,world).normalize();return [v.x,v.y,v.z].map(n=>+n.toFixed(4));};
+   data[key]={name:node.name,position:[p.x,p.y,p.z].map(n=>+n.toFixed(4)),
+    localX:axis(B.Axis.X),localY:axis(B.Axis.Y),localZ:axis(B.Axis.Z),
+    parent:node.parent?.name||null};
+  }
+  return data;
+ }
+ state.sampleRigSpace=sampleRigSpace;
+ state.rigSpace=sampleRigSpace();
+
  const manifest=await fetch(new URL('../../assets/ww2-weapons/manifest.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('manifest HTTP '+r.status);return r.json();});
  const toVec=a=>new B.Vector3(...a);
  const positionOf=node=>node?.getAbsolutePosition?.()||B.Vector3.Zero();
