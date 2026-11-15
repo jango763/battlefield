@@ -73,10 +73,17 @@
     controls.minDistance=Math.max(.5,size.y*.45);
     controls.maxDistance=Math.max(8,size.y*5);
     setView(35);
-    status.textContent='Оригинал загружен · '+state.meshes+' частей модели · '+state.bones+' костей · '+state.materials+' материалов. Вращайте пальцем.';
-    state.ready=true;
     state.bounds={width:size.x,height:size.y,depth:size.z};
     state.originalMaterials=true;
+    if(new URLSearchParams(location.search).get('weapon')==='none'){
+      status.textContent='Исходная модель без оружия · '+state.bones+' костей';
+      state.weaponStatus='none';state.ready=true;
+    }else{
+      if(typeof window.installPanzerKar98k!=='function')throw Error('Скрипт подгонки винтовки не загружен');
+      window.installPanzerKar98k({figure:original,scene,status,state})
+        .then(()=>{state.ready=true;})
+        .catch(fail);
+    }
    }catch(e){fail(e)}
   },(e)=>{if(e.lengthComputable)status.textContent='Загрузка оригинала: '+Math.round(100*e.loaded/e.total)+'%';},fail);
  }catch(e){fail(e)}
