@@ -1,3 +1,4 @@
+import {buildTailoredKit} from './tailored-kit.js';
 // Battlefield · Heer M40 visual-fit test on a verified 90-bone body.
 // Source references: Kenton-GMI/muster-ww2 (MIT), see SOURCES.md.
 // This is a rigid-accessory + skinned-body material prototype, NOT finished re-rigging.
@@ -137,12 +138,12 @@ async function loadCap(scene,name,tracker){
   low=B.Vector3.Minimize(low,b.minimumWorld);hi=B.Vector3.Maximize(hi,b.maximumWorld);
  }
  const extent=hi.subtract(low),center=low.add(hi).scale(.5);
- const capWidth=.184;
+ const capWidth=name==='m43-field-cap'?.217:.209;
  const scalar=capWidth/extent.x;
  // Head pivot is at ~1.525m in the reference skeleton. The native cap
  // geometry has its own height; align its lowest point ~0.16m above head joint.
  pivot.scaling.setAll(scalar);
- pivot.position.set(-center.x*scalar,.150-low.y*scalar,-center.z*scalar);
+ pivot.position.set(-center.x*scalar,(name==='m43-field-cap'?.110:.095)-low.y*scalar,-center.z*scalar+.010);
  const group=new B.TransformNode('M40-'+name+'-track',scene);
  group.parent=tracker.node;
  pivot.parent=group;
@@ -214,7 +215,7 @@ function buildTailoredM40(scene,body){
  const identify=(x,y,z)=>{
   const ax=Math.abs(x);
   if(y<.24||y>1.48)return 'skin';
-  if(y<1.02&&ax>.192&&y>.77)return 'skin'; // uncovered palms
+  if(y<.83&&ax>.183&&y>.73)return 'skin'; // only exposed palms, not forearms
   if(y<.77)return 'pants';
   if(y<.97&&ax<.22)return 'pants';
   return 'coat';
@@ -268,7 +269,7 @@ export async function installWehrmachtOutfit(scene,model,onUpdate){
  const chest=getJoint(model,'spine_05'),head=getJoint(model,'head');
  if(!chest||!head)throw Error('90-joint model does not expose chest/head transform nodes');
  const chestTracker=createTracker(scene,chest),headTracker=createTracker(scene,head);
- const kit=decorateM40(scene,chestTracker);
+ const kit=buildTailoredKit(scene,chestTracker);
  const sleeves=buildTailoredM40(scene,wool.body);
  const caps={};
  const errors=[];
