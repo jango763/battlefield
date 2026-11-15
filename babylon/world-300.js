@@ -16,6 +16,7 @@ function from(v){return {x:v.x+ORIGIN,z:v.z+ORIGIN}}
 function create(scene,B,map){
  if(!scene||!B||map?.size!==SIZE)throw Error('World300 requires 300x300 map');
  const nodes=[],obstacles=[],rings=new Map(),farmMats=new Map();
+ const wreckProxies=new Map();let originalWrecksLoaded=0;
  const mats={};
  function material(id,hex,emissive=null){
   if(mats[id])return mats[id];
@@ -143,20 +144,62 @@ function create(scene,B,map){
  // The original GLB is embedded in a huge legacy HTML file and must be
  // extracted before the intact BTR model is substituted here.
  for(const w of map.wrecks){
+  const proxies=[];
   const hull=box('legacy-btr-position-'+w.id,7.4,1.6,3.1,w.x,1.0,w.z,mat.burnt,w.heading);
-  hull.metadata={mapTag:'original-btr-asset-needed',wreckId:w.id};
-  box('btr-top-'+w.id,4.1,.85,2.7,w.x,2.0,w.z,mat.rust,w.heading);
+  proxies.push(hull);
+  proxies.push(box('btr-top-'+w.id,4.1,.85,2.7,w.x,2.0,w.z,mat.rust,w.heading));
   for(const sign of [-1,1])for(const offset of [-2.3,0,2.3]){
    const wheel=cylinder('btr-wheel-'+w.id+'-'+sign+'-'+offset,1.35,.62,
     w.x+Math.cos(w.heading)*offset-Math.sin(w.heading)*sign*1.7,
     .78,w.z+Math.sin(w.heading)*offset+Math.cos(w.heading)*sign*1.7,
     mat.black,10);
-   wheel.rotation.z=Math.PI/2;
+   wheel.rotation.z=Math.PI/2;proxies.push(wheel);
   }
   obstacle(w.x,w.z,8,4,'btr-wreck');
-  // scorched terrain and wreck smoke marker; rendered smoke comes later.
   const burn=cylinder('btr-scorch-'+w.id,10,.018,w.x,.07,w.z,mat.burnt,16);
-  burn.scaling.z=.5;
+  burn.scaling.z=.5;proxies.push(burn);
+  wreckProxies.set(w.id,proxies);
+ }
+ // Source: the original project's embedded Tykryk Sketchfab GLB,
+ // CC BY 4.0 ("Cartoon Dieselpunk armored cars Polygonal Style").
+ // Use its actual Object_2, Object_3, Object_4 meshes rather than new cars.
+ async function loadOriginalBTR(){
+  try{
+   const container=await B.SceneLoader.LoadAssetContainerAsync(
+    './assets/','btr-convoy-legacy.glb',scene);
+   container.addAllToScene();
+   const list=[...(container.meshes||[]),...(container.transformNodes||[])];
+   const originals=['Object_2','Object_3','Object_4'];
+   const unused=list.find(node=>node.name==='Object_5');
+   unused?.setEnabled(false);
+   for(let i=0;i<map.wrecks.length;i++){
+    const w=map.wrecks[i],name=originals[i],mesh=list.find(node=>node.name===name);
+    if(!mesh || !mesh.getHierarchyBoundingVectors)throw Error('Missing original '+name);
+    mesh.computeWorldMatrix(true);
+    const bound=mesh.getHierarchyBoundingVectors(true);
+    const center=bound.min.add(bound.max).scale(.5);
+    const bounds=bound.max.subtract(bound.min);
+    const span=Math.max(bounds.x,bounds.z);
+    if(!Number.isFinite(span)||span<.01)throw Error('Original BTR dimensions invalid');
+    const anchor=new B.TransformNode('real-btr-'+w.id,scene);
+    anchor.position.copyFrom(at(w.x,w.z,0,B));
+    anchor.rotation.y=w.heading;
+    anchor.scaling.setAll(7.6/span);
+    // The original GLB nodes have identity parents and baked geometry.
+    mesh.parent=anchor;
+    mesh.position.x-=center.x;
+    mesh.position.z-=center.z;
+    mesh.position.y-=bound.min.y;
+    const placeholder=wreckProxies.get(w.id)||[];
+    for(const part of placeholder)part.dispose();
+    wreckProxies.delete(w.id);
+    originalWrecksLoaded++;
+   }
+   return {ok:true,loaded:originalWrecksLoaded};
+  }catch(error){
+   console.warn('Original convoy GLB unavailable; retaining collision-safe silhouettes.',error);
+   return {ok:false,loaded:originalWrecksLoaded,error:String(error)};
+  }
  }
  // Sandbags and intermittent trees — use instances for low draw-call count.
  for(let i=0;i<50;i++){
@@ -186,7 +229,8 @@ function create(scene,B,map){
    rings.get(farm.id).isVisible=true;
   }
  }
- return {ground,nodes,obstacles,rings,syncFarms,
+ return {ground,nodes,obstacles,rings,syncFarms,loadOriginalBTR,
+  getOriginalWreckCount:()=>originalWrecksLoaded,
   toScene:(x,z,y=0)=>at(x,z,y,B),
   fromScene:from,
   inBase:(x,z,team,radius=25)=>{
