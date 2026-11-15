@@ -158,6 +158,7 @@
       }
       if (unit.reloadRemaining > 0) return { ok: false, reason: 'already-reloading' };
       if (slot.loaded >= w.magazineSize) return { ok: false, reason: 'magazine-full' };
+      unit.cooldown = 0; // A reload cannot accumulate fire time.
       unit.reloadRemaining = w.reloadSeconds;
       unit.reloadWeapon = weapon;
       emit('reload-start', { id: unit.id, weapon, seconds: w.reloadSeconds });
@@ -167,7 +168,7 @@
       if (!Number.isFinite(dt) || dt < 0) throw Error('Invalid delta time');
       for (const unit of units) {
         if (!unit.alive) continue;
-        unit.cooldown = Math.max(0, unit.cooldown - dt);
+        unit.cooldown = Math.max(-.25, unit.cooldown - dt);
         unit.suppressed = Math.max(0, unit.suppressed - dt);
         if (unit.reloadRemaining <= 0) continue;
         unit.reloadRemaining = Math.max(0, unit.reloadRemaining - dt);
@@ -205,7 +206,7 @@
         slot.loaded--;
       }
       attacker.shots++;
-      attacker.cooldown = w.interval;
+      attacker.cooldown += w.interval; // Preserve fractional frame overshoot across FPS.
       const probability = hitChance(weapon, d, { moving, suppressed: attacker.suppressed > 0, cover });
       const hit = random() < probability;
       const hits = [];
