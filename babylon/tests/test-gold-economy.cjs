@@ -1,0 +1,57 @@
+'use strict';
+const assert=require('node:assert/strict');
+const gold=require('../gold-economy-core.js');
+const {MAP,FARMS,create}=gold;
+assert.equal(MAP.size,300);
+assert.equal(MAP.farms.length,5);
+assert.equal(MAP.pillboxes.length,7);
+assert.equal(MAP.wrecks.length,3);
+assert.equal(MAP.teamsize,12);
+assert.equal(FARMS.filter(f=>f.id==='center').length,1);
+assert.deepEqual(FARMS.filter(f=>f.id==='center').map(f=>[f.x,f.z]),[[150,150]]);
+const sim=create();
+assert.deepEqual(sim.summary().treasury,{blue:560,red:560});
+assert.equal(sim.summary().hero.gold,150);
+const blue={id:'blue-bot',team:'blue',x:70,z:95,hp:100,alive:true,gold:0};
+const red={id:'red-bot',team:'red',x:230,z:205,hp:100,alive:true,gold:0};
+for(let i=0;i<20;i++)sim.update(.25,[blue,red]);
+assert.equal(sim.farms.find(f=>f.id==='south-west').owner,'blue');
+assert.equal(sim.farms.find(f=>f.id==='north-east').owner,'red');
+assert.equal(sim.treasury.blue,610);
+assert.equal(sim.treasury.red,610);
+for(let i=0;i<20;i++)sim.update(.25,[blue,red]);
+assert.equal(sim.treasury.blue,635); // +25 every five seconds per farm
+assert.equal(sim.treasury.red,635);
+assert.equal(Math.round(blue.gold*100)/100,1.25);
+assert.equal(Math.round(red.gold*100)/100,1.25);
+const contested=create();
+const a={team:'blue',x:150,z:150,hp:100,alive:true};
+const b={team:'red',x:150,z:150,hp:100,alive:true};
+for(let i=0;i<40;i++)contested.update(.25,[a,b]);
+assert.equal(contested.farms.find(f=>f.id==='center').owner,null);
+assert.equal(contested.treasury.blue,560);
+for(let i=0;i<20;i++)contested.update(.25,[a]);
+assert.equal(contested.farms.find(f=>f.id==='center').owner,'blue');
+assert.equal(contested.treasury.blue,610); // one-time capture
+for(let i=0;i<20;i++)contested.update(.25,[a,b]); // central still earns when contested
+assert.equal(contested.treasury.blue,735); // 125 gold / 5 s
+assert.equal(contested.treasury.red,560);
+a.alive=false;
+for(let i=0;i<20;i++)contested.update(.25,[a,b]);
+assert.equal(contested.farms.find(f=>f.id==='center').owner,'red');
+assert.equal(contested.treasury.red,610);
+assert.equal(contested.kill('red',{team:'blue'},{armoured:true}),30);
+assert.equal(contested.treasury.red,640);
+assert.equal(contested.pay('red',90),true);
+assert.equal(contested.pay('red',100000),false);
+assert.equal(contested.treasury.red,550);
+contested.changeHeroSide('red');
+assert.equal(contested.summary().hero.team,'red');
+assert.equal(contested.kill('red',{team:'blue'},{heroKill:true}),15);
+assert.equal(contested.hero.gold,165);
+assert.equal(contested.hero.kills,1);
+assert.equal(contested.kill('red',{team:'red'}),false);
+assert.throws(()=>contested.update(2,[]),/delta/);
+assert.throws(()=>create({centreMultiplier:0}),/multiplier/);
+assert.throws(()=>contested.changeHeroSide('third'),/team/);
+console.log('MAP_300X300_FIVE_FARMS_LEGACY_GOLD_ECONOMY_PASS');
