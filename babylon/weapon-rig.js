@@ -1,0 +1,283 @@
+/* Battlefield Babylon weapon rig v1. Approved Panzergrenadier meshes/textures remain unchanged.
+   glTF joint TransformNodes are driven (not their linked bones). See Babylon glTF skinning docs.
+   Three licensed GLBs + an explicitly procedural Panzerschreck study, no Panzerfaust. */
+(function () {
+  'use strict';
+  const B = window.BABYLON;
+  const ROCKET = {
+    trigger: [0, -0.17, -0.23],
+    support: [0, -0.135, 0.25],
+    muzzle: [0, 0, 0.82],
+    shoulder: [0, -0.07, -0.48],
+    triggerAxis: [0, 0.97, 0.24],
+    supportAxis: [0, 0.92, 0.40],
+    triggerPalm: [-0.8, 0, -0.6],
+    supportPalm: [0.8, 0, -0.6]
+  };
+  const WEAPONS = [
+    ['de-kar98k', 'Kar98k'],
+    ['de-mp40', 'MP40'],
+    ['de-mg42', 'MG42'],
+    ['de-panzerschreck', 'Panzerschreck']
+  ];
+  const v = a => new B.Vector3(a[0], a[1], a[2]);
+  const canonical = n => String(n || '').replace(/^mixamorig[:_]?/i, '')
+    .replace(/_\d+$/, '').replace(/[^a-z]/gi, '').toLowerCase();
+  const matrixFromQuat = q => B.Matrix.FromQuaternion(q);
+  const rotated = (vec, q) => B.Vector3.TransformNormal(vec, matrixFromQuat(q));
+  function worldRotation(node) {
+    node.computeWorldMatrix(true);
+    const q = B.Quaternion.Identity();
+    node.getWorldMatrix().decompose(undefined, q, undefined);
+    return q.normalize();
+  }
+  function refresh(node) {
+    if (!node) return;
+    const chain = [];
+    for (let p = node; p; p = p.parent) chain.unshift(p);
+    for (const p of chain) p.computeWorldMatrix(true);
+  }
+  function makeHandOrientation(axis, palm, weaponQ) {
+    const y = rotated(v(axis), weaponQ).normalize();
+    const p = rotated(v(palm), weaponQ);
+    let z = p.subtract(y.scale(B.Vector3.Dot(y, p)));
+    if (z.lengthSquared() < 1e-8) z = B.Vector3.Cross(y, B.Axis.X);
+    z.normalize();
+    const x = B.Vector3.Cross(y, z).normalize();
+    z = B.Vector3.Cross(x, y).normalize();
+    const mat = B.Matrix.Identity();
+    B.Matrix.FromXYZAxesToRef(x, y, z, mat);
+    return B.Quaternion.FromRotationMatrix(mat).normalize();
+  }
+  function alignJoint(joint, end, goal, maxStep) {
+    refresh(end);
+    const origin = joint.getAbsolutePosition();
+    const from = end.getAbsolutePosition().subtract(origin);
+    const toward = goal.subtract(origin);
+    if (from.lengthSquared() < 1e-8 || toward.lengthSquared() < 1e-8) return;
+    from.normalize(); toward.normalize();
+    let axis = B.Vector3.Cross(from, toward);
+    const sine = axis.length();
+    const cosine = B.Scalar.Clamp(B.Vector3.Dot(from, toward), -1, 1);
+    if (sine < 1e-7) {
+      if (cosine > 0) return;
+      axis = B.Vector3.Cross(from, Math.abs(from.y) < .9 ? B.Axis.Y : B.Axis.X);
+    }
+    axis.normalize();
+    const angle = Math.min(maxStep, Math.atan2(sine, cosine));
+    const qWorld = B.Quaternion.RotationAxis(axis, angle);
+    const qParent = joint.parent ? worldRotation(joint.parent) : B.Quaternion.Identity();
+    const qLocal = qParent.conjugate().multiply(qWorld).multiply(qParent);
+    const current = joint.rotationQuaternion || B.Quaternion.FromEulerAngles(
+      joint.rotation.x, joint.rotation.y, joint.rotation.z);
+    joint.rotationQuaternion = qLocal.multiply(current).normalize();
+  }
+  function solveArm(arm, target) {
+    // Rebuild after each joint rotation: stale matrices caused the old four-hands prototype.
+    for (let iteration = 0; iteration < 22; iteration++) {
+      for (const j of [arm.fore, arm.upper, arm.shoulder])
+        alignJoint(j, arm.hand, target, .30);
+      refresh(arm.hand);
+      if (B.Vector3.DistanceSquared(arm.hand.getAbsolutePosition(), target) < .000625)
+        break;
+    }
+    return B.Vector3.Distance(arm.hand.getAbsolutePosition(), target);
+  }
+  function setHandRotation(hand, worldQ) {
+    refresh(hand.parent);
+    const qParent = hand.parent ? worldRotation(hand.parent) : B.Quaternion.Identity();
+    hand.rotationQuaternion = qParent.conjugate().multiply(worldQ).normalize();
+    refresh(hand);
+  }
+  function proceduralRocket(scene, parent) {
+    const meshes = [], mats = [];
+    const steel = new B.PBRMaterial('rPzB steel', scene);
+    steel.albedoColor = new B.Color3(.28, .31, .25);
+    steel.metallic = .73; steel.roughness = .57;
+    const dark = new B.PBRMaterial('rPzB recess', scene);
+    dark.albedoColor = new B.Color3(.045, .048, .043);
+    dark.metallic = .45; dark.roughness = .75;
+    const wood = new B.PBRMaterial('rPzB grip', scene);
+    wood.albedoColor = new B.Color3(.23, .16, .095);
+    wood.metallic = 0; wood.roughness = .88;
+    mats.push(steel, dark, wood);
+    function part(mesh, material, xyz, rotation) {
+      mesh.parent = parent; mesh.material = material;
+      mesh.position.copyFrom(v(xyz));
+      if (rotation) mesh.rotation.copyFrom(v(rotation));
+      meshes.push(mesh); return mesh;
+    }
+    function cylinder(name, diameter, length, xyz, material = steel) {
+      return part(B.MeshBuilder.CreateCylinder(name, {
+        diameter, height: length, tessellation: 24
+      }, scene), material, xyz, [Math.PI / 2, 0, 0]);
+    }
+    function box(name, sizes, xyz, material = steel) {
+      return part(B.MeshBuilder.CreateBox(name, {
+        width: sizes[0], height: sizes[1], depth: sizes[2]
+      }, scene), material, xyz);
+    }
+    cylinder('Panzerschreck 88mm barrel', .104, 1.64, [0, 0, 0]);
+    cylinder('front black bore', .088, .003, [0, 0, .822], dark);
+    cylinder('rear black bore', .088, .003, [0, 0, -.822], dark);
+    for (const z of [-.78, -.43, .09, .77])
+      cylinder('tube strengthening band', .117, .028, [0, 0, z]);
+    box('blast shield RpzB54', [.46, .34, .018], [-.055, .017, .30]);
+    box('sight window', [.072, .053, .022], [-.193, .083, .312], dark);
+    box('shield window rim upper', [.084, .009, .027], [-.193, .112, .327]);
+    box('underslung trigger housing', [.12, .115, .19], [0, -.109, -.22]);
+    box('rear pistol grip', [.067, .17, .062], [0, -.23, -.23], wood);
+    box('front support handle', [.067, .15, .067], [0, -.20, .25], wood);
+    box('rear shoulder pad', [.13, .06, .20], [0, -.098, -.48], wood);
+    cylinder('front sight', .017, .035, [0, .083, .66], dark);
+    return () => { for (const mesh of meshes) mesh.dispose(); for (const mat of mats) mat.dispose(); };
+  }
+  async function create({ scene, imported, root, state }) {
+    const skeleton = imported.skeletons[0];
+    const linked = (skeleton?.bones || []).map(b => b.getTransformNode?.()).filter(Boolean);
+    const nodes = [...imported.transformNodes, ...imported.meshes, ...linked];
+    const joint = name => nodes.find(n => canonical(n.name) === canonical(name) &&
+      n.rotationQuaternion !== undefined && n.getAbsolutePosition);
+    const right = {
+      shoulder: joint('RightShoulder'), upper: joint('RightArm'),
+      fore: joint('RightForeArm'), hand: joint('RightHand')
+    };
+    const left = {
+      shoulder: joint('LeftShoulder'), upper: joint('LeftArm'),
+      fore: joint('LeftForeArm'), hand: joint('LeftHand')
+    };
+    const chest = joint('Spine2');
+    if (!chest || Object.values(right).some(x => !x) || Object.values(left).some(x => !x))
+      throw Error('Panzergrenadier: linked arm joints not found; model remains unmodified.');
+    if (!skeleton || skeleton.bones.length !== 65)
+      throw Error('Unexpected soldier skeleton; refusing to retarget');
+
+    // Pose reset is imperative until approved locomotion clips exist for this GLB.
+    const controlled = [...Object.values(right), ...Object.values(left)];
+    const rest = new Map(controlled.map(n => [n, n.rotationQuaternion?.clone() ||
+      B.Quaternion.FromEulerAngles(n.rotation.x, n.rotation.y, n.rotation.z)]));
+    const response = await fetch('../assets/ww2-weapons/manifest.json');
+    if (!response.ok) throw Error('Weapon manifest HTTP ' + response.status);
+    const manifest = await response.json();
+    const pivot = new B.TransformNode('weapon-chest-stabilized-world', scene);
+    pivot.rotationQuaternion = B.Quaternion.Identity();
+
+    let pose = 'ready', weaponId = null, meta = null, container = null;
+    let rocketDispose = null, generation = 0;
+    state.weaponRig = {
+      rig: 'Mixamo/65 linked glTF nodes', pose, weapon: null,
+      rightGripMeters: null, leftGripMeters: null,
+      preliminaryGeometryOnly: true, experimentalFourthAsset: true
+    };
+    const report = state.weaponRig;
+
+    function update() {
+      if (!meta) return;
+      for (const [node, q] of rest) node.rotationQuaternion = q.clone();
+      refresh(chest); refresh(right.shoulder); refresh(left.shoulder);
+      const t = performance.now() * .001;
+      const walking = pose === 'walk', firing = pose === 'fire';
+      const breathing = .004 * Math.sin(t * 1.45);
+      const bob = walking ? .013 * Math.sin(t * 9) : 0;
+      const recoil = firing ? .025 * Math.max(0, Math.sin(t * 18)) : 0;
+      const chestQ = worldRotation(chest);
+      const angles = {
+        ready: [-.095, -.02, -.020],
+        aim: [.012, 0, 0],
+        walk: [-.15, -.035, -.048],
+        fire: [.012, 0, 0]
+      }[pose];
+      const localQ = B.Quaternion.FromEulerAngles(angles[0], angles[1], angles[2]);
+      const gunQ = chestQ.multiply(localQ).normalize();
+      // Right shoulder stays fixed relative to chest; the weapon is not attached
+      // to a swinging wrist, avoiding a feedback loop for the left support hand.
+      const stockOffset = weaponId === 'de-panzerschreck'
+        ? new B.Vector3(.075, .125, .06)
+        : new B.Vector3(.038, -.07, .115);
+      const stock = right.shoulder.getAbsolutePosition()
+        .add(rotated(stockOffset, chestQ))
+        .add(rotated(new B.Vector3(0, breathing + bob, -recoil), chestQ));
+      pivot.rotationQuaternion.copyFrom(gunQ);
+      pivot.position.copyFrom(stock.subtract(rotated(v(meta.shoulder), gunQ)));
+      refresh(pivot);
+
+      const rightQ = makeHandOrientation(meta.triggerAxis, meta.triggerPalm, gunQ);
+      const leftQ = makeHandOrientation(meta.supportAxis, meta.supportPalm, gunQ);
+      const rightFinger = rotated(B.Axis.Y, rightQ).normalize();
+      const leftFinger = rotated(B.Axis.Y, leftQ).normalize();
+      const trigger = pivot.position.add(rotated(v(meta.trigger), gunQ));
+      const support = pivot.position.add(rotated(v(meta.support), gunQ));
+      const rightGoal = trigger.subtract(rightFinger.scale(.065));
+      const leftGoal = support.subtract(leftFinger.scale(.065));
+      report.rightIKMeters = +solveArm(right, rightGoal).toFixed(4);
+      report.leftIKMeters = +solveArm(left, leftGoal).toFixed(4);
+      setHandRotation(right.hand, rightQ);
+      setHandRotation(left.hand, leftQ);
+      report.rightGripMeters = +B.Vector3.Distance(right.hand.getAbsolutePosition()
+        .add(rightFinger.scale(.065)), trigger).toFixed(4);
+      report.leftGripMeters = +B.Vector3.Distance(left.hand.getAbsolutePosition()
+        .add(leftFinger.scale(.065)), support).toFixed(4);
+      report.geometricPass = report.rightGripMeters < .075 && report.leftGripMeters < .075;
+      report.pose = pose;
+    }
+    const observer = scene.onBeforeRenderObservable.add(() => { try { update(); }
+      catch (e) { report.error = String(e); console.error('weapon IK', e); } });
+
+    function buttonState() {
+      for (const el of document.querySelectorAll('[data-weapon]'))
+        el.setAttribute('aria-pressed', String(el.dataset.weapon === weaponId));
+      for (const el of document.querySelectorAll('[data-pose]'))
+        el.setAttribute('aria-pressed', String(el.dataset.pose === pose));
+    }
+    function setPose(value) {
+      if (!['ready', 'aim', 'walk', 'fire'].includes(value)) return;
+      pose = value; buttonState();
+    }
+    async function equip(id) {
+      const entry = WEAPONS.find(x => x[0] === id);
+      if (!entry) throw Error('Unknown weapon: ' + id);
+      const token = ++generation;
+      const nextMeta = id === 'de-panzerschreck' ? ROCKET : manifest.weapons[id];
+      if (!nextMeta) throw Error('Weapon manifest missing ' + id);
+      let incoming = null;
+      if (id !== 'de-panzerschreck') {
+        incoming = await B.SceneLoader.LoadAssetContainerAsync(
+          '', '../assets/ww2-weapons/' + nextMeta.file, scene);
+      }
+      if (token !== generation) { incoming?.dispose(); return; }
+      if (container) container.dispose(); container = null;
+      if (rocketDispose) rocketDispose(); rocketDispose = null;
+      for (const child of pivot.getChildren()) {
+        // GLB nodes belonged to the disposed asset container.
+        if (!child.isDisposed?.()) child.dispose(false, false);
+      }
+      if (incoming) {
+        incoming.addAllToScene();
+        for (const n of [...incoming.meshes, ...incoming.transformNodes])
+          if (!n.parent) n.parent = pivot;
+        container = incoming;
+      } else {
+        rocketDispose = proceduralRocket(scene, pivot);
+      }
+      meta = nextMeta; weaponId = id; report.weapon = id;
+      report.asset = incoming ? 'MIT original GLB' : 'procedural preview, not approved GLB';
+      buttonState(); update();
+      return report;
+    }
+    for (const el of document.querySelectorAll('[data-weapon]'))
+      el.addEventListener('click', () => equip(el.dataset.weapon).catch(e => {
+        report.error = String(e); console.error(e);
+      }));
+    for (const el of document.querySelectorAll('[data-pose]'))
+      el.addEventListener('click', () => setPose(el.dataset.pose));
+    await equip('de-kar98k');
+    state.weaponVariants = WEAPONS.map(x => x[0]);
+    state.weaponRigReady = true;
+    state.equipWeapon = equip;
+    state.setWeaponPose = setPose;
+    state.disposeWeaponRig = () => { scene.onBeforeRenderObservable.remove(observer);
+      container?.dispose(); rocketDispose?.(); pivot.dispose(); };
+    return report;
+  }
+  window.BattlefieldWeaponRig = { create, WEAPONS };
+})();
