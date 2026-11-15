@@ -18,8 +18,8 @@ button:active,button[aria-pressed=true]{background:#526c52;border-color:#c0d5bc}
 </style></head>
 <body>
 <canvas id="render" aria-label="Трёхмерный немецкий солдат; вращайте пальцем"></canvas>
-<header><h1>Немецкий Panzergrenadier · оригинал</h1><p>Никаких новых деталей формы · только исходная 3D-модель и её материалы</p></header>
-<div id="info" role="status">Загрузка оригинальной модели…</div>
+<header><h1>Немецкий Panzergrenadier + Kar98k</h1><p>Оригинальная форма · наша винтовка · тест положения рук</p></header>
+<div id="info" role="status">Загрузка немецкого стрелка и Kar98k…</div>
 <div id="credit">Модель: britdawgmasterfunk · CC BY 4.0<br><a href="https://sketchfab.com/3d-models/ww2-panzergrenadier-2k-cc0-6a104431bcb8400080b79446ec019696" target="_blank" rel="noopener noreferrer">Источник и автор</a></div>
 <div id="actions" role="group" aria-label="Ракурс просмотра">
 <button data-view="front" aria-pressed="false">Спереди</button>
@@ -30,5 +30,6 @@ button:active,button[aria-pressed=true]{background:#526c52;border-color:#c0d5bc}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="./weapon-fit.js"></script>
 <script src="./viewer.js"></script>
 </body></html>
