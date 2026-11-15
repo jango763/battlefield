@@ -359,11 +359,20 @@
       const token = ++generation;
       const baseMeta = id === 'de-panzerschreck' ? ROCKET : manifest.weapons[id];
       // MG42's original +0.505m grip exceeds this character's left-arm reach.
-      const nextMeta = baseMeta && { ...baseMeta, support:
-        id === 'de-kar98k' ? [0, .04, .27] :
-        id === 'de-mp40' ? [0, .027, .19] :
-        // The MG42 front grip near the receiver prevents a straight locked elbow.
-        id === 'de-mg42' ? [0, .074, .19] : baseMeta.support };
+      // Weapon manifest grip axes describe the ARTIST'S barrel/grip features,
+      // not the Mixamo palm/finger axes. Using MP40's [0,+.97,+.24] as the
+      // finger direction pointed the soldier's index finger STRAIGHT UP.
+      // Human two-hand carry: right fingers wrap DOWN around the pistol-grip
+      // (or rifle wrist), left fingers wrap ACROSS the handguard from below.
+      const nextMeta = baseMeta && { ...baseMeta,
+        support: id === 'de-kar98k' ? [0,.04,.27] :
+          id === 'de-mp40' ? [0,.027,.19] :
+          id === 'de-mg42' ? [0,.074,.19] : baseMeta.support,
+        triggerAxis: id === 'de-kar98k' ? [0,-.88,.48] : [0,-.96,.28],
+        triggerPalm: [.90,.23,-.35],
+        supportAxis: [-.85,.32,.42],
+        supportPalm: [-.25,.75,.60]
+      };
       if (!nextMeta) throw Error('Weapon manifest missing ' + id);
       let incoming = null;
       if (id !== 'de-panzerschreck') {
