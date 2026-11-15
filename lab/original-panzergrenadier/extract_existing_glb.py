@@ -17,11 +17,19 @@ for m in tags:
   if 'preview-german-glb' in tag or ('octet-stream' in tag and len(body)>50000):
     candidates.append(body)
 if not candidates:
+  # The original test HTML also keeps the binary as a long JS base64 string.
+  # Pick only candidates that decode to the GLB magic and declared length.
+  raw_matches=list(re.finditer(r'[A-Za-z0-9+/]{50000,}={0,2}',source))
+  print('LONG_BASE64_CANDIDATES',[(len(m.group(0)),m.start()) for m in raw_matches[:20]])
+  candidates.extend(m.group(0) for m in raw_matches)
+if not candidates:
   print('GLB_KEY_CONTEXT',source[max(0,source.find('preview-german-glb')-250):source.find('preview-german-glb')+600] if 'preview-german-glb' in source else 'not found')
   print('LONG_SCRIPTS',[(m.group(1)[:110],len(m.group(2))) for m in tags if len(m.group(2))>100000])
   raise SystemExit('No embedded WW2 GLB script tag found')
 for k,body in enumerate(candidates):
-  data=base64.b64decode(re.sub(r'\s+','',body),validate=True)
+  try: data=base64.b64decode(re.sub(r'\s+','',body),validate=True)
+  except Exception as e:
+    print('BASE64_DECODE_ERROR',k,str(e));continue
   print('CANDIDATE',k,'bytes',len(data),'magic',data[:4])
   if data[:4]==b'glTF':
     declared=struct.unpack_from('<I',data,8)[0]
