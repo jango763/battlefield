@@ -1,0 +1,31 @@
+name: Compare actual weapon finger grip poses
+on:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths: ['.github/workflows/grip-variants-review.yml','babylon/animstudio-preview/test-grip-variants.cjs']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare Babylon and Playwright
+        run: |
+          node --check babylon/weapon-rig.js
+          npm install --no-audit --no-fund --prefix /tmp/animstudio-viewer-qa playwright@1.58.2
+          /tmp/animstudio-viewer-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/grip-http.log 2>&1 &
+          sleep 2
+      - name: Compare five finger styles for original German soldier
+        run: node babylon/animstudio-preview/test-grip-variants.cjs
+      - name: Upload actual rendered A/B images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: babylon-five-finger-styles
+          path: babylon/animstudio-preview/grip-qa/
+          if-no-files-found: ignore
+          retention-days: 14
