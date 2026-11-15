@@ -163,6 +163,7 @@
     pivot.rotationQuaternion = B.Quaternion.Identity();
 
     let pose = 'ready', weaponId = null, meta = null, container = null;
+    let needsPose = true, lastSolveTime = 0;
     let rocketDispose = null, generation = 0;
     state.weaponRig = {
       rig: 'Mixamo/65 linked glTF nodes', pose, weapon: null,
@@ -173,11 +174,15 @@
 
     function update() {
       if (!meta) return;
+      const now = performance.now();
+      if (!needsPose && (pose === 'ready' || pose === 'aim')) return;
+      if (!needsPose && now - lastSolveTime < 65) return;
+      needsPose = false; lastSolveTime = now;
       for (const [node, q] of rest) node.rotationQuaternion = q.clone();
       refresh(chest); refresh(right.shoulder); refresh(left.shoulder);
       const t = performance.now() * .001;
       const walking = pose === 'walk', firing = pose === 'fire';
-      const breathing = .004 * Math.sin(t * 1.45);
+      const breathing = walking || firing ? .004 * Math.sin(t * 1.45) : 0;
       const bob = walking ? .013 * Math.sin(t * 9) : 0;
       const recoil = firing ? .025 * Math.max(0, Math.sin(t * 18)) : 0;
       const chestQ = worldRotation(chest);
@@ -209,6 +214,12 @@
       const support = pivot.position.add(rotated(v(meta.support), gunQ));
       const rightGoal = trigger.subtract(rightFinger.scale(.065));
       const leftGoal = support.subtract(leftFinger.scale(.065));
+      report.leftReachMeters = +(
+        B.Vector3.Distance(left.upper.getAbsolutePosition(), left.fore.getAbsolutePosition()) +
+        B.Vector3.Distance(left.fore.getAbsolutePosition(), left.hand.getAbsolutePosition())
+      ).toFixed(4);
+      report.leftGoalFromShoulderMeters =
+        +B.Vector3.Distance(left.upper.getAbsolutePosition(), leftGoal).toFixed(4);
       report.rightIKMeters = +solveArm(right, rightGoal).toFixed(4);
       report.leftIKMeters = +solveArm(left, leftGoal).toFixed(4);
       setHandRotation(right.hand, rightQ);
@@ -231,13 +242,17 @@
     }
     function setPose(value) {
       if (!['ready', 'aim', 'walk', 'fire'].includes(value)) return;
-      pose = value; buttonState();
+      pose = value; needsPose = true; buttonState();
     }
     async function equip(id) {
       const entry = WEAPONS.find(x => x[0] === id);
       if (!entry) throw Error('Unknown weapon: ' + id);
       const token = ++generation;
-      const nextMeta = id === 'de-panzerschreck' ? ROCKET : manifest.weapons[id];
+      const baseMeta = id === 'de-panzerschreck' ? ROCKET : manifest.weapons[id];
+      // MG42's original +0.505m grip exceeds this character's left-arm reach.
+      const nextMeta = baseMeta && { ...baseMeta, support:
+        id === 'de-kar98k' ? [0, .04, .27] :
+        id === 'de-mg42' ? [0, .074, .28] : baseMeta.support };
       if (!nextMeta) throw Error('Weapon manifest missing ' + id);
       let incoming = null;
       if (id !== 'de-panzerschreck') {
@@ -260,6 +275,7 @@
         rocketDispose = proceduralRocket(scene, pivot);
       }
       meta = nextMeta; weaponId = id; report.weapon = id;
+      needsPose = true; report.error = null;
       report.asset = incoming ? 'MIT original GLB' : 'procedural preview, not approved GLB';
       buttonState(); update();
       return report;
