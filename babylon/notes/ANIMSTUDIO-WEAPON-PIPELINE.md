@@ -41,7 +41,8 @@
    к \`Weapon_R\`: primary grip / спусковой крючок в origin, дуло вдоль +Z.
 4. Через \`update_prop\` прописать \`support\` — точку на цевье или второй рукоятке.
    **Не держать за магазин и не подменять пальцы дополнительной геометрией.**
-5. Записать \`Hold\`, \`Aim\`, \`Fire\`, \`Walk\` отдельно для каждого оружия.
+5. Записать \`Hold\`, \`Aim\`, \`Fire\`, \`Run\` отдельно для каждого оружия.
+   По утверждённой боевой доктрине **ходьба исключена**: для перемещения `generate_motion(type: 'run')`, а не ускорение `walk`.
    \`key_weapon_pose\` или \`weapon_animation\` решают IK правой и левой руки.
    Положение локтей необходимо проверять в профиль и сзади.
 6. Сохранить .animproj.json и экспортировать стандартные GLB анимации.
@@ -111,3 +112,14 @@ summary.json); он изолирован от работающего Babylon-п�
 - https://doc.babylonjs.com/features/featuresDeepDive/importers/glTF/glTFSkinning
 - https://doc.babylonjs.com/features/featuresDeepDive/mesh/bonesSkeletons
 - https://doc.babylonjs.com/features/featuresDeepDive/mesh/transforms/coordinateSystems/
+
+## Доктрина боевого перемещения (15.11.2026)
+
+Все солдаты передвигаются **бегом**, независимо от оружия. Ходьбу исключили
+из режима боя и интерфейса просмотра. В AnimStudio заново созданы отдельные
+циклы `Kar98k_Run`, `MP40_Run`, `MG42_Run`, `Panzerschreck_Run`
+через `generate_motion({type:'run'})`, с `hold_in_clip` либо оружейными
+ключами для двухручного хвата. Это реальная анимация ног, а не ускоренная
+старая ходьба. Экспорт: `babylon/animstudio-preview/models/all-combat-run.glb`.
+Существующие оригинальные 16 старых экспортов остаются историческими и в
+просмотре более не используются. Первая игра на Three.js не изменена.
