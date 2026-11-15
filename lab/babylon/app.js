@@ -119,17 +119,20 @@ async function start(){
   grip.rotationQuaternion=null;
   // Weapon forward is +Z in its GLB. This is a provisional local orientation;
   // the two-hand combat pose still needs a verified animation.
-  grip.rotation.set(-Math.PI/2,0,0);
+  // Do not roll the magazine upward: weapon local +Z is the barrel direction.
+  grip.rotation.set(0,0,0);
   const trigger=weaponRoot.getAbsolutePosition();
   const support=toVec(weaponRoot.metadata?.support||[0,0,.25]);
   const supportWorld=B.Vector3.TransformCoordinates(support,weaponRoot.getWorldMatrix());
   if(state.animation==='combat'&&!combatPoseSolved){
    combatPoseSolved=true;
    try{
-    if(rightUpper&&rightLower&&rightHand&&leftUpper&&leftLower&&leftHand){
-     poseArm(rightUpper,rightLower,rightHand,trigger);
+    if(rightHand&&leftUpper&&leftLower&&leftHand){
+     // The weapon is parented to the right hand, so right-hand IK would
+     // chase its own child and introduce an unstable feedback loop.
+     // Solve the free (support) arm toward the actual foregrip point.
      poseArm(leftUpper,leftLower,leftHand,supportWorld);
-     state.combatPoseStatus='IK attempted on both arms';
+     state.combatPoseStatus='Left support-hand IK attempted; right hand is weapon anchor';
     }else state.combatPoseStatus='IK skipped: arm joints unavailable';
    }catch(error){state.combatPoseStatus='IK failed: '+String(error);}
   }
@@ -156,7 +159,7 @@ async function start(){
    weaponRoot.metadata={support:meta.support,trigger:meta.trigger};
    for(const mesh of weaponContainer.meshes.filter(m=>!m.parent))mesh.parent=weaponRoot;
    for(const node of weaponContainer.transformNodes.filter(n=>!n.parent))node.parent=weaponRoot;
-   state.weaponAttached=true;updateWeaponPose();
+   state.weaponAttached=true;combatPoseSolved=false;updateWeaponPose();
   }catch(e){state.weaponError=String(e);console.error('Weapon load',e);}
   select(state.animation);
  }
