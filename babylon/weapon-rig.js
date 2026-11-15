@@ -6,7 +6,7 @@
   const B = window.BABYLON;
   const ROCKET = {
     trigger: [0, -0.17, -0.23],
-    support: [0, -0.135, 0.25],
+    support: [0, -0.135, -0.10],
     muzzle: [0, 0, 0.82],
     shoulder: [0, -0.07, -0.48],
     triggerAxis: [0, 0.97, 0.24],
@@ -127,7 +127,7 @@
     box('shield window rim upper', [.084, .009, .027], [-.193, .112, .327]);
     box('underslung trigger housing', [.12, .115, .19], [0, -.109, -.22]);
     box('rear pistol grip', [.067, .17, .062], [0, -.23, -.23], wood);
-    box('front support handle', [.067, .15, .067], [0, -.20, .25], wood);
+    box('front support handle', [.067, .15, .067], [0, -.20, -.10], wood);
     box('rear shoulder pad', [.13, .06, .20], [0, -.098, -.48], wood);
     cylinder('front sight', .017, .035, [0, .083, .66], dark);
     return () => { for (const mesh of meshes) mesh.dispose(); for (const mat of mats) mat.dispose(); };
