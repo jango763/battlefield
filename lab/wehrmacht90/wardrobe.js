@@ -230,9 +230,9 @@ function buildTailoredM40(scene,body){
  for(let i=0;i<vcount;i++)region[i]=identify(pos[i*3],pos[i*3+1],pos[i*3+2]);
  for(let i=0;i<indices.length;i+=3){
   const a=indices[i],b=indices[i+1],c=indices[i+2];
-  const counts={coat:0,pants:0};
+  const counts={coat:0,pants:0,boots:0};
   for(const vertex of [a,b,c])if(counts[region[vertex]]!==undefined)counts[region[vertex]]++;
-  const part=counts.coat>=2?'coat':counts.pants>=2?'pants':null;
+  const part=counts.coat>=2?'coat':counts.pants>=2?'pants':counts.boots>=2?'boots':null;
   if(part)faces[part].push(a,b,c);
  }
  const stats={sourceVertices:vcount,sourceTriangles:indices.length/3,parts:{}};
