@@ -32,14 +32,13 @@ const fs=require('node:fs');
     await page.click('#handsmode');
    }
   }
-  const approved=results.filter(x=>x.gun!=='Panzerschreck');
-  const bad=approved.filter(x=>x.error||!x.pass||x.rightElbow<20||x.leftElbow<20);
-  const provisional=results.filter(x=>x.gun==='Panzerschreck'&&
-    (x.error||!x.pass||x.rightElbow<20||x.leftElbow<20));
-  if(provisional.length)console.warn('PANZERSCHRECK_PROTOTYPE_NOT_APPROVED '+JSON.stringify(provisional));
-  if(bad.length)throw Error('APPROVED_THREE_GUNS_HAND_QUALITY_FAILED '+JSON.stringify(bad));
+  // Require the fourth weapon's IK to pass too, while keeping the 3D prop
+  // labelled as a provisional artist model.
+  const bad=results.filter(x=>x.error||!x.pass||x.rightElbow<20||x.leftElbow<20||
+    (x.gun==='Panzerschreck'&&(x.goal/x.reach)>.92));
+  if(bad.length)throw Error('FOUR_WEAPONS_ARM_QUALITY_FAILED '+JSON.stringify(bad));
   if(errors.length)throw Error('Console errors '+JSON.stringify(errors));
-  console.log('THREE_APPROVED_WEAPONS_BOTH_HANDS_PASS__PZ_PROTOTYPE_PENDING');
+  console.log('FOUR_WEAPONS_ARM_IK_PASS__PANZERSCHRECK_MODEL_STILL_PROTOTYPE');
  }catch(e){console.error('HANDS_FAST_QA_FAILED',e);process.exitCode=1}
  finally{await browser?.close()}
 })();
