@@ -16,7 +16,7 @@ const fs=require('node:fs');const {spawnSync}=require('node:child_process');
   await page.waitForFunction(()=>window.__BATTLEFIELD_ANIMATIONS__?.loaded===true,null,{timeout:90000});
   // Film actual running clips in Babylon, one by one. No generated stills masquerading as motion.
   for(const gun of ['Kar98k','MP40','MG42','Panzerschreck']){
-   for(const pose of ['Hold','Aim','Fire','Walk']){
+   for(const pose of ['Hold','Aim','Fire','Run']){
     await page.evaluate(async([g,p])=>window.__BATTLEFIELD_ANIMATIONS__.show(g,p),[gun,pose]);
     await page.waitForTimeout(pose==='Fire'?1700:2300);
    }
