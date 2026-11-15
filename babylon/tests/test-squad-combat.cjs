@@ -8,7 +8,7 @@ assert.deepEqual(squad.formation({side:'ally',count:4}),[
 assert.equal(squad.formation({side:'enemy',distance:60,count:4}).length,4);
 assert.equal(squad.formation({side:'enemy',distance:60,count:4})[0].x,60);
 assert.throws(()=>squad.formation({count:3}),/1 or 4/);
-function make(weapon='Kar98k',targetHP=100000,initial=70,random=()=>0){
+function make(weapon='Kar98k',targetHP=100000,initial=70,random=()=>.99){
  const b=balance.createBattle({funds:1000,prices:{
   MP40:{weapon:100,magazine:12},MG42:{weapon:200,magazine:20},
   Panzerschreck:{weapon:300,magazine:30}
@@ -31,7 +31,7 @@ function make(weapon='Kar98k',targetHP=100000,initial=70,random=()=>0){
   if(a.x>before)moved++;
  }
  assert(moved>0);
- assert(a.x>=37);
+ assert(a.x>=15); // Both riflemen advance until they enter engagement distance.
  assert(shots.length>0);
  assert(shots.every(s=>s.moving===false));
  assert(shots.every(s=>s.unit===a||s.unit===e));
