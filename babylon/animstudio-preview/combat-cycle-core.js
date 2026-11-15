@@ -1,95 +1,156 @@
-/* Battlefield Babylon: deterministic weapon-specific stop-to-fire rules.
-   Pure state machine. This file does not modify the approved soldier or grip.
-   The interactive browser demo is in combat-demo.js. */
+/* Battlefield Babylon - animation-frame-driven combat cycle.
+ * Stops movement before any shot, drives an actual crouch layer (Kar98k),
+ * requires the bolt cycle before resuming/re-firing, and emits shot/bolt
+ * events at specified keyframe markers. No DOM/Babylon dependency.
+ * All timing below is authored in 30-fps animation frames, not setTimeout.
+ */
 (function(root,factory){
-  const value=factory();
-  if(typeof module==='object'&&module.exports)module.exports=value;
-  if(root)root.BattlefieldCombatCycle=value;
+  const api=factory();
+  if(typeof module==='object'&&module.exports)module.exports=api;
+  if(root)root.BattlefieldCombatCycle=api;
 })(typeof window!=='undefined'?window:null,function(){
-  'use strict';
-  const PROFILES=Object.freeze({
-    Kar98k:Object.freeze([
-      {id:'run',label:'Боевой бег',pose:'Run',moving:true,ms:1100,crouch:0},
-      {id:'stop',label:'Остановка перед стрельбой',pose:'Hold',moving:false,ms:260,crouch:.30},
-      {id:'lower',label:'Пригнулся, занял стрелковую стойку',pose:'Aim',moving:false,ms:460,crouch:1},
-      {id:'aim',label:'Прицельная подготовка',pose:'Aim',moving:false,ms:820,crouch:1},
-      {id:'fire',label:'Прицельный выстрел',pose:'Fire',moving:false,ms:200,crouch:1},
-      {id:'bolt',label:'Передёргивание затвора Kar98k',pose:'Aim',moving:false,ms:900,crouch:1},
-      {id:'recover',label:'Выход из стрелковой стойки',pose:'Hold',moving:false,ms:490,crouch:.30},
-      {id:'resume',label:'Продолжение боевого бега',pose:'Run',moving:true,ms:1150,crouch:0}
-    ]),
-    Panzerschreck:Object.freeze([
-      {id:'run',label:'Переноска в боевом беге',pose:'Run',moving:true,ms:1200,crouch:0},
-      {id:'stop',label:'Полная остановка',pose:'Hold',moving:false,ms:300,crouch:.05},
-      {id:'aim',label:'Устойчивая стойка с трубой на плече',pose:'Aim',moving:false,ms:1000,crouch:.10},
-      {id:'fire',label:'Выстрел только с места',pose:'Fire',moving:false,ms:200,crouch:.10},
-      {id:'recover',label:'Опустить оружие',pose:'Hold',moving:false,ms:650,crouch:.05},
-      {id:'resume',label:'Вернуться к бегу',pose:'Run',moving:true,ms:1150,crouch:0}
-    ])
-  });
-  const allowed=['Run','Hold','Aim','Fire'];
-  function create({weapon='Kar98k',applyPose=()=>{},onStage=()=>{},onShot=()=>{},now=()=>performance.now()}={}){
-    if(!PROFILES[weapon])throw Error('Unsupported combat profile '+weapon);
-    const steps=PROFILES[weapon];
-    const state={weapon,phase:'idle',index:-1,playing:false,moving:false,
-      velocity:0,crouch:0,shots:0,bolts:0,triggerWhileMoving:0,
-      lastShotHadStop:false,ready:false,history:[]};
-    let phaseStarted=0, busy=false, token=0;
-    function snapshot(){return {...state,history:state.history.map(x=>({...x}))}}
-    async function enter(index,time){
-      if(index>=steps.length){state.playing=false;state.phase='completed';
-        state.moving=false;state.velocity=0;state.crouch=0;onStage(snapshot());return snapshot()}
-      const step=steps[index];
-      if(!allowed.includes(step.pose))throw Error('Unknown animation pose '+step.pose);
-      // Make phase and velocity transitions synchronous BEFORE any animation await.
-      // A shot must never be permitted while the soldier is running or braking.
-      const previous=state.phase;
-      state.phase=step.id;state.index=index;state.moving=step.moving;
-      state.velocity=step.moving?1:0;state.crouch=step.crouch;
-      phaseStarted=time;busy=true;
-      if(step.id==='fire'){
-        if(state.velocity!==0||state.moving)state.triggerWhileMoving++;
-        if(state.triggerWhileMoving)throw Error('Shot attempted during movement');
-        if(!state.history.some(x=>x.phase==='stop'))throw Error('Shot before stopping');
-        if(!state.history.some(x=>x.phase==='aim'))throw Error('Shot before aiming');
-        state.shots++;state.lastShotHadStop=true;
-      }
-      if(step.id==='bolt'){
-        if(weapon!=='Kar98k')throw Error('No bolt phase for rocket launcher');
-        if(previous!=='fire')throw Error('Bolt requires a preceding shot');
-        state.bolts++;
-      }
-      state.history.push({phase:step.id,pose:step.pose,moving:step.moving,
-        timestamp:time,crouch:step.crouch});
-      onStage(snapshot());
-      const currentToken=token;
-      try{
-        await applyPose(step.pose,step.id);
-        if(currentToken!==token)return snapshot();
-        if(step.id==='fire')onShot(snapshot());
-      }finally{if(currentToken===token)busy=false}
-      return snapshot();
-    }
-    async function start(time=now()){
-      if(state.playing)throw Error('Combat cycle already running');
-      token++;state.playing=true;state.index=-1;state.history=[];
-      state.phase='idle';state.moving=false;state.velocity=0;state.crouch=0;
-      state.shots=0;state.bolts=0;state.triggerWhileMoving=0;
-      state.lastShotHadStop=false;state.ready=true;
-      return enter(0,time);
-    }
-    async function tick(time=now()){
-      if(!state.playing||busy)return snapshot();
-      if(time-phaseStarted>=steps[state.index].ms)
-        return enter(state.index+1,time);
-      return snapshot();
-    }
-    function stop(){
-      token++;busy=false;state.playing=false;state.phase='idle';
-      state.moving=false;state.velocity=0;state.crouch=0;
-      onStage(snapshot());return snapshot();
-    }
-    return {start,tick,stop,snapshot,steps};
-  }
-  return {create,PROFILES};
+'use strict';
+const FPS=30;
+const stages={
+ Kar98k:[
+  {id:'run',clip:'Run',frames:36,travel:true,stance:0,markers:[]},
+  {id:'stop',clip:'Hold',frames:14,travel:false,stance:.18,markers:[]},
+  {id:'lower',clip:'Aim',frames:21,travel:false,stance:1,markers:[]},
+  {id:'aim',clip:'Aim',frames:29,travel:false,stance:1,markers:[]},
+  {id:'fire',clip:'Fire',frames:10,travel:false,stance:1,
+   markers:[{frame:4,name:'shot'}]},
+  {id:'bolt',clip:'Aim',frames:33,travel:false,stance:1,
+   markers:[{frame:4,name:'bolt-handle-lift'},
+     {frame:10,name:'bolt-back'},{frame:23,name:'bolt-forward'},
+     {frame:30,name:'bolt-locked'}]},
+  {id:'recover',clip:'Hold',frames:23,travel:false,stance:.18,markers:[]},
+  {id:'resume',clip:'Run',frames:31,travel:true,stance:0,markers:[]}
+ ],
+ Panzerschreck:[
+  {id:'run',clip:'Run',frames:35,travel:true,stance:0,markers:[]},
+  {id:'stop',clip:'Hold',frames:14,travel:false,stance:.03,markers:[]},
+  {id:'aim',clip:'Aim',frames:32,travel:false,stance:.11,markers:[]},
+  {id:'fire',clip:'Fire',frames:11,travel:false,stance:.11,
+   markers:[{frame:5,name:'shot'}]},
+  {id:'recover',clip:'Hold',frames:29,travel:false,stance:.03,markers:[]},
+  {id:'resume',clip:'Run',frames:30,travel:true,stance:0,markers:[]}
+ ]
+};
+for(const key of Object.keys(stages))Object.freeze(stages[key]);
+function clamp(x,a,b){return Math.min(b,Math.max(a,x))}
+function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
+  measureSpeed=null,requestStop=()=>{},speedEpsilon=.06,
+  runSpeed=3.4,deceleration=9,fps=FPS}={}){
+ if(!stages[weapon])throw Error('Unknown firearm '+weapon);
+ const timeline=stages[weapon],s={
+   weapon,phase:'idle',clip:'Hold',phaseFrame:0,progress:0,
+   moving:false,speed:0,crouch:0,boltProgress:0,
+   fired:0,boltLocked:weapon==='Panzerschreck',
+   boltCount:0,shotsOnMove:0,history:[],markers:[],done:false,
+   running:false,requestedStop:false
+ };
+ let phaseIndex=-1,phaseFrame=0,markerSeen=new Set(),sequenceId=0;
+ function copy(){return {...s,history:s.history.map(x=>({...x})),markers:s.markers.map(x=>({...x}))}}
+ function log(kind,fields={}){s.history.push({kind,phase:s.phase,...fields})}
+ function transition(index){
+   if(index===timeline.length){
+     s.phase='complete';s.clip='Hold';s.phaseFrame=0;s.progress=1;
+     s.crouch=0;s.moving=false;s.speed=0;s.done=true;s.running=false;
+     onStage(copy());return;
+   }
+   phaseIndex=index;phaseFrame=0;markerSeen=new Set();
+   const stage=timeline[index];
+   s.phase=stage.id;s.clip=stage.clip;s.phaseFrame=0;s.progress=0;
+   s.moving=stage.travel;s.crouch=stage.stance;s.boltProgress=0;
+   if(stage.id==='stop'){s.requestedStop=true;requestStop();}
+   if(stage.id==='fire'){
+     if(s.speed>speedEpsilon||s.moving){s.shotsOnMove++;throw Error('Cannot shoot while moving');}
+     if(!s.markers.some(x=>x.name==='stop-confirmed'))throw Error('Stop not confirmed');
+     if(weapon==='Kar98k'&&!s.boltLocked)throw Error('Bolt must be closed before shot');
+   }
+   if(stage.id==='bolt'&&weapon!=='Kar98k')throw Error('Rocket launcher has no bolt');
+   log('phase',{frame:0});
+   onStage(copy());
+ }
+ function emit(name,frame){
+   const marker={name,phase:s.phase,frame,sequenceId};
+   if(name==='shot'){
+     if(s.speed>speedEpsilon||s.moving){s.shotsOnMove++;throw Error('Shot fired while moving');}
+     if(weapon==='Kar98k'&&!s.boltLocked)throw Error('Bolt is not ready');
+     if(!s.markers.some(x=>x.name==='stop-confirmed'))throw Error('Shot without stopped pose');
+     s.fired++;
+     if(weapon==='Kar98k')s.boltLocked=false;
+   }
+   if(name==='bolt-locked'){s.boltLocked=true;s.boltCount++;}
+   s.markers.push(marker);log('marker',{name,frame});
+   onMarker(marker,copy());
+ }
+ function start(){
+   sequenceId++;s.phase='idle';s.clip='Hold';s.progress=0;s.phaseFrame=0;
+   s.running=true;s.done=false;s.moving=true;s.speed=runSpeed;s.crouch=0;
+   s.boltProgress=0;s.fired=0;s.boltCount=0;s.shotsOnMove=0;s.markers=[];s.history=[];
+   s.boltLocked=true;s.requestedStop=false;
+   transition(0);
+   return copy();
+ }
+ function update(dt){
+   if(!s.running)return copy();
+   if(!Number.isFinite(dt)||dt<0)throw Error('Invalid delta');
+   // Frame-rate independent fixed-time event search. 240ms tab stall cannot
+   // skip a shot or cycle the bolt twice.
+   let frames=Math.min(dt,1.0)*fps;
+   let limit=0;
+   while(frames>1e-8 && s.running){
+     if(++limit>100)throw Error('Animation state machine did not advance');
+     const stage=timeline[phaseIndex];
+     const remaining=stage.frames-phaseFrame;
+     const take=Math.min(frames,remaining);
+     const before=phaseFrame;
+     phaseFrame+=take;frames-=take;
+     const seconds=take/fps;
+     if(stage.id==='run'||stage.id==='resume'){
+       s.speed=typeof measureSpeed==='function'
+         ?Math.max(0,Number(measureSpeed())||0):runSpeed;
+     }else if(typeof measureSpeed==='function'){
+       s.speed=Math.max(0,Number(measureSpeed())||0);
+     }else{
+       s.speed=Math.max(0,s.speed-deceleration*seconds);
+     }
+     s.phaseFrame=phaseFrame;s.progress=clamp(phaseFrame/stage.frames,0,1);
+     if(stage.id==='lower')s.crouch=.18+.82*smooth(s.progress);
+     else if(stage.id==='recover')s.crouch=1-.82*smooth(s.progress);
+     else if(stage.id==='stop')s.crouch=.18*smooth(s.progress);
+     else s.crouch=stage.stance;
+     if(stage.id==='bolt')s.boltProgress=s.progress;
+     onPose(copy());
+     for(const m of stage.markers)if(before<m.frame&&phaseFrame>=m.frame&&!markerSeen.has(m.name)){
+       markerSeen.add(m.name);emit(m.name,m.frame);
+     }
+     if(phaseFrame+1e-7>=stage.frames){
+       if(stage.id==='stop'){
+         if(s.speed>speedEpsilon){
+           // Keep the animation parked at its last stopping frame until
+           // the actual movement system reports that the soldier is still.
+           phaseFrame=stage.frames-1;s.phaseFrame=phaseFrame;
+           s.progress=phaseFrame/stage.frames;
+           if(frames>0)frames=0;
+           break;
+         }
+         if(!s.markers.some(m=>m.name==='stop-confirmed'))
+           emit('stop-confirmed',stage.frames);
+       }
+       transition(phaseIndex+1);
+     }
+   }
+   return copy();
+ }
+ function smooth(t){t=clamp(t,0,1);return t*t*(3-2*t)}
+ function stop(){
+   sequenceId++;s.running=false;s.done=false;s.phase='idle';s.clip='Hold';
+   s.speed=0;s.moving=false;s.crouch=0;s.boltProgress=0;
+   onStage(copy());return copy();
+ }
+ return {start,update,stop,snapshot:copy,timeline,framesPerSecond:fps};
+}
+return {create,PROFILES:stages,FPS};
 });
