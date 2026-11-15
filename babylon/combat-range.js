@@ -152,16 +152,16 @@
       'Боекомплект ' + weapon + ' уже полный.');
     refresh();
   }
-  function tracer(from, to, weapon, isHit) {
-    const p1 = coords(from, 1.45), p2 = coords(to, 1.1);
-    if (!isHit) p2.z += (Math.random() - .5) * 2;
+  function tracer(from, to, weapon, isHit, impact = null) {
+    const p1 = coords(from, 1.45), p2 = impact ? coords(impact, 1.1) : coords(to, 1.1);
+    if (!isHit && !impact) p2.z += (Math.random() - .5) * 2;
     const l = B.MeshBuilder.CreateLines('shot', { points: [p1, p2] }, scene);
     l.color = weapon === 'Panzerschreck' ? new B.Color3(1, .46, .1) :
       from === actor ? new B.Color3(1, .86, .44) : new B.Color3(1, .35, .22);
     effects.push({ mesh: l, ttl: weapon === 'Panzerschreck' ? .32 : .12 });
     if (weapon === 'Panzerschreck') {
       const sphere = B.MeshBuilder.CreateSphere('HE blast', { diameter: 1.1, segments: 12 }, scene);
-      sphere.position.copyFrom(coords(to, .7));
+      sphere.position.copyFrom(coords(impact || to, .7));
       const mat = new B.StandardMaterial('HE glow', scene);
       mat.emissiveColor = new B.Color3(1, .38, .06);
       mat.alpha = .5; sphere.material = mat;
@@ -175,7 +175,7 @@
     while (loops++ < 6) {
       const result = battle.fire(unit, target, { moving: unit === actor && moving });
       if (!result.ok) break;
-      tracer(unit, target, result.weapon, result.hit);
+      tracer(unit, target, result.weapon, result.hit, result.impact);
       if (unit === actor) {
         shotAge = 0; // A real successful fire() event drives the 3D recoil pose.
         // The visible GLB must follow the automatic fallback, not just the damage rules.
@@ -197,8 +197,8 @@
   function drawFrame() {
     const dt = Math.min(engine.getDeltaTime() / 1000, .075);
     if (ready && Number.isFinite(shotAge)) shotAge += dt;
+    if (ready) battle.tick(dt); // Timers also advance safely on the base.
     if (ready && active) {
-      battle.tick(dt);
       const target = foes.find(x => x.alive);
       if (actor.alive && target) actShot(actor, target, dt);
       for (const enemy of foes) {
