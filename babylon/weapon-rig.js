@@ -285,19 +285,30 @@
     // default previews: applies ONLY with ?gripStudio=1. Corrected hand and
     // finger poses can be saved as JSON for Blender-based animation authoring.
     const gripStudio=new URLSearchParams(window.location.search).get('gripStudio')==='1';
+    // Two fully independent hands. Right grips Kar98k wrist/trigger, left
+    // supports forestock. The butt remains fixed to the RIGHT shoulder.
+    // Existing v1 flat keys are migrated through legacyAliases in the API.
     const masterDefaults=Object.freeze({
       rightPitch:0,rightYaw:0,rightRoll:0,
       rightOffsetX:0,rightOffsetY:0,rightOffsetZ:0,
-      supportOffsetZ:0,
-      fingerCurl:1.55,indexCurl:.75,thumbCurl:1.05
+      rightFingerCurl:1.55,rightIndexCurl:.75,rightThumbCurl:1.05,
+      leftPitch:0,leftYaw:0,leftRoll:0,
+      leftOffsetX:0,leftOffsetY:0,leftOffsetZ:0,
+      leftFingerCurl:1.55,leftIndexCurl:1.55,leftThumbCurl:1.05
     });
     const master={...masterDefaults};
     const masterKeys=Object.keys(masterDefaults);
     const masterRanges={
       rightPitch:[-80,80],rightYaw:[-80,80],rightRoll:[-120,120],
       rightOffsetX:[-.07,.07],rightOffsetY:[-.07,.07],rightOffsetZ:[-.07,.07],
-      supportOffsetZ:[-.12,.12],
-      fingerCurl:[0,2.6],indexCurl:[0,2.5],thumbCurl:[0,2.5]
+      rightFingerCurl:[0,2.6],rightIndexCurl:[0,2.5],rightThumbCurl:[0,2.5],
+      leftPitch:[-80,80],leftYaw:[-80,80],leftRoll:[-120,120],
+      leftOffsetX:[-.07,.07],leftOffsetY:[-.07,.07],leftOffsetZ:[-.12,.12],
+      leftFingerCurl:[0,2.6],leftIndexCurl:[0,2.5],leftThumbCurl:[0,2.5]
+    };
+    const legacyAliases={
+      fingerCurl:'rightFingerCurl',indexCurl:'rightIndexCurl',
+      thumbCurl:'rightThumbCurl',supportOffsetZ:'leftOffsetZ'
     };
 
     // Experimental anatomical wrist-basis calibration: glTF/Mixamo wrist
@@ -356,7 +367,8 @@
           // Compare source rest, stronger flexion, reverse and alternate axis
           // without changing the approved soldier's skinned geometry.
           const multiplier=gripStudio
-            ? master[digit==='Thumb'?'thumbCurl':digit==='Index'?'indexCurl':'fingerCurl']
+            ? master[(rightHand?'right':'left')+
+              (digit==='Thumb'?'ThumbCurl':digit==='Index'?'IndexCurl':'FingerCurl')]
             : gripDebug==='neutral'?0:gripDebug==='classic'?1:1.55;
           const sign=gripDebug==='reverse'?-1:1;
           const curlAxis=gripDebug==='axisX'?B.Axis.X:B.Axis.Z;
@@ -464,12 +476,14 @@
       refresh(pivot);
 
       const rightBaseQ=desiredHandFrame('Right',meta.triggerAxis,meta.triggerPalm,gunQ);
-      const editR=gripStudio&&weaponId==='de-kar98k'
-        ?B.Quaternion.FromEulerAngles(master.rightPitch*Math.PI/180,
-          master.rightYaw*Math.PI/180,master.rightRoll*Math.PI/180)
+      const leftBaseQ=desiredHandFrame('Left',meta.supportAxis,meta.supportPalm,gunQ);
+      const studioPose=gripStudio&&weaponId==='de-kar98k';
+      const handEdit=(side)=>studioPose
+        ?B.Quaternion.FromEulerAngles(master[side+'Pitch']*Math.PI/180,
+          master[side+'Yaw']*Math.PI/180,master[side+'Roll']*Math.PI/180)
         :B.Quaternion.Identity();
-      const rightQ=rightBaseQ.multiply(editR).normalize();
-      const leftQ=desiredHandFrame('Left',meta.supportAxis,meta.supportPalm,gunQ);
+      const rightQ=rightBaseQ.multiply(handEdit('right')).normalize();
+      const leftQ=leftBaseQ.multiply(handEdit('left')).normalize();
       const rightFinger=rotated(localHandForward('Right'),rightQ).normalize();
       const leftFinger=rotated(localHandForward('Left'),leftQ).normalize();
       const trigger = pivot.position.add(rotated(v(meta.trigger),gunQ));
@@ -485,8 +499,9 @@
           ? (weaponId==='de-panzerschreck'?[0,-.135,-.09]:meta.support)
           : meta.support;
       const support=pivot.position.add(rotated(v(supportPoint),gunQ));
-      if(gripStudio&&weaponId==='de-kar98k')
-        support.addInPlace(rotated(new B.Vector3(0,0,master.supportOffsetZ),gunQ));
+      if(studioPose)
+        support.addInPlace(rotated(new B.Vector3(master.leftOffsetX,
+          master.leftOffsetY,master.leftOffsetZ),gunQ));
       // Reach-aware correction for the TEMPORARY shoulder-launched weapon ONLY.
       // IK cannot create a natural elbow if the support grip lies beyond the
       // model's upper-arm + forearm length. Instead of stretching the soldier
@@ -660,18 +675,30 @@
     state.masterPoseEnabled=gripStudio;
     state.setMasterPose=(patch)=>{
       if(!gripStudio)throw Error('Master-pose editor is not enabled');
-      if(!patch||typeof patch!=='object')throw Error('Invalid master-pose patch');
-      for(const key of masterKeys)if(Object.prototype.hasOwnProperty.call(patch,key)){
-        const val=Number(patch[key]);
-        if(!Number.isFinite(val))throw Error('Invalid finite value for '+key);
+      if(!patch||typeof patch!=='object'||Array.isArray(patch))
+        throw Error('Invalid master-pose patch');
+      const next={...master};
+      for(const [rawKey,rawValue] of Object.entries(patch)){
+        const key=legacyAliases[rawKey]||rawKey;
+        if(!Object.prototype.hasOwnProperty.call(masterRanges,key))
+          throw Error('Unknown master-pose key '+rawKey);
+        const val=Number(rawValue);
+        if(!Number.isFinite(val))throw Error('Invalid finite value for '+rawKey);
         const [lo,hi]=masterRanges[key];
-        master[key]=B.Scalar.Clamp(val,lo,hi);
+        next[key]=B.Scalar.Clamp(val,lo,hi);
       }
+      Object.assign(master,next);
       needsPose=true;update();
       return {...master};
     };
     state.getMasterPose=()=>({...master});
     state.resetMasterPose=()=>state.setMasterPose(masterDefaults);
+    state.resetMasterHandPose=(side)=>{
+      if(side!=='right'&&side!=='left')throw Error('Hand must be right or left');
+      return state.setMasterPose(Object.fromEntries(masterKeys
+        .filter(key=>key.startsWith(side))
+        .map(key=>[key,masterDefaults[key]])));
+    };
     state.weaponVariants = WEAPONS.map(x => x[0]);
     state.weaponRigReady = true;
     state.equipWeapon = equip;
