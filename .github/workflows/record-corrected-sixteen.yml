@@ -1,0 +1,32 @@
+name: Record corrected sixteen Babylon animations
+on:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths: ['.github/workflows/record-corrected-sixteen.yml', 'babylon/animstudio-preview/record-video.cjs']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  record:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare video encoder and headless browser
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          npm install --no-audit --no-fund --prefix /tmp/animstudio-viewer-qa playwright@1.58.2
+          /tmp/animstudio-viewer-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8758 --bind 127.0.0.1 > /tmp/babylon-video-http.log 2>&1 &
+          sleep 2
+      - name: Record all corrected animated clips
+        run: node babylon/animstudio-preview/record-video.cjs
+      - name: Upload MP4 review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corrected-babylon-16-animations-mp4
+          path: babylon/animstudio-preview/qa/battlefield-16-animations.mp4
+          if-no-files-found: warn
+          retention-days: 30
