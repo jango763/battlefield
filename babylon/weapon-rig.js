@@ -281,6 +281,25 @@
       B.Quaternion.FromEulerAngles(n.rotation.x, n.rotation.y, n.rotation.z)]));
     const gripDebug = typeof window!=='undefined'
       ? new URLSearchParams(window.location.search).get('gripDebug') : null;
+    // Kar98k master-pose authoring studio. Isolated from gameplay and all
+    // default previews: applies ONLY with ?gripStudio=1. Corrected hand and
+    // finger poses can be saved as JSON for Blender-based animation authoring.
+    const gripStudio=new URLSearchParams(window.location.search).get('gripStudio')==='1';
+    const masterDefaults=Object.freeze({
+      rightPitch:0,rightYaw:0,rightRoll:0,
+      rightOffsetX:0,rightOffsetY:0,rightOffsetZ:0,
+      supportOffsetZ:0,
+      fingerCurl:1.55,indexCurl:.75,thumbCurl:1.05
+    });
+    const master={...masterDefaults};
+    const masterKeys=Object.keys(masterDefaults);
+    const masterRanges={
+      rightPitch:[-80,80],rightYaw:[-80,80],rightRoll:[-120,120],
+      rightOffsetX:[-.07,.07],rightOffsetY:[-.07,.07],rightOffsetZ:[-.07,.07],
+      supportOffsetZ:[-.12,.12],
+      fingerCurl:[0,2.6],indexCurl:[0,2.5],thumbCurl:[0,2.5]
+    };
+
     // Experimental anatomical wrist-basis calibration: glTF/Mixamo wrist
     // local +Y is not guaranteed to point down the fingers. Infer axes from
     // actual approved skinned joint positions IN BIND POSE instead.
@@ -336,7 +355,9 @@
           // Temporary URL-only research control; no extra visible gameplay UI.
           // Compare source rest, stronger flexion, reverse and alternate axis
           // without changing the approved soldier's skinned geometry.
-          const multiplier=gripDebug==='neutral'?0:gripDebug==='classic'?1:1.55;
+          const multiplier=gripStudio
+            ? master[digit==='Thumb'?'thumbCurl':digit==='Index'?'indexCurl':'fingerCurl']
+            : gripDebug==='neutral'?0:gripDebug==='classic'?1:1.55;
           const sign=gripDebug==='reverse'?-1:1;
           const curlAxis=gripDebug==='axisX'?B.Axis.X:B.Axis.Z;
           const bend=B.Quaternion.RotationAxis(curlAxis,amount[i]*multiplier*sign);
@@ -434,11 +455,19 @@
       pivot.position.copyFrom(stock.subtract(rotated(v(meta.shoulder), gunQ)));
       refresh(pivot);
 
-      const rightQ=desiredHandFrame('Right',meta.triggerAxis,meta.triggerPalm,gunQ);
+      const rightBaseQ=desiredHandFrame('Right',meta.triggerAxis,meta.triggerPalm,gunQ);
+      const editR=gripStudio&&weaponId==='de-kar98k'
+        ?B.Quaternion.FromEulerAngles(master.rightPitch*Math.PI/180,
+          master.rightYaw*Math.PI/180,master.rightRoll*Math.PI/180)
+        :B.Quaternion.Identity();
+      const rightQ=rightBaseQ.multiply(editR).normalize();
       const leftQ=desiredHandFrame('Left',meta.supportAxis,meta.supportPalm,gunQ);
       const rightFinger=rotated(localHandForward('Right'),rightQ).normalize();
       const leftFinger=rotated(localHandForward('Left'),leftQ).normalize();
-      const trigger = pivot.position.add(rotated(v(meta.trigger), gunQ));
+      const trigger = pivot.position.add(rotated(v(meta.trigger),gunQ));
+      if(gripStudio&&weaponId==='de-kar98k')
+        trigger.addInPlace(rotated(new B.Vector3(master.rightOffsetX,
+          master.rightOffsetY,master.rightOffsetZ),gunQ));
       // Aiming moves the left hand toward the receiver/launcher control,
       // preventing a fully locked support elbow while keeping the muzzle stable.
       const supportPoint=(pose==='aim'||pose==='fire')
@@ -446,7 +475,9 @@
           : weaponId==='de-panzerschreck'?[0,-.135,-.09]
           : meta.support)
         : meta.support;
-      const support = pivot.position.add(rotated(v(supportPoint), gunQ));
+      const support=pivot.position.add(rotated(v(supportPoint),gunQ));
+      if(gripStudio&&weaponId==='de-kar98k')
+        support.addInPlace(rotated(new B.Vector3(0,0,master.supportOffsetZ),gunQ));
       // Reach-aware correction for the TEMPORARY shoulder-launched weapon ONLY.
       // IK cannot create a natural elbow if the support grip lies beyond the
       // model's upper-arm + forearm length. Instead of stretching the soldier
@@ -523,6 +554,8 @@
         .add(rPalm.scale(rightPalmReach)), trigger).toFixed(4);
       report.leftGripMeters = +B.Vector3.Distance(left.hand.getAbsolutePosition()
         .add(lPalm.scale(leftPalmReach)), support).toFixed(4);
+      report.masterPoseEditor=gripStudio;
+      report.masterPose=gripStudio?{...master}:null;
       report.anatomicalHandCalibration=anatomicalDebug &&
         !!anatomicalBases.Right && !!anatomicalBases.Left;
       report.handFocus = B.Vector3.Lerp(
@@ -600,6 +633,21 @@
         el.addEventListener('click', () => setPose(el.dataset.pose));
     }
     await equip('de-kar98k');
+    state.masterPoseEnabled=gripStudio;
+    state.setMasterPose=(patch)=>{
+      if(!gripStudio)throw Error('Master-pose editor is not enabled');
+      if(!patch||typeof patch!=='object')throw Error('Invalid master-pose patch');
+      for(const key of masterKeys)if(Object.prototype.hasOwnProperty.call(patch,key)){
+        const val=Number(patch[key]);
+        if(!Number.isFinite(val))throw Error('Invalid finite value for '+key);
+        const [lo,hi]=masterRanges[key];
+        master[key]=B.Scalar.Clamp(val,lo,hi);
+      }
+      needsPose=true;update();
+      return {...master};
+    };
+    state.getMasterPose=()=>({...master});
+    state.resetMasterPose=()=>state.setMasterPose(masterDefaults);
     state.weaponVariants = WEAPONS.map(x => x[0]);
     state.weaponRigReady = true;
     state.equipWeapon = equip;
