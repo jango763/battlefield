@@ -33,6 +33,26 @@ button:disabled{opacity:.5;cursor:default}
  button{font-size:11px;padding:8px 6px}#readout{font-size:11px;padding:7px}.row{margin-bottom:6px}
  #footer{font-size:10px;padding:5px}
 }
+
+#battlefield-brief{position:fixed;inset:0;z-index:40;background:#111915;color:#f5f0df;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+#battlefield-brief[hidden]{display:none!important}
+.brief-head{text-align:center;padding:14px 12px 8px;background:#18221b;border-bottom:1px solid #6e7559}
+.brief-head h2{margin:0 0 5px;font-size:20px;color:#ebd7a9}
+.brief-head p{margin:0;font-size:12px;color:#bdcbb9}
+.brief-layout{max-width:1380px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(275px,.55fr);gap:14px;padding:14px}
+.brief-map{width:100%;border:1px solid #647159;border-radius:10px;display:block;background:#151b15}
+.brief-content{background:#202c22;border:1px solid #647159;border-radius:10px;padding:16px;align-self:start}
+.brief-content h3{font-size:17px;margin:0 0 12px;color:#edd9a1}
+.brief-content p{font-size:13px;line-height:1.5;margin:10px 0}
+.brief-content table{border-collapse:collapse;width:100%;font-size:13px;margin:13px 0}
+.brief-content th,.brief-content td{padding:8px 5px;border-bottom:1px solid #455746;text-align:left}
+.brief-content td:last-child{text-align:right;font-weight:700;color:#f0d27d}
+#brief-progress{font-size:13px;color:#dfebc9;min-height:28px;margin:14px 0 4px}
+#enter-game{display:block;width:100%;font-size:16px;background:#a28c46;color:#161f18;border:1px solid #dfc97c;padding:14px;cursor:pointer}
+#enter-game:disabled{background:#576452;color:#aeb9a8;cursor:wait;border-color:#697767}
+.brief-tip{font-size:11px!important;color:#a9b8a8}
+@media(max-width:760px){.brief-layout{display:block;padding:8px}.brief-content{margin-top:10px;padding:12px}.brief-map{max-height:none}.brief-head h2{font-size:18px}.brief-content h3{font-size:15px}#enter-game{position:sticky;bottom:calc(env(safe-area-inset-bottom) + 7px);z-index:2}}
+
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -41,8 +61,41 @@ button:disabled{opacity:.5;cursor:default}
 <script src="./combat-presentation-core.js"></script>
 <script src="./squad-combat-core.js"></script>
 <script src="./field-orders-core.js"></script>
+<script src="./gold-economy-core.js"></script>
 </head>
 <body>
+<div id="battlefield-brief" role="dialog" aria-label="Заставка и правила карты Перекрёсток" aria-modal="true">
+ <header class="brief-head"><h2>КАРТА «ПЕРЕКРЁСТОК» · 300 × 300</h2>
+ <p>Перед боем ознакомьтесь с расположением объектов и экономикой. Заставка не исчезнет, пока вы не нажмёте «В бой».</p></header>
+ <div class="brief-layout">
+  <div>
+   <a href="./map-loading-schematic.svg" target="_blank" rel="noopener" aria-label="Открыть схему карты крупно">
+    <img class="brief-map" src="./map-loading-schematic.svg" alt="Схема поля боя 300 на 300: южная и северная базы, четыре обычные фермы, центральная богатая ферма, семь ДОТов и три подбитых БТР"/>
+   </a>
+   <p class="brief-tip">Нажмите на карту для увеличения. Оригинал утверждённого иллюстрированного чертежа сохранён отдельно в библиотеке Battlefield.</p>
+  </div>
+  <aside class="brief-content">
+   <h3>План сражения · 12 против 12</h3>
+   <p>У каждой стороны главная база и две фермы. Пятая, самая богатая, находится строго в центре. Три ДОТа держат центр, ещё по два прикрывают подходы к базам. Разбитая колонна из трёх БТР служит ориентиром и укрытием.</p>
+   <h3>Золото — правила первого проекта</h3>
+   <table><thead><tr><th>Событие</th><th>Золото</th></tr></thead>
+   <tbody>
+    <tr><td>Начальная казна армии</td><td>560</td></tr>
+    <tr><td>Личные деньги героя</td><td>150</td></tr>
+    <tr><td>Захват точки за 5 секунд</td><td>+50</td></tr>
+    <tr><td>Обычная ферма / 5 секунд</td><td>+25</td></tr>
+    <tr><td>Богатая ферма / 5 секунд</td><td>+125</td></tr>
+    <tr><td>Уничтожение бойца</td><td>+15</td></tr>
+    <tr><td>Уничтожение бронированного</td><td>+30</td></tr>
+   </tbody></table>
+   <p>Герой занимает одно место из 12. При смене стороны в новой команде убирается один бот, а в прежней появляется новый: баланс всегда <b>12 на 12</b>.</p>
+   <div id="brief-progress" role="status" aria-live="polite">Загружаем Battlefield…</div>
+   <button id="enter-game" type="button" disabled>Загрузка бойцов…</button>
+   <p class="brief-tip">Старт боя — только по нажатию. Можно спокойно дочитать схему, даже если игра уже загрузилась.</p>
+  </aside>
+ </div>
+</div>
+
 <canvas id="view" aria-label="Основная игра Battlefield. Коснитесь земли, чтобы приказать герою двигаться."></canvas>
 <header id="heading"><h1>Капрал на линии фронта</h1>
 <small>Battlefield · Babylon.js · управление героем и отрядом</small></header>
