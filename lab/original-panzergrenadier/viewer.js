@@ -47,8 +47,11 @@
     const raw=new THREE.Box3().setFromObject(original);
     const span=raw.getSize(new THREE.Vector3());
     if(!(span.y>0&&Number.isFinite(span.y)))throw Error('Некорректные размеры исходного GLB');
-    // Display-only translation: no mesh, material, texture, or skeleton is altered.
-    original.position.y-=raw.min.y;
+    // The source GLB uses a large authoring coordinate system (height ~95).
+    // Apply only a top-level DISPLAY scale to 1.8m; no geometry or materials change.
+    const viewScale=1.8/span.y;
+    original.scale.setScalar(viewScale);
+    original.position.y-=raw.min.y*viewScale;
     const normalized=new THREE.Box3().setFromObject(original);
     const size=normalized.getSize(new THREE.Vector3());
     center=normalized.getCenter(new THREE.Vector3());
