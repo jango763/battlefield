@@ -71,6 +71,46 @@
     state.played.push(weapon+'_'+pose);
   }
   state.show=show;
+  // Opt-in combat preview bridge. Blend native GLB animation groups while
+  // a separate deterministic controller drives lower-body stance / markers.
+  // Existing 16-clip viewer and saved artist grip remain unchanged.
+  let combatBlend=null;
+  state.setCombatClip=(weapon,pose,phase,authoredFrames)=>{
+    if(state.weapon!==weapon)throw Error('Combat weapon not equipped: '+weapon);
+    const name=weapon+'_'+pose;
+    const clip=scene.animationGroups.find(g=>g.name===name);
+    if(!clip)throw Error('Missing combat clip '+name);
+    state.pose=pose;
+    state.clip=name;
+    state.combatPhase=phase;
+    state.currentDuration=authoredFrames/30;
+    if(active!==clip){
+      const from=active;
+      if(combatBlend){
+        combatBlend.old?.stop();
+        combatBlend=null;
+      }
+      // A short weighted fade prevents a sudden head/arm snap when stopping.
+      // Matches imported glTF animation groups with the same skeleton targets.
+      const ratio=pose==='Fire'
+        ? Math.max(.1,(clip.to-clip.from)/Math.max(1,authoredFrames)):1;
+      clip.start(pose!=='Fire',ratio,clip.from,clip.to,false);
+      if(from?.isPlaying){
+        from.setWeightForAllAnimatables(1);
+        clip.setWeightForAllAnimatables(0);
+        combatBlend={old:from,next:clip,time:0,duration:.18};
+      }else clip.setWeightForAllAnimatables(1);
+      active=clip;
+    }
+    state.setWeaponPose(poseMap[pose]);
+    buttons();
+    return clip;
+  };
+  sceneCombatBlendPlaceholder();
+  function sceneCombatBlendPlaceholder(){
+    // Render observer is registered as soon as a scene exists below.
+    // This function intentionally has no side effects before GLB load.
+  }
   state.playAll=async()=>{
     if(state.all){stopAuto();return;}
     state.all=true;buttons();
@@ -136,6 +176,15 @@
     key.intensity=1.9;key.diffuse=new B.Color3(1,.92,.81);
     const back=new B.DirectionalLight('edge',new B.Vector3(.5,-.2,.8),scene);
     back.intensity=.7;
+    scene.onBeforeRenderObservable.add(()=>{
+      if(!combatBlend)return;
+      combatBlend.time+=Math.min(engine.getDeltaTime()/1000,.08);
+      const t=Math.min(1,combatBlend.time/combatBlend.duration);
+      const k=t*t*(3-2*t);
+      combatBlend.old.setWeightForAllAnimatables(1-k);
+      combatBlend.next.setWeightForAllAnimatables(k);
+      if(t>=1){combatBlend.old.stop();combatBlend=null}
+    });
     engine.runRenderLoop(()=>scene.render());
     window.addEventListener('resize',()=>engine.resize());
 
