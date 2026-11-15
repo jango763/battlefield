@@ -316,6 +316,16 @@
         new B.Vector3(.30,-.24,.20), chestQ));
       stabiliseElbow(right,rightPole);
       stabiliseElbow(left,leftPole);
+      // A pole adjustment may move a skinned wrist slightly in this imported rig.
+      // Re-pin wrist targets without moving the corrected elbow poles/clavicle.
+      for (const [arm,goal] of [[right,rightGoal],[left,leftGoal]]) {
+        for (let retry=0;retry<5;retry++) {
+          refresh(arm.hand);
+          if(B.Vector3.DistanceSquared(arm.hand.getAbsolutePosition(),goal)<.000144)break;
+          alignJoint(arm.fore,arm.hand,goal,.15);
+          alignJoint(arm.upper,arm.hand,goal,.09);
+        }
+      }
       report.rightElbowDegrees = elbowBend(right);
       report.leftElbowDegrees = elbowBend(left);
       setHandRotation(right.hand, rightQ);
