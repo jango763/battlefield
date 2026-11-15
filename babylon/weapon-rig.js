@@ -365,9 +365,10 @@
       // Human two-hand carry: right fingers wrap DOWN around the pistol-grip
       // (or rifle wrist), left fingers wrap ACROSS the handguard from below.
       const nextMeta = baseMeta && { ...baseMeta,
-        support: id === 'de-kar98k' ? [0,.04,.27] :
-          id === 'de-mp40' ? [0,.027,.19] :
-          id === 'de-mg42' ? [0,.074,.19] : baseMeta.support,
+        support: id === 'de-kar98k' ? [0,.04,.14] :
+          id === 'de-mp40' ? [0,.027,.085] :
+          id === 'de-mg42' ? [0,.074,.115] :
+          [0,-.135,-.02],
         triggerAxis: id === 'de-kar98k' ? [0,-.88,.48] : [0,-.96,.28],
         triggerPalm: [.90,.23,-.35],
         supportAxis: [-.85,.32,.42],
