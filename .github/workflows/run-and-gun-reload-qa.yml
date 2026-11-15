@@ -1,0 +1,39 @@
+name: Babylon MP40 MG42 moving fire and reload QA
+on:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths:
+      - 'babylon/animstudio-preview/combat-cycle-core.js'
+      - 'babylon/animstudio-preview/combat-demo.js'
+      - 'babylon/weapon-rig.js'
+      - 'babylon/animstudio-preview/test-run-and-gun-reload.cjs'
+      - '.github/workflows/run-and-gun-reload-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install browser and check scripts
+        run: |
+          node --check babylon/animstudio-preview/combat-cycle-core.js
+          node --check babylon/animstudio-preview/combat-demo.js
+          node --check babylon/weapon-rig.js
+          node --check babylon/animstudio-preview/test-run-and-gun-reload.cjs
+          npm install --no-audit --no-fund --prefix /tmp/animstudio-viewer-qa playwright@1.58.2
+          /tmp/animstudio-viewer-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/moving-fire-http.log 2>&1 &
+          sleep 2
+      - name: Verify run fire and timed reload MP40 MG42 on desktop and mobile
+        run: node babylon/animstudio-preview/test-run-and-gun-reload.cjs
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mp40-mg42-fire-reload-preview
+          path: babylon/animstudio-preview/reload-qa/
+          if-no-files-found: ignore
+          retention-days: 14
