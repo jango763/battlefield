@@ -12,10 +12,12 @@
 'use strict';
 const FPS=30;
 const RUN_AND_GUN=new Set(['MP40','MG42']);
-// Durations are animation frames at 30 fps: MP40 = 2.5 s; MG42 = 7.5 s.
+// Authored gameplay reload durations at 30 fps:
+// MP40 2.5 s, MG42 7.5 s, shoulder launcher Panzerschreck 9 s.
 const RELOAD=Object.freeze({
  MP40:Object.freeze({frames:75,seconds:2.5,capacity:32,mayMove:true}),
- MG42:Object.freeze({frames:225,seconds:7.5,capacity:50,mayMove:false})
+ MG42:Object.freeze({frames:225,seconds:7.5,capacity:50,mayMove:false}),
+ Panzerschreck:Object.freeze({frames:270,seconds:9,capacity:1,mayMove:false})
 });
 const stages={
  Kar98k:[
@@ -64,6 +66,11 @@ const stages={
   {id:'aim',clip:'Aim',frames:32,travel:false,stance:.11,markers:[]},
   {id:'fire',clip:'Fire',frames:11,travel:false,stance:.11,
    markers:[{frame:5,name:'shot'}]},
+  // Rocket already fired; stand still and reload from the rear of the tube.
+  // This is a blocked 9-second gameplay state; the 3D gesture is a placeholder.
+  {id:'reload',clip:'Hold',frames:RELOAD.Panzerschreck.frames,travel:false,
+   stance:.08,markers:[{frame:1,name:'reload-start'},
+     {frame:270,name:'reload-complete'}]},
   {id:'recover',clip:'Hold',frames:29,travel:false,stance:.03,markers:[]},
   {id:'resume',clip:'Run',frames:30,travel:true,stance:0,markers:[]}
  ]
@@ -107,7 +114,9 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
      if(!s.markers.some(x=>x.name==='stop-confirmed'))throw Error('Stop not confirmed');
      if(weapon==='Kar98k'&&!s.boltLocked)throw Error('Bolt must be closed before shot');
    }
-   if(stage.id==='bolt'&&weapon!=='Kar98k')throw Error('Rocket launcher has no bolt');
+   if(stage.id==='bolt'&&weapon!=='Kar98k')throw Error('Only Kar98k cycles a bolt');
+   if(stage.id==='reload'&&!RELOAD[weapon])
+     throw Error('Weapon cannot enter reload phase');
    log('phase',{frame:0});
    onStage(copy());
  }
@@ -115,6 +124,8 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
    const marker={name,phase:s.phase,frame,sequenceId};
    if(name==='shot'){
      if(s.reloading)throw Error('Cannot shoot during reload');
+     if(RELOAD[weapon]&&s.ammoRemaining<=0)
+       throw Error('No ammunition: reload required');
      if(RUN_AND_GUN.has(weapon)){
        if(s.ammoRemaining===0)throw Error('Magazine empty: reload required');
        if(s.phase!=='runFire'||!s.moving||s.speed<=speedEpsilon)
@@ -127,14 +138,14 @@ function create({weapon='Kar98k',onStage=()=>{},onMarker=()=>{},onPose=()=>{},
          throw Error('Shot without stopped pose');
      }
      s.fired++;
-     if(RUN_AND_GUN.has(weapon))s.ammoRemaining--;
+     if(RELOAD[weapon])s.ammoRemaining--;
      if(weapon==='Kar98k')s.boltLocked=false;
    }
    if(name==='reload-start'){
      if(!RELOAD[weapon]||!s.reloading)
        throw Error('Reload marker outside firearm reload phase');
      if(!RELOAD[weapon].mayMove&&s.speed>speedEpsilon)
-       throw Error('MG42 reload requires full stop');
+       throw Error('Heavy weapon reload requires full stop');
    }
    if(name==='reload-complete'){
      if(!RELOAD[weapon]||!s.reloading)
