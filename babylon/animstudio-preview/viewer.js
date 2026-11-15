@@ -10,10 +10,11 @@
   const status=document.querySelector('#status');
   const info=document.querySelector('#info');
   const allButton=document.querySelector('#playall');
+  const viewmodeButton=document.querySelector('#viewmode');
   const variants={Kar98k:'de-kar98k',MP40:'de-mp40',MG42:'de-mg42',Panzerschreck:'de-panzerschreck'};
-  const poseMap={Hold:'ready',Aim:'aim',Fire:'fire',Walk:'walk'};
-  const poses=['Hold','Aim','Fire','Walk'];
-  let scene,engine,active=null,socket=null,root=null,scale=1,autoHandle=null;
+  const poseMap={Hold:'ready',Aim:'aim',Fire:'fire',Run:'run'};
+  const poses=['Hold','Aim','Fire','Run'];
+  let scene,engine,camera,active=null,socket=null,root=null,scale=1,autoHandle=null;
   function reportError(e){
     state.error=String(e?.stack||e);
     console.error('AnimStudio preview:',e);
@@ -29,7 +30,7 @@
     allButton.setAttribute('aria-pressed',String(state.all));
     allButton.textContent=state.all?'■ Остановить показ 16 анимаций':'▶ Показать все 16 по очереди';
     info.textContent=state.weapon+' · '+({
-      Hold:'стойка с оружием',Aim:'прицеливание',Fire:'цикл стрельбы',Walk:'ходьба с оружием'
+      Hold:'стойка с оружием',Aim:'прицеливание',Fire:'цикл стрельбы',Run:'боевой бег с оружием'
     }[state.pose]||'')+(state.weapon==='Panzerschreck'?' · макет':'');
   }
   function stopAuto(){
@@ -89,6 +90,14 @@
     stopAuto();show(state.weapon,el.dataset.pose).catch(reportError);
   }));
   allButton.addEventListener('click',()=>state.playAll().catch(reportError));
+  viewmodeButton.addEventListener('click',()=>{
+    state.fullBody=!state.fullBody;
+    document.body.classList.toggle('full-body',state.fullBody);
+    if(camera){camera.radius=state.fullBody?3.65:3.0;
+      camera.setTarget(new B.Vector3(0,.90,0));}
+    viewmodeButton.setAttribute('aria-pressed',String(state.fullBody));
+    viewmodeButton.textContent=state.fullBody?'Показать меню':'Весь боец';
+  });
   try{
     if(!B?.SceneLoader)throw Error('Не загружен Babylon.js');
     engine=new B.Engine(canvas,true,{preserveDrawingBuffer:false,stencil:true,powerPreference:'high-performance'});
@@ -97,7 +106,7 @@
     scene.useRightHandedSystem=true;
     scene.clearColor=new B.Color4(.11,.17,.15,1);
     scene.ambientColor=new B.Color3(.3,.35,.33);
-    const camera=new B.ArcRotateCamera('orbit',.23*Math.PI,.42*Math.PI,3.0,new B.Vector3(0,.97,0),scene);
+    camera=new B.ArcRotateCamera('orbit',.23*Math.PI,.42*Math.PI,3.0,new B.Vector3(0,.97,0),scene);
     camera.lowerRadiusLimit=1.25;camera.upperRadiusLimit=6;camera.wheelDeltaPercentage=.013;
     camera.pinchDeltaPercentage=.015;camera.inertia=.65;camera.attachControl(canvas,true);
     const ambient=new B.HemisphericLight('soft skylight',new B.Vector3(0,1,0),scene);
@@ -109,7 +118,7 @@
     engine.runRenderLoop(()=>scene.render());
     window.addEventListener('resize',()=>engine.resize());
 
-    const imported=await B.SceneLoader.ImportMeshAsync('','./models/','all-animations.glb',scene);
+    const imported=await B.SceneLoader.ImportMeshAsync('','./models/','all-combat-run.glb',scene);
     const drawable=imported.meshes.filter(m=>m.getTotalVertices?.()>0);
     const min=new B.Vector3(Infinity,Infinity,Infinity);
     const max=new B.Vector3(-Infinity,-Infinity,-Infinity);
@@ -131,8 +140,9 @@
     socket=findSocket(imported);
     state.clips=scene.animationGroups.map(g=>g.name);
     state.meshCount=drawable.length;
+    state.locomotion='run';
     state.skeletonBones=Math.max(...imported.skeletons.map(x=>x.bones.length));
-    if(state.clips.filter(n=>/^(Kar98k|MP40|MG42|Panzerschreck)_(Hold|Aim|Fire|Walk)$/.test(n)).length!==16)
+    if(state.clips.filter(n=>/^(Kar98k|MP40|MG42|Panzerschreck)_(Hold|Aim|Fire|Run)$/.test(n)).length!==16)
       throw Error('Проверка обнаружила не 16 анимаций');
     if(!window.BattlefieldWeaponRig)throw Error('Не загружен корректирующий IK-модуль');
     await window.BattlefieldWeaponRig.create({scene,imported,root,state,
