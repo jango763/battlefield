@@ -46,6 +46,7 @@ window.installPanzerKar98k=function({figure,scene,status,state}){
  return new Promise((resolve,reject)=>{
  new THREE.GLTFLoader().load('../../assets/ww2-weapons/de-kar98k.glb',gltf=>{
  try{
+  state.availableBones=[];figure.traverse(n=>{if(n.isBone)state.availableBones.push(n.name)});
   const bones={};
   for(const n of ['RightArm','RightForeArm','RightHand','LeftArm','LeftForeArm','LeftHand'])bones[n]=getBone(figure,n);
   if(Object.values(bones).some(n=>!n))throw Error('Оригинальный скелет: не найдены кости рук '+Object.entries(bones).filter(([,v])=>!v).map(([k])=>k).join(','));
