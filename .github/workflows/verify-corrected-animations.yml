@@ -1,0 +1,36 @@
+name: Verify sixteen corrected Babylon animations
+on:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths:
+      - 'babylon/weapon-rig.js'
+      - 'babylon/animstudio-preview/**'
+      - '.github/workflows/verify-corrected-animations.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare the interactive animation viewer
+        run: |
+          node --check babylon/weapon-rig.js
+          node --check babylon/animstudio-preview/viewer.js
+          node --check babylon/animstudio-preview/test-viewer.cjs
+          npm install --no-audit --no-fund --prefix /tmp/animstudio-viewer-qa playwright@1.58.2
+          /tmp/animstudio-viewer-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/corrected-viewer-http.log 2>&1 &
+          sleep 2
+      - name: Verify 16 poses with corrected grips in desktop and mobile browser
+        run: node babylon/animstudio-preview/test-viewer.cjs
+      - name: Save all 32 screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corrected-babylon-sixteen-clips-screenshots
+          path: babylon/animstudio-preview/qa/*.png
+          retention-days: 30
+          if-no-files-found: ignore
