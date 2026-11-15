@@ -76,10 +76,10 @@ function playerScene(){
  const engine=new B.Engine(view,true,{stencil:true,preserveDrawingBuffer:false,disableWebGL2Support:false});
  const scene=new B.Scene(engine);
  scene.clearColor=new B.Color4(.19,.26,.22,1);
- const camera=new B.ArcRotateCamera('inspection',Math.PI/2.65,1.12,4.3,new B.Vector3(0,1,0),scene);
+ const camera=new B.ArcRotateCamera('inspection',Math.PI/2.65,1.15,3.5,new B.Vector3(0,1.06,0),scene);
  camera.attachControl(view,true);camera.lowerRadiusLimit=2;camera.upperRadiusLimit=10;
- const ambient=new B.HemisphericLight('fill',new B.Vector3(0,1,0),scene);ambient.intensity=1.5;
- const sun=new B.DirectionalLight('sun',new B.Vector3(-1,-1,-.5),scene);sun.intensity=1.1;
+ const ambient=new B.HemisphericLight('fill',new B.Vector3(0,1,0),scene);ambient.intensity=1.02;
+ const sun=new B.DirectionalLight('sun',new B.Vector3(-1,-1,-.5),scene);sun.intensity=.88;
  const floor=B.MeshBuilder.CreateGround('terrain',{width:12,height:12},scene);
  const mat=new B.StandardMaterial('earth',scene);
  mat.diffuseColor=new B.Color3(.25,.32,.24);floor.material=mat;
@@ -185,7 +185,7 @@ async function main(){
   try{
    const kit=await installWehrmachtOutfit(scene,model);
    state.wardrobe={ready:true,selected:kit.selected,capMeshCounts:Object.fromEntries(Object.entries(kit.caps).map(([name,cap])=>[name,cap.meshCount])),
-    coloredVertices:kit.wool.vertices,patchAreas:kit.wool.areas,kitParts:kit.kit.pieces,errors:kit.errors};
+    coloredVertices:kit.wool.vertices,patchAreas:kit.wool.areas,kitParts:kit.kit.pieces,sleeveParts:kit.sleeves,errors:kit.errors};
    const sync=()=>{state.wardrobe.selected=kit.selected;};
    for(const button of document.querySelectorAll('[data-headwear]')){
     button.onclick=()=>{try{kit.setHeadwear(button.dataset.headwear);sync();
