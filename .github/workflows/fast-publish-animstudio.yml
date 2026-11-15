@@ -1,0 +1,31 @@
+name: Fast publish AnimStudio 16 clips
+on:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths: ['.github/workflows/fast-publish-animstudio.yml']
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download confirmed 16-clip AnimStudio export and publish to branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/anim-exports babylon/animstudio-preview/models
+          gh run download 43714882285 --repo jango763/battlefield --name animstudio-four-weapons --dir /tmp/anim-exports
+          cp /tmp/anim-exports/Battlefield_Panzerschreck.glb babylon/animstudio-preview/models/all-animations.glb
+          cp /tmp/anim-exports/de-panzerschreck-preview.glb babylon/animstudio-preview/models/de-panzerschreck-preview.glb
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add babylon/animstudio-preview/models/
+          if git diff --cached --quiet; then echo 'Already published'; exit 0; fi
+          git commit -m 'assets(babylon): publish all 16 real AnimStudio clips'
+          git pull --rebase origin next/babylon-game-foundation-20261115
+          git push origin HEAD:next/babylon-game-foundation-20261115
