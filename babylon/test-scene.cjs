@@ -26,7 +26,8 @@ const fs = require('node:fs');
      await page.evaluate(async id => { await window.__BABYLON_SOLDIER__.equipWeapon(id); }, gun);
      for (const pose of ['ready', 'aim', 'walk', 'fire']) {
        await page.evaluate(mode => window.__BABYLON_SOLDIER__.setWeaponPose(mode), pose);
-       await page.waitForTimeout(180);
+       await page.waitForFunction(mode =>
+         window.__BABYLON_SOLDIER__?.weaponRig?.pose === mode, pose, {timeout:15000});
        const d=await page.evaluate(() => ({...window.__BABYLON_SOLDIER__.weaponRig}));
        weaponQA.push({gun,pose,right:d.rightGripMeters,left:d.leftGripMeters,error:d.error,pass:d.geometricPass});
        if(d.error || !Number.isFinite(d.rightGripMeters) || !Number.isFinite(d.leftGripMeters))
