@@ -15,7 +15,7 @@ for(const cfg of [{name:'desktop',width:1200,height:850},{name:'mobile',width:39
   expect(state.wardrobe?.ready,'Uniform installation failed: '+JSON.stringify(state.wardrobe)).toBe(true);
   expect(state.wardrobe.coloredVertices).toBeGreaterThan(10000);
   expect(state.wardrobe.kitParts).toBeGreaterThan(20);
-  expect(state.wardrobe.sleeveParts).toBe(2);
+  expect(state.wardrobe.sleeveParts).toBe(3); // tunic shell, trouser shell and boots
   expect(state.wardrobe.garment.parts.coat.triangles).toBeGreaterThan(400);
   expect(state.wardrobe.garment.parts.pants.triangles).toBeGreaterThan(400);
   expect(state.wardrobe.garment.parts.coat.bones).toBe(90);
