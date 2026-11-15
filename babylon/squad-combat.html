@@ -31,12 +31,12 @@ button[aria-pressed="true"]{background:#d2deac;color:#1d301e}button:disabled{opa
 <header id="heading"><h1>Battlefield · боевой полигон отрядов</h1>
 <small>Babylon.js · утверждённый немецкий боец · индивидуальный бег и стрельба</small></header>
 <section id="panel" aria-label="Проверка боевых отрядов">
-<div id="loading" role="status">Загружаю утверждённую модель и 16 анимаций…</div>
+<div id="loading" role="status">Загружаю 2 солдат для быстрого боя 1 на 1…</div>
 <h2>Состав и испытание</h2>
 <div class="row">
-<button data-scenario="duel" aria-pressed="false" disabled>1 на 1</button>
+<button data-scenario="duel" aria-pressed="true" disabled>1 на 1</button>
 <button data-scenario="assault" aria-pressed="false" disabled>1 против 4</button>
-<button data-scenario="squads" aria-pressed="true" disabled>4 против 4</button>
+<button data-scenario="squads" aria-pressed="false" disabled>4 против 4</button>
 </div>
 <h2>Оружие героя · покупка на базе</h2>
 <div class="row">
@@ -54,8 +54,8 @@ button[aria-pressed="true"]{background:#d2deac;color:#1d301e}button:disabled{opa
 <div id="reload"><span id="reload-fill"></span></div>
 <div id="readout">Загрузка сцены…</div>
 <div id="event" role="status">Коснитесь вражеского бойца, чтобы назначить приоритетную цель.</div>
-<p class="note">Зелёные метки — свои, красные — противник. Пока обе стороны используют одну утверждённую модель немецкого стрелка; британская форма ещё не готова. Строй и бег тестовые, карта и ручное RTS-управление не подключены. Смена БК — по игровому таймеру; анимации рук для перезарядки ещё нет.</p>
+<p class="note">Сначала загружаются два солдата. Режимы 1×4 и 4×4 подгружаются отдельно при выборе. Зелёные метки — свои, красные — противник. Пока обе стороны используют одну утверждённую модель немецкого стрелка; британская форма ещё не готова. Строй и бег тестовые, карта и ручное RTS-управление не подключены. Смена БК — по игровому таймеру; анимации рук для перезарядки ещё нет.</p>
 </section>
-<div id="footer">Вращение камерой — пальцем · Выбор цели — касание солдата · Стрельба и движение отрядов автоматические</div>
+<div id="footer">После загрузки нажмите «▶ Начать бой» · камера — пальцем · приоритетная цель — касанием солдата</div>
 <script src="./squad-combat-range.js"></script>
 </body></html>
