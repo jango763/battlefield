@@ -11,8 +11,18 @@ const tactics=window.BattlefieldSquadController;
 const presentation=window.BattlefieldCombatPresentation;
 const orders=window.BattlefieldFieldOrders;
 const canvas=$('view');
+// Retry and menu work even if CDN scripts or the 3D model failed to load.
+$('retry').addEventListener('click',()=>location.reload());
+$('hud-toggle').addEventListener('click',()=>{
+ const panel=$('panel'),closed=panel.classList.toggle('closed');
+ $('hud-toggle').setAttribute('aria-pressed',String(!closed));
+ $('hud-toggle').textContent=closed?'Меню':'Скрыть';
+});
 if(!B||!combat||!tactics||!presentation||!orders||!window.BattlefieldWeaponRig){
- $('loading').textContent='Не загружены Babylon.js или боевые модули.';
+ const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
+ $('loading').textContent=message;
+ $('failure-text').textContent=message;
+ $('failure').style.display='block';
  return;
 }
 const META={Kar98k:'de-kar98k',MP40:'de-mp40',MG42:'de-mg42',
@@ -30,13 +40,6 @@ let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
 let actors=new Map(),fx=[],scenario='duel',atBase=true;
 let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 function alertStatus(message){$('event').textContent=message}
-// Controls remain available even when initial glTF/IK loading fails.
-$('retry').addEventListener('click',()=>location.reload());
-$('hud-toggle').addEventListener('click',()=>{
- const panel=$('panel'),closed=panel.classList.toggle('closed');
- $('hud-toggle').setAttribute('aria-pressed',String(!closed));
- $('hud-toggle').textContent=closed?'Меню':'Скрыть';
-});
 function position(unit,y=0){
  return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y,unit.z*UNIT_SCALE);
 }
