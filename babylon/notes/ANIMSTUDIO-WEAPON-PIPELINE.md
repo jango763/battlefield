@@ -183,3 +183,22 @@ MP40 и MG42 без отдельной визуальной оценки.
 Основание решения:
 - https://doc.babylonjs.com/features/featuresDeepDive/mesh/bonesSkeletons
 - https://ezengine.net/pages/docs/animation/skeletal-animation/ik/two-bone-ik-component.html
+
+## Двухручный хват: практические уроки и переработка IK (15.11.2026)
+
+Вместо дальнейшей эвристической подгонки изучены:
+- [MK Graphics: Blender Rigging Tutorial — Hold a Rifle with Both Hands](https://www.youtube.com/watch?v=y2iPJBHZkvM), 2025: pivot/точка оружия, ведущая правая рука, вторая рука как IK target.
+- [Blender Secrets: Two handed prop in Mocap](https://www.youtube.com/watch?v=JyXFdiPYiDQ): IK ограничения для сохранения хвата на движении.
+- [Babylon.js Bones and Skeletons](https://doc.babylonjs.com/features/featuresDeepDive/mesh/bonesSkeletons): Two-bone IK, pole target; glTF linked TransformNodes управляются через `getTransformNode()`.
+- [Исходник Babylon.js BoneIKController](https://github.com/BabylonJS/Babylon.js/blob/master/packages/dev/core/src/Bones/boneIKController.ts): закон косинусов и ограничение допустимой досягаемости.
+- [Babylon.js Right-handed GLB coordinates](https://doc.babylonjs.com/features/featuresDeepDive/mesh/transforms/coordinateSystems/): согласование осей без зеркалирования.
+
+Реализация только в `next/babylon-game-foundation-20261115`:
+1. `solveTwoBone` вычисляет желаемое положение локтя из измеренных плечо–локоть–запястье и pole target. Без 22 циклов CCD за кадр.
+2. `bodyFacingFrame` восстанавливает направление +Z из положения плеч, шеи и бёдер. Раньше локальная ось `Spine2` разворачивала MP40 и MG42 вбок/вниз.
+3. Оружие предварительно перемещается в диапазон досягаемости двух сегментов руки с ограничением сдвига 18–20 см. Длина костей не изменяется.
+4. `twistForearmToPalm` распределяет поворот кисти на предплечье; локальный wrist twist ограничен 55° и измеряется уже после вращения.
+5. Проведено настоящее screenshot A/B пяти вариантов анимации пальцев: `neutral`, `classic`, `firm`, `reverse`, `axisX`. После визуального сравнения Kar98k/MP40/MG42 выбран `firm`, альтернативы оставлены только как тестовые параметры `?gripDebug=`.
+6. Расширен отчёт: `forwardDot`, `weaponReachCorrectionMeters`, `right/leftFingerDirectionErrorDegrees`, `right/leftForearmTwistDegrees`, `right/leftWristDegrees`. Чистая близость кисти к оружию не является художественной приёмкой.
+
+Статус: автоматические проверки геометрии хвата — не эквивалент точной постановке пальцев на конкретной модели оружия. Для AAA/CoH-уровня требуются ручная постановка хвата с деформированным скелетом в Blender или специализированном анимационном ПО, ретаргет/экспорт этих поз, проверка с трёх сторон и смешивание локомоции/верхней части тела. Текущий риг остаётся рабочим предпросмотром; одобренный `assets/soldiers/german.glb` и ветка Three.js не меняются.
