@@ -143,7 +143,7 @@ async function ensureUnits(scenarioName){
  if(!slots)throw Error('Неизвестный режим отряда: '+scenarioName);
  if(!asset){
   $('loading').textContent='Загружаю анимированного немецкого стрелка…';
-  asset=await B.SceneLoader.LoadAssetContainerAsync('',
+  asset=await B.SceneLoader.LoadAssetContainerAsync(
    './animstudio-preview/models/','all-combat-run.glb',scene);
   if(asset.animationGroups.length<16)
    throw Error('В GLB отсутствуют 16 согласованных боевых анимаций');
