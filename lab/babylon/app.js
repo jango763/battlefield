@@ -194,7 +194,9 @@ async function start(){
    if(!chest||!rightHand||!leftHand)throw Error('Torso or hand transforms missing; cannot mount weapon');
    grip=new B.TransformNode('chestWeaponSocket',scene);grip.parent=chest;
    weaponRoot=new B.TransformNode('weaponTrigger',scene);weaponRoot.parent=grip;
-   weaponRoot.metadata={support:meta.support,trigger:meta.trigger,muzzle:meta.muzzle,shoulder:meta.shoulder};\n   grip.position.set(0,-.10,.33);\n   grip.rotationQuaternion=null;grip.rotation.set(0,0,0);
+   weaponRoot.metadata={support:meta.support,trigger:meta.trigger,muzzle:meta.muzzle,shoulder:meta.shoulder};
+   grip.position.set(0,-.10,.33);
+   grip.rotationQuaternion=null;grip.rotation.set(0,0,0);
    for(const mesh of weaponContainer.meshes.filter(m=>!m.parent))mesh.parent=weaponRoot;
    for(const node of weaponContainer.transformNodes.filter(n=>!n.parent))node.parent=weaponRoot;
    state.weaponAttached=true;combatPoseSolved=false;updateWeaponPose();
