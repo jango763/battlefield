@@ -156,6 +156,28 @@
     const b=arm.hand.getAbsolutePosition().subtract(arm.fore.getAbsolutePosition()).normalize();
     return Math.round((180 - Math.acos(B.Scalar.Clamp(B.Vector3.Dot(a,b),-1,1))*180/Math.PI)*10)/10;
   }
+  // Rotate the FOREARM around its own axis before asking the wrist to orient.
+  // This is the standard twist distribution used by two-hand prop rigs.
+  // Without it the wrist alone must absorb 120+ degrees and the skin looks
+  // like a detached glove. Twisting around forearm-to-hand keeps palm anchored.
+  function twistForearmToPalm(arm, desiredHandWorldQ) {
+    refresh(arm.hand);
+    const axis=arm.hand.getAbsolutePosition().subtract(arm.fore.getAbsolutePosition());
+    if(axis.lengthSquared()<1e-7)return 0;
+    axis.normalize();
+    const present=worldRotation(arm.hand);
+    let delta=desiredHandWorldQ.multiply(present.conjugate()).normalize();
+    // q and -q represent the same orientation: choose shorter rotation.
+    if(delta.w<0)delta=new B.Quaternion(-delta.x,-delta.y,-delta.z,-delta.w);
+    const signed=2*Math.atan2(delta.x*axis.x+delta.y*axis.y+delta.z*axis.z,delta.w);
+    const theta=B.Scalar.Clamp(signed,-.95,.95);
+    const parentQ=arm.fore.parent?worldRotation(arm.fore.parent):B.Quaternion.Identity();
+    const rotation=B.Quaternion.RotationAxis(axis,theta);
+    const local=parentQ.conjugate().multiply(rotation).multiply(parentQ);
+    arm.fore.rotationQuaternion=local.multiply(arm.fore.rotationQuaternion).normalize();
+    refresh(arm.hand);
+    return +(theta*180/Math.PI).toFixed(1);
+  }
   function setHandRotation(hand, worldQ, bindLocal) {
     refresh(hand.parent);
     const qParent = hand.parent ? worldRotation(hand.parent) : B.Quaternion.Identity();
@@ -436,6 +458,8 @@
       report.solver='analytical-two-bone-with-pole';
       report.rightElbowDegrees = elbowBend(right);
       report.leftElbowDegrees = elbowBend(left);
+      report.rightForearmTwistDegrees=twistForearmToPalm(right,rightQ);
+      report.leftForearmTwistDegrees=twistForearmToPalm(left,leftQ);
       report.rightWristDegrees=setHandRotation(right.hand,rightQ,rest.get(right.hand));
       report.leftWristDegrees=setHandRotation(left.hand,leftQ,rest.get(left.hand));
       flexFingers('Right'); flexFingers('Left');
