@@ -5,6 +5,9 @@ assert.equal(RELOAD.MP40.seconds,2.5);
 assert.equal(RELOAD.MG42.seconds,7.5);
 assert.equal(RELOAD.MP40.frames,75);
 assert.equal(RELOAD.MG42.frames,225);
+assert.equal(RELOAD.Panzerschreck.seconds,9);
+assert.equal(RELOAD.Panzerschreck.frames,270);
+assert.equal(RELOAD.Panzerschreck.capacity,1);
 const all=[];
 function simulate(weapon,fps){
  const events=[],phaseHistory=[];
@@ -62,7 +65,6 @@ function simulate(weapon,fps){
   }
  }else{
   assert.equal(shots.length,1);
-  assert.equal(state.reloadCount,0);
   const stop=events.findIndex(e=>e.name==='stop-confirmed');
   const shot=events.findIndex(e=>e.name==='shot');
   assert(stop>=0&&shot>stop,'Fired without confirmed stop');
@@ -76,6 +78,19 @@ function simulate(weapon,fps){
   }else{
    assert.equal(state.boltCount,0);
    assert.equal(phaseHistory.find(x=>x.phase==='fire').crouch,.11);
+   assert.equal(state.reloadCount,1,'Panzerschreck rocket must be reloaded');
+   assert.equal(state.ammoRemaining,1);
+   const start=events.find(e=>e.name==='reload-start');
+   const end=events.find(e=>e.name==='reload-complete');
+   assert(start&&end,'Launcher reload markers missing');
+   assert.equal(start.phase,'reload');
+   assert.equal(end.phase,'reload');
+   assert.equal(end.elapsed,270);
+   assert.equal(start.moving,false,'Launcher must reload while stationary');
+   assert.equal(start.speed,0,'Launcher reloaded before stopping');
+   assert(events.indexOf(start)>shot,'Launcher reload started before firing');
+   assert(events.indexOf(end)>events.indexOf(start));
+   assert(shots.every(x=>x.phase!=='reload'));
   }
  }
  return {weapon,fps,events:events.map(e=>e.name),shots:state.fired,
@@ -118,5 +133,5 @@ assert.equal(mg.snapshot().reloadCount,0);
 assert.equal(mg.snapshot().ammoRemaining,half.ammoRemaining);
 assert(!mgMarks.includes('reload-complete'));
 console.log('FOUR_WEAPON_COMBAT_RELOAD_TESTS_PASS '+JSON.stringify(all));
-console.log('MP40_2_5S_MG42_7_5S_EXACT_FRAME_RELOAD_PASS');
+console.log('MP40_2_5S_MG42_7_5S_PANZERSCHRECK_9S_RELOAD_PASS');
 console.log('RIFLE_ROCKET_STOP_FIRE_AND_RELOAD_CANCELLATION_PASS');
