@@ -1,0 +1,33 @@
+name: Calibrate anatomical Mixamo hand basis
+on:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths:
+      - 'babylon/animstudio-preview/test-hand-basis.cjs'
+      - '.github/workflows/hand-basis-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install headless browser
+        run: |
+          node --check babylon/weapon-rig.js
+          npm install --no-audit --no-fund --prefix /tmp/animstudio-viewer-qa playwright@1.58.2
+          /tmp/animstudio-viewer-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/hand-basis-http.log 2>&1 &
+          sleep 2
+      - name: Compare calibrated and original wrist orientations
+        run: node babylon/animstudio-preview/test-hand-basis.cjs
+      - name: Save 16 real close-up screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mixamo-anatomical-wrist-A-B
+          path: babylon/animstudio-preview/wrist-basis-qa/
+          retention-days: 14
+          if-no-files-found: ignore
