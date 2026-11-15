@@ -3,7 +3,7 @@ const fs = require('node:fs');
 (async () => {
  let browser;
  try {
-  browser = await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--no-sandbox']});
+  browser = await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--enable-webgl','--no-sandbox']});
   for (const o of [
     {name:'desktop',w:1280,h:860,mobile:false},
     {name:'iphone',w:390,h:844,mobile:true}
@@ -19,7 +19,26 @@ const fs = require('node:fs');
    if(s.error || !s.loaded || s.skinnedMeshes<4 || s.skeletonBones<60 || s.materialCount<4 || errors.length) {
      throw new Error('Babylon verification failed '+JSON.stringify({state:s,errors}));
    }
+   if(!s.weaponRigReady || s.weaponVariants?.length !== 4) throw Error('Missing 4-weapon rig');
    fs.mkdirSync('babylon-qa-results',{recursive:true});
+   const weaponQA = [];
+   for (const gun of s.weaponVariants) {
+     await page.evaluate(async id => { await window.__BABYLON_SOLDIER__.equipWeapon(id); }, gun);
+     for (const pose of ['ready', 'aim', 'walk', 'fire']) {
+       await page.evaluate(mode => window.__BABYLON_SOLDIER__.setWeaponPose(mode), pose);
+       await page.waitForTimeout(180);
+       const d=await page.evaluate(() => ({...window.__BABYLON_SOLDIER__.weaponRig}));
+       weaponQA.push({gun,pose,right:d.rightGripMeters,left:d.leftGripMeters,error:d.error,pass:d.geometricPass});
+       if(d.error || !Number.isFinite(d.rightGripMeters) || !Number.isFinite(d.leftGripMeters))
+         throw Error('Weapon IK runtime failed: '+JSON.stringify({gun,pose,d}));
+       if(d.rightGripMeters > .15 || d.leftGripMeters > .15)
+         throw Error('Weapon IK exceeded 15 cm: '+JSON.stringify({gun,pose,d}));
+       if(pose === 'aim') await page.screenshot({
+         path:'babylon-qa-results/babylon-'+o.name+'-'+gun+'.png'
+       });
+     }
+   }
+   console.log('BABYLON_WEAPON_IK_'+o.name+' '+JSON.stringify(weaponQA));
    await page.waitForTimeout(650);
    await page.screenshot({path:'babylon-qa-results/babylon-soldier-'+o.name+'.png'});
    await page.close();
