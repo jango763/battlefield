@@ -15,6 +15,7 @@ for(const cfg of [{name:'desktop',width:1200,height:850},{name:'mobile',width:39
   expect(state.wardrobe?.ready,'Uniform installation failed: '+JSON.stringify(state.wardrobe)).toBe(true);
   expect(state.wardrobe.coloredVertices).toBeGreaterThan(10000);
   expect(state.wardrobe.kitParts).toBeGreaterThan(20);
+  expect(state.wardrobe.sleeveParts).toBe(6);
   expect(state.wardrobe.errors).toEqual([]);
   expect(state.wardrobe.capMeshCounts.m43).toBeGreaterThan(0);
   expect(state.wardrobe.capMeshCounts.sidecap).toBeGreaterThan(0);
