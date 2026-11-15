@@ -198,13 +198,78 @@ function installSleeves(scene,model){
  update();
  return {update,parts:specs.length};
 }
+// Tailored garment shell based on the source's "surface around body + sleeves" technique.
+// Unlike rigid cylinders, each coat/trouser vertex keeps its original 90-joint skin
+// influences and participates in the same native Babylon animations as the skin.
+function buildTailoredM40(scene,body){
+ const pos=body.getVerticesData(B.VertexBuffer.PositionKind);
+ const norm=body.getVerticesData(B.VertexBuffer.NormalKind);
+ const indices=body.getIndices();
+ const vcount=pos?.length/3||0;
+ if(!pos||!norm||!indices||!body.skeleton||vcount<4000)
+  throw Error('Source body has no skinned vertex geometry / normals / skeleton');
+ const faces={coat:[],pants:[]};
+ // Original body: 1.75 m height, I-pose arms. Cut along anatomical
+ // regions; no new joints and no duplicate hand or head meshes.
+ const identify=(x,y,z)=>{
+  const ax=Math.abs(x);
+  if(y<.24||y>1.48)return 'skin';
+  if(y<1.02&&ax>.192&&y>.77)return 'skin'; // uncovered palms
+  if(y<.77)return 'pants';
+  if(y<.97&&ax<.22)return 'pants';
+  return 'coat';
+ };
+ const region=new Array(vcount);
+ for(let i=0;i<vcount;i++)region[i]=identify(pos[i*3],pos[i*3+1],pos[i*3+2]);
+ for(let i=0;i<indices.length;i+=3){
+  const a=indices[i],b=indices[i+1],c=indices[i+2];
+  const counts={coat:0,pants:0};
+  for(const vertex of [a,b,c])if(counts[region[vertex]]!==undefined)counts[region[vertex]]++;
+  const part=counts.coat>=2?'coat':counts.pants>=2?'pants':null;
+  if(part)faces[part].push(a,b,c);
+ }
+ const stats={sourceVertices:vcount,sourceTriangles:indices.length/3,parts:{}};
+ const cloth={
+  coat:material(scene,'woven-fieldgrey-tunic',palette.tunic,.96),
+  pants:material(scene,'fieldgrey-trousers',palette.trousers,.96)
+ };
+ const outputs={};
+ for(const kind of ['coat','pants']){
+  const kept=faces[kind];
+  if(kept.length<600)throw Error(kind+' garment extraction produced only '+kept.length/3+' faces');
+  const shell=body.clone('M40-skinned-'+kind,body.parent,true);
+  shell.makeGeometryUnique();
+  const inflated=new Float32Array(pos.length);
+  for(let i=0;i<vcount;i++){
+   const x=pos[i*3],y=pos[i*3+1],z=pos[i*3+2];
+   const spread=kind==='coat'?(y<.93?Math.min(.019,(.93-y)*.21):0):0;
+   const ease=kind==='coat'?.0135:.0095;
+   // Seam-side ease, small drape of the tunic skirt, and an outward cloth layer.
+   inflated[i*3]=x+norm[i*3]*ease+Math.sign(x)*spread*.4;
+   inflated[i*3+1]=y+norm[i*3+1]*ease;
+   inflated[i*3+2]=z+norm[i*3+2]*ease+Math.sign(z)*spread*.7;
+  }
+  shell.setVerticesData(B.VertexBuffer.PositionKind,inflated,false);
+  shell.setIndices(kept);
+  shell.material=cloth[kind];
+  shell.useVertexColors=false;
+  shell.hasVertexAlpha=false;
+  shell.isPickable=false;
+  shell.receiveShadows=true;
+  if(!shell.skeleton||shell.skeleton.bones.length!==90)
+   throw Error(kind+' garment has lost native skeleton');
+  stats.parts[kind]={triangles:kept.length/3,bones:shell.skeleton.bones.length};
+  outputs[kind]=shell;
+ }
+ return {stats,outputs,count:Object.keys(outputs).length};
+}
 export async function installWehrmachtOutfit(scene,model,onUpdate){
  const wool=makeWool(scene,model);
  const chest=getJoint(model,'spine_05'),head=getJoint(model,'head');
  if(!chest||!head)throw Error('90-joint model does not expose chest/head transform nodes');
  const chestTracker=createTracker(scene,chest),headTracker=createTracker(scene,head);
  const kit=decorateM40(scene,chestTracker);
- const sleeves=installSleeves(scene,model);
+ const sleeves=buildTailoredM40(scene,wool.body);
  const caps={};
  const errors=[];
  for(const [id,file] of Object.entries({m43:'m43-field-cap',sidecap:'field-grey-sidecap'})){
@@ -219,8 +284,8 @@ export async function installWehrmachtOutfit(scene,model,onUpdate){
  };
  if(caps.m43)setHeadwear('m43');
  else if(caps.sidecap)setHeadwear('sidecap');
- const update=()=>{chestTracker.update();headTracker.update();sleeves.update();onUpdate?.();};
+ const update=()=>{chestTracker.update();headTracker.update();onUpdate?.();};
  const subscription=scene.onBeforeRenderObservable.add(update);
- return {wool,kit,caps,errors,sleeves:sleeves.parts,get selected(){return selected},setHeadwear,update,
+ return {wool,kit,caps,errors,garment:sleeves.stats,sleeves:sleeves.count,get selected(){return selected},setHeadwear,update,
   release:()=>scene.onBeforeRenderObservable.remove(subscription)};
 }
