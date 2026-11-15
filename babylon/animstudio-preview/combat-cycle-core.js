@@ -16,7 +16,7 @@ const RUN_AND_GUN=new Set(['MP40','MG42']);
 // MP40 2.5 s, MG42 7.5 s, shoulder launcher Panzerschreck 9 s.
 const RELOAD=Object.freeze({
  MP40:Object.freeze({frames:75,seconds:2.5,capacity:32,mayMove:true}),
- MG42:Object.freeze({frames:225,seconds:7.5,capacity:50,mayMove:false}),
+ MG42:Object.freeze({frames:225,seconds:7.5,capacity:100,mayMove:false}),
  Panzerschreck:Object.freeze({frames:270,seconds:9,capacity:1,mayMove:false})
 });
 const stages={
