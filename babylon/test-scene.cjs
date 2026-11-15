@@ -24,7 +24,7 @@ const fs = require('node:fs');
    const weaponQA = [];
    for (const gun of s.weaponVariants) {
      await page.evaluate(async id => { await window.__BABYLON_SOLDIER__.equipWeapon(id); }, gun);
-     for (const pose of ['ready', 'aim', 'walk', 'fire']) {
+     for (const pose of ['ready', 'aim', 'run', 'fire']) {
        await page.evaluate(mode => window.__BABYLON_SOLDIER__.setWeaponPose(mode), pose);
        await page.waitForFunction(mode =>
          window.__BABYLON_SOLDIER__?.weaponRig?.pose === mode, pose, {timeout:15000});
