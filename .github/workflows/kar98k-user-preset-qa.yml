@@ -1,0 +1,36 @@
+name: Exact user Kar98k grip preset QA
+on:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths:
+      - 'babylon/animstudio-preview/presets/kar98k-user-v2.json'
+      - 'babylon/animstudio-preview/grip-studio.js'
+      - 'babylon/animstudio-preview/test-user-preset.cjs'
+      - '.github/workflows/kar98k-user-preset-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install browser
+        run: |
+          node --check babylon/animstudio-preview/grip-studio.js
+          node --check babylon/animstudio-preview/test-user-preset.cjs
+          npm install --no-audit --no-fund --prefix /tmp/animstudio-viewer-qa playwright@1.58.2
+          /tmp/animstudio-viewer-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/user-grip-qa-http.log 2>&1 &
+          sleep 2
+      - name: Verify all 32 exact hand-pose parameters and butt anchor on desktop and phone
+        run: node babylon/animstudio-preview/test-user-preset.cjs
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kar98k-user-saved-preset-screenshots
+          path: babylon/animstudio-preview/user-grip-qa/
+          retention-days: 21
+          if-no-files-found: ignore
