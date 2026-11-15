@@ -315,6 +315,33 @@
           : meta.support)
         : meta.support;
       const support = pivot.position.add(rotated(v(supportPoint), gunQ));
+      // Reach-aware correction for the TEMPORARY shoulder-launched weapon ONLY.
+      // IK cannot create a natural elbow if the support grip lies beyond the
+      // model's upper-arm + forearm length. Instead of stretching the soldier
+      // or faking his grip, reposition the entire launcher a little towards
+      // his left shoulder while preserving BOTH actual grip points on the prop.
+      report.rocketRepositionMeters = 0;
+      if (weaponId === 'de-panzerschreck') {
+        refresh(left.hand);
+        const shoulderPos = left.upper.getAbsolutePosition();
+        const armLength = B.Vector3.Distance(shoulderPos, left.fore.getAbsolutePosition())
+          + B.Vector3.Distance(left.fore.getAbsolutePosition(), left.hand.getAbsolutePosition());
+        const palmAim = support.subtract(leftFinger.scale(.045));
+        const span = B.Vector3.Distance(shoulderPos, palmAim);
+        const preferred = armLength * .86; // ~60° elbow bend with two equal limb segments
+        if (span > preferred && span > 1e-6) {
+          const correction = shoulderPos.subtract(palmAim).scale((span - preferred) / span);
+          const maxOffset = .20; // never pull the tube arbitrarily inside the soldier
+          if (correction.lengthSquared() > maxOffset * maxOffset)
+            correction.normalize().scaleInPlace(maxOffset);
+          pivot.position.addInPlace(correction);
+          refresh(pivot);
+          trigger.addInPlace(correction);
+          support.addInPlace(correction);
+          report.rocketRepositionMeters = +correction.length().toFixed(4);
+        }
+        report.rocketOriginalReachRatio = +(span / Math.max(armLength, .0001)).toFixed(3);
+      }
       // The former 6.5 cm wrist offset lifted the pistol hand ABOVE its grip,
       // exposing a hollow sleeve cuff and hanging the fingers in midair.
       // Grip geometry: the right wrist sits just behind the trigger housing;
