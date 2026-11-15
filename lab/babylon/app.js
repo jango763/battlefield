@@ -29,7 +29,14 @@ async function start(){
  const wanted={idle:'Idle_Loop',jog:'Jog_Fwd_Loop',sprint:'Sprint_Loop'};
  // The animation GLB has its own node hierarchy. Babylon animates transform nodes,
  // not necessarily Skeleton.bones. Resolve targets against the imported character.
+ // Keep animated transform nodes separate from Skeleton.bones: the latter
+ // may expose names without being the actual GLB animation targets.
  const modelTargets=[...model.transformNodes,...model.meshes,...model.skeletons.flatMap(x=>x.bones)];
+ state.rigInventory={
+  skeletons:model.skeletons.map(sk=>({name:sk.name,bones:sk.bones.map(b=>b.name)})),
+  transforms:model.transformNodes.map(n=>({name:n.name,parent:n.parent?.name||null})),
+  meshes:model.meshes.map(n=>({name:n.name,parent:n.parent?.name||null}))
+ };
  const norm=name=>String(name||'').replace(/^mixamorig[:_]?/i,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
  const byName=new Map();
  for(const node of modelTargets){
@@ -62,7 +69,7 @@ async function start(){
  // Two-handed pose is an experimental procedural aim constraint.
  let weaponContainer=null,weaponRoot=null,grip=null,weaponGeneration=0;
  const weaponSelect=document.querySelector('#weapon');
- const findPart=(...names)=>modelTargets.find(n=>names.some(x=>norm(n.name)===norm(x)));
+ const findPart=(...names)=>model.transformNodes.find(n=>names.some(x=>norm(n.name)===norm(x)))||modelTargets.find(n=>names.some(x=>norm(n.name)===norm(x)));
  const chest=findPart('spine_03','spine_02','spine2','chest','upperchest','spine1');
  const rightHand=findPart('hand_r','righthand','RightHand');
  const leftHand=findPart('hand_l','lefthand','LeftHand');
@@ -74,7 +81,7 @@ async function start(){
   const joints={chest,rightUpper,rightLower,rightHand,leftUpper,leftLower,leftHand};
   const info={};
   for(const [key,node] of Object.entries(joints))info[key]=node?{name:node.name,type:node.getClassName?.(),parent:node.parent?.name||null,rotationQuaternion:!!node.rotationQuaternion}:null;
-  state.rigAudit={joints:info,skeletons:model.skeletons.map(x=>({name:x.name,bones:x.bones.map(b=>b.name)})),armCandidates:modelTargets.map(n=>n.name).filter(n=>/arm|hand|clavicle|spine|chest|wrist/i.test(n))};
+  state.rigAudit={joints:info,skeletons:state.rigInventory.skeletons,armCandidates:modelTargets.map(n=>n.name).filter(n=>/arm|hand|clavicle|spine|chest|wrist/i.test(n))};
   return state.rigAudit;
  };
  auditRig();
