@@ -89,8 +89,27 @@ async function boot(){
   B.MeshBuilder.CreateSphere('left-hand-goal',{diameter:.075},scene)];
  const yellow=new B.StandardMaterial('hand-goal',scene);yellow.emissiveColor=new B.Color3(.95,.75,.20);
  for(const m of markers){m.material=yellow;m.setEnabled(false);m.isPickable=false;}
- let rest=null,posed=null,transition=null,active=null;
- function stopClips(){for(const group of Object.values(groups))group.stop();}
+ let rest=null,posed=null,transition=null,active=null,aimRaise=null,aimLower=null;
+ function stopClips(){
+  for(const group of Object.values(groups))group.stop();
+  aimRaise?.stop();aimLower?.stop();
+ }
+ // Bake the solved 65-joint rig pose into Babylon AnimationGroup keyframes.
+ // It is a real replayable animation clip, not a per-frame IK override.
+ function bakeArmClip(name,from,to,frames){
+  const clip=new B.AnimationGroup(name,scene);
+  armNodes.forEach((node,i)=>{
+   const track=new B.Animation(name+'-'+node.name,'rotationQuaternion',30,
+    B.Animation.ANIMATIONTYPE_QUATERNION,B.Animation.ANIMATIONLOOPMODE_CONSTANT);
+   track.setKeys([{frame:0,value:from[i].clone()},{frame:frames,value:to[i].clone()}]);
+   const easing=new B.CubicEase();
+   easing.setEasingMode(B.EasingFunction.EASINGMODE_EASEINOUT);
+   track.setEasingFunction(easing);
+   clip.addTargetedAnimation(track,node);
+  });
+  clip.normalize(0,frames);
+  return clip;
+ }
  function play(mode){stopClips();groups[mode].start(true);active=mode;}
  function freezeIdle(){stopClips();groups.idle.start(true);groups.idle.goToFrame(groups.idle.from);groups.idle.pause();active=null;refresh(joints.rightHand);refresh(joints.leftHand);}
  function createAimPose(){
@@ -139,16 +158,24 @@ async function boot(){
    result:passes?'Цели достигнуты':'ТРЕБУЕТ ПРОВЕРКИ / КОРРЕКЦИИ',note:'Тест геометрии; положение кистей следует осмотреть визуально'};
   return best;
  }
- const smooth=t=>t*t*(3-2*t);
  function switchMode(mode){
   if(mode==='aim'){
    try{
     state.error=null;createAimPose();state.mode='aim';
-    transition={type:'up',start:armNodes.map(quaternionOf),end:posed,elapsed:0,duration:.55};
+    aimRaise?.stop();aimRaise?.dispose();
+    aimLower?.stop();
+    aimRaise=bakeArmClip('Aim_Raise_65',rest,posed,18);
+    state.aimClip={name:aimRaise.name,tracks:aimRaise.targetedAnimations.length,frames:18,framerate:30};
+    transition={type:'clip-up',elapsed:0,duration:.6};
+    aimRaise.start(false,1,0,18);
    }catch(error){state.error=String(error);state.mode='idle';play('idle');console.error(error);}
   }else if(groups[mode]){
    if(state.mode==='aim'&&rest){
-    transition={type:'down',start:armNodes.map(quaternionOf),end:rest,elapsed:0,duration:.38,next:mode};state.mode=mode;
+    const from=armNodes.map(quaternionOf);
+     stopClips();aimLower?.dispose();
+     aimLower=bakeArmClip('Aim_Lower_65',from,rest,12);
+     transition={type:'clip-down',elapsed:0,duration:.4,next:mode};state.mode=mode;
+     aimLower.start(false,1,0,12);
    }else{transition=null;state.mode=mode;play(mode);}
   }
   for(const btn of document.querySelectorAll('[data-mode]'))btn.setAttribute('aria-pressed',String(btn.dataset.mode===state.mode));
@@ -166,13 +193,18 @@ async function boot(){
   const now=performance.now(),dt=Math.min(.05,(now-last)/1000);last=now;
   if(transition){
    transition.elapsed=Math.min(transition.duration,transition.elapsed+dt);
-   const factor=smooth(transition.elapsed/transition.duration);
-   const q=transition.start.map((from,i)=>B.Quaternion.Slerp(from,transition.end[i],factor));
-   setQuats(q);
+   // The AnimationGroup, rather than the render loop, rotates the joints.
    if(transition.elapsed>=transition.duration){
     const completed=transition;transition=null;
-    if(completed.type==='down')play(completed.next);
+    if(completed.type==='clip-down'){aimLower?.stop();play(completed.next);}
+    else if(completed.type==='clip-up'){aimRaise?.pause();}
    }
+  }
+  if(state.mode==='aim'&&state.pose&&!transition){
+   const actual=[B.Vector3.Distance(at(joints.rightHand),markers[0].position),
+    B.Vector3.Distance(at(joints.leftHand),markers[1].position)];
+   state.pose.appliedDistances=actual.map(n=>+n.toFixed(3));
+   state.pose.applied=actual.every(n=>n<.10);
   }
   const visible=state.showGuides&&state.mode==='aim';
   for(const m of markers)m.setEnabled(visible);
@@ -181,7 +213,9 @@ async function boot(){
    lastReport=now;
    label.textContent='Скелет: '+state.rig.bones+' костей | дорожки Idle/Jog/Sprint: '+Object.values(state.tracks).join('/')+
     '\nРежим: '+state.mode+(transition?' · переход '+Math.round(transition.elapsed/transition.duration*100)+'%':'')+
-    (state.pose?'\nБоевая стойка: '+state.pose.result+' | кисти: '+state.pose.distances.join('/')+' м | локти: '+state.pose.elbows.join('/')+'°':'')+
+    (state.pose?'\nБоевая стойка: '+state.pose.result+' | кисти: '+state.pose.distances.join('/')+' м | локти: '+state.pose.elbows.join('/')+'°'
+     +' | результат клипа: '+(state.pose.applied===undefined?'ожидание':state.pose.applied?'OK':'ОШИБКА'):'')+
+    (state.aimClip?'\nКлип: '+state.aimClip.name+' · '+state.aimClip.tracks+' дорожки':'')+
     (state.error?'\nОШИБКА: '+state.error:'')+'\nFPS: '+Math.round(engine.getFps());
   }
  });
