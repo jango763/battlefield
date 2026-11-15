@@ -2,10 +2,10 @@ const {chromium}=require('/tmp/animstudio-viewer-qa/node_modules/playwright');
 const fs=require('node:fs');
 const expected={
  rightPitch:-80,rightYaw:-80,rightRoll:120,rightOffsetX:-.05,rightOffsetY:-.025,rightOffsetZ:0,
- leftPitch:10,leftYaw:-69,leftRoll:120,leftOffsetX:.075,leftOffsetY:-.075,leftOffsetZ:.38,
+ leftPitch:10,leftYaw:-62,leftRoll:120,leftOffsetX:-.12,leftOffsetY:-.035,leftOffsetZ:.38,
  rightThumbCurl:1,rightThumbSpread:-34,rightIndexCurl:.75,rightIndexSpread:-11,
  rightMiddleCurl:2.25,rightMiddleSpread:0,rightRingCurl:1.55,rightRingSpread:0,
- rightPinkyCurl:1.55,rightPinkySpread:0,leftThumbCurl:.15,leftThumbSpread:5,
+ rightPinkyCurl:1.55,rightPinkySpread:0,leftThumbCurl:0,leftThumbSpread:5,
  leftIndexCurl:2.6,leftIndexSpread:43,leftMiddleCurl:1.55,leftMiddleSpread:0,
  leftRingCurl:1.55,leftRingSpread:0,leftPinkyCurl:1.55,leftPinkySpread:0
 };
