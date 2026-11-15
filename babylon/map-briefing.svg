@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1050" role="img" aria-labelledby="title desc">
-<title id="title">Battlefield: схема карты 300 на 300, британцы синие против немцев красных</title>
+<title id="title">Battlefield: схема карты 300 на 300, британцы синие против Вермахта красного</title>
 <desc id="desc">Северная база Вермахта сверху, южная британская база снизу, четыре обычные фермы по флангам, богатая нейтральная ферма в центре, семь ДОТов и три сожжённых БТР колонной у дороги</desc>
 <defs>
  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0 H0 V40" fill="none" stroke="#c4aa6f" opacity=".14" stroke-width="1"/></pattern>
@@ -26,7 +26,7 @@
  <rect x="335" y="97" width="330" height="100" rx="14" fill="#571f1d" fill-opacity=".83" stroke="#db6555" stroke-width="5"/>
  <rect x="335" y="839" width="330" height="93" rx="14" fill="#183c5b" fill-opacity=".87" stroke="#69a9e8" stroke-width="5"/>
  <text x="500" y="135" font-size="23" fill="#ffe8dd" text-anchor="middle" font-weight="bold" font-family="sans-serif">СЕВЕРНАЯ БАЗА</text>
- <text x="500" y="170" font-size="20" fill="#eeb2a1" text-anchor="middle" font-family="sans-serif">НЕМЦЫ · ВЕРМАХТ</text>
+ <text x="500" y="170" font-size="20" fill="#eeb2a1" text-anchor="middle" font-family="sans-serif">ВЕРМАХТ</text>
  <text x="500" y="875" font-size="22" fill="#d3e8ff" text-anchor="middle" font-weight="bold" font-family="sans-serif">ЮЖНАЯ БАЗА</text>
  <text x="500" y="908" font-size="22" fill="#aed4ff" text-anchor="middle" font-family="sans-serif">БРИТАНЦЫ · СИНИЕ</text>
 </g>
