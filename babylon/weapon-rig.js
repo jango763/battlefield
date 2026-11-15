@@ -614,6 +614,8 @@
       report.masterPose=gripStudio?{...master}:null;
       report.anatomicalHandCalibration=anatomicalDebug &&
         !!anatomicalBases.Right && !!anatomicalBases.Left;
+      report.rightHandFocus=right.hand.getAbsolutePosition().asArray();
+      report.leftHandFocus=left.hand.getAbsolutePosition().asArray();
       report.handFocus = B.Vector3.Lerp(
         right.hand.getAbsolutePosition(),left.hand.getAbsolutePosition(),.5).asArray();
       report.geometricPass = report.rightGripMeters < .075 && report.leftGripMeters < .075;
