@@ -37,6 +37,9 @@ test('A failed remote GLB never produces a silent blank screen',async({page})=>{
  await page.route('**/*.glb',route=>route.abort('failed'));
  await page.goto('http://127.0.0.1:8765/lab/ue5-reference/index.html',{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__rifle90?.error,null,{timeout:35000});
+ // Fast mocked network failures can finish before the sixth render frame.
+ // Let the independent scene loop continue briefly before asserting visibility.
+ await page.waitForFunction(()=>window.__rifle90?.renderFrames>5,null,{timeout:12000});
  const result=await page.evaluate(()=>({
   frames:window.__rifle90.renderFrames,
   status:document.querySelector('#status').textContent,
