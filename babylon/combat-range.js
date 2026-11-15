@@ -7,8 +7,9 @@
   const $ = id => document.getElementById(id);
   const log = message => { $('events').textContent = message; };
   const B = window.BABYLON, rules = window.BattlefieldBalance;
+  const presentation = window.BattlefieldCombatPresentation;
   const canvas = $('view');
-  if (!B || !rules) {
+  if (!B || !rules || !presentation) {
     $('telemetry').textContent = 'Ошибка: Babylon.js или модуль баланса не загружены';
     return;
   }
@@ -21,7 +22,8 @@
   let engine, scene, heroMesh, rigState, battle, actor, foes = [];
   let scenario = 'duel', distance = 40, moving = false, atBase = true;
   let targets = [], effects = [], selected = 'Kar98k', camera = null;
-  let lastPaint = 0, ready = false, active = false;
+  let lastPaint = 0, lastVisualPaint = 0, ready = false, active = false;
+  let shotAge = Infinity, lastVisualPose = null;
   const gear = { Kar98k: 'de-kar98k', MP40: 'de-mp40',
     MG42: 'de-mg42', Panzerschreck: 'de-panzerschreck' };
   const coords = (unit, y = 0) =>
@@ -76,7 +78,7 @@
   }
   function setScenario(next) {
     scenario = next;
-    active = false; atBase = true;
+    active = false; atBase = true; shotAge = Infinity; lastVisualPose = null;
     const settings = { duel: 40, squad: 60, blast: 30 };
     distance = settings[scenario];
     $('distance').value = distance;
@@ -128,8 +130,9 @@
       return;
     }
     selected = weapon;
-    setPose(active ? 'fire' : 'ready');
+    shotAge = Infinity; lastVisualPose = null;
     await changeVisualWeapon();
+    syncPresentation();
     refresh();
     log(weapon === 'Kar98k' ? 'Штатная винтовка, патроны бесконечны.' :
       'Снаряжение: ' + weapon + ', боекомплект ' + battle.totalAmmo(actor, weapon) + ' патронов/снарядов.');
@@ -174,6 +177,7 @@
       if (!result.ok) break;
       tracer(unit, target, result.weapon, result.hit);
       if (unit === actor) {
+        shotAge = 0; // A real successful fire() event drives the 3D recoil pose.
         // The visible GLB must follow the automatic fallback, not just the damage rules.
         if (actor.weapon === 'Kar98k' && result.weapon !== 'Kar98k') {
           selected = 'Kar98k';
@@ -192,6 +196,7 @@
   }
   function drawFrame() {
     const dt = Math.min(engine.getDeltaTime() / 1000, .075);
+    if (ready && Number.isFinite(shotAge)) shotAge += dt;
     if (ready && active) {
       battle.tick(dt);
       const target = foes.find(x => x.alive);
@@ -209,6 +214,7 @@
         lastPaint = performance.now(); refresh();
       }
     }
+    if (ready) syncPresentation();
     for (const target of targets) {
       const alive = target.unit.alive;
       target.root.setEnabled(alive);
@@ -226,6 +232,33 @@
     }
     scene.render();
   }
+  function syncPresentation() {
+    if (!actor) return;
+    const visual = presentation.describe(actor, { active, moving, shotAge });
+    if (visual.pose !== lastVisualPose) {
+      setPose(visual.pose);
+      lastVisualPose = visual.pose;
+    }
+    if (rigState) {
+      // The approved weapon rig owns all IK and geometry. This layer only
+      // signals moving-fire recoil; never invents an animation or refill event.
+      rigState.combatPose = {
+        active: active && actor.alive,
+        stage: visual.stage,
+        recoilPulse: visual.recoilPulse,
+        crouch: 0
+      };
+    }
+    const now = performance.now();
+    if (now - lastVisualPaint < 90) return;
+    lastVisualPaint = now;
+    $('combat-state').textContent = visual.display;
+    $('reload-fill').style.width = Math.round(visual.reloadProgress * 100) + '%';
+    $('reload-bar').setAttribute('aria-valuenow',
+      String(Math.round(visual.reloadProgress * 100)));
+    // The DOM represents game-state reload time, NOT the preview's artificial
+    // fixed 30 fps sequence, which historically refilled infinite ammo.
+  }
   function refresh() {
     if (!battle || !actor) return;
     for (const button of document.querySelectorAll('[data-gun]'))
@@ -235,6 +268,9 @@
     $('distanceValue').textContent = String(distance);
     $('go').textContent = atBase ? 'В бой' : 'Вернуться на базу';
     $('supply').disabled = !atBase;
+    $('manual-reload').disabled = !actor.alive || actor.weapon === 'Kar98k' ||
+      actor.reloadRemaining > 0 || actor.inventory[actor.weapon]?.reserve <= 0 ||
+      actor.inventory[actor.weapon]?.loaded === rules.WEAPONS[actor.weapon].magazineSize;
     const weapon = actor.weapon;
     const inventory = weapon !== 'Kar98k' ? actor.inventory[weapon] : null;
     const paid = ['MP40', 'MG42', 'Panzerschreck']
@@ -248,6 +284,8 @@
         ' · ' + inventory.loaded + ' в оружии, ' + inventory.reserve + ' в запасе') +
       (actor.reloadRemaining > 0 ? '\nПерезарядка: ' + actor.reloadRemaining.toFixed(1) + ' с' : '') +
       (paid ? '\nАрсенал: ' + paid : '') +
+      '\nТочность сейчас: ' + Math.round(rules.hitChance(actor.weapon, distance,
+        { moving, suppressed: actor.suppressed > 0 }) * 100) + '% на '+ distance + ' ед.' +
       '\nВыстрелы: ' + actor.shots + ' · попадания: ' + actor.hits +
       ' · уничтожено: ' + actor.kills;
   }
@@ -276,11 +314,19 @@
     });
     $('restart').addEventListener('click', () => setScenario(scenario));
     $('supply').addEventListener('click', restoreSupply);
+    $('manual-reload').addEventListener('click', () => {
+      const reload = battle.startReload(actor);
+      log(reload.ok ? 'Начата перезарядка ' + actor.reloadWeapon + ' · ' +
+        reload.seconds + ' с. Во время неё стрельба заблокирована.' :
+        'Нельзя перезарядить: ' + (reload.reason || 'неизвестная причина'));
+      syncPresentation(); refresh();
+    });
     $('go').addEventListener('click', () => {
       if (!actor.alive) { log('Боец погиб. Нажмите «Сброс».'); return; }
       atBase = !atBase;
       active = !atBase && foes.some(e => e.alive);
-      setPose(active ? 'fire' : 'ready');
+      shotAge = Infinity;
+      syncPresentation();
       log(active ? 'Начался бой. Выстрелы и HP рассчитываются автоматически.' :
         'На основной базе. Можно купить оружие и пополнить БК.');
       refresh();
