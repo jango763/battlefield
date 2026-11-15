@@ -5,6 +5,7 @@ on:
       - preview/muster-original-rifleman-20261115
     paths:
       - .github/workflows/muster-original-rifleman.yml
+      - lab/muster-rifleman-check.spec.cjs
   workflow_dispatch:
 
 permissions:
