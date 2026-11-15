@@ -262,28 +262,63 @@
     const poseLegs={
       leftThigh:joint('LeftUpLeg'),rightThigh:joint('RightUpLeg'),
       leftKnee:joint('LeftLeg'),rightKnee:joint('RightLeg'),
+      leftFoot:joint('LeftFoot'),rightFoot:joint('RightFoot'),
       spine:joint('Spine')
     };
     const originalRootY=root.position.y;
+    let plantedFeet=null;
     const applyCombatStance=()=>{
       const data=state.combatPose;
       const w=B.Scalar.Clamp(Number(data?.crouch)||0,0,1);
-      if(!data?.active){root.position.y=originalRootY;return;}
-      // Low marksman stance: staggered knees and a short forward lean.
-      // Blend is driven by animation phase frames (not by a CSS camera trick).
-      root.position.y=originalRootY-.12*w;
-      const bends={
-        leftThigh:[.42,0,.13],rightThigh:[-.44,0,-.12],
-        leftKnee:[-.88,0,0],rightKnee:[.82,0,0],
-        spine:[.20,0,0]
-      };
-      for(const [name,angles] of Object.entries(bends)){
-        const node=poseLegs[name];
-        if(!node||!node.rotationQuaternion)continue;
-        const adjust=B.Quaternion.FromEulerAngles(
-          angles[0]*w,angles[1]*w,angles[2]*w);
-        node.rotationQuaternion=node.rotationQuaternion.multiply(adjust).normalize();
-        refresh(node);
+      if(!data?.active||w<.001){
+        root.position.y=originalRootY;
+        plantedFeet=null;
+        return;
+      }
+      if(!plantedFeet){
+        // At the first STOP frame, remember the REAL ankle positions and
+        // orientations before lowering the pelvis. These are world anchors.
+        // Keeps boots on the ground instead of rotating both legs in the air.
+        plantedFeet={};
+        for(const side of ['left','right']){
+          const n=poseLegs[side+'Foot'];
+          if(!n)continue;
+          refresh(n);
+          plantedFeet[side]={target:n.getAbsolutePosition().clone(),
+            rotation:worldRotation(n).clone()};
+        }
+      }
+      // Crouch the pelvis in world space and solve BOTH 2-bone leg chains.
+      // The knees bend naturally because hip-to-foot reach becomes shorter.
+      root.position.y=originalRootY-.235*w;
+      const spine=poseLegs.spine;
+      if(spine?.rotationQuaternion){
+        spine.rotationQuaternion=spine.rotationQuaternion.multiply(
+          B.Quaternion.FromEulerAngles(.16*w,0,0)).normalize();
+        refresh(spine);
+      }
+      for(const side of ['left','right']){
+        const planted=plantedFeet?.[side];
+        const upper=poseLegs[side+'Thigh'];
+        const fore=poseLegs[side+'Knee'];
+        const hand=poseLegs[side+'Foot'];
+        if(!planted||!upper||!fore||!hand)continue;
+        refresh(upper);refresh(hand);
+        const hip=upper.getAbsolutePosition();
+        // Knees lean slightly forward, outward from the other knee.
+        const pole=hip.add(new B.Vector3(side==='left'?.11:-.11,-.06,.55));
+        const drift=hip.subtract(planted.target);
+        // Never stretch the skeleton when entering/exiting the crouch.
+        const target=planted.target.clone();
+        if(drift.lengthSquared()<1e-8)continue;
+        solveTwoBone({upper,fore,hand},target,pole);
+        refresh(hand);
+        if(hand.parent?.rotationQuaternion){
+          const parentQ=worldRotation(hand.parent);
+          hand.rotationQuaternion=parentQ.conjugate()
+            .multiply(planted.rotation).normalize();
+          refresh(hand);
+        }
       }
     };
     if (!hips || !neck || !chest || Object.values(right).some(x => !x) || Object.values(left).some(x => !x))
