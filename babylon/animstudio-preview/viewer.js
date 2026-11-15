@@ -211,7 +211,11 @@
           ' см / L '+Math.round(d.leftGripMeters*100)+' см · '+
           (state.weapon==='Panzerschreck'?'прототип — руки доработать'
             : d.geometricPass&&d.rightElbowDegrees>=20&&d.leftElbowDegrees>=20
-              ?'хват и локти OK':'проверить руки');
+              ? 'геометрия OK · поза пальцев не утверждена'
+              : 'проверить руки')+
+          (Number.isFinite(d.rightFingerDirectionErrorDegrees)
+            ? ' · угол кисти R '+Math.round(d.rightFingerDirectionErrorDegrees)+'°'
+            : '');
     });
   }catch(e){reportError(e);}
 })();
