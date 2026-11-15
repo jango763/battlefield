@@ -608,13 +608,13 @@
           ? (weaponId==='de-panzerschreck'?[0,-.135,-.09]:meta.support)
           : meta.support;
       const support=pivot.position.add(rotated(v(supportPoint),gunQ));
-      // Preview-only reload gesture: move the support hand between fore-end
-      // and MP40 magazine / MG42 receiver at authored timeline landmarks.
-      // We do NOT pretend that real magazine / feed-cover GLB animation is
-      // complete; a dedicated asset/clip is still required for final art.
+      // Preview-only reload gesture. MP40: magazine; MG42: feed area;
+      // Panzerschreck: support hand moves briefly towards rear loading end.
+      // This is a stand-in, NOT a fully rigged rocket/belt/magazine animation.
       const reloadActive=state.combatPose?.active&&
         state.combatPose.stage==='reload'&&
-        (weaponId==='de-mp40'||weaponId==='de-mg42');
+        (weaponId==='de-mp40'||weaponId==='de-mg42'||
+         weaponId==='de-panzerschreck');
       const reloadT=reloadActive
         ?B.Scalar.Clamp(Number(state.combatPose.reloadProgress)||0,0,1):0;
       let handShift=new B.Vector3(0,0,0);
@@ -623,9 +623,13 @@
           ?[[0,0,0,0],[.16,-.015,-.045,-.10],
             [.40,-.02,-.095,-.115],[.65,-.01,-.075,-.08],
             [.88,0,-.035,-.03],[1,0,0,0]]
-          :[[0,0,0,0],[.12,-.015,.06,-.075],
+          :weaponId==='de-mg42'
+          ?[[0,0,0,0],[.12,-.015,.06,-.075],
             [.35,-.02,.10,-.07],[.67,-.035,.07,-.055],
-            [.89,-.015,.045,-.025],[1,0,0,0]];
+            [.89,-.015,.045,-.025],[1,0,0,0]]
+          :[[0,0,0,0],[.14,.015,-.035,-.045],
+            [.38,.025,-.055,-.14],[.70,.025,-.055,-.14],
+            [.90,.010,-.02,-.025],[1,0,0,0]];
         for(let i=1;i<marks.length;i++)if(reloadT<=marks[i][0]){
           const prev=marks[i-1],next=marks[i];
           const u=(reloadT-prev[0])/(next[0]-prev[0]);
