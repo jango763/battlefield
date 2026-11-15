@@ -38,12 +38,29 @@ const path=require('node:path');
             right:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.rightGripMeters,
             left:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.leftGripMeters,
             pass:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.geometricPass,
+            rightElbow:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.rightElbowDegrees,
+            leftElbow:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.leftElbowDegrees,
+            fingers:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.fingerJoints,
+            poles:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.anatomicalElbowPoles,
+            focus:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.handFocus,
             rigError:window.__BATTLEFIELD_ANIMATIONS__.weaponRig?.error
           }));
           if(s.clip!==gun+'_'+pose||s.error||!s.loaded.includes(gun))throw Error(env.name+' mismatched clip '+JSON.stringify(s));
           if(!s.corrected||s.rigError||!s.pass||!Number.isFinite(s.right)||!Number.isFinite(s.left)||s.right>.075||s.left>.075)
             throw Error(env.name+' IK grip FAILED '+gun+' '+pose+' '+JSON.stringify(s));
+          if(!s.poles||s.fingers<28||!Number.isFinite(s.rightElbow)||
+             !Number.isFinite(s.leftElbow)||!Array.isArray(s.focus))
+            throw Error('Anatomical elbow/finger rig missing '+env.name+' '+gun+' '+pose+' '+JSON.stringify(s));
+          console.log('HANDS_POSE '+JSON.stringify({env:env.name,gun,pose,
+            rightElbow:s.rightElbow,leftElbow:s.leftElbow,
+            gripR:s.right,gripL:s.left,fingers:s.fingers}));
           await page.screenshot({path:path.join(out,env.name+'-'+gun+'-'+pose+'.png')});
+          if(pose==='Run'||pose==='Aim'){
+            await page.click('#handsmode');
+            await page.waitForTimeout(220);
+            await page.screenshot({path:path.join(out,env.name+'-'+gun+'-'+pose+'-hands-close.png')});
+            await page.click('#handsmode');
+          }
           if(pose==='Run'){
             // Seek to the exact keyframes, independent of headless WebGL frame rate.
             // Timed snapshots sometimes sampled only one leg's stance phase.
