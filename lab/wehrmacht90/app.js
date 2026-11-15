@@ -185,7 +185,7 @@ async function main(){
   try{
    const kit=await installWehrmachtOutfit(scene,model);
    state.wardrobe={ready:true,selected:kit.selected,capMeshCounts:Object.fromEntries(Object.entries(kit.caps).map(([name,cap])=>[name,cap.meshCount])),
-    coloredVertices:kit.wool.vertices,patchAreas:kit.wool.areas,kitParts:kit.kit.pieces,sleeveParts:kit.sleeves,errors:kit.errors};
+    coloredVertices:kit.wool.vertices,patchAreas:kit.wool.areas,kitParts:kit.kit.pieces,sleeveParts:kit.sleeves,garment:kit.garment,errors:kit.errors};
    const sync=()=>{state.wardrobe.selected=kit.selected;};
    for(const button of document.querySelectorAll('[data-headwear]')){
     button.onclick=()=>{try{kit.setHeadwear(button.dataset.headwear);sync();
