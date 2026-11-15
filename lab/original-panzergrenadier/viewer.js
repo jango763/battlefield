@@ -21,6 +21,7 @@
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.MeshStandardMaterial({color:0x344436,roughness:1,metalness:0}));
   floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;floor.position.y=-.007;scene.add(floor);
   const controls=new THREE.OrbitControls(camera,renderer.domElement);
+  window.__PANZER_DIAG__={scene,camera,renderer,controls};
   controls.enableDamping=true;controls.dampingFactor=.085;controls.enablePan=false;
   controls.minDistance=.8;controls.maxDistance=12;controls.maxPolarAngle=Math.PI*.84;
   let center=new THREE.Vector3(0,1,0),distance=3.2,yaw=35;
