@@ -25,7 +25,7 @@
   controls.minDistance=.8;controls.maxDistance=12;controls.maxPolarAngle=Math.PI*.84;
   let center=new THREE.Vector3(0,1,0),distance=3.2,yaw=35;
   const setView=(deg)=>{yaw=deg;const angle=THREE.MathUtils.degToRad(deg);
-    camera.position.set(center.x+distance*Math.sin(angle)*.9,center.y+distance*.12,center.z+distance*Math.cos(angle)*.9);
+    camera.position.set(center.x+distance*Math.sin(angle),center.y+distance*.07,center.z+distance*Math.cos(angle));
     camera.lookAt(center);controls.target.copy(center);controls.update();
   };
   const buttons=[...document.querySelectorAll('[data-view]')];
@@ -55,7 +55,8 @@
     const normalized=new THREE.Box3().setFromObject(original);
     const size=normalized.getSize(new THREE.Vector3());
     center=normalized.getCenter(new THREE.Vector3());
-    distance=Math.max(size.y*1.45,2.45);
+    const tanHalfFov=Math.tan(THREE.MathUtils.degToRad(camera.fov)*.5);
+    distance=Math.max(2.8,1.32*size.y/(2*tanHalfFov),1.30*size.x/(2*tanHalfFov*camera.aspect));
     // Leave the original skeleton, poses and source materials untouched.
     const mats=new Set(),bones=new Set();
     original.traverse(node=>{
