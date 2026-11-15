@@ -52,6 +52,11 @@ enterButton.addEventListener('click',()=>{
  const r=controller.start();
  if(!r.ok){alertStatus('Бой не удалось начать: '+r.reason);return;}
  gameStarted=true;gamePausedForBriefing=false;
+ // Bring in the full 12-on-12 models progressively, while the match is running.
+ void ensureUnits('squads').then(()=>processWeaponQueue()).catch(error=>{
+  $('loading').textContent='Некоторые бойцы не загрузились: '+(error?.message||error);
+  console.error('24 soldier models',error);
+ });
  briefing.hidden=true;briefing.setAttribute('aria-hidden','true');
  atBase=false;state.atBase=false;
  alertStatus('Бой начался: британцы 🔵 против Вермахта 🔴. Касайтесь земли, чтобы управлять героем.');
@@ -334,12 +339,19 @@ function setup(scenarioName){
  lastEconomyBlue=economy.treasury.blue;
  battle=combat.createBattle({funds:goldRules.START_TREASURY,prices:PRICES});
  allies=[];enemies=[];
- const alliesXY=tactics.formation({side:'ally',count:ours});
- const enemiesXY=tactics.formation({side:'enemy',count:theirs,distance:60});
+ // Symmetric army deployments around each approved base; one hero + 11 bots.
+ const alliesXY=Array.from({length:ours},(_,i)=>{
+  if(i===0)return {x:150,z:43};
+  const n=i-1;
+  return {x:150+(n%4-1.5)*6,z:32+Math.floor(n/4)*4};
+ });
+ const enemiesXY=Array.from({length:theirs},(_,i)=>({
+  x:150+(i%4-1.5)*6,z:267-Math.floor(i/4)*4
+ }));
  for(let i=0;i<ours;i++)allies.push(battle.addUnit({
-  id:'свой-'+(i+1),team:'свои',...alliesXY[i]}));
+  id:i===0?'hero':'британец-'+(i+1),team:'свои',...alliesXY[i]}));
  for(let i=0;i<theirs;i++)enemies.push(battle.addUnit({
-  id:'враг-'+(i+1),team:'враг',...enemiesXY[i]}));
+  id:'вермахт-'+(i+1),team:'враг',...enemiesXY[i]}));
  for(const u of allies){u.economyTeam='blue';u.isHero=u===allies[0];}
  for(const u of enemies)u.economyTeam='red';
  fieldOrders=orders.create({hero:allies[0],allies,enemies,onArrive:()=>{
@@ -352,13 +364,13 @@ function setup(scenarioName){
    'Отряд разгромлен. Нажмите «Новый бой», чтобы повторить атаку.')
  });
  actors=new Map();
- for(let i=0;i<4;i++){
+ for(let i=0;i<12;i++){
   if(views[i])assignView(views[i],allies[i]||null);
-  if(allies[i])actors.set(allies[i],views[i]);
+  if(views[i]&&allies[i])actors.set(allies[i],views[i]);
  }
- for(let i=0;i<4;i++){
-  if(views[i+4])assignView(views[i+4],enemies[i]||null);
-  if(enemies[i])actors.set(enemies[i],views[i+4]);
+ for(let i=0;i<12;i++){
+  if(views[i+12])assignView(views[i+12],enemies[i]||null);
+  if(views[i+12]&&enemies[i])actors.set(enemies[i],views[i+12]);
  }
  for(const button of document.querySelectorAll('[data-scenario]'))
   button.setAttribute('aria-pressed',String(button.dataset.scenario===scenario));
@@ -480,7 +492,7 @@ function drawHud(){
  const paid=Object.keys(hero.inventory).map(w=>w+':'+battle.totalAmmo(hero,w)).join(' · ');
  $('readout').textContent=
   'Бой: '+(snap.active?'ИДЁТ':snap.done?'ЗАВЕРШЁН':'ОЖИДАНИЕ')+
-  ' · свои '+snap.alliesAlive+'/'+allies.length+' · враги '+snap.enemiesAlive+'/'+enemies.length+
+  ' · британцы '+snap.alliesAlive+'/'+allies.length+' · Вермахт '+snap.enemiesAlive+'/'+enemies.length+
   '\nГерой: '+Math.round(hero.hp)+'/100 HP · оружие: '+hero.weapon+
   (inventory?' · '+inventory.loaded+'+'+inventory.reserve+' патр.':' · ∞ патронов')+
   (hero.reloadRemaining>0?'\nПерезарядка: '+hero.reloadRemaining.toFixed(1)+' c':'')+
@@ -606,6 +618,12 @@ function frame(){
    }
   }
   for(const view of views)if(view?.unit)syncVisual(view);
+  // Follow the controlled hero with the existing touch-orbit camera.
+  if(allies[0]?.alive&&camera){
+   const dest=position(allies[0],.75);
+   camera.target=B.Vector3.Lerp(camera.target,dest,Math.min(1,dt*2.8));
+  }
+  if(world&&economy)world.syncFarms(economy.summary());
   const now=performance.now();
   if(now-statusAt>220){statusAt=now;drawHud();}
  }
@@ -621,7 +639,7 @@ try{
  state.loading=false;state.ready=true;
  for(const el of document.querySelectorAll('button'))el.disabled=false;
  registerUI();
- setup('duel');
+ setup('squads');
  briefingProgress.textContent='Бойцы загружены. Читайте карту и нажмите «В бой».';
  enterButton.disabled=false;
  enterButton.textContent='В бой · начать игру';
