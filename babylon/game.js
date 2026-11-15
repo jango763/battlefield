@@ -471,9 +471,10 @@ function drawHud(){
  const funds=battle.getFunds();
  const econ=economy?.summary();
  const central=econ?.central;
+ const left=central?.started?Math.ceil(central.remainingSeconds):0;
  const timerLabel=central?.open?'ОТКРЫТА':
-  central?.started?'Откроется через '+String(Math.floor((central.remainingSeconds+1e-8)/60)).padStart(2,'0')+
-   ':'+String(Math.ceil(central.remainingSeconds%60)).padStart(2,'0'):
+  central?.started?'Откроется через '+String(Math.floor(left/60)).padStart(2,'0')+
+   ':'+String(left%60).padStart(2,'0'):
    'ЗАКРЫТА — ждём гибель первого бота';
  $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
  $('supply').disabled=!atBase||!hero.alive;
