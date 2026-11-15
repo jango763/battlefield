@@ -1,0 +1,41 @@
+name: AnimStudio four-weapon retargeting
+on:
+  workflow_dispatch:
+  push:
+    branches: ['next/babylon-game-foundation-20261115']
+    paths:
+      - 'babylon/tools/run-animstudio-4.cjs'
+      - 'babylon/tools/make-panzerschreck-glb.py'
+      - '.github/workflows/animstudio-four-weapons.yml'
+permissions:
+  contents: read
+jobs:
+  animate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare AnimStudio 1.4.0 (pinned)
+        run: |
+          git clone -q https://github.com/Sheggyb/AnimStudio.git /tmp/AnimStudio
+          git -C /tmp/AnimStudio checkout -q f61e3e08019a6223f10aceb5bc5df7fd9416c459
+          npm install --no-audit --no-fund --prefix /tmp/AnimStudio
+          npm install --no-audit --no-fund --prefix /tmp/animstudio-qa playwright@1.58.2
+          /tmp/animstudio-qa/node_modules/.bin/playwright install chromium
+          python3 -m pip install --quiet trimesh numpy
+      - name: Build the temporary fourth prop (Panzerschreck)
+        run: |
+          mkdir -p babylon/animstudio-output
+          python3 babylon/tools/make-panzerschreck-glb.py babylon/animstudio-output/de-panzerschreck-preview.glb
+      - name: Run 4 weapons through AnimStudio socket and two-hand IK
+        run: |
+          node --check babylon/tools/run-animstudio-4.cjs
+          node babylon/tools/run-animstudio-4.cjs /tmp/AnimStudio
+      - name: Keep GLBs, diagnostics and previews (not merged to game)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: animstudio-four-weapons
+          path: babylon/animstudio-output/
+          if-no-files-found: warn
+          retention-days: 30
