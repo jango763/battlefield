@@ -1,0 +1,33 @@
+name: Verify original 90-bone authored animations
+on:
+  push:
+    branches:
+      - rig/reference-90bone-native-20261115
+  workflow_dispatch:
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate JS syntax
+        run: node --check --input-type=module < lab/ue5-reference/app.js
+      - name: Browser runtime dependencies
+        run: |
+          npm install --no-save @playwright/test
+          npx playwright install --with-deps chromium
+      - name: Playback and screenshot verification
+        run: |
+          mkdir -p test-results
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/rig90-http.log 2>&1 &
+          sleep 2
+          npx playwright test lab/ue5-reference/reference.spec.js --reporter=line --workers=1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ue5-90bone-preview
+          path: test-results/
+          if-no-files-found: ignore
