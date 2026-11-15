@@ -75,7 +75,7 @@ function playerScene(){
  const engine=new B.Engine(view,true,{stencil:true,preserveDrawingBuffer:false,disableWebGL2Support:false});
  const scene=new B.Scene(engine);
  scene.clearColor=new B.Color4(.19,.26,.22,1);
- const camera=new B.ArcRotateCamera('inspection',-Math.PI/2.45,1.12,4.3,new B.Vector3(0,1,0),scene);
+ const camera=new B.ArcRotateCamera('inspection',Math.PI/2.65,1.12,4.3,new B.Vector3(0,1,0),scene);
  camera.attachControl(view,true);camera.lowerRadiusLimit=2;camera.upperRadiusLimit=10;
  const ambient=new B.HemisphericLight('fill',new B.Vector3(0,1,0),scene);ambient.intensity=1.5;
  const sun=new B.DirectionalLight('sun',new B.Vector3(-1,-1,-.5),scene);sun.intensity=1.1;
