@@ -4,7 +4,7 @@ import {buildTailoredKit} from './tailored-kit.js';
 // Source references: Kenton-GMI/muster-ww2 (MIT), see SOURCES.md.
 // This is a rigid-accessory + skinned-body material prototype, NOT finished re-rigging.
 const B=window.BABYLON;
-const palette={tunic:'#41493e',trousers:'#444b40',leather:'#26221e',canvas:'#625f4f',metal:'#87877b',
+const palette={tunic:'#41493e',trousers:'#444b40',leather:'#181b17',canvas:'#625f4f',metal:'#87877b',
   skin:'#c39279',hair:'#3b2c20',piping:'#c9c5b2',litzen:'#8e8f86'};
 const asColor=s=>B.Color3.FromHexString(s);
 function material(scene,name,color,roughness=.86,metallic=0){
@@ -34,7 +34,7 @@ function makeWool(scene,model){
  const areas=Object.fromEntries(clothNames.map(x=>[x,0]));
  const choose=(x,y,z)=>{
   const a=Math.abs(x);
-  if(y<.23)return 'leather';
+  if(y<.335)return 'leather';
   if(y>1.69)return 'hair';
   if(y>1.47)return 'skin';
   if(y>1.4&&a<.072)return 'skin';
@@ -210,12 +210,13 @@ function buildTailoredM40(scene,body){
  const vcount=pos?.length/3||0;
  if(!pos||!norm||!indices||!body.skeleton||vcount<4000)
   throw Error('Source body has no skinned vertex geometry / normals / skeleton');
- const faces={coat:[],pants:[]};
+ const faces={coat:[],pants:[],boots:[]};
  // Original body: 1.75 m height, I-pose arms. Cut along anatomical
  // regions; no new joints and no duplicate hand or head meshes.
  const identify=(x,y,z)=>{
   const ax=Math.abs(x);
-  if(y<.24||y>1.48)return 'skin';
+  if(y<.335)return 'boots';
+  if(y>1.48)return 'skin';
   if(y<.83&&ax>.183&&y>.73)return 'skin'; // only exposed palms, not forearms
   if(y<.77)return 'pants';
   if(y<.97&&ax<.22)return 'pants';
@@ -233,10 +234,11 @@ function buildTailoredM40(scene,body){
  const stats={sourceVertices:vcount,sourceTriangles:indices.length/3,parts:{}};
  const cloth={
   coat:material(scene,'woven-fieldgrey-tunic',palette.tunic,.96),
-  pants:material(scene,'fieldgrey-trousers',palette.trousers,.96)
+  pants:material(scene,'fieldgrey-trousers',palette.trousers,.96),
+  boots:material(scene,'black-leather-marching-boots',palette.leather,.78)
  };
  const outputs={};
- for(const kind of ['coat','pants']){
+ for(const kind of ['coat','pants','boots']){
   const kept=faces[kind];
   if(kept.length<600)throw Error(kind+' garment extraction produced only '+kept.length/3+' faces');
   const shell=body.clone('M40-skinned-'+kind,body.parent,true);
@@ -245,7 +247,7 @@ function buildTailoredM40(scene,body){
   for(let i=0;i<vcount;i++){
    const x=pos[i*3],y=pos[i*3+1],z=pos[i*3+2];
    const spread=kind==='coat'?(y<.93?Math.min(.019,(.93-y)*.21):0):0;
-   const ease=kind==='coat'?.0135:.0095;
+   const ease=kind==='coat'?.0135:kind==='boots'?.010:.0095;
    // Seam-side ease, small drape of the tunic skirt, and an outward cloth layer.
    inflated[i*3]=x+norm[i*3]*ease+Math.sign(x)*spread*.4;
    inflated[i*3+1]=y+norm[i*3+1]*ease;
