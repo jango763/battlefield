@@ -54,10 +54,10 @@ window.installPanzerKar98k=function({figure,scene,status,state}){
   const shoulderMid=rightShoulder.clone().add(leftShoulder).multiplyScalar(.5);
   const towardLeft=V().subVectors(leftShoulder,rightShoulder).normalize();
   // The rifle grip (trigger) sits just below the right chest; its muzzle faces the enemy (+Z).
-  const trigger=rightShoulder.clone().lerp(leftShoulder,.14);
-  trigger.y=shoulderMid.y-.24;
-  trigger.z=shoulderMid.z+.25;
-  const barrelDir=V(towardLeft.x*.29,.075,.954).normalize();
+  const trigger=rightShoulder.clone().lerp(leftShoulder,.46);
+  trigger.y=shoulderMid.y-.11;
+  trigger.z=shoulderMid.z+.14;
+  const barrelDir=V(towardLeft.x*.60,-.08,.797).normalize();
   const weaponRoot=new THREE.Group();weaponRoot.name='ApprovedGermanKar98k';
   weaponRoot.position.copy(trigger);
   weaponRoot.quaternion.setFromUnitVectors(V(0,0,1),barrelDir);
