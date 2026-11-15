@@ -77,13 +77,48 @@
   function solveArm(arm, target) {
     // Rebuild after each joint rotation: stale matrices caused the old four-hands prototype.
     for (let iteration = 0; iteration < 22; iteration++) {
-      for (const j of [arm.fore, arm.upper, arm.shoulder])
+      // The clavicle is not a free third elbow: preserve natural shoulder line.
+      // Only move the clavicle for genuinely hard-to-reach grip positions.
+      for (const j of [arm.fore, arm.upper])
         alignJoint(j, arm.hand, target, .30);
+      if (B.Vector3.DistanceSquared(arm.hand.getAbsolutePosition(), target) > .0036)
+        alignJoint(arm.shoulder, arm.hand, target, .11);
       refresh(arm.hand);
       if (B.Vector3.DistanceSquared(arm.hand.getAbsolutePosition(), target) < .000625)
         break;
     }
     return B.Vector3.Distance(arm.hand.getAbsolutePosition(), target);
+  }
+  // Elbow pole stabilisation after CCD. Rotation about the shoulder-to-wrist
+  // axis leaves the wrist at its IK target but keeps elbows out of the torso.
+  // This works on linked TransformNodes, not the non-authoritative glTF bones.
+  function stabiliseElbow(arm, pole) {
+    refresh(arm.hand);
+    const shoulder = arm.upper.getAbsolutePosition();
+    const elbow = arm.fore.getAbsolutePosition();
+    const wrist = arm.hand.getAbsolutePosition();
+    const axis = wrist.subtract(shoulder);
+    if (axis.lengthSquared() < 1e-8) return;
+    axis.normalize();
+    const project = v => v.subtract(axis.scale(B.Vector3.Dot(v, axis)));
+    const e = project(elbow.subtract(shoulder));
+    const p = project(pole.subtract(shoulder));
+    if (e.lengthSquared() < 1e-8 || p.lengthSquared() < 1e-8) return;
+    e.normalize(); p.normalize();
+    const angle = Math.atan2(B.Vector3.Dot(axis, B.Vector3.Cross(e,p)),
+      B.Scalar.Clamp(B.Vector3.Dot(e,p),-1,1));
+    // Two small steps avoid sudden elbow flips when switching weapons.
+    const parentQ = arm.upper.parent ? worldRotation(arm.upper.parent) : B.Quaternion.Identity();
+    const qw = B.Quaternion.RotationAxis(axis, B.Scalar.Clamp(angle,-.55,.55));
+    const qLocal = parentQ.conjugate().multiply(qw).multiply(parentQ);
+    arm.upper.rotationQuaternion = qLocal.multiply(arm.upper.rotationQuaternion).normalize();
+    refresh(arm.hand);
+  }
+  function elbowBend(arm) {
+    refresh(arm.hand);
+    const a=arm.upper.getAbsolutePosition().subtract(arm.fore.getAbsolutePosition()).normalize();
+    const b=arm.hand.getAbsolutePosition().subtract(arm.fore.getAbsolutePosition()).normalize();
+    return Math.round((180 - Math.acos(B.Scalar.Clamp(B.Vector3.Dot(a,b),-1,1))*180/Math.PI)*10)/10;
   }
   function setHandRotation(hand, worldQ) {
     refresh(hand.parent);
@@ -175,15 +210,22 @@
     const rest = new Map(controlled.map(n => [n, n.rotationQuaternion?.clone() ||
       B.Quaternion.FromEulerAngles(n.rotation.x, n.rotation.y, n.rotation.z)]));
     function flexFingers(side) {
-      // Finger segment rotations only; no extra meshes or duplicated hands.
-      for (const digit of ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky']) {
+      // The approved Mixamo model's finger phalanges run along local +Y.
+      // Curl around joint-local Z and tuck the THUMB around a separate X axis.
+      // No hand meshes or skeletal joints are duplicated.
+      const rightHand = side === 'Right';
+      for (const digit of ['Thumb','Index','Middle','Ring','Pinky']) {
         const segments = fingerRoots[side][digit];
-        const amount = digit === 'Thumb' ? [-.25, -.22, -.10] :
-          digit === 'Index' && side === 'Right' ? [-.35, -.35, -.18] :
-          [-.67, -.68, -.35];
-        segments.forEach((node, i) => {
-          const curl = B.Quaternion.RotationAxis(B.Axis.Z, amount[i]);
-          node.rotationQuaternion = rest.get(node).multiply(curl).normalize();
+        const amount = digit === 'Thumb' ? [-.36,-.38,-.20]
+          : digit === 'Index' && rightHand ? [-.33,-.48,-.28]
+          : digit === 'Index' ? [-.53,-.75,-.45]
+          : [-.67,-.90,-.52];
+        segments.forEach((node,i)=>{
+          const bend = B.Quaternion.RotationAxis(B.Axis.Z,amount[i]);
+          const tuck = digit === 'Thumb'
+            ? B.Quaternion.RotationAxis(B.Axis.X,(rightHand?-.30:.30)*(i===0?1:.50))
+            : B.Quaternion.Identity();
+          node.rotationQuaternion=rest.get(node).multiply(tuck).multiply(bend).normalize();
         });
       }
     }
@@ -197,7 +239,7 @@
     let needsPose = true, lastSolveTime = 0;
     let rocketDispose = null, generation = 0;
     state.weaponRig = {
-      rig: 'Mixamo linked glTF nodes + real-time two-hand IK', pose, weapon: null,
+      rig: 'Mixamo linked glTF nodes + 2-hand IK + elbow poles + grip fingers', pose, weapon: null,
       animationDriven,
       rightGripMeters: null, leftGripMeters: null,
       preliminaryGeometryOnly: true, experimentalFourthAsset: true
@@ -265,6 +307,16 @@
         +B.Vector3.Distance(left.upper.getAbsolutePosition(), leftGoal).toFixed(4);
       report.rightIKMeters = +solveArm(right, rightGoal).toFixed(4);
       report.leftIKMeters = +solveArm(left, leftGoal).toFixed(4);
+      // Right/left bend outward and slightly forward, not through the abdomen.
+      // Pole targets follow the chest while the real run animation moves the torso.
+      const rightPole = right.upper.getAbsolutePosition().add(rotated(
+        new B.Vector3(-.30,-.24,.14), chestQ));
+      const leftPole = left.upper.getAbsolutePosition().add(rotated(
+        new B.Vector3(.30,-.24,.20), chestQ));
+      stabiliseElbow(right,rightPole);
+      stabiliseElbow(left,leftPole);
+      report.rightElbowDegrees = elbowBend(right);
+      report.leftElbowDegrees = elbowBend(left);
       setHandRotation(right.hand, rightQ);
       setHandRotation(left.hand, leftQ);
       flexFingers('Right'); flexFingers('Left');
