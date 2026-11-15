@@ -10,12 +10,8 @@
   const status=document.querySelector('#status');
   const info=document.querySelector('#info');
   const allButton=document.querySelector('#playall');
-  const variants={
-    Kar98k:{path:'../../assets/ww2-weapons/',file:'de-kar98k.glb'},
-    MP40:{path:'../../assets/ww2-weapons/',file:'de-mp40.glb'},
-    MG42:{path:'../../assets/ww2-weapons/',file:'de-mg42.glb'},
-    Panzerschreck:{path:'./models/',file:'de-panzerschreck-preview.glb'}
-  };
+  const variants={Kar98k:'de-kar98k',MP40:'de-mp40',MG42:'de-mg42',Panzerschreck:'de-panzerschreck'};
+  const poseMap={Hold:'ready',Aim:'aim',Fire:'fire',Walk:'walk'};
   const poses=['Hold','Aim','Fire','Walk'];
   let scene,engine,active=null,socket=null,root=null,scale=1,autoHandle=null;
   function reportError(e){
@@ -48,21 +44,6 @@
     state.socket=node.name;
     return node;
   }
-  async function prepareWeapon(name){
-    if(state.weapons[name])return state.weapons[name];
-    const data=variants[name];
-    const imported=await B.SceneLoader.ImportMeshAsync('',data.path,data.file,scene);
-    const holder=new B.TransformNode('prop_'+name,scene);
-    holder.parent=socket;
-    holder.scaling.setAll(1/scale);
-    holder.position.set(0,0,0);
-    holder.rotationQuaternion=B.Quaternion.Identity();
-    const children=[...imported.meshes,...imported.transformNodes];
-    for(const node of children){if(!node.parent)node.parent=holder;}
-    holder.setEnabled(false);
-    state.weapons[name]=holder;
-    return holder;
-  }
   function playClip(){
     for(const group of scene.animationGroups)group.stop();
     const name=state.weapon+'_'+state.pose;
@@ -78,10 +59,12 @@
   async function show(weapon,pose){
     state.weapon=weapon;state.pose=pose;
     buttons();
-    const holder=await prepareWeapon(weapon);
+    // Animation drives body and legs; world-space corrective IK drives arms and both grips.
+    // Never parent a meter-scale prop to the original 95-unit Weapon_R socket.
+    await state.equipWeapon(variants[weapon]);
     if(state.weapon!==weapon)return;
-    for(const [id,prop] of Object.entries(state.weapons))
-      prop.setEnabled(id===weapon);
+    state.setWeaponPose(poseMap[pose]);
+    state.weapons[weapon]=true;
     playClip();
     state.played.push(weapon+'_'+pose);
   }
@@ -151,7 +134,27 @@
     state.skeletonBones=Math.max(...imported.skeletons.map(x=>x.bones.length));
     if(state.clips.filter(n=>/^(Kar98k|MP40|MG42|Panzerschreck)_(Hold|Aim|Fire|Walk)$/.test(n)).length!==16)
       throw Error('Проверка обнаружила не 16 анимаций');
+    if(!window.BattlefieldWeaponRig)throw Error('Не загружен корректирующий IK-модуль');
+    await window.BattlefieldWeaponRig.create({scene,imported,root,state,
+      animationDriven:true,bindUI:false,acceptExportSockets:true,
+      weaponRoot:'../../assets/ww2-weapons/'});
+    state.correctiveIK=true;
     await show(state.weapon,state.pose);
     state.loaded=true;state.ready=true;
+    // Render-frame validation uses real wrist-to-grip distances in meters.
+    let last=0;
+    scene.onAfterRenderObservable.add(()=>{
+      if(performance.now()-last<600)return;
+      last=performance.now();
+      const d=state.weaponRig;
+      state.rightGripMeters=d.rightGripMeters;
+      state.leftGripMeters=d.leftGripMeters;
+      state.geometricPass=d.geometricPass;
+      if(d.error)status.textContent='IK ошибка: '+d.error;
+      else if(Number.isFinite(d.rightGripMeters)&&Number.isFinite(d.leftGripMeters))
+        status.textContent=state.clip+' · хват R '+Math.round(d.rightGripMeters*100)+
+          ' см / L '+Math.round(d.leftGripMeters*100)+' см · '+
+          (d.geometricPass?'IK OK':'проверить хват');
+    });
   }catch(e){reportError(e);}
 })();
