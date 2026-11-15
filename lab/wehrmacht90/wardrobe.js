@@ -1,3 +1,4 @@
+import {loftTunic} from './skinned-loft.js';
 import {buildTailoredKit} from './tailored-kit.js';
 // Battlefield · Heer M40 visual-fit test on a verified 90-bone body.
 // Source references: Kenton-GMI/muster-ww2 (MIT), see SOURCES.md.
@@ -271,6 +272,7 @@ export async function installWehrmachtOutfit(scene,model,onUpdate){
  const chestTracker=createTracker(scene,chest),headTracker=createTracker(scene,head);
  const kit=buildTailoredKit(scene,chestTracker);
  const sleeves=buildTailoredM40(scene,wool.body);
+ const loft=loftTunic(scene,wool.body,palette.tunic);
  const caps={};
  const errors=[];
  for(const [id,file] of Object.entries({m43:'m43-field-cap',sidecap:'field-grey-sidecap'})){
@@ -287,6 +289,6 @@ export async function installWehrmachtOutfit(scene,model,onUpdate){
  else if(caps.sidecap)setHeadwear('sidecap');
  const update=()=>{chestTracker.update();headTracker.update();onUpdate?.();};
  const subscription=scene.onBeforeRenderObservable.add(update);
- return {wool,kit,caps,errors,garment:sleeves.stats,sleeves:sleeves.count,get selected(){return selected},setHeadwear,update,
+ return {wool,kit,caps,errors,garment:{...sleeves.stats,loft:{triangles:loft.triangles,vertices:loft.vertices,joints:loft.joints}},sleeves:sleeves.count,get selected(){return selected},setHeadwear,update,
   release:()=>scene.onBeforeRenderObservable.remove(subscription)};
 }
