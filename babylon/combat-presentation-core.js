@@ -14,7 +14,8 @@
     const reloading = unit.reloadRemaining > 0 && !!unit.reloadWeapon;
     const firing = !!unit.alive && !!active && !reloading &&
       shotAge >= 0 && shotAge <= (SHOT_HOLD[unit.weapon] || .10);
-    const running = !!unit.alive && !!active && !!moving;
+    const running = !!unit.alive && !!active && !!moving &&
+      (!reloading || unit.weapon === 'MP40'); // MG42/Panzerschreck reload only at rest.
     const reloadSeconds = unit.reloadWeapon === 'MP40' ? 2.5 :
       unit.reloadWeapon === 'MG42' ? 7.5 :
       unit.reloadWeapon === 'Panzerschreck' ? 9 : 0;
