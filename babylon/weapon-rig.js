@@ -213,21 +213,21 @@
       for (const [node, q] of rest) node.rotationQuaternion = q.clone();
       refresh(chest); refresh(right.shoulder); refresh(left.shoulder);
       const t = performance.now() * .001;
-      const walking = pose === 'walk', firing = pose === 'fire';
-      const breathing = walking || firing ? .004 * Math.sin(t * 1.45) : 0;
-      const bob = walking ? .013 * Math.sin(t * 9) : 0;
+      const running = pose === 'run', firing = pose === 'fire';
+      const breathing = running || firing ? .004 * Math.sin(t * 1.45) : 0;
+      const bob = running ? .014 * Math.sin(t * 13) : 0;
       const recoil = firing ? .025 * Math.max(0, Math.sin(t * 18)) : 0;
       const chestQ = worldRotation(chest);
       const angles = (weaponId === 'de-panzerschreck' ? {
         // The rocket tube is shoulder-borne when aiming, lower while moving.
         ready: [-.16, -.04, -.01],
         aim: [.015, -.035, 0],
-        walk: [-.28, -.055, -.025],
+        run: [-.28, -.055, -.025],
         fire: [.015, -.035, 0]
       } : {
         ready: [-.095, -.02, -.020],
         aim: [.012, 0, 0],
-        walk: [-.15, -.035, -.048],
+        run: [-.18, -.035, -.048],
         fire: [.012, 0, 0]
       })[pose];
       const localQ = B.Quaternion.FromEulerAngles(angles[0], angles[1], angles[2]);
@@ -235,7 +235,7 @@
       // Right shoulder stays fixed relative to chest; the weapon is not attached
       // to a swinging wrist, avoiding a feedback loop for the left support hand.
       const stockOffset = weaponId === 'de-panzerschreck'
-        ? (walking ? new B.Vector3(.10, -.13, .10)
+        ? (running ? new B.Vector3(.10, -.13, .10)
           : pose === 'ready' ? new B.Vector3(.15, -.015, .06)
           : new B.Vector3(.16, .025, .05))
         : new B.Vector3(.038, -.07, .115);
@@ -282,7 +282,7 @@
         el.setAttribute('aria-pressed', String(el.dataset.pose === pose));
     }
     function setPose(value) {
-      if (!['ready', 'aim', 'walk', 'fire'].includes(value)) return;
+      if (!['ready', 'aim', 'run', 'fire'].includes(value)) return;
       pose = value; needsPose = true; buttonState();
     }
     async function equip(id) {
