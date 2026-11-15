@@ -17,7 +17,7 @@ function create({hero,allies,enemies,onArrive=()=>{}}){
  let arrivalCount=0;
  function setDestination(x,z){
   if(!Number.isFinite(x)||!Number.isFinite(z))return {ok:false,reason:'invalid-coordinates'};
-  destination={x:CLAMP(x,-35,105),z:CLAMP(z,-48,48)};
+  destination={x:CLAMP(x,0,300),z:CLAMP(z,0,300)};
   const dx=destination.x-hero.x,dz=destination.z-hero.z,d=Math.hypot(dx,dz);
   if(d>1e-5)heading={x:dx/d,z:dz/d};
   return {ok:true,destination:{...destination}};
@@ -61,14 +61,17 @@ function create({hero,allies,enemies,onArrive=()=>{}}){
   for(let i=0;i<bots.length;i++){
    const bot=bots[i];
    if(!bot?.alive)continue;
-   const side=i-1,fx=heading.x,fz=heading.z;
+   const fx=heading.x,fz=heading.z;
    let forward,lateral;
    if(mode==='turtle'){
-    forward=4.4;lateral=side*3.5;
+    // 11 escorts: 3 columns with up to 4 ranks, all ahead of the hero.
+    const rank=Math.floor(i/3),lane=i%3-1;
+    forward=4.4+rank*3.8;lateral=lane*3.8;
    }else{
-    const t=side*Math.PI*.26;
-    forward=4.6*Math.cos(t);
-    lateral=4.6*Math.sin(t);
+    // One row in a forward-facing semicircle, evenly spaced.
+    const t=(i-(bots.length-1)/2)*Math.PI/Math.max(6,bots.length);
+    forward=16*Math.cos(t);
+    lateral=16*Math.sin(t);
    }
    const point={x:hero.x+fx*forward-fz*lateral,
      z:hero.z+fz*forward+fx*lateral};
