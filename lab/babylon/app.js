@@ -166,7 +166,16 @@ async function start(){
    poseArm(rightUpper,rightLower,rightHand,trigger);
    poseArm(leftUpper,leftLower,leftHand,support);
   }
-  state.combatPoseStatus='Torso-mounted MP40; both hand positions solved with CCD';
+  const elbowAngle=(upper,lower,hand)=>{
+   refreshChain(hand);
+   const elbow=lower.getAbsolutePosition();
+   const a=upper.getAbsolutePosition().subtract(elbow).normalize();
+   const b=hand.getAbsolutePosition().subtract(elbow).normalize();
+   return Math.acos(B.Scalar.Clamp(B.Vector3.Dot(a,b),-1,1))*180/Math.PI;
+  };
+  state.elbowAngles={right:+elbowAngle(rightUpper,rightLower,rightHand).toFixed(1),
+   left:+elbowAngle(leftUpper,leftLower,leftHand).toFixed(1)};
+  state.combatPoseStatus='Dual-hand IK with anatomical elbow diagnostics';
  }
 
  function updateWeaponPose(){
@@ -189,8 +198,9 @@ async function start(){
    const rightGrip=rightDistance<.12;
    // Compare muzzle direction against the torso's forward axis, not global Z.\n   const torsoForward=B.Vector3.TransformNormal(B.Axis.Z,chest.getWorldMatrix()).normalize();\n   const muzzleForward=B.Vector3.Dot(muzzleWorld.subtract(trigger).normalize(),torsoForward)>.5;
    const buttNearShoulder=!!rightUpper&&B.Vector3.Distance(shoulderWorld,positionOf(rightUpper))<.65;
-   state.combatAcceptance={rightRaised,leftSupport,rightGrip,muzzleForward,buttNearShoulder,
-    passed:!!(rightRaised&&leftSupport&&rightGrip&&muzzleForward&&buttNearShoulder),
+   const elbowBendOk=!!state.elbowAngles&&Object.values(state.elbowAngles).every(deg=>deg>35&&deg<165);
+   state.combatAcceptance={rightRaised,leftSupport,rightGrip,muzzleForward,buttNearShoulder,elbowBendOk,elbowAngles:state.elbowAngles,
+    passed:!!(rightRaised&&leftSupport&&rightGrip&&muzzleForward&&buttNearShoulder&&elbowBendOk),
     note:'Geometric gate only. Hand rotations and mesh deformation require visual verification'};
   }else state.combatAcceptance=null;
  }
