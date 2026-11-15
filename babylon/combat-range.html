@@ -16,7 +16,7 @@ button{font:650 12px system-ui;color:#f4f6ee;border:1px solid #809880;background
 button[aria-pressed="true"]{background:#d1dfa6;color:#1b2a1d;border-color:#e9eed4}
 button:disabled{opacity:.4;cursor:default}
 input[type=range]{width:100%;accent-color:#bed29a}
-#telemetry{font-size:12px;line-height:1.5;white-space:pre-line;font-variant-numeric:tabular-nums;border-radius:7px;padding:10px;background:#304536}
+#combat-state{font-size:12px;color:#d9e8bd;margin-bottom:7px}#reload-bar{height:7px;background:#425645;border-radius:8px;overflow:hidden;margin-bottom:8px}#reload-fill{width:0%;height:100%;background:#d7c68e;transition:width .1s linear}#telemetry{font-size:12px;line-height:1.5;white-space:pre-line;font-variant-numeric:tabular-nums;border-radius:7px;padding:10px;background:#304536}
 #events{font-size:11px;color:#f0dda0;margin:9px 0 0;min-height:32px;line-height:1.4}
 #notice{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 10px);left:12px;right:12px;max-width:600px;margin:auto;text-align:center;background:#1c2b22df;border:1px solid #657e63;border-radius:8px;padding:8px;font-size:11px;pointer-events:none}
 @media(max-width:680px){
@@ -29,6 +29,7 @@ input[type=range]{width:100%;accent-color:#bed29a}
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
 <script src="./weapon-rig.js"></script>
 <script src="./combat-balance-core.js"></script>
+<script src="./combat-presentation-core.js"></script>
 </head>
 <body>
 <canvas id="view" aria-label="3D испытательный полигон Babylon"></canvas>
@@ -44,6 +45,7 @@ input[type=range]{width:100%;accent-color:#bed29a}
 <div class="row">
 <button id="go">В бой</button>
 <button id="supply">Пополнить БК</button>
+<button id="manual-reload">Сменить магазин</button>
 </div>
 <h2>2. Испытание</h2>
 <div class="row" id="scenarios">
@@ -54,9 +56,11 @@ input[type=range]{width:100%;accent-color:#bed29a}
 <label for="distance">Дистанция: <b id="distanceValue">40</b> ед.</label>
 <input id="distance" type="range" min="15" max="100" step="5" value="40">
 <div class="row"><button id="motion" aria-pressed="false">Стрелять на бегу: нет</button><button id="restart">Сброс</button></div>
+<div id="combat-state" role="status">Ожидание</div>
+<div id="reload-bar" role="progressbar" aria-label="Перезарядка" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="reload-fill"></div></div>
 <div id="telemetry">Готовим полигон…</div>
 <div id="events">Для покупки оружия оставайтесь на базе, затем нажмите «В бой».</div>
-<p class="sub">Цены в этом полигоне условные, только для теста экономики. Урон, дальность, вместимость и время перезарядки — согласованные. Радиус взрыва и скорострельность ещё настраиваются.</p>
+<p class="sub">Цены в этом полигоне условные, только для теста экономики. Движение пока имитируется позой и штрафом к точности (полноценный бег ног не подключён). Урон, дальность, вместимость и время перезарядки — согласованные. Радиус взрыва и скорострельность ещё настраиваются.</p>
 </section>
 <div id="notice">Вращайте камеру пальцем. После боя вернитесь на базу и докупите боекомплект.</div>
 <script src="./combat-range.js"></script>
