@@ -10,6 +10,8 @@ const combat=window.BattlefieldBalance;
 const tactics=window.BattlefieldSquadController;
 const presentation=window.BattlefieldCombatPresentation;
 const orders=window.BattlefieldFieldOrders;
+const goldRules=window.BattlefieldGoldEconomy;
+const briefing=$('battlefield-brief'),enterButton=$('enter-game'),briefingProgress=$('brief-progress');
 const canvas=$('view');
 // Retry and menu work even if CDN scripts or the 3D model failed to load.
 $('retry').addEventListener('click',()=>location.reload());
@@ -18,11 +20,13 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
  $('failure').style.display='block';
+ briefingProgress.textContent=message;
+ enterButton.textContent='Не удалось загрузить игру';
  return;
 }
 const META={Kar98k:'de-kar98k',MP40:'de-mp40',MG42:'de-mg42',
@@ -40,7 +44,18 @@ let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
 let actors=new Map(),fx=[],scenario='duel',atBase=true;
 let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 let weaponQueue=[],weaponWorker=false;
+let economy=null,gameStarted=false,gamePausedForBriefing=true;
 function alertStatus(message){$('event').textContent=message}
+enterButton.addEventListener('click',()=>{
+ if(!state.ready||gameStarted)return;
+ const r=controller.start();
+ if(!r.ok){alertStatus('Бой не удалось начать: '+r.reason);return;}
+ gameStarted=true;gamePausedForBriefing=false;
+ briefing.hidden=true;briefing.setAttribute('aria-hidden','true');
+ atBase=false;state.atBase=false;
+ alertStatus('Бой начался: британцы 🔵 против немцев 🔴. Касайтесь земли, чтобы управлять героем.');
+ drawHud();
+});
 function position(unit,y=0){
  return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y,unit.z*UNIT_SCALE);
 }
@@ -107,7 +122,7 @@ function createWorld(){
     destinationMark.position.set(BASE_X+move.destination.x*UNIT_SCALE,.06,
      move.destination.z*UNIT_SCALE);
     destinationMark.isVisible=true;
-    if(!controller.snapshot().active&&!controller.snapshot().done){
+    if(gameStarted&&!controller.snapshot().active&&!controller.snapshot().done){
      controller.start();atBase=false;state.atBase=false;
     }
     alertStatus('Приказ: двигаться. Отряд следует за героем.');
@@ -257,7 +272,7 @@ async function chooseScenario(name){
   await ensureUnits(name);
   setup(name);
   void processWeaponQueue();
-  const launch=controller.start();
+  const launch=gameStarted?controller.start():{ok:false};
   if(launch.ok){atBase=false;state.atBase=false;}
   alertStatus('Подкрепление прибыло. Нажмите на землю, чтобы управлять отрядом.');
  }catch(error){
@@ -316,7 +331,8 @@ function setup(scenarioName){
  if(destinationMark)destinationMark.isVisible=false;
  state.scenario=scenario;state.atBase=true;state.focus=null;
  const [ours,theirs]=SCENARIOS[scenario];
- battle=combat.createBattle({funds:1500,prices:PRICES});
+ economy=goldRules.create();
+ battle=combat.createBattle({funds:goldRules.START_TREASURY,prices:PRICES});
  allies=[];enemies=[];
  const alliesXY=tactics.formation({side:'ally',count:ours});
  const enemiesXY=tactics.formation({side:'enemy',count:theirs,distance:60});
@@ -324,6 +340,8 @@ function setup(scenarioName){
   id:'свой-'+(i+1),team:'свои',...alliesXY[i]}));
  for(let i=0;i<theirs;i++)enemies.push(battle.addUnit({
   id:'враг-'+(i+1),team:'враг',...enemiesXY[i]}));
+ for(const u of allies){u.economyTeam='blue';u.isHero=u===allies[0];}
+ for(const u of enemies)u.economyTeam='red';
  fieldOrders=orders.create({hero:allies[0],allies,enemies,onArrive:()=>{
   if(destinationMark)destinationMark.isVisible=false;
  }});
@@ -430,6 +448,7 @@ function drawHud(){
  const snap=controller.snapshot();
  const inventory=hero.weapon==='Kar98k'?null:hero.inventory[hero.weapon];
  const funds=battle.getFunds();
+ const econ=economy?.summary();
  $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
  $('supply').disabled=!atBase||!hero.alive;
  $('reload-manual').disabled=!hero.alive||hero.weapon==='Kar98k'||
@@ -444,7 +463,8 @@ function drawHud(){
   '\nГерой: '+Math.round(hero.hp)+'/100 HP · оружие: '+hero.weapon+
   (inventory?' · '+inventory.loaded+'+'+inventory.reserve+' патр.':' · ∞ патронов')+
   (hero.reloadRemaining>0?'\nПерезарядка: '+hero.reloadRemaining.toFixed(1)+' c':'')+
-  '\nАрмейская казна: '+funds+
+  '\nБританцы 🔵: '+funds+' · Немцы 🔴: '+(econ?.treasury.red??'—')+
+  '\nФермы: '+(econ?.owners.blue.length||0)+' синих · '+(econ?.owners.red.length||0)+' красных'+
   (paid?'\nЗапас: '+paid:'')+
   '\nСтрой: '+(fieldOrders?.snapshot().mode==='semicircle'?'боевой полукруг':'черепаха')+
   '\nВыстрелы героя: '+hero.shots+' · поражено: '+hero.kills+
@@ -540,7 +560,16 @@ function registerUI(){
 function frame(){
  const dt=Math.max(0,Math.min(.05,engine.getDeltaTime()/1000));
  if(state.ready&&controller){
-  controller.update(dt);
+  if(!gamePausedForBriefing){
+   controller.update(dt);
+   if(economy){
+    economy.update(dt,[...allies,...enemies]);
+    // Economy is tracked in the old game's two independent army treasuries.
+    // The combat store receives gold from farm income/captures.
+    const credited=economy.treasury.blue-battle.getFunds();
+    if(credited>0)battle.grantFunds?.(credited);
+   }
+  }
   for(const view of views)if(view?.unit)syncVisual(view);
   const now=performance.now();
   if(now-statusAt>220){statusAt=now;drawHud();}
@@ -558,21 +587,22 @@ try{
  for(const el of document.querySelectorAll('button'))el.disabled=false;
  registerUI();
  setup('duel');
+ briefingProgress.textContent='Бойцы загружены. Читайте карту и нажмите «В бой».';
+ enterButton.disabled=false;
+ enterButton.textContent='В бой · начать игру';
  // The first playable frame is available before armature IK/weapon loading.
  void processWeaponQueue();
- const firstBattle=controller.start();
- if(firstBattle.ok){
-  atBase=false;state.atBase=false;
-  alertStatus('Игра началась. Касанием земли двигайте героя, касанием врага выбирайте цель.');
-  drawHud();
- }
- $('loading').textContent='Готово. Управляйте героем; «Отряд 4×4» добавит подкрепление.';
+// Do not start combat under the briefing: player chooses the start time.
+ $('loading').textContent='Готово. На заставке нажмите «В бой», когда прочитаете правила.';
+ drawHud();
 }catch(error){
  state.loading=false;state.error=String(error?.stack||error);
  $('loading').textContent='Ошибка: '+(error?.message||error);
  $('readout').textContent='Не удалось запустить игру. Проверьте загрузку модели.';
  $('failure-text').textContent=(error?.message||String(error));
  $('failure').style.display='block';
+ briefingProgress.textContent='Ошибка загрузки: '+(error?.message||error);
+ enterButton.textContent='Ошибка загрузки. Перезапустите игру';
  console.error('Battlefield main game',error);
 }
 })();
