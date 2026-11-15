@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --no-save --no-package-lock playwright
+      - name: Validate GLB skeleton, animations and MP40 manifest\n        run: node lab/babylon/verify-assets.mjs\n      - run: npm install --no-save --no-package-lock playwright
       - run: npx playwright install --with-deps chromium
       - name: Start static server
         run: python3 -m http.server 8765 > /tmp/battlefield-server.log 2>&1 &
