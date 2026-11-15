@@ -44,7 +44,7 @@ let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
 let actors=new Map(),fx=[],scenario='duel',atBase=true;
 let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 let weaponQueue=[],weaponWorker=false;
-let economy=null,gameStarted=false,gamePausedForBriefing=true;
+let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
 function alertStatus(message){$('event').textContent=message}
 enterButton.addEventListener('click',()=>{
  if(!state.ready||gameStarted)return;
@@ -332,6 +332,7 @@ function setup(scenarioName){
  state.scenario=scenario;state.atBase=true;state.focus=null;
  const [ours,theirs]=SCENARIOS[scenario];
  economy=goldRules.create();
+ lastEconomyBlue=economy.treasury.blue;
  battle=combat.createBattle({funds:goldRules.START_TREASURY,prices:PRICES});
  allies=[];enemies=[];
  const alliesXY=tactics.formation({side:'ally',count:ours});
@@ -371,6 +372,17 @@ function addEffect(mesh,ttl,material=null){
  fx.push({mesh,ttl,material});
 }
 function drawShot({unit,target,result}){
+ // Bounties are credited to the killer's army; the hero also earns
+ // personal gold, exactly as in the original Three.js economy.
+ if(economy && result.hits?.length){
+  for(const hit of result.hits){
+   if(hit.hp>0)continue;
+   const victim=[...allies,...enemies].find(u=>u.id===hit.id);
+   if(victim&&!victim.alive)
+    economy.kill(unit.economyTeam,{team:victim.economyTeam},
+     {heroKill:unit.isHero,armoured:false});
+  }
+ }
  const source=actors.get(unit),targetView=actors.get(target);
  if(!source||!targetView)return;
  const muzzle=source.rig?.weaponRig?.muzzleWorldPosition;
@@ -487,6 +499,11 @@ async function chooseGun(weapon){
    'Не удалось выбрать оружие: '+result.reason);
   return;
  }
+ if(economy&&result.cost>0){
+  if(!economy.pay('blue',result.cost))
+   throw Error('Несоответствие игровой казны стоимости оружия');
+  lastEconomyBlue=economy.treasury.blue;
+ }
  state.selected=weapon;
  const visual=actors.get(hero);
  if(visual){
@@ -509,6 +526,11 @@ function resupplyHero(){
  if(!last){alertStatus('Бесплатной Kar98k боеприпасы не требуются.');return;}
  const result=battle.resupply(hero,last,{atBase});
  if(!result.ok){alertStatus('БК не пополнен: '+result.reason);return;}
+ if(economy&&result.cost>0){
+  if(!economy.pay('blue',result.cost))
+   throw Error('Несоответствие игровой казны расходам на БК');
+  lastEconomyBlue=economy.treasury.blue;
+ }
  alertStatus('Пополнение '+last+': +'+result.added+' за '+result.cost+' монет.');
  drawHud();
 }
@@ -564,10 +586,11 @@ function frame(){
    controller.update(dt);
    if(economy){
     economy.update(dt,[...allies,...enemies]);
-    // Economy is tracked in the old game's two independent army treasuries.
-    // The combat store receives gold from farm income/captures.
-    const credited=economy.treasury.blue-battle.getFunds();
-    if(credited>0)battle.grantFunds?.(credited);
+    // Only newly earned income enters the combat treasury. Purchases
+    // deduct from BOTH treasuries, preventing an accidental money refund.
+    const credited=economy.treasury.blue-lastEconomyBlue;
+    if(credited>0)battle.grantFunds(credited);
+    lastEconomyBlue=economy.treasury.blue;
    }
   }
   for(const view of views)if(view?.unit)syncVisual(view);
