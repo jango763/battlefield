@@ -19,6 +19,12 @@ assert(app.includes('ground.isPickable=true'));
 assert(app.includes('fieldOrders.setDestination(x,z)'));
 assert(app.includes('driveAllies:dt=>fieldOrders.update(dt)'));
 assert(app.includes("await ensureUnits('duel')"),'Initial mobile boot must not block on 8 GLBs');
+assert(/B\.SceneLoader\.LoadAssetContainerAsync\(\s*'\.\/animstudio-preview\/models\/',\s*'all-combat-run\.glb',\s*scene\)/.test(app),
+ 'SceneLoader loader signature must be (rootUrl, filename, scene)');
+assert(!app.includes("LoadAssetContainerAsync('',\n   './animstudio-preview/models/'"),
+ 'Regression: Invalid four-argument LoadAssetContainerAsync call');
+assert(app.includes('void processWeaponQueue()'), 'Weapon IK should not block the playable scene');
+
 assert(app.includes("const firstBattle=controller.start()"));
 assert(app.includes("if(!B||!combat||!tactics||!presentation||!orders"));
 assert(app.includes("$('failure').style.display='block'"));
