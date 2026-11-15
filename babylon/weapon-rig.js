@@ -475,6 +475,10 @@
       // target; this prevents a false geometric "IK OK" for twisted hands.
       const rPalm=rotated(B.Axis.Y,worldRotation(right.hand)).normalize();
       const lPalm=rotated(B.Axis.Y,worldRotation(left.hand)).normalize();
+      const aimError=(a,b)=>+(Math.acos(B.Scalar.Clamp(B.Vector3.Dot(a,b),-1,1))*
+        180/Math.PI).toFixed(1);
+      report.rightFingerDirectionErrorDegrees=aimError(rPalm,rightFinger);
+      report.leftFingerDirectionErrorDegrees=aimError(lPalm,leftFinger);
       report.rightGripMeters = +B.Vector3.Distance(right.hand.getAbsolutePosition()
         .add(rPalm.scale(rightPalmReach)), trigger).toFixed(4);
       report.leftGripMeters = +B.Vector3.Distance(left.hand.getAbsolutePosition()
