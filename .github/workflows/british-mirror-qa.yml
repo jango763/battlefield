@@ -5,6 +5,7 @@ on:
       - feature/british-mirror-skin-v1-20261116
       - feature/allied-four-models-hero-20261116
       - feature/allied-real-model-ik-integration-v1-20261116
+      - feature/babylon-native-clip-blending-20261116
     paths:
       - 'babylon/**'
       - 'assets/ww2-weapons/**'
@@ -26,6 +27,8 @@ jobs:
           node --check babylon/british-soldier-original.js
           node --check babylon/allied-model-catalog.js
           node --check babylon/allied-asset-loader.js
+          node --check babylon/native-clip-blend.js
+          node babylon/tests/test-native-blend.cjs
           node babylon/tests/test-allied-loader.cjs
           node babylon/tests/test-allied-casting.cjs
           node babylon/tests/test-british-mirror.cjs
