@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17211e">
+<title>Battlefield · профессиональные движения Quaternius</title>
+<style>
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#14201b;color:#f3f1e7;font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+header{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:12px;right:10px;z-index:3;pointer-events:none;text-shadow:0 2px 5px #0009}
+header h1{font-size:17px;margin:0 0 4px;font-weight:750}header p{font-size:11px;color:#d5dfd1;margin:0}
+#panel{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 10px);left:10px;right:10px;z-index:4;max-width:650px;margin:auto;border:1px solid #748b73;border-radius:12px;padding:9px;background:#18291fdc;backdrop-filter:blur(7px);box-shadow:0 5px 28px #0007}
+#panel h2{font-size:12px;color:#dde7d4;margin:0 0 6px}
+.controls{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+button{min-height:43px;touch-action:manipulation;border:1px solid #80947d;color:#e7efe4;border-radius:8px;background:#39523d;font:650 12px system-ui;padding:8px 3px}
+button[aria-pressed=true]{background:#d3e1a9;color:#183020;border-color:#e0edb6}
+button:disabled{opacity:.5}
+#status{font-size:12px;color:#f0ddb0;white-space:pre-line;line-height:1.4;margin:9px 2px 2px;min-height:20px}
+footer{font-size:10px;color:#b9c9ba;margin:5px 2px 1px}
+#debug{display:none}
+@media(min-width:800px){#panel{left:auto;right:18px;width:470px;bottom:20px}}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./native-clip-blend.js"></script>
+</head>
+<body>
+<canvas id="view" aria-label="Вращаемый 3D-персонаж с настоящими анимациями Quaternius"></canvas>
+<header><h1>Battlefield · настоящие движения</h1>
+<p>43 анимации Quaternius (CC0) · тест исходных клипов, не финальная модель героя</p></header>
+<section id="panel" aria-label="Контроллер готовых анимаций">
+<h2>Выбери движение</h2>
+<div class="controls">
+<button data-motion="Idle_Loop" aria-pressed="true" disabled>Стойка</button>
+<button data-motion="Walk_Loop" disabled>Ходьба</button>
+<button data-motion="Jog_Fwd_Loop" disabled>Бег</button>
+<button data-motion="Sprint_Loop" disabled>Спринт</button>
+<button data-motion="Crouch_Fwd_Loop" disabled>Присед</button>
+<button data-motion="Crouch_Idle_Loop" disabled>В укрытии</button>
+<button data-motion="Hit_Chest" disabled>Попадание</button>
+<button data-motion="Death01" disabled>Падение</button>
+</div>
+<div id="status" role="status" aria-live="polite">Загружаю настоящие анимации…</div>
+<footer>Вращай одним пальцем, приближай двумя · это официальный CC0-анимационный набор, не код PUBG</footer>
+</section>
+<script>
+(async function(){
+'use strict';
+const B=window.BABYLON,canvas=document.getElementById('view');
+const status=document.getElementById('status');
+const controller=window.BattlefieldNativeClipBlend;
+const game={ready:false,motion:null,clipCount:0,error:null,transitionCount:0};
+window.__QUATERNIUS_REVIEW__=game;
+const say=s=>{status.textContent=s};
+try{
+ if(!B?.SceneLoader||!controller)throw Error('Babylon.js не загрузился: проверь интернет');
+ const engine=new B.Engine(canvas,true,{powerPreference:'high-performance',stencil:true});
+ engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.7));
+ const scene=new B.Scene(engine);scene.useRightHandedSystem=true;
+ scene.clearColor=new B.Color4(.085,.125,.11,1);
+ const light=new B.HemisphericLight('soft',new B.Vector3(0,1,0),scene);light.intensity=1.5;
+ const front=new B.DirectionalLight('front',new B.Vector3(-.6,-1,-.8),scene);front.intensity=1.5;
+ const rim=new B.DirectionalLight('rim',new B.Vector3(.7,-.35,.5),scene);rim.intensity=.75;
+ const camera=new B.ArcRotateCamera('orbit',Math.PI/2,Math.PI*.43,3.0,new B.Vector3(0,.95,0),scene);
+ camera.lowerRadiusLimit=.7;camera.upperRadiusLimit=7;camera.pinchDeltaPercentage=.018;
+ camera.wheelDeltaPercentage=.013;camera.attachControl(canvas,true);
+ engine.runRenderLoop(()=>{
+  controller.update(game,Math.min(.05,engine.getDeltaTime()/1000));
+  scene.render();
+ });
+ window.addEventListener('resize',()=>engine.resize());
+ say('Получаю GLB Quaternius из нашего GitHub…');
+ const imported=await B.SceneLoader.ImportMeshAsync('','./assets/quaternius/',
+  'universal-animation-library.glb',scene);
+ const groups=imported.animationGroups;
+ const clips=new Map(groups.map(g=>[g.name,g]));
+ const required=['Idle_Loop','Walk_Loop','Jog_Fwd_Loop','Sprint_Loop',
+  'Crouch_Fwd_Loop','Crouch_Idle_Loop','Hit_Chest','Death01'];
+ const absent=required.filter(name=>!clips.has(name));
+ if(absent.length)throw Error('Нет оригинальных клипов: '+absent.join(', '));
+ game.clipCount=groups.length;
+ game.clips=clips;
+ // Source asset already supplies its own complete skinned mannequin.
+ const visible=imported.meshes.filter(m=>m.getTotalVertices?.()>0);
+ if(!visible.length)throw Error('GLB содержит только анимации, нет 3D-фигуры');
+ const min=new B.Vector3(Infinity,Infinity,Infinity),max=new B.Vector3(-Infinity,-Infinity,-Infinity);
+ for(const mesh of visible){
+  mesh.computeWorldMatrix(true);
+  const box=mesh.getBoundingInfo().boundingBox;
+  min.minimizeInPlace(box.minimumWorld);max.maximizeInPlace(box.maximumWorld);
+ }
+ const center=B.Vector3.Center(min,max),height=max.y-min.y;
+ if(!Number.isFinite(height)||height<=0)throw Error('Неправильный размер манекена');
+ const stage=new B.TransformNode('quaternius-review-stage',scene);
+ for(const node of imported.meshes)if(!node.parent)node.parent=stage;
+ for(const node of imported.transformNodes)if(!node.parent)node.parent=stage;
+ const factor=1.8/height;stage.scaling.setAll(factor);
+ stage.position.set(-center.x*factor,-min.y*factor,-center.z*factor);
+ camera.setTarget(new B.Vector3(0,.91,0));
+ camera.radius=3.15;
+ const play=name=>{
+  const clip=clips.get(name);
+  if(!clip)throw Error('Не найден '+name);
+  const pose=name==='Death01'?'fire':name.includes('Crouch')?'aim':
+    name.includes('Walk')||name.includes('Jog')||name.includes('Sprint')?'run':'ready';
+  controller.play(game,clip,pose,{loop:name!=='Death01'&&name!=='Hit_Chest',
+   duration:.20});
+  game.motion=name;game.transitionCount++;
+  document.querySelectorAll('[data-motion]').forEach(btn=>
+   btn.setAttribute('aria-pressed',String(btn.dataset.motion===name)));
+  say('Готово: '+name+' · '+game.clipCount+' настоящих клипа Quaternius');
+ };
+ game.ready=true;
+ for(const btn of document.querySelectorAll('[data-motion]')){
+  btn.disabled=false;
+  btn.addEventListener('click',()=>{try{play(btn.dataset.motion)}catch(e){say(e.message)}});
+ }
+ play('Idle_Loop');
+}catch(e){
+ game.error=String(e?.stack||e);
+ say('Ошибка просмотра: '+String(e?.message||e)+'\nОткрой ссылку в Safari, не через просмотр файла.');
+ console.error('Quaternius Battlefield',e);
+}
+})();
+</script></body></html>
