@@ -1,0 +1,213 @@
+<!doctype html><html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#15211c">
+<title>Battlefield · проверка оригинальных союзных GLB и хвата оружия</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:#17201a;color:#e5eee2;font:13px system-ui}
+#canvas{width:100%;height:100%;display:block;touch-action:none}
+#title{position:fixed;top:calc(env(safe-area-inset-top) + 9px);left:13px;pointer-events:none;text-shadow:0 1px 8px #000}
+h1{font-size:17px;margin:0}#title p{margin:4px 0;font-size:11px;color:#bdc9bc}
+#controls{position:fixed;right:9px;top:calc(env(safe-area-inset-top) + 57px);width:min(350px,calc(100% - 18px));background:#1a2d22ed;border:1px solid #758572;border-radius:11px;padding:10px;max-height:77vh;overflow:auto}
+label{display:block;margin:4px 0 5px;font-weight:700;color:#dce8c9}
+select,input[type=file],button{font:12px system-ui;color:#eaf3e4;background:#334b38;border:1px solid #849b7e;border-radius:7px;padding:9px;width:100%}
+select,input{margin-bottom:8px}input[type=file]{padding:5px}
+.group{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:9px}
+button{cursor:pointer;padding:9px 4px}button:disabled{opacity:.5}
+button[aria-pressed=true]{color:#192a1e;background:#d3e2a8}
+#status{white-space:pre-line;line-height:1.55;background:#233a29;padding:9px;border-radius:7px;font-size:12px;min-height:60px}
+#source{font-size:11px;color:#d5d5b3}
+#bottom{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 7px);left:10px;right:10px;text-align:center;font-size:11px;background:#27372aee;border:1px solid #63785e;padding:7px;border-radius:8px;pointer-events:none}
+@media(max-width:650px){#controls{top:auto;left:7px;right:7px;bottom:calc(env(safe-area-inset-bottom) + 49px);width:auto;max-height:46dvh}h1{font-size:14px}.group button{font-size:11px;padding:8px 3px}}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./allied-model-catalog.js"></script>
+<script src="./allied-asset-loader.js"></script>
+<script src="./british-faction.js"></script>
+<script src="./weapon-rig.js"></script>
+</head><body>
+<canvas id="canvas" aria-label="Полигон осмотра модели и её хвата оружия"></canvas>
+<div id="title"><h1>Battlefield · четыре оригинальных бойца</h1><p>Загрузка реальных GLB · проверка 16 анимаций и двух кистей</p></div>
+<section id="controls">
+<label for="choice">Кого проверяем</label>
+<select id="choice">
+<option value="americanHero">🇺🇸 Американец — наш герой</option>
+<option value="britishDanoob">🇬🇧 Danoob — пехота</option>
+<option value="britishJakeli">🇬🇧 Jakeli — пехота</option>
+<option value="britishFab">🇬🇧 Fab — тяжёлая пехота</option>
+</select>
+<label for="file">Выберите оригинальный GLB после законного скачивания и конвертации</label>
+<input type="file" id="file" accept=".glb,model/gltf-binary">
+<div class="group" id="weapons">
+<button data-weapon="Kar98k" aria-pressed="true" disabled>Lee-Enfield</button>
+<button data-weapon="MP40" disabled>Sten</button>
+<button data-weapon="MG42" disabled>Bren</button>
+<button data-weapon="Panzerschreck" disabled>PIAT</button>
+</div>
+<div class="group" id="poses">
+<button data-pose="Hold" aria-pressed="true" disabled>Держит</button>
+<button data-pose="Aim" disabled>Прицел</button>
+<button data-pose="Fire" disabled>Стреляет</button>
+<button data-pose="Run" disabled>Бежит</button>
+</div>
+<div id="status" role="status">Модель не загружена. Выберите файл .glb в приложении «Файлы» на iPhone.</div>
+<p id="source"><a id="original" href="https://sketchfab.com/3d-models/american-soldier-ww2-8bf29411fd3c4fa5a4e540433bf56106" style="color:#e5dfb1" target="_blank" rel="noopener">Оригинальная страница автора</a>. Модель хранится только в памяти вашего браузера. В GitHub автоматически не публикуется.</p>
+</section>
+<div id="bottom">Поворачивайте модель пальцем · приближайте двумя · красная ошибка = нельзя внедрять в 12×12</div>
+<script>
+(async function(){
+'use strict';
+const B=window.BABYLON,$=id=>document.getElementById(id);
+const modelCatalog=window.BattlefieldAlliedModels;
+const loader=window.BattlefieldAlliedAssetLoader;
+const faction=window.BattlefieldBritishFaction;
+const state={model:null,weapon:'Kar98k',pose:'Hold',ready:false,grip:null};
+window.__ALLIED_IK_LAB__=state;
+const setStatus=message=>{$('status').textContent=message};
+const poseName={Hold:'ready',Aim:'aim',Fire:'fire',Run:'run'};
+let engine,scene,camera,reference=null,container=null,root=null,loadedURL=null;
+let clips=[],rig=null,active=null;
+function enableButtons(flag){
+ document.querySelectorAll('[data-weapon],[data-pose]').forEach(b=>b.disabled=!flag);
+}
+function selected(){
+ const r=modelCatalog.byId($('choice').value);$('original').href=r.source;
+ return r;
+}
+function dispose(){
+ if(rig?.disposeWeaponRig)rig.disposeWeaponRig();
+ for(const g of clips)g.dispose?.();
+ if(container)container.dispose();
+ if(root)root.dispose(false,false);
+ if(loadedURL)URL.revokeObjectURL(loadedURL);
+ root=container=loadedURL=rig=active=null;clips=[];state.ready=false;
+ enableButtons(false);
+}
+function showButtons(){
+ document.querySelectorAll('[data-weapon]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.weapon===state.weapon)));
+ document.querySelectorAll('[data-pose]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.pose===state.pose)));
+}
+async function selectWeaponPose(weapon,pose){
+ if(!state.ready)return;
+ state.weapon=weapon;state.pose=pose;showButtons();
+ const id=weapon+'_'+pose;
+ const group=clips.find(g=>g.name.endsWith(id));
+ if(!group)throw Error('Отсутствует анимация '+id);
+ if(active)active.stop();
+ group.start(pose!=='Fire',1,group.from,group.to,false);
+ active=group;rig.combatPose.active=true;
+ rig.combatPose.stage=poseName[pose];
+ const model=faction.asset('british',weapon);
+ await rig.equipWeapon(model);
+ rig.setWeaponPose(poseName[pose]);
+ state.currentWeapon=model;
+ setStatus('Оригинальная модель: '+selected().title+
+  '\nПоза: '+pose+' · '+faction.label('british',weapon)+
+  '\nПривязка оружия запущена. Проверяю правую и левую кисть по кадрам…');
+}
+async function loadFile(file){
+ dispose();
+ if(!file||!file.name.toLowerCase().endsWith('.glb'))
+  throw Error('Нужен файл .glb, не архив ZIP/FBX. Сначала конвертируйте его в Blender.');
+ setStatus('Загружаем '+file.name+' · '+Math.round(file.size/1024)+' КБ');
+ const spec=selected();
+ loadedURL=URL.createObjectURL(file);
+ if(typeof B.LoadAssetContainerAsync==='function'){
+  container=await B.LoadAssetContainerAsync(loadedURL,scene,{pluginExtension:'.glb'});
+ }else{
+  container=await B.SceneLoader.LoadAssetContainerAsync('',loadedURL,scene,undefined,'.glb');
+ }
+ container.addAllToScene();
+ const report=loader.inspect(container,{maxTriangles:65000});
+ state.validation=report;
+ if(!report.ok){
+  setStatus('НЕ ПОДХОДИТ К ПРЯМОМУ ВНЕДРЕНИЮ: '+spec.title+
+   '\n'+report.issues.join('\n')+
+   '\nПоказываю исходную модель без анимаций. Требуется доработка в Blender.');
+  state.ready=false;
+  // Keep the imported model visible for user inspection even when unusable.
+  return;
+ }
+ const removed=loader.hideEmbeddedWeapons(container);
+ root=new B.TransformNode('inspected-'+spec.id,scene);
+ for(const n of container.rootNodes||[]){
+  if(!n.parent)n.parent=root;
+ }
+ // Fit the entire character into the same 1.8m combat visual scale.
+ const drawable=container.meshes.filter(m=>m.getTotalVertices?.()>0&&m.isVisible!==false);
+ let min=new B.Vector3(Infinity,Infinity,Infinity),max=new B.Vector3(-Infinity,-Infinity,-Infinity);
+ for(const m of drawable){m.computeWorldMatrix(true);const bb=m.getBoundingInfo().boundingBox;
+  min.minimizeInPlace(bb.minimumWorld);max.maximizeInPlace(bb.maximumWorld);}
+ const height=max.y-min.y;
+ if(!Number.isFinite(height)||height<=0)throw Error('Модель без видимого объёма');
+ root.scaling.setAll(1.8/height);
+ root.position.set(-.5*(max.x+min.x)*1.8/height,-min.y*1.8/height,
+  -.5*(max.z+min.z)*1.8/height);
+ clips=loader.retarget(B,root,reference.animationGroups,report.rig,'review-'+spec.id);
+ rig={combatPose:{active:true,stage:'ready',crouch:0,recoilPulse:0}};
+ await window.BattlefieldWeaponRig.create({
+  scene,imported:{meshes:container.meshes,transformNodes:container.transformNodes,
+   skeletons:container.skeletons},root,state:rig,
+  animationDriven:true,bindUI:false,acceptExportSockets:true,
+  allowRetargetedSkeleton:true,initialWeaponId:'uk-lee-enfield',
+  weaponRoot:'../assets/ww2-weapons/'
+ });
+ state.ready=true;enableButtons(true);
+ state.duplicatesHidden=removed;
+ camera.setTarget(new B.Vector3(0,.99,0));camera.radius=2.9;
+ await selectWeaponPose('Kar98k','Hold');
+}
+try{
+ if(!B?.SceneLoader||!loader||!modelCatalog)throw Error('Babylon.js или модули не загружены');
+ engine=new B.Engine($('canvas'),true,{powerPreference:'high-performance'});
+ engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.7));
+ scene=new B.Scene(engine);scene.useRightHandedSystem=true;
+ scene.clearColor=new B.Color4(.13,.16,.14,1);
+ const hemi=new B.HemisphericLight('ambient',new B.Vector3(0,1,0),scene);
+ hemi.intensity=1.3;
+ const light=new B.DirectionalLight('key',new B.Vector3(-.6,-1,-.3),scene);light.intensity=1.6;
+ camera=new B.ArcRotateCamera('camera',Math.PI*.20,Math.PI*.43,2.9,new B.Vector3(0,1,0),scene);
+ camera.lowerRadiusLimit=.8;camera.upperRadiusLimit=6;camera.attachControl($('canvas'),true);
+ engine.runRenderLoop(()=>scene.render());
+ window.addEventListener('resize',()=>engine.resize());
+ reference=await B.SceneLoader.LoadAssetContainerAsync('./animstudio-preview/models/','all-combat-run.glb',scene);
+ loader.sourceClips(reference.animationGroups);
+ $('choice').addEventListener('change',()=>{
+  selected();dispose();setStatus('Выбран '+selected().title+
+  '. Загрузите его оригинальный файл GLB для оценки.');
+ });
+ $('file').addEventListener('change',event=>{
+  loadFile(event.target.files?.[0]).catch(err=>{
+   state.error=String(err);setStatus('ОШИБКА ЗАГРУЗКИ: '+err.message);
+  });
+ });
+ document.querySelectorAll('[data-weapon]').forEach(b=>b.addEventListener('click',()=>{
+  selectWeaponPose(b.dataset.weapon,state.pose).catch(err=>setStatus(err.message));
+ }));
+ document.querySelectorAll('[data-pose]').forEach(b=>b.addEventListener('click',()=>{
+  selectWeaponPose(state.weapon,b.dataset.pose).catch(err=>setStatus(err.message));
+ }));
+ let frames=0;
+ scene.onAfterRenderObservable.add(()=>{
+  if(!state.ready||!rig?.weaponRig)return;
+  if(++frames%15!==0)return;
+  const measurement=loader.gripAssessment(rig.weaponRig,state.currentWeapon,{
+   rightMaxMeters:.06,leftMaxMeters:.06,stockMaxMeters:.15
+  });
+  state.grip=measurement;
+  if(measurement.ok)setStatus('✓ ГЕОМЕТРИЧЕСКИЙ ХВАТ В НОРМЕ'+
+   '\n'+selected().title+' · '+faction.label('british',state.weapon)+
+   ' · '+state.pose+
+   '\nПравая: '+measurement.rightGripMeters+' м · левая: '+measurement.leftGripMeters+
+   ' м\nСкрыто отдельно названных оружейных мешей: '+(state.duplicatesHidden?.length||0)+
+   '\nВизуальная приёмка хвата и анимаций ещё обязательна.');
+  else setStatus('⚠ СБОЙ КОНТАКТА РУКИ С ОРУЖИЕМ'+
+   '\n'+measurement.reason.join('\n')+
+   '\nНе внедрять, требуется настройка рига или точек хвата.');
+ });
+ selected();
+ setStatus('Выберите оригинальный .glb. Проверка не выдаёт фото, прототип или пустой манекен за готовую модель.');
+}catch(err){state.error=String(err);setStatus('ОШИБКА: '+err.message)}
+})();
+</script>
+</body></html>
