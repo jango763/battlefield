@@ -8,7 +8,7 @@ const directory=path.resolve(__dirname,'..');
 const app=fs.readFileSync(path.join(directory,'game.js'),'utf8');
 const html=fs.readFileSync(path.join(directory,'index.html'),'utf8');
 const rig=fs.readFileSync(path.join(directory,'weapon-rig.js'),'utf8');
-const skin=fs.readFileSync(path.join(directory,'british-skin.js'),'utf8');
+const skin=fs.readFileSync(path.join(directory,'british-soldier-original.js'),'utf8');
 const manifest=JSON.parse(fs.readFileSync(path.join(directory,'../assets/ww2-weapons/manifest.json'),'utf8'));
 const soldiers=[
  ['Kar98k','Lee-Enfield','uk-lee-enfield'],
@@ -72,18 +72,30 @@ assert.equal(WEAPONS.MP40.reloadSeconds,2.5);
 assert.equal(WEAPONS.MG42.reloadSeconds,7.5);
 assert.equal(WEAPONS.Panzerschreck.reloadSeconds,9);
 assert(html.includes('src="./british-faction.js"'));
-assert(html.includes('src="./british-skin.js"'));
+assert(html.includes('src="./british-soldier-original.js"'));
 assert(html.indexOf('british-faction.js')<html.indexOf('game.js'));
-assert(html.indexOf('british-skin.js')<html.indexOf('game.js'));
+assert(html.indexOf('british-soldier-original.js')<html.indexOf('game.js'));
 assert(app.includes("asset.instantiateModelsToScene("));
 assert(app.includes("const weaponAsset=(view,weapon)=>factions.asset(view.faction,weapon)"));
 assert(app.includes("if(view.faction==='british')"));
-assert(app.includes("const skin=britishSkin.apply({B,scene,view})"));
+assert(app.includes("const soldier=britishSoldier.create({B,scene,view})"));
 assert(app.includes("weaponAsset(view,wanted)"));
 assert(app.includes("weaponAsset(view,unit.weapon)"));
 assert(app.includes("weaponAsset(visual,weapon)"));
-assert(skin.includes("kit.setParent(chest)"));
-assert(skin.includes("recolouredMeshes"));
+// The imported German 3D body must be HIDDEN, not recoloured.
+assert(skin.includes('mesh.isVisible=false'),'German donor mesh must not render');
+assert(skin.includes('MeshBuilder.CreateCylinder'),
+ 'New British body geometry must be constructed');
+assert(skin.includes('new-british-face'),'A new face is mandatory');
+assert(skin.includes('waist-length-battledress-blouse'),'British blouse missing');
+assert(skin.includes('left-thigh-map-pocket'),'Distinctive British leg pocket missing');
+assert(skin.includes('british-side-cap-body'),'British field cap missing');
+assert(skin.includes('P37-basic-pouch'),'Pattern 37 kit missing');
+assert(skin.includes('britishOriginal:true'),'New geometry must be identifiable');
+assert(skin.includes("sourceRigBones:skel.bones.length"),
+ 'Exact same skeleton required for shared Run/Hold/Aim/Fire');
+assert(app.includes('view.britishSoldier.start()'),
+ 'British dynamic animation update must be active after IK');
 assert(rig.includes("proceduralPiat"));
 assert(rig.includes("await equip(initialWeaponId)"),
  'No German rifle should briefly appear on British initial spawn');
