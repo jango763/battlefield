@@ -13,7 +13,7 @@ const orders=window.BattlefieldFieldOrders;
 const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
 const factions=window.BattlefieldBritishFaction;
-const britishSkin=window.BattlefieldBritishSkin;
+const britishSoldier=window.BattlefieldBritishSoldier;
 const briefing=$('battlefield-brief'),enterButton=$('enter-game'),briefingProgress=$('brief-progress');
 const canvas=$('view');
 // Retry and menu work even if CDN scripts or the 3D model failed to load.
@@ -23,7 +23,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSkin||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -219,8 +219,8 @@ async function ensureUnits(scenarioName){
     name=>name,false,{doNotInstantiate:true});
   const view=unitVisual(i,entries);
   if(view.faction==='british'){
-   const skin=britishSkin.apply({B,scene,view});
-   if(!skin.applied)console.warn('British P37 preview unavailable',skin.reason);
+   const soldier=britishSoldier.create({B,scene,view});
+   if(!soldier.applied)throw Error('Original British mesh: '+soldier.reason);
   }
   // A shared skeleton or shared track would animate two actors at once.
   for(const prev of views.filter(Boolean)){
@@ -273,6 +273,9 @@ async function processWeaponQueue(){
     if(view.index===0)
      alertStatus('Боец загружен, но оружейный IK недоступен: '+view.weaponError);
    }
+   // British body follows the same Mixamo animations. Start observer after
+   // weapon IK so the new bare hands track its corrected wrist pose.
+   if(view.britishSoldier?.applied)view.britishSoldier.start();
    // Keep the UI responsive between expensive weapon imports on mobile.
    await new Promise(resolve=>requestAnimationFrame(resolve));
   }
