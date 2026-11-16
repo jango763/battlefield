@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/british-mirror-skin-v1-20261116
+      - feature/allied-four-models-hero-20261116
     paths:
       - 'babylon/**'
       - 'assets/ww2-weapons/**'
@@ -20,7 +21,9 @@ jobs:
           node --check babylon/game.js
           node --check babylon/weapon-rig.js
           node --check babylon/british-faction.js
-          node --check babylon/british-skin.js
+          node --check babylon/british-soldier-original.js
+          node --check babylon/allied-model-catalog.js
+          node babylon/tests/test-allied-casting.cjs
           node babylon/tests/test-british-mirror.cjs
           node babylon/tests/test-weapon-balance.cjs
           node babylon/tests/test-game-entry.cjs
