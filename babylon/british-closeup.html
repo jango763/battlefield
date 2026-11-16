@@ -34,11 +34,11 @@ button:disabled{opacity:.4}
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
 <script src="./weapon-rig.js"></script>
 <script src="./british-faction.js"></script>
-<script src="./british-skin.js"></script>
+<script src="./british-soldier-original.js"></script>
 </head>
 <body>
 <canvas id="canvas" aria-label="Британский солдат в 3D. Поворачивайте одним пальцем; приближайте двумя."></canvas>
-<header><h1>Battlefield · британский стрелок</h1><p>Крупный план · форма P37 · тот же скелет и движения, что у Вермахта</p></header>
+<header><h1>Battlefield · британский стрелок</h1><p>Новая британская модель · движения по утверждённому скелету</p></header>
 <section id="panel" aria-label="Оружие и позы">
 <h2>ОРУЖИЕ</h2>
 <div class="group" id="weapons">
@@ -62,16 +62,16 @@ button:disabled{opacity:.4}
 <button id="side">Сбоку</button>
 </div>
 <div id="status" role="status" aria-live="polite">Загрузка 3D-модели и анимаций…</div>
-<div id="foot">* PIAT — временный макет. Британский P37 — пока прототип поверх исходной немецкой модели, не окончательный скин.<br><a href="https://github.com/Kenton-GMI/muster-ww2" target="_blank" rel="noopener">Оружие: Muster WWII (MIT)</a></div>
+<div id="foot">* PIAT — временный макет. Британская фигура построена заново. Только скелет и анимации общие с немецкими. Визуальная приёмка впереди.<br><a href="https://github.com/Kenton-GMI/muster-ww2" target="_blank" rel="noopener">Оружие: Muster WWII (MIT)</a></div>
 </section>
-<div id="notice">Проверяйте форму и обе кисти с каждым оружием. Вращение — одним пальцем, приближение — двумя.</div>
+<div id="notice">Оригинальная британская 3D-геометрия: форма Battledress и фуражка. Вращение — одним пальцем, приближение — двумя.</div>
 <script>
 (async function(){
 'use strict';
 const $=id=>document.getElementById(id);
 const B=window.BABYLON;
 const faction=window.BattlefieldBritishFaction;
-const skin=window.BattlefieldBritishSkin;
+const skin=window.BattlefieldBritishSoldier;
 const state={ready:false,weapon:'Kar98k',pose:'Hold',close:false,error:null};
 window.__BRITISH_REVIEW__=state;
 let scene,camera,engine,root,imported,clip=null;
@@ -103,7 +103,7 @@ async function show(weapon,pose){
  state.setWeaponPose(poses[pose]);
  state.clip=key;
  status(faction.label('british',weapon)+' · '+({Hold:'держит',Aim:'целится',Fire:'стреляет',Run:'бежит'}[pose])+
-  '\nФорма: предварительный P37, '+state.skinParts+' деталей'+
+  '\nФорма: оригинальная британская геометрия, '+state.skinParts+' деталей'+
   '\nКисти: '+(state.weaponRig?.geometricPass?'IK геометрически согласован':'IK требует визуальной проверки'));
  if(state.close)frameCamera();
 }
@@ -152,14 +152,15 @@ try{
  root.position.set(-.5*(min.x+max.x)*factor,-min.y*factor,-.5*(min.z+max.z)*factor);
  root.computeWorldMatrix(true);
  const view={index:0,faction:'british',root,imported};
- const uniform=skin.apply({B,scene,view});
+ const uniform=skin.create({B,scene,view});
  if(!uniform.applied)throw Error('Британское обмундирование не закрепилось: '+uniform.reason);
- state.skinParts=uniform.parts;
+ state.skinParts=uniform.meshCount;
  await window.BattlefieldWeaponRig.create({
   scene,imported,root,state,animationDriven:true,bindUI:false,
   acceptExportSockets:true,initialWeaponId:'uk-lee-enfield',
   weaponRoot:'../assets/ww2-weapons/'
  });
+ uniform.start();
  state.ready=true;
  // Start with the already loaded British rifle, avoid briefly showing German rifle.
  const params=new URLSearchParams(location.search);
