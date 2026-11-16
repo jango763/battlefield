@@ -258,11 +258,12 @@ async function processWeaponQueue(){
     await window.BattlefieldWeaponRig.create({
      scene,imported:view.imported,root:view.root,state:rig,
      animationDriven:true,bindUI:false,acceptExportSockets:true,
+     initialWeaponId:weaponAsset(view,view.unit?.weapon||view.weapon),
      weaponRoot:'../assets/ww2-weapons/'
     });
     if(!rig.weaponRigReady)throw Error('Двухручный IK не подготовлен');
     const wanted=view.unit?.weapon||view.weapon;
-    if((wanted!=='Kar98k'||view.faction==='british')&&rig.equipWeapon)
+    if(rig.weaponRig?.weapon!==weaponAsset(view,wanted)&&rig.equipWeapon)
      await rig.equipWeapon(weaponAsset(view,wanted));
     view.weaponError=null;
    }catch(error){
