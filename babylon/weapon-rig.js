@@ -14,11 +14,19 @@
     triggerPalm: [-0.8, 0, -0.6],
     supportPalm: [0.8, 0, -0.6]
   };
+  // The two armies share the same Mixamo rig and sixteen animation clips.
+  // British weapon meshes are the licensed muster-ww2 GLBs already in /assets.
+  const PIAT = {
+    trigger:[0,-.155,-.15],support:[0,-.115,.11],
+    muzzle:[0,.055,.49],shoulder:[0,-.045,-.40],
+    triggerAxis:[0,.97,.24],supportAxis:[0,.92,.40],
+    triggerPalm:[-.8,0,-.6],supportPalm:[.8,0,-.6]
+  };
   const WEAPONS = [
-    ['de-kar98k', 'Kar98k'],
-    ['de-mp40', 'MP40'],
-    ['de-mg42', 'MG42'],
-    ['de-panzerschreck', 'Panzerschreck']
+    ['de-kar98k', 'Kar98k'], ['de-mp40', 'MP40'],
+    ['de-mg42', 'MG42'], ['de-panzerschreck', 'Panzerschreck'],
+    ['uk-lee-enfield', 'Lee-Enfield'], ['uk-sten', 'Sten'],
+    ['uk-bren', 'Bren'], ['uk-piat', 'PIAT']
   ];
   const v = a => new B.Vector3(a[0], a[1], a[2]);
   const canonical = n => String(n || '').replace(/^mixamorig[:_]?/i, '')
@@ -238,6 +246,42 @@
     box('rear shoulder pad', [.13, .06, .20], [0, -.098, -.48], wood);
     cylinder('front sight', .017, .035, [0, .083, .66], dark);
     return () => { for (const mesh of meshes) mesh.dispose(); for (const mat of mats) mat.dispose(); };
+  }
+  // PIAT is a spigot projector with an open front tray, NOT a rocket tube.
+  // First-party provisional mesh. Replace with a licensed optimized GLB later.
+  function proceduralPiat(scene,parent){
+    const meshes=[],mats=[];
+    const makeMat=(name,hex,metallic)=>{
+      const m=new B.PBRMaterial(name,scene);
+      m.albedoColor=B.Color3.FromHexString(hex);m.metallic=metallic;m.roughness=.73;
+      mats.push(m);return m;
+    };
+    const steel=makeMat('uk-piat-steel','#515b48',.55);
+    const dark=makeMat('uk-piat-dark','#252b25',.28);
+    const canvas=makeMat('uk-piat-pad','#615f4d',.03);
+    function put(mesh,xyz,material,rotation){
+      mesh.parent=parent;mesh.position.copyFrom(v(xyz));
+      if(rotation)mesh.rotation.copyFrom(v(rotation));
+      mesh.material=material;meshes.push(mesh);
+    }
+    const box=(n,size,at,mat,rot)=>put(B.MeshBuilder.CreateBox(n,{
+      width:size[0],height:size[1],depth:size[2]},scene),at,mat,rot);
+    const tube=(n,diam,len,at,mat)=>put(B.MeshBuilder.CreateCylinder(n,{
+      diameter:diam,height:len,tessellation:12},scene),at,mat,[Math.PI/2,0,0]);
+    tube('PIAT spring body',.125,.67,[0,0,-.075],steel);
+    tube('PIAT forward mortar spigot',.065,.29,[0,0,.40],dark);
+    box('PIAT open bomb tray',[.145,.034,.31],[0,-.055,.365],steel);
+    box('PIAT tray left wall',[.025,.075,.31],[-.067,-.011,.365],steel);
+    box('PIAT tray right wall',[.025,.075,.31],[.067,-.011,.365],steel);
+    box('PIAT shoulder stock',[.165,.125,.23],[0,-.040,-.40],steel);
+    box('PIAT rubber butt',[.17,.17,.040],[0,-.045,-.525],canvas);
+    box('PIAT trigger assembly',[.085,.095,.14],[0,-.122,-.16],dark);
+    box('PIAT grip',[.060,.155,.055],[0,-.204,-.16],canvas);
+    box('PIAT forward support',[.075,.095,.07],[0,-.145,.11],canvas);
+    box('PIAT folding monopod',[.022,.28,.022],[0,-.175,.38],steel);
+    box('PIAT rear sight',[.025,.070,.020],[0,.10,-.28],dark);
+    return ()=>{for(const mesh of meshes)mesh.dispose();
+      for(const mat of mats)mat.dispose();};
   }
   async function create({ scene, imported, root, state, animationDriven = false, bindUI = true,
     weaponRoot = '../assets/ww2-weapons/', acceptExportSockets = false }) {
@@ -517,7 +561,11 @@
       const recoil = firing ? .025 * Math.max(0, Math.sin(t * 18)) : 0;
       const bodyFrame=bodyFacingFrame();
       const chestQ=bodyFrame.q;
-      const angles = (weaponId === 'de-panzerschreck' ? {
+      const launcher=weaponId==='de-panzerschreck'||weaponId==='uk-piat';
+      const rifle=weaponId==='de-kar98k'||weaponId==='uk-lee-enfield';
+      const smg=weaponId==='de-mp40'||weaponId==='uk-sten';
+      const lmg=weaponId==='de-mg42'||weaponId==='uk-bren';
+      const angles = (launcher ? {
         // The rocket tube is shoulder-borne when aiming, lower while moving.
         ready: [-.16, -.04, -.01],
         aim: [.015, -.035, 0],
@@ -532,7 +580,7 @@
       // During mobile shooting, legs KEEP the Run clip. Only the upper-body
       // aim and recoil are adjusted; no gait or approved rifle grip changes.
       const runAndGun=state.combatPose?.active&&
-        (weaponId==='de-mp40'||weaponId==='de-mg42')&&
+        (smg||lmg)&&
         state.combatPose.stage==='runFire';
       const pulse=runAndGun
         ?B.Scalar.Clamp(Number(state.combatPose.recoilPulse)||0,0,1):0;
@@ -546,7 +594,7 @@
       // it is NOT held at shoulder-height as if firing while sprinting.
       // Right shoulder stays fixed relative to chest; the weapon is not attached
       // to a swinging wrist, avoiding a feedback loop for the left support hand.
-      const stockOffset = weaponId === 'de-panzerschreck'
+      const stockOffset = launcher
         ? (running ? new B.Vector3(.10,-.13,.10)
           : pose === 'ready' ? new B.Vector3(.075,-.095,.055)
           : new B.Vector3(.050,-.090,.035))
@@ -556,7 +604,7 @@
       // Use the world-space upper-arm shoulder joint as the anatomical anchor,
       // not the clavicle root: the old stockOffset put the butt in front of
       // the torso. Keep the butt fixed there through Hold/Aim/Fire/Run.
-      const kar98k=weaponId==='de-kar98k';
+      const kar98k=rifle;
       const rifleShoulderSocket=right.upper.getAbsolutePosition().add(rotated(
         new B.Vector3(.055,-.075,-.030),chestQ));
       const stock=kar98k?rifleShoulderSocket.clone():
@@ -582,7 +630,7 @@
       // Frame-keyed right-hand bolt operation is a temporary grip offset,
       // not an edit to the approved Kar98k master profile. The rifle stays
       // anchored to the right shoulder through all phases.
-      const bolt=weaponId==='de-kar98k'&&state.combatPose?.active
+      const bolt=rifle&&state.combatPose?.active
         ?B.Scalar.Clamp(Number(state.combatPose.boltProgress)||0,0,1):0;
       if(bolt>0){
         const keyed=[[0,0,0,0],[.12,.038,.045,-.012],
@@ -601,11 +649,11 @@
           master.rightOffsetY,master.rightOffsetZ),gunQ));
       // Aiming moves the left hand toward the receiver/launcher control,
       // preventing a fully locked support elbow while keeping the muzzle stable.
-      const supportPoint=weaponId==='de-kar98k'
+      const supportPoint=rifle
         ? (running?[0,.04,.015]
           : pose==='aim'||pose==='fire'?[0,.04,.055]:meta.support)
         : (pose==='aim'||pose==='fire')
-          ? (weaponId==='de-panzerschreck'?[0,-.135,-.09]:meta.support)
+          ? (launcher?[0,-.135,-.09]:meta.support)
           : meta.support;
       const support=pivot.position.add(rotated(v(supportPoint),gunQ));
       // Preview-only reload gesture. MP40: magazine; MG42: feed area;
@@ -613,17 +661,16 @@
       // This is a stand-in, NOT a fully rigged rocket/belt/magazine animation.
       const reloadActive=state.combatPose?.active&&
         state.combatPose.stage==='reload'&&
-        (weaponId==='de-mp40'||weaponId==='de-mg42'||
-         weaponId==='de-panzerschreck');
+        (smg||lmg||launcher);
       const reloadT=reloadActive
         ?B.Scalar.Clamp(Number(state.combatPose.reloadProgress)||0,0,1):0;
       let handShift=new B.Vector3(0,0,0);
       if(reloadActive){
-        const marks=weaponId==='de-mp40'
+        const marks=smg
           ?[[0,0,0,0],[.16,-.015,-.045,-.10],
             [.40,-.02,-.095,-.115],[.65,-.01,-.075,-.08],
             [.88,0,-.035,-.03],[1,0,0,0]]
-          :weaponId==='de-mg42'
+          :lmg
           ?[[0,0,0,0],[.12,-.015,.06,-.075],
             [.35,-.02,.10,-.07],[.67,-.035,.07,-.055],
             [.89,-.015,.045,-.025],[1,0,0,0]]
@@ -660,12 +707,12 @@
         const palmAim = support.subtract(leftFinger.scale(.045));
         const span = B.Vector3.Distance(shoulderPos, palmAim);
         const preferred = armLength *
-          (weaponId==='de-panzerschreck' ? .86 : .89); // flexed elbows without overreach
+          (launcher ? .86 : .89); // flexed elbows without overreach
         if (!kar98k && span > preferred && span > 1e-6) {
           // Never translate the Kar98k after the butt is seated: sliding
           // the entire rifle toward the left arm would detach its stock.
           const correction = shoulderPos.subtract(palmAim).scale((span - preferred) / span);
-          const maxOffset = weaponId==='de-panzerschreck' ? .20 : .18;
+          const maxOffset = launcher ? .20 : .18;
           // Moving a prop closer beats stretching or faking limb lengths.
           // Keep muzzle, trigger, and support targets rigidly tied to the prop.
           if (correction.lengthSquared() > maxOffset * maxOffset)
@@ -675,11 +722,11 @@
           trigger.addInPlace(correction);
           support.addInPlace(correction);
           report.weaponReachCorrectionMeters=+correction.length().toFixed(4);
-          if(weaponId==='de-panzerschreck')
+          if(launcher)
             report.rocketRepositionMeters=report.weaponReachCorrectionMeters;
         }
         report.weaponOriginalReachRatio=+(span / Math.max(armLength,.0001)).toFixed(3);
-        if(weaponId==='de-panzerschreck')
+        if(launcher)
           report.rocketOriginalReachRatio=report.weaponOriginalReachRatio;
       }
       // The former 6.5 cm wrist offset lifted the pistol hand ABOVE its grip,
@@ -769,7 +816,9 @@
       const entry = WEAPONS.find(x => x[0] === id);
       if (!entry) throw Error('Unknown weapon: ' + id);
       const token = ++generation;
-      const baseMeta = id === 'de-panzerschreck' ? ROCKET : manifest.weapons[id];
+      const isLauncher=id==='de-panzerschreck'||id==='uk-piat';
+      const baseMeta = id==='de-panzerschreck' ? ROCKET :
+        id==='uk-piat' ? PIAT : manifest.weapons[id];
       // MG42's original +0.505m grip exceeds this character's left-arm reach.
       // Weapon manifest grip axes describe the ARTIST'S barrel/grip features,
       // not the Mixamo palm/finger axes. Using MP40's [0,+.97,+.24] as the
@@ -778,17 +827,21 @@
       // (or rifle wrist), left fingers wrap ACROSS the handguard from below.
       const nextMeta = baseMeta && { ...baseMeta,
         support: id === 'de-kar98k' ? [0,.04,.14] :
+          id === 'uk-lee-enfield' ? [0,.04,.14] :
           id === 'de-mp40' ? [0,.027,.085] :
+          id === 'uk-sten' ? [0,.031,.11] :
           id === 'de-mg42' ? [0,.074,.115] :
-          [0,-.135,-.02],
-        triggerAxis: id === 'de-kar98k' ? [0,-.88,.48] : [0,-.96,.28],
+          id === 'uk-bren' ? [0,.054,.14] :
+          id==='uk-piat' ? PIAT.support : [0,-.135,-.02],
+        triggerAxis: ['de-kar98k','uk-lee-enfield'].includes(id) ?
+          [0,-.88,.48] : [0,-.96,.28],
         triggerPalm: [.90,.23,-.35],
         supportAxis: [-.85,.32,.42],
         supportPalm: [-.25,.75,.60]
       };
       if (!nextMeta) throw Error('Weapon manifest missing ' + id);
       let incoming = null;
-      if (id !== 'de-panzerschreck') {
+      if (!isLauncher) {
         incoming = await B.SceneLoader.LoadAssetContainerAsync(
           '', weaponRoot + nextMeta.file, scene);
       }
@@ -805,11 +858,14 @@
           if (!n.parent) n.parent = pivot;
         container = incoming;
       } else {
-        rocketDispose = proceduralRocket(scene, pivot);
+        rocketDispose = id==='uk-piat' ? proceduralPiat(scene,pivot) :
+          proceduralRocket(scene, pivot);
       }
       meta = nextMeta; weaponId = id; report.weapon = id;
       needsPose = true; report.error = null;
-      report.asset = incoming ? 'MIT original GLB' : 'procedural preview, not approved GLB';
+      report.asset = incoming ? 'MIT original GLB' :
+        id==='uk-piat' ? 'procedural PIAT prototype (no licensed GLB yet)' :
+        'procedural preview, not approved GLB';
       buttonState(); update();
       return report;
     }
