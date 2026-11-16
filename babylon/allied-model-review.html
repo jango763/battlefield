@@ -18,9 +18,14 @@ nav button[aria-pressed=true]{background:#d0dda5;color:#1e2c22}
 main{padding:0 10px 90px}
 #model-window{width:100%;height:min(60svh,650px);min-height:320px;background:#0b130e;border:1px solid #546552;border-radius:10px;overflow:hidden;display:grid;place-items:center}
 iframe{width:100%;height:100%;border:0}
-#fab-note{padding:15px;line-height:1.6;max-width:420px}
-#fab-note p{margin:8px 0}
-#fab-note strong{font-size:18px}
+#fab-gallery{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;padding:8px;gap:7px}
+#fab-main{display:block;width:100%;max-height:calc(100% - 75px);min-height:0;object-fit:contain;flex:1}
+#fab-main:focus{outline:2px solid #d1e9b0}
+#fab-thumbnails{display:flex;gap:5px;max-width:100%;overflow-x:auto;justify-content:center}
+#fab-thumbnails button{background:#29352e;border:2px solid #64745f;border-radius:6px;display:block;padding:2px;width:65px;height:53px;flex:none}
+#fab-thumbnails button[aria-pressed=true]{border-color:#cfdca4}
+#fab-thumbnails img{width:100%;height:100%;object-fit:cover;display:block;border-radius:3px}
+#fab-credit{font-size:11px;color:#d5e2cd;text-align:center}
 #details{margin:12px 0;background:#22332a;border:1px solid #536b57;border-radius:10px;padding:11px}
 #details h2{font-size:17px;margin:0 0 5px}
 #details p{margin:6px 0;font-size:13px;line-height:1.5}
@@ -52,7 +57,7 @@ a{color:#d1e9b0}
 <p id="status"></p>
 <p><a id="original" rel="noopener noreferrer" target="_blank">Открыть оригинал у автора</a></p>
 </section>
-<p id="foot">Sketchfab показывает оригинальную модель в собственном 3D-плеере. Fab открывается на официальной странице. В Battlefield геометрия ещё не подменена: сначала нужны оригинальные файлы, подтверждённая лицензия и перенос анимаций.</p>
+<p id="foot">Sketchfab показывает оригинальные модели через 3D-плеер. Для Fab представлены настоящие опубликованные изображения с официального media.fab.com — это галерея фотографий модели, не интерактивный 3D. В Battlefield геометрия ещё не импортирована.</p>
 </main>
 <script src="./allied-model-catalog.js"></script>
 <script>
@@ -60,6 +65,48 @@ a{color:#d1e9b0}
 'use strict';
 const catalog=window.BattlefieldAlliedModels;
 const $=id=>document.getElementById(id);
+const fabImages=[
+ 'https://media.fab.com/image_previews/listing_thumbnails/b5606835-9d12-42ec-952a-e2c0f03bd593/bffd50b6-b092-4477-aca6-4e8bd7fe9fb2.jpg',
+ 'https://media.fab.com/image_previews/gallery_images/e9287f8e-8f67-4b47-a6c5-cc65aff8f1b6/0b791fa8-4e50-417d-9d3e-81fe84833d29.jpg',
+ 'https://media.fab.com/image_previews/gallery_images/5cda84d7-461e-4f6b-8fcd-b8b9ef44486e/cf73302e-f5ce-479c-a5a8-73bf9ff041d3.jpg',
+ 'https://media.fab.com/image_previews/gallery_images/81be5f1e-0a98-4261-9633-bdca9e2bfbf1/958cc0ef-014a-4fba-a4e0-3d98f1c66779.jpg',
+ 'https://media.fab.com/image_previews/gallery_images/db5d04de-2fa6-44d7-9376-b75852489005/85fc05c2-6219-4041-affc-632900076b24.jpg'
+];
+function fabGallery(){
+ const container=document.createElement('div');
+ container.id='fab-gallery';
+ const image=document.createElement('img');
+ image.id='fab-main';
+ image.alt='Оригинальный WWII British Soldier на Fab — британский солдат в каске и форме';
+ image.loading='eager';
+ const thumbs=document.createElement('div');
+ thumbs.id='fab-thumbnails';
+ thumbs.setAttribute('aria-label','Выберите ракурс британского солдата');
+ function setPhoto(index){
+  image.src=fabImages[index];
+  image.onerror=()=>{image.alt='Изображение не загрузилось. Откройте оригинал на Fab.'};
+  [...thumbs.children].forEach((b,i)=>b.setAttribute('aria-pressed',String(i===index)));
+ }
+ fabImages.forEach((url,index)=>{
+  const button=document.createElement('button');
+  button.type='button';
+  button.setAttribute('aria-label','Ракурс '+(index+1));
+  button.setAttribute('aria-pressed',String(index===0));
+  const thumbnail=document.createElement('img');
+  thumbnail.src=url;
+  thumbnail.alt='';
+  thumbnail.loading='lazy';
+  button.append(thumbnail);
+  button.addEventListener('click',()=>setPhoto(index));
+  thumbs.append(button);
+ });
+ const credit=document.createElement('div');
+ credit.id='fab-credit';
+ credit.textContent='Оригинальные кадры с Fab · 5 ракурсов · не 3D-плеер';
+ container.append(image,thumbs,credit);
+ setPhoto(0);
+ return container;
+}
 function show(id){
  const m=catalog.byId(id);
  if(!m)return;
@@ -81,9 +128,9 @@ function show(id){
   iframe.src='https://sketchfab.com/models/'+m.sketchfabUid+'/embed?autostart=1&ui_theme=dark';
   win.append(iframe);
  }else{
-  const block=document.createElement('div');block.id='fab-note';
-  block.innerHTML='<strong>Fab · британский солдат</strong><p>Эта площадка не предоставляет доступного встроенного 3D-просмотра через нашу страницу. Откройте оригинал по ссылке ниже.</p>';
-  win.append(block);
+  // Fab does not expose an embedded 3D widget for this listing. Use actual
+  // publisher photos from Fab's official media CDN, not a made-up 3D render.
+  win.append(fabGallery());
  }
 }
 document.querySelectorAll('[data-id]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.id)));
