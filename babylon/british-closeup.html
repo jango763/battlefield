@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17211d">
+<title>Battlefield · британский солдат · крупный план</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#18211c;color:#f4f3e9;font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+#canvas{display:block;width:100%;height:100%;touch-action:none}
+header{position:fixed;top:calc(env(safe-area-inset-top) + 9px);left:13px;right:13px;pointer-events:none;text-shadow:0 2px 8px #000}
+h1{margin:0;font-size:18px}header p{margin:3px 0 0;font-size:12px;color:#d9e4d6}
+#panel{position:fixed;right:10px;top:calc(env(safe-area-inset-top) + 65px);width:min(345px,calc(100vw - 20px));padding:11px;background:#172820ed;border:1px solid #748574;border-radius:12px;box-shadow:0 6px 22px #0009}
+h2{font-size:12px;color:#d5ddc9;margin:9px 0 6px}
+.group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+button{color:#e9efe4;background:#354b3c;border:1px solid #788c73;border-radius:8px;font:650 12px system-ui;padding:10px 5px;cursor:pointer;touch-action:manipulation}
+button[aria-pressed=true]{background:#d5e0aa;color:#243327;border-color:#f4f4df}
+button:disabled{opacity:.4}
+#notice{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom) + 9px);margin:auto;max-width:600px;padding:9px;border-radius:8px;border:1px solid #667765;background:#23362be8;text-align:center;font-size:12px;line-height:1.45}
+#status{font-size:11px;color:#e7e2c1;line-height:1.45;margin-top:10px;white-space:pre-line}
+#foot{font-size:10px;color:#abb8a9;margin-top:10px}
+#foot a{color:#e8dca5}
+@media(max-width:680px){
+ h1{font-size:16px}
+ #panel{top:auto;left:7px;right:7px;bottom:calc(env(safe-area-inset-bottom) + 55px);width:auto;padding:8px 10px}
+ .group{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+ button{font-size:11px;padding:9px 3px;min-height:42px}
+ #foot{display:none}h2{margin:6px 0 5px}
+ #notice{font-size:10px;padding:5px}
+}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./weapon-rig.js"></script>
+<script src="./british-faction.js"></script>
+<script src="./british-skin.js"></script>
+</head>
+<body>
+<canvas id="canvas" aria-label="Британский солдат в 3D. Поворачивайте одним пальцем; приближайте двумя."></canvas>
+<header><h1>Battlefield · британский стрелок</h1><p>Крупный план · форма P37 · тот же скелет и движения, что у Вермахта</p></header>
+<section id="panel" aria-label="Оружие и позы">
+<h2>ОРУЖИЕ</h2>
+<div class="group" id="weapons">
+<button data-weapon="Kar98k" aria-pressed="true">Lee-Enfield</button>
+<button data-weapon="MP40" aria-pressed="false">Sten</button>
+<button data-weapon="MG42" aria-pressed="false">Bren</button>
+<button data-weapon="Panzerschreck" aria-pressed="false">PIAT*</button>
+</div>
+<h2>ПОЗА</h2>
+<div class="group" id="poses">
+<button data-pose="Hold" aria-pressed="true">Держит</button>
+<button data-pose="Aim" aria-pressed="false">Прицел</button>
+<button data-pose="Fire" aria-pressed="false">Стреляет</button>
+<button data-pose="Run" aria-pressed="false">Бежит</button>
+</div>
+<h2>РАКУРС</h2>
+<div class="group">
+<button id="body" aria-pressed="true">Весь боец</button>
+<button id="hands" aria-pressed="false">Кисти крупно</button>
+<button id="front">Спереди</button>
+<button id="side">Сбоку</button>
+</div>
+<div id="status" role="status" aria-live="polite">Загрузка 3D-модели и анимаций…</div>
+<div id="foot">* PIAT — временный макет. Британский P37 — пока прототип поверх исходной немецкой модели, не окончательный скин.<br><a href="https://github.com/Kenton-GMI/muster-ww2" target="_blank" rel="noopener">Оружие: Muster WWII (MIT)</a></div>
+</section>
+<div id="notice">Проверяйте форму и обе кисти с каждым оружием. Вращение — одним пальцем, приближение — двумя.</div>
+<script>
+(async function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const B=window.BABYLON;
+const faction=window.BattlefieldBritishFaction;
+const skin=window.BattlefieldBritishSkin;
+const state={ready:false,weapon:'Kar98k',pose:'Hold',close:false,error:null};
+window.__BRITISH_REVIEW__=state;
+let scene,camera,engine,root,imported,clip=null;
+const poses={Hold:'ready',Aim:'aim',Fire:'fire',Run:'run'};
+function status(message){$('status').textContent=message}
+function showButtons(){
+ document.querySelectorAll('[data-weapon]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.weapon===state.weapon)));
+ document.querySelectorAll('[data-pose]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.pose===state.pose)));
+}
+function frameCamera(){
+ if(!camera)return;
+ const focus=state.close&&Array.isArray(state.weaponRig?.handFocus)
+  ?new B.Vector3(...state.weaponRig.handFocus):new B.Vector3(0,.98,0);
+ camera.setTarget(focus);
+ camera.radius=state.close?1.12:3.05;
+ $('body').setAttribute('aria-pressed',String(!state.close));
+ $('hands').setAttribute('aria-pressed',String(state.close));
+}
+async function show(weapon,pose){
+ if(!state.ready)return;
+ state.weapon=weapon;state.pose=pose;showButtons();
+ const key=weapon+'_'+pose;
+ const next=imported.animationGroups.find(x=>x.name===key);
+ if(!next)throw Error('Отсутствует немецкая эталонная анимация '+key);
+ if(clip)clip.stop();
+ for(const group of imported.animationGroups)if(group.isPlaying)group.stop();
+ clip=next;next.start(pose!=='Fire',1,next.from,next.to,false);
+ await state.equipWeapon(faction.asset('british',weapon));
+ state.setWeaponPose(poses[pose]);
+ state.clip=key;
+ status(faction.label('british',weapon)+' · '+({Hold:'держит',Aim:'целится',Fire:'стреляет',Run:'бежит'}[pose])+
+  '\nФорма: предварительный P37, '+state.skinParts+' деталей'+
+  '\nКисти: '+(state.weaponRig?.geometricPass?'IK геометрически согласован':'IK требует визуальной проверки'));
+ if(state.close)frameCamera();
+}
+function failure(error){
+ state.error=String(error?.stack||error);
+ console.error('British soldier preview',error);
+ status('Ошибка 3D: '+String(error?.message||error));
+}
+try{
+ if(!B?.SceneLoader||!faction||!skin||!window.BattlefieldWeaponRig)
+  throw Error('Не загрузился Babylon.js или один из модулей 3D');
+ const canvas=$('canvas');
+ engine=new B.Engine(canvas,true,{stencil:true,powerPreference:'high-performance'});
+ engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.8));
+ scene=new B.Scene(engine);scene.useRightHandedSystem=true;
+ scene.clearColor=new B.Color4(.105,.14,.12,1);
+ scene.ambientColor=new B.Color3(.3,.34,.30);
+ camera=new B.ArcRotateCamera('camera',Math.PI*.23,Math.PI*.43,3.05,new B.Vector3(0,.98,0),scene);
+ camera.lowerRadiusLimit=.75;camera.upperRadiusLimit=6;
+ camera.pinchDeltaPercentage=.018;camera.wheelDeltaPercentage=.015;
+ camera.attachControl(canvas,true);
+ const hemi=new B.HemisphericLight('ambient',new B.Vector3(0,1,0),scene);hemi.intensity=1.42;
+ const front=new B.DirectionalLight('key',new B.Vector3(-.6,-1,-.7),scene);front.intensity=1.75;
+ front.diffuse=new B.Color3(1,.92,.81);
+ const rim=new B.DirectionalLight('rim',new B.Vector3(.6,-.25,.7),scene);rim.intensity=.75;
+ engine.runRenderLoop(()=>scene.render());
+ window.addEventListener('resize',()=>engine.resize());
+ // EXACT same 65-bone animated combat asset as in the 12v12 game.
+ imported=await B.SceneLoader.ImportMeshAsync('','./animstudio-preview/models/','all-combat-run.glb',scene);
+ if(!imported.animationGroups||imported.animationGroups.length<16)
+  throw Error('Не удалось загрузить утверждённые 16 клипов');
+ const drawable=imported.meshes.filter(m=>m.getTotalVertices?.()>0);
+ const min=new B.Vector3(Infinity,Infinity,Infinity);
+ const max=new B.Vector3(-Infinity,-Infinity,-Infinity);
+ for(const m of drawable){
+  m.computeWorldMatrix(true);
+  const bb=m.getBoundingInfo().boundingBox;
+  min.minimizeInPlace(bb.minimumWorld);max.maximizeInPlace(bb.maximumWorld);
+ }
+ const h=max.y-min.y;
+ if(!(h>.01))throw Error('Некорректная 3D-модель');
+ root=new B.TransformNode('approved-british-review-display',scene);
+ for(const m of imported.meshes)if(!m.parent)m.parent=root;
+ for(const n of imported.transformNodes)if(!n.parent)n.parent=root;
+ const factor=1.8/h;root.scaling.setAll(factor);
+ root.position.set(-.5*(min.x+max.x)*factor,-min.y*factor,-.5*(min.z+max.z)*factor);
+ root.computeWorldMatrix(true);
+ const view={index:0,faction:'british',root,imported};
+ const uniform=skin.apply({B,scene,view});
+ if(!uniform.applied)throw Error('Британское обмундирование не закрепилось: '+uniform.reason);
+ state.skinParts=uniform.parts;
+ await window.BattlefieldWeaponRig.create({
+  scene,imported,root,state,animationDriven:true,bindUI:false,
+  acceptExportSockets:true,initialWeaponId:'uk-lee-enfield',
+  weaponRoot:'../assets/ww2-weapons/'
+ });
+ state.ready=true;
+ // Start with the already loaded British rifle, avoid briefly showing German rifle.
+ const params=new URLSearchParams(location.search);
+ const wanted={LeeEnfield:'Kar98k',Sten:'MP40',Bren:'MG42',PIAT:'Panzerschreck'};
+ const initial=Object.hasOwn(wanted,params.get('weapon'))?wanted[params.get('weapon')]:'Kar98k';
+ const p=['Hold','Aim','Fire','Run'].includes(params.get('pose'))?params.get('pose'):'Hold';
+ await show(initial,p);
+ document.querySelectorAll('[data-weapon]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.weapon,state.pose).catch(failure)));
+ document.querySelectorAll('[data-pose]').forEach(b=>b.addEventListener('click',()=>show(state.weapon,b.dataset.pose).catch(failure)));
+ $('body').addEventListener('click',()=>{state.close=false;frameCamera()});
+ $('hands').addEventListener('click',()=>{state.close=true;frameCamera()});
+ $('front').addEventListener('click',()=>{camera.alpha=0;frameCamera()});
+ $('side').addEventListener('click',()=>{camera.alpha=Math.PI/2;frameCamera()});
+}catch(error){failure(error)}
+})();
+</script>
+</body></html>
