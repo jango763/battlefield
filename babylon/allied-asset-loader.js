@@ -200,6 +200,11 @@
    const current=inspect(entries,{maxTriangles:manifest.models[id].maxTriangles});
    if(!current.ok){entries.dispose?.();const err=Error(current.issues.join('; '));
     errors.set(id,err.message);throw err;}
+   // The newly rigged US model ships four provisional inspection clips.
+   // Do not let those sample clips fight the approved 16 gameplay clips.
+   const previewGroups=[...(entries.animationGroups||[])];
+   for(const group of previewGroups){group.stop?.();group.dispose?.();}
+   entries.animationGroups=[];
    // Reparent clone roots once. No duplicate body/skeleton to produce four hands.
    const root=new B.TransformNode('real-allied-'+id+'-'+tag,scene);
    for(const node of entries.rootNodes){
