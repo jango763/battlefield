@@ -1,0 +1,48 @@
+name: Compact authored gait samples for offline mobile preview
+on:
+  push:
+    branches:
+      - feature/american-quaternius-baked-preview-20261116
+    paths: ['.github/workflows/slim-us-quaternius.yml']
+  workflow_dispatch:
+permissions: {contents: write}
+jobs:
+  compact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Curate offline quaternion frames from original 43-clip source
+        run: |
+          python3 - <<'PY'
+          import json,zlib,base64,struct,pathlib
+          p=pathlib.Path('babylon/assets/quaternius/hero-motion-pack.json')
+          d=json.loads(p.read_text())
+          wanted=['pelvis','spine_01','spine_02','spine_03','neck_01','Head',
+            'clavicle_l','upperarm_l','lowerarm_l','hand_l','clavicle_r',
+            'upperarm_r','lowerarm_r','hand_r','thigh_l','calf_l','foot_l',
+            'thigh_r','calf_r','foot_r']
+          keep=[d['joints'].index(x) for x in wanted]
+          out={'version':1,'fps':9,'joints':wanted,'sourceSha256':d['sourceSha256'],
+            'clips':{}}
+          for name,rec in d['clips'].items():
+            raw=zlib.decompress(base64.b64decode(rec['packed']))
+            stride=len(d['joints'])*8
+            indices=list(range(0,rec['frames']-1,2))+[rec['frames']-1]
+            result=b''.join(raw[frame*stride+joint*8:frame*stride+joint*8+8]
+              for frame in indices for joint in keep)
+            packed=base64.b64encode(zlib.compress(result,9)).decode()
+            out['clips'][name]={'frames':len(indices),'duration':rec['duration'],
+              'packed':packed,'bytes':len(result)}
+          dest=pathlib.Path('babylon/assets/quaternius/hero-motion-offline.json')
+          dest.write_text(json.dumps(out,separators=(',',':'))+'\n')
+          print('Verified offline source-derived motions',dest.stat().st_size)
+          PY
+      - name: Commit compact data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add babylon/assets/quaternius/hero-motion-offline.json
+          if ! git diff --cached --quiet; then
+            git commit -m "assets(babylon): four offline Quaternius hero motions"
+            git push
+          fi
