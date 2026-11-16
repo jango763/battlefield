@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const {WEAPONS,hitChance}=require('../combat-balance-core.js');
+const {WEAPONS,hitChance,createBattle}=require('../combat-balance-core.js');
 const factions=require('../british-faction.js');
 const directory=path.resolve(__dirname,'..');
 const app=fs.readFileSync(path.join(directory,'game.js'),'utf8');
@@ -31,6 +31,30 @@ for(const [gameplay,display,asset] of soldiers){
   assert(fs.existsSync(path.join(directory,'../assets/ww2-weapons/',manifest.weapons[asset].file)));
  }
  assert(rig.includes("'"+asset+"'"),asset+' not registered in IK');
+}
+// Two independently simulated army units fire under identical conditions.
+ // Matching gameplay IDs mean parity is executable, not just a design claim.
+function firstShot(team,combatClass){
+ const battle=createBattle({funds:2000,random:()=>.4,prices:{
+  MP40:{weapon:100,magazine:15},MG42:{weapon:240,magazine:40},
+  Panzerschreck:{weapon:350,magazine:70}
+ }});
+ const unit=battle.addUnit({id:'attacker',team,x:0,z:0,hp:1000});
+ const target=battle.addUnit({id:'defender',team:team==='A'?'B':'A',
+  x:20,z:0,hp:1000});
+ if(combatClass!=='Kar98k')
+  assert(battle.buyWeapon(unit,combatClass,{atBase:true}).ok);
+ const before=battle.totalAmmo(unit);
+ const shot=battle.fire(unit,target,{
+  moving:combatClass==='MP40'||combatClass==='MG42'
+ });
+ return {weapon:unit.weapon,before,after:battle.totalAmmo(unit),hit:shot.hit,
+  result:shot.ok,damage:shot.hits?.map(x=>x.damage),hp:target.hp,
+  reload:WEAPONS[combatClass].reloadSeconds};
+}
+for(const [gameplay] of soldiers){
+ assert.deepEqual(firstShot('A',gameplay),firstShot('B',gameplay),
+  gameplay+' must have identical British and Wehrmacht outcomes');
 }
 for(let i=0;i<24;i++){
  assert.equal(factions.sideForSlot(i),i<12?'british':'wehrmacht');
@@ -61,6 +85,8 @@ assert(app.includes("weaponAsset(visual,weapon)"));
 assert(skin.includes("kit.setParent(chest)"));
 assert(skin.includes("recolouredMeshes"));
 assert(rig.includes("proceduralPiat"));
+assert(rig.includes("await equip(initialWeaponId)"),
+ 'No German rifle should briefly appear on British initial spawn');
 assert(!app.includes("CLIP_IDS=Object.keys(factions.BRITISH)"),
  'Do not multiply clips or import unapproved animations');
 console.log('BATTLEFIELD_BRITISH_MIRROR_TESTS_PASS');
