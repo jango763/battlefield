@@ -12,6 +12,8 @@ const presentation=window.BattlefieldCombatPresentation;
 const orders=window.BattlefieldFieldOrders;
 const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
+const factions=window.BattlefieldBritishFaction;
+const britishSkin=window.BattlefieldBritishSkin;
 const briefing=$('battlefield-brief'),enterButton=$('enter-game'),briefingProgress=$('brief-progress');
 const canvas=$('view');
 // Retry and menu work even if CDN scripts or the 3D model failed to load.
@@ -21,7 +23,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSkin||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -32,6 +34,9 @@ if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!wi
 }
 const META={Kar98k:'de-kar98k',MP40:'de-mp40',MG42:'de-mg42',
  Panzerschreck:'de-panzerschreck'};
+// Preserve existing gameplay weapon IDs for identical damage, ammo and motion.
+const weaponAsset=(view,weapon)=>factions.asset(view.faction,weapon);
+const britishLabel=weapon=>factions.label('british',weapon);
 const PRICES={MP40:{weapon:100,magazine:15},MG42:{weapon:240,magazine:40},
  Panzerschreck:{weapon:350,magazine:70}};
 const UNIT_SCALE=1,BASE_X=-150,BASE_Z=-150;
@@ -185,7 +190,7 @@ function unitVisual(index,entries){
  hpMat.emissiveColor=color(index<12?'#8bdaa0':'#e78f6b');
  hpMat.disableLighting=true;hpFill.material=hpMat;hpFill.isPickable=false;
  for(const mesh of drawable)mesh.metadata={...(mesh.metadata||{}),squadSlot:index};
- return {index,anchor,root,entries,clips,imported:{
+ return {index,faction:factions.sideForSlot(index),anchor,root,entries,clips,imported:{
   meshes,transformNodes:transforms,skeletons:entries.skeletons
  },unit:null,rig:null,clip:null,weapon:'Kar98k',lastPose:null,
   inactive:true,marker,hpBack,hpFill,healthMaterial:hpMat,
@@ -213,6 +218,10 @@ async function ensureUnits(scenarioName){
   const entries=asset.instantiateModelsToScene(
     name=>name,false,{doNotInstantiate:true});
   const view=unitVisual(i,entries);
+  if(view.faction==='british'){
+   const skin=britishSkin.apply({B,scene,view});
+   if(!skin.applied)console.warn('British P37 preview unavailable',skin.reason);
+  }
   // A shared skeleton or shared track would animate two actors at once.
   for(const prev of views.filter(Boolean)){
    if(prev.imported.skeletons[0]===view.imported.skeletons[0])
@@ -253,8 +262,8 @@ async function processWeaponQueue(){
     });
     if(!rig.weaponRigReady)throw Error('Двухручный IK не подготовлен');
     const wanted=view.unit?.weapon||view.weapon;
-    if(wanted!=='Kar98k'&&rig.equipWeapon)
-     await rig.equipWeapon(META[wanted]);
+    if((wanted!=='Kar98k'||view.faction==='british')&&rig.equipWeapon)
+     await rig.equipWeapon(weaponAsset(view,wanted));
     view.weaponError=null;
    }catch(error){
     // The animated approved soldier stays visible and game logic works.
@@ -429,7 +438,7 @@ function drawShot({unit,target,result}){
  if(unit===findActor()){
   const hit=result.hits.length?result.hits.map(h=>h.id+' −'+h.damage+' HP').join(', '):
    'промах';
-  alertStatus(result.weapon+': '+hit+(result.lethal?' · СМЕРТЕЛЬНЫЙ ВЫСТРЕЛ':''));
+  alertStatus(britishLabel(result.weapon)+': '+hit+(result.lethal?' · СМЕРТЕЛЬНЫЙ ВЫСТРЕЛ':''));
  }
 }
 function syncVisual(view){
@@ -462,7 +471,7 @@ function syncVisual(view){
   view.weapon=unit.weapon;
   view.lastPose=null; // Force matching animation after fallback.
   if(view.rig?.equipWeapon){
-   view.rig.equipWeapon(META[unit.weapon]).catch(error=>{
+   view.rig.equipWeapon(weaponAsset(view,unit.weapon)).catch(error=>{
     view.weaponError=String(error);
     alertStatus('Оружие не загрузилось: '+error);
    });
@@ -500,7 +509,7 @@ function drawHud(){
  $('readout').textContent=
   'Бой: '+(snap.active?'ИДЁТ':snap.done?'ЗАВЕРШЁН':'ОЖИДАНИЕ')+
   ' · британцы '+snap.alliesAlive+'/'+allies.length+' · Вермахт '+snap.enemiesAlive+'/'+enemies.length+
-  '\nГерой: '+Math.round(hero.hp)+'/100 HP · оружие: '+hero.weapon+
+  '\nГерой: '+Math.round(hero.hp)+'/100 HP · оружие: '+britishLabel(hero.weapon)+
   (inventory?' · '+inventory.loaded+'+'+inventory.reserve+' патр.':' · ∞ патронов')+
   (hero.reloadRemaining>0?'\nПерезарядка: '+hero.reloadRemaining.toFixed(1)+' c':'')+
   '\nБританцы 🔵: '+funds+' · Вермахт 🔴: '+(econ?.treasury.red??'—')+
@@ -538,14 +547,14 @@ async function chooseGun(weapon){
  if(visual){
   visual.weapon=weapon;
   if(visual.rig?.equipWeapon){
-   await visual.rig.equipWeapon(META[weapon]).catch(e=>{
+   await visual.rig.equipWeapon(weaponAsset(visual,weapon)).catch(e=>{
     visual.weaponError=String(e);alertStatus('Ошибка модели оружия: '+e);
    });
   }
   const snapshot=presentation.describe(hero);
   setClip(visual,snapshot.pose);
  }
- alertStatus('Боец вооружён: '+weapon+' · БК '+(battle.totalAmmo(hero,weapon)||'∞'));
+ alertStatus('Боец вооружён: '+britishLabel(weapon)+' · БК '+(battle.totalAmmo(hero,weapon)||'∞'));
  drawHud();
 }
 function resupplyHero(){
@@ -560,7 +569,7 @@ function resupplyHero(){
    throw Error('Несоответствие игровой казны расходам на БК');
   lastEconomyBlue=economy.treasury.blue;
  }
- alertStatus('Пополнение '+last+': +'+result.added+' за '+result.cost+' монет.');
+ alertStatus('Пополнение '+britishLabel(last)+': +'+result.added+' за '+result.cost+' монет.');
  drawHud();
 }
 function registerUI(){
