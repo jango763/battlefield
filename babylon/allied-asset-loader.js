@@ -54,7 +54,7 @@
   // Licensed character GLBs sometimes ship with a rifle glued into the mesh.
   // Hide only separately named prop meshes. A merged body+gun must be fixed
   // manually in Blender; guessing could erase the character itself.
-  const pattern=/(?:^|[\\s._-])(rifle|weapon|smg|lmg|gun|carbine|sten|bren|lee[\\s._-]?enfield|pistol|kar98k)(?:$|[\\s._-])/i;
+  const pattern=/(?:^|[\s._-])(rifle|weapon|smg|lmg|gun|carbine|sten|bren|lee[\s._-]?enfield|pistol|kar98k)(?:$|[\s._-])/i;
   const disabled=[];
   for(const mesh of entries?.meshes||[]){
    if(!mesh.getTotalVertices?.()||!pattern.test(mesh.name||''))continue;
