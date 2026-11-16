@@ -112,6 +112,9 @@
     const names=nodeMapFor(g,rig);
     if(names.size<18)
      throw Error('Too few mapped animated joints for '+id+': '+names.size);
+    const sourceHips=(g.targetedAnimations||[]).find(t=>
+      normalize(t.target?.name)==='hips')?.target?.name;
+    if(!sourceHips)throw Error('Source Hips node not animated: '+id);
     const converted=avatar.retargetAnimationGroup(g,{
      animationGroupName:'allied-'+tag+'-'+id,
      mapNodeNames:names,
@@ -120,11 +123,17 @@
      fixGroundReference:false,
      fixAnimations:true,
      checkHierarchy:false,
-     rootNodeName:'Hips'
+     rootNodeName:sourceHips
     });
-    if((converted?.targetedAnimations?.length||0)<18){
+    const targets=(converted?.targetedAnimations||[])
+      .map(t=>normalize(t.target?.name));
+    const critical=['hips','leftarm','leftforearm','lefthand',
+      'rightarm','rightforearm','righthand',
+      'leftupleg','leftleg','leftfoot','rightupleg','rightleg','rightfoot'];
+    const missing=critical.filter(n=>!targets.includes(n));
+    if(targets.length<18||missing.length){
      converted?.dispose?.();
-     throw Error('Retargeted animation has too few tracks: '+id);
+     throw Error('Retargeted clip '+id+' has missing limbs: '+missing.join(', '));
     }
     converted.stop();
     result.push(converted);
