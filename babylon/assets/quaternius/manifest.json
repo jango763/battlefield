@@ -5,6 +5,9 @@
   "filename": "universal-animation-library.glb",
   "bytes": 2714756,
   "sha256": "4c748767741a3e495d89667b9a218b690ba9810b9517a12e960780e3ca72c4e9",
+  "meshCount": 1,
+  "skinnedCount": 1,
+  "nodeCount": 67,
   "animationCount": 43,
   "animations": [
     "A_TPose",
