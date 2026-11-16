@@ -15,6 +15,7 @@ const worldBuilder=window.BattlefieldWorld300;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
 const alliedModels=window.BattlefieldAlliedModels;
+const alliedLoader=window.BattlefieldAlliedAssetLoader;
 const briefing=$('battlefield-brief'),enterButton=$('enter-game'),briefingProgress=$('brief-progress');
 const canvas=$('view');
 // Retry and menu work even if CDN scripts or the 3D model failed to load.
@@ -24,7 +25,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!alliedModels||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!alliedModels||!alliedLoader||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -45,9 +46,11 @@ const SCENARIOS={duel:[1,1],assault:[1,4],squads:[12,12]};
 const CLIP_POSES={ready:'Hold',aim:'Aim',fire:'Fire',run:'Run'};
 const CLIP_IDS=Object.keys(META).flatMap(w=>Object.values(CLIP_POSES).map(p=>w+'_'+p));
 const state={ready:false, loading:true, error:null, models:0, clips:0,
- scenario:'squads',atBase:true,selected:'Kar98k',focus:null, fps:0};
+ scenario:'squads',atBase:true,selected:'Kar98k',focus:null, fps:0,
+ importedAlliedCount:0,modelErrors:{},alliedManifest:null};
 window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
+let modelDepot=null;
 let actors=new Map(),fx=[],scenario='squads',atBase=true,world=null;
 let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 let weaponQueue=[],weaponWorker=false;
@@ -140,7 +143,7 @@ function createWorld(){
  engine.runRenderLoop(frame);
  window.addEventListener('resize',()=>engine.resize());
 }
-function unitVisual(index,entries){
+function unitVisual(index,entries,{externalModel=null}={}){
  const anchor=new B.TransformNode('soldier-anchor-'+index,scene);
  const root=new B.TransformNode('approved-animated-rig-'+index,scene);
  root.parent=anchor;
@@ -150,7 +153,7 @@ function unitVisual(index,entries){
  const meshes=unique.filter(n=>n instanceof B.AbstractMesh);
  const transforms=unique.filter(n=>n instanceof B.TransformNode);
  const drawable=meshes.filter(m=>m.getTotalVertices?.()>0);
- if(drawable.length<4||!entries.skeletons.some(s=>s.bones.length>=60))
+ if(drawable.length<4||!entries.skeletons.some(s=>s.bones.length>=(externalModel?40:60)))
   throw Error('У отряда '+(index+1)+' не обнаружена утверждённая 65-костная модель');
  for(const node of entries.rootNodes)if(!node.parent)node.parent=root;
  const min=new B.Vector3(Infinity,Infinity,Infinity);
@@ -193,7 +196,8 @@ function unitVisual(index,entries){
  for(const mesh of drawable)mesh.metadata={...(mesh.metadata||{}),squadSlot:index};
  return {index,faction:factions.sideForSlot(index),
   chosenAlliedModel:index<12?alliedModels.forBlueSlot(index).id:null,
-  importedAlliedModel:false, // The original licensed mesh has not been downloaded.
+  importedAlliedModel:!!externalModel,
+  importedAlliedName:externalModel?.modelId||null,
   anchor,root,entries,clips,imported:{
   meshes,transformNodes:transforms,skeletons:entries.skeletons
  },unit:null,rig:null,clip:null,weapon:'Kar98k',lastPose:null,
@@ -214,18 +218,43 @@ async function ensureUnits(scenarioName){
   if(asset.animationGroups.length<16)
    throw Error('В GLB отсутствуют 16 согласованных боевых анимаций');
  }
+ if(!modelDepot){
+  modelDepot=alliedLoader.create({B,scene,catalog:alliedModels,
+   sourceGroups:asset.animationGroups});
+  try{
+   state.alliedManifest=await modelDepot.init();
+  }catch(error){
+   state.modelErrors.manifest=String(error?.message||error);
+   // Missing manifest does not make 12v12 unplayable; no false model import.
+   console.warn('Allied GLB manifest unavailable; source models not installed',error);
+   modelDepot=null;
+  }
+ }
  for(const i of slots){
   if(views[i])continue;
   $('loading').textContent='Загружаю бойцов: '+state.models+'/'+slots.length+
    ' · создание №'+(i+1);
   // Preserve exact Mixamo joint names in clone-local hierarchies for IK.
-  const entries=asset.instantiateModelsToScene(
-    name=>name,false,{doNotInstantiate:true});
-  const view=unitVisual(i,entries);
-  if(view.faction==='british'){
-   const soldier=britishSoldier.create({B,scene,view});
-   if(!soldier.applied)throw Error('Original British mesh: '+soldier.reason);
+  let externalModel=null;
+  if(i<12&&modelDepot){
+   const casting=alliedModels.forBlueSlot(i);
+   try{
+    externalModel=await modelDepot.instantiate(casting.id,i);
+   }catch(error){
+    state.modelErrors[casting.id]=String(error?.message||error);
+    console.error('Allied licensed model rejected',casting.id,error);
+   }
   }
+  // No invented download: if the original licensed file is missing, only
+  // the explicitly labelled pre-existing prototype is available.
+  const entries=externalModel?.entries||asset.instantiateModelsToScene(
+   name=>name,false,{doNotInstantiate:true});
+  const view=unitVisual(i,entries,{externalModel});
+  if(view.faction==='british'&&!externalModel){
+   const soldier=britishSoldier.create({B,scene,view});
+   if(!soldier.applied)throw Error('Temporary British prototype: '+soldier.reason);
+  }
+  if(externalModel)state.importedAlliedCount++;
   // A shared skeleton or shared track would animate two actors at once.
   for(const prev of views.filter(Boolean)){
    if(prev.imported.skeletons[0]===view.imported.skeletons[0])
@@ -243,7 +272,10 @@ async function ensureUnits(scenarioName){
   views[i]=view;state.models++;state.clips+=16;
   weaponQueue.push(view);
   const unit=i<12?allies[i]:enemies[i-12];
-  if(state.ready&&unit){assignView(view,unit);actors.set(unit,view);}
+  if(state.ready&&unit){
+   unit.characterModelImported=!!externalModel;
+   assignView(view,unit);actors.set(unit,view);
+  }
   // Allow browser to paint loading progress on mobile between clones.
   await new Promise(resolve=>requestAnimationFrame(resolve));
  }
@@ -262,6 +294,7 @@ async function processWeaponQueue(){
     await window.BattlefieldWeaponRig.create({
      scene,imported:view.imported,root:view.root,state:rig,
      animationDriven:true,bindUI:false,acceptExportSockets:true,
+     allowRetargetedSkeleton:view.importedAlliedModel,
      initialWeaponId:weaponAsset(view,view.unit?.weapon||view.weapon),
      weaponRoot:'../assets/ww2-weapons/'
     });
@@ -270,6 +303,15 @@ async function processWeaponQueue(){
     if(rig.weaponRig?.weapon!==weaponAsset(view,wanted)&&rig.equipWeapon)
      await rig.equipWeapon(weaponAsset(view,wanted));
     view.weaponError=null;
+    if(view.importedAlliedModel){
+     // Sample after the IK render observer has run. A numerical PASS does
+     // not replace the final close-up visual acceptance on iPhone.
+     const assessment=modelDepot.gripAssessment(rig.weaponRig,
+      weaponAsset(view,wanted));
+     view.gripStatus=assessment;
+     if(!assessment.ok)console.warn('Allied hand sockets pending QA',
+      view.importedAlliedName,assessment.reason);
+    }
    }catch(error){
     // The animated approved soldier stays visible and game logic works.
     view.weaponError=String(error?.message||error);
@@ -523,7 +565,7 @@ function drawHud(){
  $('readout').textContent=
   'Бой: '+(snap.active?'ИДЁТ':snap.done?'ЗАВЕРШЁН':'ОЖИДАНИЕ')+
   ' · британцы '+snap.alliesAlive+'/'+allies.length+' · Вермахт '+snap.enemiesAlive+'/'+enemies.length+
-  '\nГерой 🇺🇸 (модель ожидает импорта): '+Math.round(hero.hp)+'/100 HP · оружие: '+britishLabel(hero.weapon)+
+  '\nГерой 🇺🇸 ('+(hero.characterModelImported?'модель загружена':'3D-файл ещё не получен')+'): '+Math.round(hero.hp)+'/100 HP · оружие: '+britishLabel(hero.weapon)+
   (inventory?' · '+inventory.loaded+'+'+inventory.reserve+' патр.':' · ∞ патронов')+
   (hero.reloadRemaining>0?'\nПерезарядка: '+hero.reloadRemaining.toFixed(1)+' c':'')+
   '\nБританцы 🔵: '+funds+' · Вермахт 🔴: '+(econ?.treasury.red??'—')+
@@ -532,6 +574,7 @@ function drawHud(){
   (paid?'\nЗапас: '+paid:'')+
   '\nСтрой: '+(fieldOrders?.snapshot().mode==='semicircle'?'боевой полукруг':'черепаха')+
   '\nВыстрелы героя: '+hero.shots+' · поражено: '+hero.kills+
+  '\nОригинальных моделей установлено: '+state.importedAlliedCount+'/12'+
   '\nFPS: '+Math.round(engine.getFps())+
   (snap.focus?'\nПриоритетная цель: '+snap.focus:'');
  const duration=combat.WEAPONS[hero.reloadWeapon]?.reloadSeconds||0;
