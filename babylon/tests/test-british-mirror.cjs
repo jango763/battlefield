@@ -77,7 +77,8 @@ assert(html.indexOf('british-faction.js')<html.indexOf('game.js'));
 assert(html.indexOf('british-soldier-original.js')<html.indexOf('game.js'));
 assert(app.includes("asset.instantiateModelsToScene("));
 assert(app.includes("const weaponAsset=(view,weapon)=>factions.asset(view.faction,weapon)"));
-assert(app.includes("if(view.faction==='british')"));
+assert(app.includes("if(view.faction==='british'&&!externalModel)"),
+ 'Old prototype may only be a temporary fallback while original GLB is unavailable');
 assert(app.includes("const soldier=britishSoldier.create({B,scene,view})"));
 assert(app.includes("weaponAsset(view,wanted)"));
 assert(app.includes("weaponAsset(view,unit.weapon)"));
