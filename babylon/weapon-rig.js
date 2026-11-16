@@ -285,7 +285,7 @@
   }
   async function create({ scene, imported, root, state, animationDriven = false, bindUI = true,
     weaponRoot = '../assets/ww2-weapons/', acceptExportSockets = false,
-    initialWeaponId = 'de-kar98k' }) {
+    initialWeaponId = 'de-kar98k', allowRetargetedSkeleton = false }) {
     const skeleton = imported.skeletons[0];
     const linked = (skeleton?.bones || []).map(b => b.getTransformNode?.()).filter(Boolean);
     const nodes = [...imported.transformNodes, ...imported.meshes, ...linked];
@@ -368,9 +368,17 @@
     };
     if (!hips || !neck || !chest || Object.values(right).some(x => !x) || Object.values(left).some(x => !x))
       throw Error('Panzergrenadier: linked arm joints not found; model remains unmodified.');
-    if (!skeleton || (skeleton.bones.length !== 65 &&
-      !(acceptExportSockets && skeleton.bones.length >= 65 && skeleton.bones.length <= 72)))
-      throw Error('Unexpected soldier skeleton; refusing to retarget');
+    // Existing German approval keeps its strict 65-bone invariant.
+    // Licensed external rigs pass ONLY after the Allied loader validates
+    // actual named shoulders, hands, elbows, feet and skinned geometry.
+    const bones=skeleton?.bones?.length||0;
+    const approvedGerman=bones===65||
+      (acceptExportSockets&&bones>=65&&bones<=72);
+    const checkedExternal=allowRetargetedSkeleton&&bones>=40&&bones<=140;
+    if(!approvedGerman&&!checkedExternal)
+      throw Error('Unexpected character skeleton; refusing blind IK retarget');
+    if(allowRetargetedSkeleton&&!linked.length)
+      throw Error('External rig has no linked glTF joint TransformNodes');
 
     // Pose reset is imperative until approved locomotion clips exist for this GLB.
     const fingerRoots = {};
