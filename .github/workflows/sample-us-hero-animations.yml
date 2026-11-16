@@ -1,0 +1,35 @@
+name: Bake source Quaternius motion sample for American hero
+on:
+  push:
+    branches:
+      - feature/american-quaternius-baked-preview-20261116
+    paths:
+      - 'babylon/tools/extract-hero-quaternius-motion.py'
+      - '.github/workflows/sample-us-hero-animations.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 babylon/tools/extract-hero-quaternius-motion.py
+      - name: Ensure original CC0 motion is sampled
+        run: |
+          python3 - <<'PY'
+          import json
+          x=json.load(open('babylon/assets/quaternius/hero-motion-pack.json'))
+          assert len(x['clips'])==4
+          assert all(v['frames']>=8 for v in x['clips'].values())
+          print({k:(v['frames'],v['duration']) for k,v in x['clips'].items()})
+          PY
+      - name: Commit source-derived world-motion samples
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add babylon/assets/quaternius/hero-motion-pack.json
+          if ! git diff --cached --quiet; then
+            git commit -m "assets(quaternius): actual four-movement quaternion samples for American hero"
+            git push
+          fi
