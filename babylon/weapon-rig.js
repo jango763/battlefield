@@ -284,7 +284,8 @@
       for(const mat of mats)mat.dispose();};
   }
   async function create({ scene, imported, root, state, animationDriven = false, bindUI = true,
-    weaponRoot = '../assets/ww2-weapons/', acceptExportSockets = false }) {
+    weaponRoot = '../assets/ww2-weapons/', acceptExportSockets = false,
+    initialWeaponId = 'de-kar98k' }) {
     const skeleton = imported.skeletons[0];
     const linked = (skeleton?.bones || []).map(b => b.getTransformNode?.()).filter(Boolean);
     const nodes = [...imported.transformNodes, ...imported.meshes, ...linked];
@@ -877,7 +878,7 @@
       for (const el of document.querySelectorAll('[data-pose]'))
         el.addEventListener('click', () => setPose(el.dataset.pose));
     }
-    await equip('de-kar98k');
+    await equip(initialWeaponId);
     state.masterPoseEnabled=gripStudio;
     state.setMasterPose=(patch)=>{
       if(!gripStudio)throw Error('Master-pose editor is not enabled');
