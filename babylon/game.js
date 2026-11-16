@@ -14,6 +14,7 @@ const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
+const alliedModels=window.BattlefieldAlliedModels;
 const briefing=$('battlefield-brief'),enterButton=$('enter-game'),briefingProgress=$('brief-progress');
 const canvas=$('view');
 // Retry and menu work even if CDN scripts or the 3D model failed to load.
@@ -23,7 +24,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!alliedModels||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -190,7 +191,10 @@ function unitVisual(index,entries){
  hpMat.emissiveColor=color(index<12?'#8bdaa0':'#e78f6b');
  hpMat.disableLighting=true;hpFill.material=hpMat;hpFill.isPickable=false;
  for(const mesh of drawable)mesh.metadata={...(mesh.metadata||{}),squadSlot:index};
- return {index,faction:factions.sideForSlot(index),anchor,root,entries,clips,imported:{
+ return {index,faction:factions.sideForSlot(index),
+  chosenAlliedModel:index<12?alliedModels.forBlueSlot(index).id:null,
+  importedAlliedModel:false, // The original licensed mesh has not been downloaded.
+  anchor,root,entries,clips,imported:{
   meshes,transformNodes:transforms,skeletons:entries.skeletons
  },unit:null,rig:null,clip:null,weapon:'Kar98k',lastPose:null,
   inactive:true,marker,hpBack,hpFill,healthMaterial:hpMat,
@@ -371,7 +375,13 @@ function setup(scenarioName){
   id:i===0?'hero':'британец-'+(i+1),team:'свои',...alliesXY[i]}));
  for(let i=0;i<theirs;i++)enemies.push(battle.addUnit({
   id:'вермахт-'+(i+1),team:'враг',...enemiesXY[i]}));
- for(const u of allies){u.economyTeam='blue';u.isHero=u===allies[0];u.spawn={x:u.x,z:u.z};}
+ for(const [i,u] of allies.entries()){
+  u.economyTeam='blue';u.isHero=i===0;
+  // Selected casting, not a claim that original asset has been imported.
+  u.characterModel=alliedModels.forBlueSlot(i).id;
+  u.characterModelImported=false;
+  u.spawn={x:u.x,z:u.z};
+ }
  for(const u of enemies){u.economyTeam='red';u.spawn={x:u.x,z:u.z};}
  fieldOrders=orders.create({hero:allies[0],allies,enemies,onArrive:()=>{
   if(destinationMark)destinationMark.isVisible=false;
@@ -513,7 +523,7 @@ function drawHud(){
  $('readout').textContent=
   'Бой: '+(snap.active?'ИДЁТ':snap.done?'ЗАВЕРШЁН':'ОЖИДАНИЕ')+
   ' · британцы '+snap.alliesAlive+'/'+allies.length+' · Вермахт '+snap.enemiesAlive+'/'+enemies.length+
-  '\nГерой: '+Math.round(hero.hp)+'/100 HP · оружие: '+britishLabel(hero.weapon)+
+  '\nГерой 🇺🇸 (модель ожидает импорта): '+Math.round(hero.hp)+'/100 HP · оружие: '+britishLabel(hero.weapon)+
   (inventory?' · '+inventory.loaded+'+'+inventory.reserve+' патр.':' · ∞ патронов')+
   (hero.reloadRemaining>0?'\nПерезарядка: '+hero.reloadRemaining.toFixed(1)+' c':'')+
   '\nБританцы 🔵: '+funds+' · Вермахт 🔴: '+(econ?.treasury.red??'—')+
