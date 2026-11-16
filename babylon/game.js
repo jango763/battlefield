@@ -421,7 +421,7 @@ function setup(scenarioName){
   u.economyTeam='blue';u.isHero=i===0;
   // Selected casting, not a claim that original asset has been imported.
   u.characterModel=alliedModels.forBlueSlot(i).id;
-  u.characterModelImported=false;
+  u.characterModelImported=!!views[i]?.importedAlliedModel;
   u.spawn={x:u.x,z:u.z};
  }
  for(const u of enemies){u.economyTeam='red';u.spawn={x:u.x,z:u.z};}
@@ -436,7 +436,10 @@ function setup(scenarioName){
  });
  actors=new Map();
  for(let i=0;i<12;i++){
-  if(views[i])assignView(views[i],allies[i]||null);
+  if(views[i]){
+   assignView(views[i],allies[i]||null);
+   if(allies[i])allies[i].characterModelImported=views[i].importedAlliedModel;
+  }
   if(views[i]&&allies[i])actors.set(allies[i],views[i]);
  }
  for(let i=0;i<12;i++){
