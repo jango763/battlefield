@@ -14,6 +14,7 @@ const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
+const nativeBlend=window.BattlefieldNativeClipBlend;
 const alliedModels=window.BattlefieldAlliedModels;
 const alliedLoader=window.BattlefieldAlliedAssetLoader;
 const briefing=$('battlefield-brief'),enterButton=$('enter-game'),briefingProgress=$('brief-progress');
@@ -25,7 +26,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!alliedModels||!alliedLoader||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!alliedModels||!alliedLoader||!nativeBlend||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -350,23 +351,17 @@ async function chooseScenario(name){
  }
 }
 function stopAnimations(view){
- if(view.clip){view.clip.stop();view.clip=null;}
- for(const group of view.clips.values())if(group.isPlaying)group.stop();
- view.lastPose=null;
+ nativeBlend.stop(view);
 }
 function setClip(view,pose){
  const id=view.weapon+'_'+CLIP_POSES[pose];
  const target=view.clips.get(id);
  if(!target){
-  view.weaponError='Нет анимации '+id;
+  view.weaponError='Нет готовой анимации '+id;
   throw Error(view.weaponError);
  }
- if(view.clip===target)return;
- if(view.clip)view.clip.stop();
- target.start(pose!=='fire',1,target.from,target.to,false);
- view.clip=target;view.animationChanges++;
- view.lastPose=pose;
- view.rig?.setWeaponPose?.(pose);
+ const didChange=nativeBlend.play(view,target,pose,{loop:pose!=='fire'});
+ if(didChange)view.rig?.setWeaponPose?.(pose);
 }
 function assignView(view,unit){
  view.unit=unit;view.inactive=!unit;
@@ -712,7 +707,10 @@ function frame(){
     lastEconomyBlue=economy.treasury.blue;
    }
   }
-  for(const view of views)if(view?.unit)syncVisual(view);
+  for(const view of views)if(view?.unit){
+   syncVisual(view);
+   nativeBlend.update(view,dt);
+  }
   // Follow the controlled hero with the existing touch-orbit camera.
   if(allies[0]?.alive&&camera){
    const dest=position(allies[0],.75);
