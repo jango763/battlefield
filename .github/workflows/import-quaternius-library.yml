@@ -1,0 +1,56 @@
+name: Import genuine CC0 Quaternius animations
+on:
+  push:
+    branches: [feature/babylon-native-clip-blending-20261116]
+    paths: ['.github/workflows/import-quaternius-library.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import-cc0-animation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Download real Quaternius animation GLB from its public CC0 mirror
+        run: |
+          set -euo pipefail
+          mkdir -p babylon/assets/quaternius
+          curl --fail --location --retry 3 --silent --show-error \
+            "https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/universal-animation-library.glb" \
+            -o babylon/assets/quaternius/universal-animation-library.glb
+          curl --fail --location --silent --show-error \
+            "https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/LICENSE-ANIMATIONS.txt" \
+            -o babylon/assets/quaternius/LICENSE.txt
+      - name: Inspect actual GLB and write clip names
+        run: |
+          python3 - <<'PY'
+          import json,struct,pathlib,hashlib
+          file=pathlib.Path("babylon/assets/quaternius/universal-animation-library.glb")
+          raw=file.read_bytes()
+          assert len(raw)>100000 and raw[:4]==b'glTF', 'Invalid/missing source GLB'
+          jlen,jtype=struct.unpack_from('<II',raw,12)
+          assert jtype==0x4e4f534a
+          doc=json.loads(raw[20:20+jlen])
+          names=[a.get('name',f'clip_{i}') for i,a in enumerate(doc.get('animations',[]))]
+          assert len(names)>=10, f'Unexpected Quaternius source with {len(names)} animations'
+          info={'source':'Seyamalam/blood-league-kickoff public CC0 Quaternius mirror',
+            'original':'https://quaternius.itch.io/universal-animation-library',
+            'license':'CC0-1.0','filename':file.name,
+            'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),
+            'animationCount':len(names),'animations':names,
+            'joints':[n.get('name','') for n in doc.get('nodes',[]) if 'name' in n][:120]}
+          pathlib.Path('babylon/assets/quaternius/manifest.json').write_text(json.dumps(info,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+          print('REAL_QUATERNIUS_IMPORT_OK',len(raw),len(names))
+          print('CLIP_NAMES:',names[:70])
+          PY
+      - name: Commit only CC0 files to experimental branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add babylon/assets/quaternius/
+          if ! git diff --cached --quiet; then
+            git commit -m "assets(babylon): import real Quaternius CC0 animations and verified clip manifest"
+            git push
+          fi
