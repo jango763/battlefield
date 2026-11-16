@@ -37,17 +37,31 @@
   const tris=drawable.reduce((total,m)=>total+
    (m.getTotalIndices?.()>0?Math.ceil(m.getTotalIndices()/3):Math.ceil(m.getTotalVertices()/3)),0);
   const mapped=skeletons.map(s=>byCanonical(s.bones));
-  const chosen=mapped.find(map=>REQUIRED.every(name=>map.has(normalize(name))));
+  // Linked glTF nodes are mandatory for the existing two-hand IK driver.
+  const chosen=mapped.find(map=>REQUIRED.every(name=>map.get(normalize(name))?.node));
   const missing=chosen?[]:REQUIRED.filter(name=>!mapped.some(map=>map.has(normalize(name))));
   const issues=[];
   if(!drawable.length)issues.push('Модель не содержит видимой геометрии');
   if(!skinned.length)issues.push('Модель не привязана к скелету — требуется skinning в Blender');
   if(!skeletons.length)issues.push('Нет скелета');
-  if(!chosen)issues.push('Отсутствуют обязательные кости: '+missing.join(', '));
+  if(!chosen)issues.push('Отсутствуют обязательные linked-кости рук/ног или glTF joints');
   if(tris>maxTriangles)issues.push('Слишком тяжёлая модель: '+tris+' треугольников; предел '+maxTriangles);
   return {ok:issues.length===0,issues,
    triangles:tris,meshCount:drawable.length,skinnedMeshes:skinned.length,
    bones:chosen?.size||skeletons[0]?.bones?.length||0,rig:chosen||null};
+ }
+ function hideEmbeddedWeapons(entries){
+  // Licensed character GLBs sometimes ship with a rifle glued into the mesh.
+  // Hide only separately named prop meshes. A merged body+gun must be fixed
+  // manually in Blender; guessing could erase the character itself.
+  const pattern=/(?:^|[\\s._-])(rifle|weapon|smg|lmg|gun|carbine|sten|bren|lee[\\s._-]?enfield|pistol|kar98k)(?:$|[\\s._-])/i;
+  const disabled=[];
+  for(const mesh of entries?.meshes||[]){
+   if(!mesh.getTotalVertices?.()||!pattern.test(mesh.name||''))continue;
+   if(mesh.skeleton)continue; // A skinned prop may share a mesh with the body.
+   mesh.setEnabled?.(false);mesh.isVisible=false;disabled.push(mesh.name);
+  }
+  return disabled;
  }
  function validateManifest(manifest,catalog){
   if(manifest?.schemaVersion!==1)throw Error('Wrong Allied asset manifest schema');
@@ -188,12 +202,13 @@
    catch(e){root.dispose(false,false);entries.dispose?.();
     errors.set(id,String(e?.message||e));throw e;}
    entries.animationGroups=animationGroups;
-   return {entries,modelId:id,rig:current,retargeted:animationGroups.length};
+   const hiddenWeapons=hideEmbeddedWeapons(entries);
+   return {entries,modelId:id,rig:current,retargeted:animationGroups.length,hiddenWeapons};
   }
   return Object.freeze({init,status,ensureAsset,instantiate,gripAssessment:
    (report,id)=>gripAssessment(report,id,manifest?.gripQA||{
     rightMaxMeters:.06,leftMaxMeters:.06,stockMaxMeters:.15})});
  }
- return Object.freeze({REQUIRED,CLIPS,normalize,inspect,
+ return Object.freeze({REQUIRED,CLIPS,normalize,inspect,hideEmbeddedWeapons,
   validateManifest,sourceClips,retarget,gripAssessment,create});
 });
