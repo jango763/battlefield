@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "note": "External licensed model files not included. Set installed:true only after original GLB is acquired, optimized and license verified; runtime still checks skeleton and grip.",
+  "models": {
+    "americanHero": {
+      "file": "us-hero.glb",
+      "installed": false,
+      "rightsCleared": true,
+      "optimized": false,
+      "maxTriangles": 65000,
+      "origin": "Sketchfab CC BY — attribution mandatory"
+    },
+    "britishDanoob": {
+      "file": "uk-danoob.glb",
+      "installed": false,
+      "rightsCleared": false,
+      "optimized": false,
+      "maxTriangles": 65000,
+      "origin": "Sketchfab license unverified"
+    },
+    "britishJakeli": {
+      "file": "uk-jakeli.glb",
+      "installed": false,
+      "rightsCleared": false,
+      "optimized": false,
+      "maxTriangles": 65000,
+      "origin": "Sketchfab license unverified"
+    },
+    "britishFab": {
+      "file": "uk-fab-optimized.glb",
+      "installed": false,
+      "rightsCleared": false,
+      "optimized": false,
+      "maxTriangles": 65000,
+      "origin": "Fab license check and reduction from 118k triangles required"
+    }
+  },
+  "gripQA": {
+    "rightMaxMeters": 0.06,
+    "leftMaxMeters": 0.06,
+    "stockMaxMeters": 0.15,
+    "frames": 5
+  }
+}
