@@ -26,7 +26,7 @@ assert.equal(roster.MODELS.americanHero.licenseVerified,true);
 assert.equal(roster.MODELS.britishFab.licenseVerified,false);
 assert.throws(()=>roster.forBlueSlot(12));
 assert(game.includes('u.characterModel=alliedModels.forBlueSlot(i).id'));
-assert(game.includes('u.characterModelImported=false'));
+assert(game.includes('u.characterModelImported=!!views[i]?.importedAlliedModel'));
 assert(game.includes("view.faction==='british'"));
 assert(html.includes('src="./allied-model-catalog.js"'));
 assert(html.indexOf('src="./allied-model-catalog.js"')<html.indexOf('src="./game.js"'));
@@ -34,4 +34,20 @@ assert(html.includes('allied-model-review.html'));
 assert(preview.includes('https://sketchfab.com/models/'));
 assert(preview.includes("show('americanHero')"));
 assert(preview.includes('Открыть оригинал у автора'));
+const loader=require('../allied-asset-loader.js');
+const manifest=JSON.parse(fs.readFileSync(path.resolve(__dirname,
+ '../../assets/allied-soldiers/manifest.json'),'utf8'));
+assert(loader.validateManifest(manifest,roster));
+assert.deepEqual(loader.CLIPS.length,16);
+assert.equal(Object.values(manifest.models).filter(r=>r.installed).length,0,
+ 'Never report external GLBs installed before they exist');
+assert(game.includes('modelDepot.instantiate(casting.id,i)'),
+ 'Real selected character must flow into game scene');
+assert(game.includes('unitVisual(i,entries,{externalModel})'),
+ 'Source model must drive actual soldier meshes');
+assert(html.includes('src="./allied-asset-loader.js"'));
+const lab=fs.readFileSync(path.resolve(__dirname,'../allied-ik-lab.html'),'utf8');
+assert(lab.includes('type="file"'),'GLB browser upload lab missing');
+assert(lab.includes('loader.gripAssessment'),'Live arm/grip QA missing');
+assert(lab.includes('loader.retarget'),'No Babylon animation retarget workflow');
 console.log('ALLIED_4_CASTING_BLUE_TEAM_12_SLOT_PASS');
