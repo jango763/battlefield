@@ -96,10 +96,14 @@ try{
    diagnosticTime=0;
    const w=qa.weaponRig;
    const fmt=v=>Number.isFinite(v)?Math.round(v*100)+" см":"?";
-   $("ik").textContent="2 кисти · хват: правая "+fmt(w.rightGripMeters)+
+   $("ik").textContent="Хват: правая "+fmt(w.rightGripMeters)+
      " · левая "+fmt(w.leftGripMeters)+
      " · приклад: "+fmt(w.stockToShoulderMeters)+
-     " · спуск от груди: "+fmt(w.triggerDistanceFromChestMeters)+
+     " | направление пальцев: правая "+
+     (Number.isFinite(w.rightFingerErrorDegrees)?Math.round(w.rightFingerErrorDegrees)+"°":"?")+
+     ", левая "+
+     (Number.isFinite(w.leftFingerErrorDegrees)?Math.round(w.leftFingerErrorDegrees)+"°":"?")+
+     " · визуальная приёмка не пройдена"+
      (w.error?" | Ошибка: "+w.error:"");
   }
   if(sampled>.7){qa.framesPerSecond=Math.round(engine.getFps());sampled=0;}
@@ -245,8 +249,9 @@ async function loadHeroFile(file,fromCache=false){
 $("file").addEventListener("change",e=>{void loadHeroFile(e.target.files?.[0],false);});
 void (async()=>{
  const saved=await readSavedHero();
- if(saved){await loadHeroFile(saved,true);return;}
- $("prompt").textContent="Выбери GLB один раз — Safari сохранит его для следующих открытий.";
+ if(saved){await loadHeroFile(saved,true);if(qa.ready)return;}
+ // Always permit a fresh file selection if stored data is obsolete or Safari rejected it.
+ $("prompt").textContent="Герой не найден в сохранённых данных Safari. Выбери GLB один раз.";
  $("load-label").textContent="Выбрать GLB героя";
  say("Модель ещё не сохранена в этом браузере. После первого выбора попробую открывать её автоматически.");
 })();
