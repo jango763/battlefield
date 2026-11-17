@@ -1,0 +1,307 @@
+/* Battlefield · Stage 4 · US hero Lee-Enfield grip.
+ * Rifle pose derived from Ara 3D Gen MIT src/core/anim/clips/shooter.ts:
+ * READY and AIM pole, finger-direction, palm-target conventions.
+ * This is a new adaptation to the user's existing 65-bone glTF skeleton,
+ * not a verbatim import of animation keys or a modification of the German rig.
+ * MIT copyright (c) 2026 Joshua Olatunde and Ara 3D Gen contributors.
+ */
+(function(root,factory){
+  const api=factory();
+  if(root)root.BattlefieldUSLeeEnfieldStage4=api;
+  if(typeof module==="object"&&module.exports)module.exports=api;
+})(typeof window!=="undefined"?window:null,function(){
+"use strict";
+const CANON=n=>String(n||"").replace(/^mixamorig[:_]?/i,"").replace(/[^a-z0-9]/gi,"").toLowerCase();
+const ARMS=new Set(["leftshoulder","leftarm","leftforearm","lefthand",
+                    "rightshoulder","rightarm","rightforearm","righthand"]);
+const DONOR={
+ ready:{
+  right:{dir:[.10,-.75,.65],palm:[1,0,0],pole:[-1,-.6,-.4]},
+  left:{dir:[-.35,.05,.93],palm:[0,1,0],pole:[.6,-1,0]}
+ },
+ aim:{
+  right:{dir:[.10,-.55,.83],palm:[1,0,0],pole:[-1,-.9,-.2]},
+  left:{dir:[-.35,.20,.91],palm:[0,1,0],pole:[.4,-1,0]}
+ }
+};
+function stripArmTracks(groups){
+ let count=0;
+ for(const g of groups||[]){
+  for(let i=(g.targetedAnimations||[]).length-1;i>=0;i--){
+   if(ARMS.has(CANON(g.targetedAnimations[i]?.target?.name))){
+    g.targetedAnimations.splice(i,1);count++;
+   }
+  }
+ }
+ return count;
+}
+async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}){
+ const B=window.BABYLON;
+ if(!B?.SceneLoader||!stage||!scene)throw Error("Babylon.js / scene missing");
+ if(imported?.skeletons?.length!==1||imported.skeletons[0].bones.length!==65)
+  throw Error("Expected original American 65-bone skeleton");
+ const bones=imported.skeletons[0].bones;
+ const byName=new Map();
+ for(const b of bones){
+  const node=b.getTransformNode?.();
+  if(node){const key=CANON(node.name);
+   if(byName.has(key))throw Error("Duplicate glTF joint "+key);
+   byName.set(key,node);
+  }
+ }
+ const find=name=>{
+  const n=byName.get(CANON(name));
+  if(!n)throw Error("No original joint "+name);
+  return n;
+ };
+ const limbs={};
+ for(const side of ["right","left"]){
+  const p=side==="right"?"Right":"Left";
+  limbs[side]={
+   shoulder:find(p+"Shoulder"),
+   upper:find(p+"Arm"),
+   fore:find(p+"ForeArm"),
+   hand:find(p+"Hand"),
+   socket:find("Weapon_"+p[0]),
+   index:find(p+"HandIndex1"),
+   middle:find(p+"HandMiddle1"),
+   pinky:find(p+"HandPinky1"),
+   thumb:find(p+"HandThumb2")
+  };
+ }
+ const chest=find("Spine2"),neck=find("Neck"),hips=find("Hips");
+ const fingerNames=[...byName.keys()].filter(k=>/^(right|left)hand(index|middle|ring|pinky|thumb)[123]$/.test(k));
+ const joints=[...new Set([...Object.values(limbs).flatMap(a=>[a.shoulder,a.upper,a.fore,a.hand]),...fingerNames.map(n=>byName.get(n))])];
+ const rest=new Map(joints.map(n=>{
+  if(!n.rotationQuaternion)n.rotationQuaternion=B.Quaternion.FromEulerAngles(n.rotation.x,n.rotation.y,n.rotation.z);
+  return [n,n.rotationQuaternion.clone()];
+ }));
+ const v=(x,y,z)=>new B.Vector3(x,y,z);
+ const arr=a=>v(...a);
+ function refresh(n){
+  const parents=[];for(let z=n;z;z=z.parent)parents.unshift(z);
+  for(const z of parents)z.computeWorldMatrix(true);
+ }
+ function worldRot(n){
+  refresh(n);const q=B.Quaternion.Identity();
+  n.getWorldMatrix().decompose(undefined,q,undefined);
+  return q.normalize();
+ }
+ function rotate(x,q){
+  const m=B.Matrix.Identity();
+  B.Matrix.FromQuaternionToRef(q,m);
+  return B.Vector3.TransformNormal(x,m);
+ }
+ function basis(forward,palm){
+  const z=forward.clone().normalize();
+  const x=palm.subtract(z.scale(B.Vector3.Dot(palm,z))).normalize();
+  const y=B.Vector3.Cross(z,x).normalize();
+  const m=B.Matrix.Identity();
+  B.Matrix.FromXYZAxesToRef(x,y,z,m);
+  return B.Quaternion.FromRotationMatrix(m).normalize();
+ }
+ function setWorldRot(node,q){
+  const parentQ=node.parent?worldRot(node.parent):B.Quaternion.Identity();
+  node.rotationQuaternion=parentQ.conjugate().multiply(q).normalize();
+  refresh(node);
+ }
+ function qFromTo(a,b){
+  if(a.lengthSquared()<1e-10||b.lengthSquared()<1e-10)return B.Quaternion.Identity();
+  const u=a.normalize(),w=b.normalize(),d=B.Scalar.Clamp(B.Vector3.Dot(u,w),-1,1);
+  if(d>.999999)return B.Quaternion.Identity();
+  if(d<-.99999){
+   let axis=B.Vector3.Cross(u,B.Axis.X);
+   if(axis.lengthSquared()<1e-5)axis=B.Vector3.Cross(u,B.Axis.Y);
+   return B.Quaternion.RotationAxis(axis.normalize(),Math.PI);
+  }
+  const axis=B.Vector3.Cross(u,w).normalize();
+  return B.Quaternion.RotationAxis(axis,Math.acos(d));
+ }
+ function setBoneToward(node,end,target){
+  refresh(end);refresh(node);
+  const a=node.getAbsolutePosition();
+  const from=end.getAbsolutePosition().subtract(a);
+  const to=target.subtract(a);
+  const delta=qFromTo(from,to);
+  setWorldRot(node,delta.multiply(worldRot(node)).normalize());
+ }
+ function solveLimb(arm,wristGoal,pole){
+  refresh(arm.hand);refresh(arm.fore);refresh(arm.upper);
+  const S=arm.upper.getAbsolutePosition().clone();
+  const E=arm.fore.getAbsolutePosition().clone();
+  const W=arm.hand.getAbsolutePosition().clone();
+  const l1=B.Vector3.Distance(S,E),l2=B.Vector3.Distance(E,W);
+  const diff=wristGoal.subtract(S),actual=diff.length();
+  const dist=B.Scalar.Clamp(actual,Math.abs(l1-l2)+.001,l1+l2-.005);
+  if(actual<1e-7)throw Error("Degenerate shoulder-to-wrist IK");
+  const aim=diff.normalize(),a=(l1*l1-l2*l2+dist*dist)/(2*dist);
+  const h=Math.sqrt(Math.max(0,l1*l1-a*a));
+  const outward=pole.subtract(S);
+  const perp=outward.subtract(aim.scale(B.Vector3.Dot(outward,aim)));
+  if(perp.lengthSquared()<1e-7)throw Error("Invalid elbow pole");
+  const elbowGoal=S.add(aim.scale(a)).add(perp.normalize().scale(h));
+  setBoneToward(arm.upper,arm.fore,elbowGoal);
+  setBoneToward(arm.fore,arm.hand,wristGoal);
+  refresh(arm.hand);
+  return {
+   error:B.Vector3.Distance(wristGoal,arm.hand.getAbsolutePosition()),
+   reachable:actual<=l1+l2-.002,
+   reach:l1+l2
+  };
+ }
+ // Build a persistent transform from each original hand's *real joint landmarks*
+ // to the anatomical axes. We never assume glTF Hand local Y is the finger axis.
+ const calibrations={};
+ for(const [side,arm] of Object.entries(limbs)){
+  refresh(arm.hand);refresh(arm.index);refresh(arm.pinky);refresh(arm.middle);refresh(arm.thumb);refresh(arm.socket);
+  const handWorld=worldRot(arm.hand);
+  const across=arm.index.getAbsolutePosition().subtract(arm.pinky.getAbsolutePosition()).normalize();
+  const forward=arm.middle.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()).normalize();
+  let palm=B.Vector3.Cross(across,forward).normalize();
+  const thumb=arm.thumb.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition());
+  if(B.Vector3.Dot(palm,thumb)<0)palm.scaleInPlace(-1);
+  const srcBasis=basis(forward,palm);
+  const localBasis=handWorld.conjugate().multiply(srcBasis).normalize();
+  const socketLocalOffset=rotate(arm.socket.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()),
+                                  handWorld.conjugate());
+  calibrations[side]={localBasis,socketLocalOffset};
+ }
+ const stoppedTracks=stripArmTracks(imported.animationGroups);
+ if(stoppedTracks!==32)throw Error("Expected 32 conflicting arm tracks, got "+stoppedTracks);
+ const poseGroups=imported.animationGroups;
+ poseGroups.forEach(g=>g.stop());
+ const gunMetaResponse=await fetch(weaponRoot+"manifest.json");
+ if(!gunMetaResponse.ok)throw Error("Weapon metadata HTTP "+gunMetaResponse.status);
+ const m=(await gunMetaResponse.json()).weapons?.["uk-lee-enfield"];
+ if(!m||!["trigger","shoulder","support","muzzle"].every(key=>Array.isArray(m[key])))
+  throw Error("Lee-Enfield manifest invalid");
+ const container=await B.SceneLoader.LoadAssetContainerAsync("",weaponRoot+"uk-lee-enfield.glb",scene);
+ const pivot=new B.TransformNode("us-step4-Lee-Enfield-rigid-stock-root",scene);
+ pivot.rotationQuaternion=B.Quaternion.Identity();
+ container.addAllToScene();
+ for(const node of [...container.meshes,...container.transformNodes])
+  if(!node.parent)node.parent=pivot;
+ let mode="ready",stopped=false;
+ const state={ready:true,mode,armChannelsRemoved:stoppedTracks,
+  rightGripMeters:Infinity,leftGripMeters:Infinity,
+  rightPalmErrorDeg:Infinity,leftPalmErrorDeg:Infinity,
+  rightFingerErrorDeg:Infinity,leftFingerErrorDeg:Infinity,
+  rightIKMeters:Infinity,leftIKMeters:Infinity,
+  supportAlongBarrelMeters:0,stockToShoulderMeters:Infinity,
+  rightReachable:false,leftReachable:false,error:null};
+ const V=(p,q)=>rotate(arr(p),q);
+ function bodyFrame(){
+  refresh(limbs.left.upper);refresh(limbs.right.upper);refresh(neck);refresh(hips);
+  const x=limbs.left.upper.getAbsolutePosition().subtract(limbs.right.upper.getAbsolutePosition()).normalize();
+  let y=neck.getAbsolutePosition().subtract(hips.getAbsolutePosition());
+  y=y.subtract(x.scale(B.Vector3.Dot(y,x))).normalize();
+  const z=B.Vector3.Cross(x,y).normalize();
+  const matrix=B.Matrix.Identity();B.Matrix.FromXYZAxesToRef(x,y,z,matrix);
+  return {q:B.Quaternion.FromRotationMatrix(matrix).normalize(),x,y,z};
+ }
+ function goalOrientation(arm,side,gQ,bQ){
+  const target=DONOR[mode][side];
+  const dir=side==="right"?V(target.dir,bQ).normalize():V(target.dir,gQ).normalize();
+  const palm=side==="right"?V(target.palm,bQ).normalize():V(target.palm,gQ).normalize();
+  const anatomical=basis(dir,palm);
+  const boneWorld=anatomical.multiply(calibrations[side].localBasis.conjugate()).normalize();
+  const gripOffset=rotate(calibrations[side].socketLocalOffset,boneWorld);
+  return {boneWorld,gripOffset,dir,palm};
+ }
+ function angleDeg(a,b){
+  return Math.acos(B.Scalar.Clamp(B.Vector3.Dot(a.normalize(),b.normalize()),-1,1))*180/Math.PI;
+ }
+ function actualHandFrame(arm){
+  refresh(arm.hand);refresh(arm.index);refresh(arm.middle);refresh(arm.pinky);refresh(arm.thumb);
+  const forward=arm.middle.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()).normalize();
+  const cross=arm.index.getAbsolutePosition().subtract(arm.pinky.getAbsolutePosition()).normalize();
+  let palm=B.Vector3.Cross(cross,forward).normalize();
+  if(B.Vector3.Dot(palm,arm.thumb.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()))<0)palm.scaleInPlace(-1);
+  return {forward,palm};
+ }
+ function foldFinger(name){
+  const match=/^(right|left)hand(index|middle|ring|pinky|thumb)([123])$/.exec(name);
+  if(!match)return;
+  const side=match[1],kind=match[2],seg=Number(match[3]);
+  if(seg===3)return;
+  const node=byName.get(name),next=byName.get(name.slice(0,-1)+(seg+1));
+  if(!node||!next||!rest.has(node))return;
+  refresh(node);refresh(next);
+  const direction=next.getAbsolutePosition().subtract(node.getAbsolutePosition()).normalize();
+  const wanted=calibrations[side].lastPalm.scale(-1);
+  const axis=B.Vector3.Cross(direction,wanted);
+  if(axis.lengthSquared()<1e-8)return;
+  const angle=kind==="thumb"?(.30-.04*seg):(seg===1?.51:.56);
+  const localAxis=rotate(axis.normalize(),worldRot(node).conjugate()).normalize();
+  node.rotationQuaternion=node.rotationQuaternion.multiply(B.Quaternion.RotationAxis(localAxis,angle)).normalize();
+  refresh(next);
+ }
+ function update(){
+  if(stopped)return;
+  try{
+   for(const [node,q] of rest)node.rotationQuaternion=q.clone();
+   const body=bodyFrame();
+   const gunQ=body.q.multiply(B.Quaternion.FromEulerAngles(mode==="aim"?.11:.24,mode==="aim"?.64:.71,0)).normalize();
+   const right=limbs.right,left=limbs.left;
+   // Anchor a rigid stock to the actual RIGHT shoulder; weapon then owns its grips.
+   const stockPoint=right.shoulder.getAbsolutePosition()
+     .add(body.x.scale(.045)).add(body.y.scale(mode==="aim"?-.045:-.07))
+     .add(body.z.scale(.025));
+   pivot.rotationQuaternion.copyFrom(gunQ);
+   pivot.position.copyFrom(stockPoint.subtract(V(m.shoulder,gunQ)));
+   refresh(pivot);
+   const trigger=pivot.position.add(V(m.trigger,gunQ));
+   const orientationR=goalOrientation(right,"right",gunQ,body.q);
+   const rGrip=trigger.add(V([-.009,-.01,.01],gunQ));
+   const rWrist=rGrip.subtract(orientationR.gripOffset);
+   const poleR=right.upper.getAbsolutePosition()
+      .add(V(DONOR[mode].right.pole,body.q).scale(.27));
+   const rSolve=solveLimb(right,rWrist,poleR);
+   setWorldRot(right.hand,orientationR.boneWorld);
+   // Walk support hand backwards toward the receiver until it can reach.
+   const orientationL=goalOrientation(left,"left",gunQ,body.q);
+   let z=mode==="aim"?.255:.22, lGrip,lWrist;
+   const leftShoulder=left.upper.getAbsolutePosition();
+   for(let n=0;n<25;n++){
+    lGrip=pivot.position.add(V([0,m.support[1]-.025,z],gunQ));
+    lWrist=lGrip.subtract(orientationL.gripOffset);
+    refresh(left.upper);refresh(left.fore);refresh(left.hand);
+    const armReach=B.Vector3.Distance(leftShoulder,left.fore.getAbsolutePosition())+
+      B.Vector3.Distance(left.fore.getAbsolutePosition(),left.hand.getAbsolutePosition());
+    if(B.Vector3.Distance(leftShoulder,lWrist)<armReach*.97||z<=.115)break;
+    z-=.006;
+   }
+   const poleL=left.upper.getAbsolutePosition().add(V(DONOR[mode].left.pole,body.q).scale(.3));
+   const lSolve=solveLimb(left,lWrist,poleL);
+   setWorldRot(left.hand,orientationL.boneWorld);
+   // Curl each original finger using joint-native axes (no duplicate hand meshes).
+   calibrations.right.lastPalm=orientationR.palm;
+   calibrations.left.lastPalm=orientationL.palm;
+   for(const name of fingerNames)foldFinger(name);
+   refresh(right.socket);refresh(left.socket);
+   const rf=actualHandFrame(right),lf=actualHandFrame(left);
+   state.rightGripMeters=B.Vector3.Distance(right.socket.getAbsolutePosition(),rGrip);
+   state.leftGripMeters=B.Vector3.Distance(left.socket.getAbsolutePosition(),lGrip);
+   state.stockToShoulderMeters=B.Vector3.Distance(pivot.position.add(V(m.shoulder,gunQ)),stockPoint);
+   state.rightIKMeters=rSolve.error;state.leftIKMeters=lSolve.error;
+   state.rightReachable=rSolve.reachable;state.leftReachable=lSolve.reachable;
+   state.rightPalmErrorDeg=angleDeg(rf.palm,orientationR.palm);
+   state.leftPalmErrorDeg=angleDeg(lf.palm,orientationL.palm);
+   state.rightFingerErrorDeg=angleDeg(rf.forward,orientationR.dir);
+   state.leftFingerErrorDeg=angleDeg(lf.forward,orientationL.dir);
+   state.supportAlongBarrelMeters=z;
+   state.mode=mode;state.error=null;
+  }catch(e){state.error=String(e?.message||e);console.error("Stage4 rifle pose",e);}
+ }
+ const observer=scene.onBeforeRenderObservable.add(update);
+ update();
+ return {
+  report:state,setPose(next){
+   if(!["ready","aim"].includes(next))throw Error("Stage4 supports only ready or aim");
+   mode=next;update();return state;
+  },
+  dispose(){stopped=true;scene.onBeforeRenderObservable.remove(observer);container.dispose();pivot.dispose();}
+ };
+}
+return Object.freeze({create,stripArmTracks,CANON,DONOR});
+});
