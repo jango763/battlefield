@@ -21,9 +21,9 @@ const PROFILES=Object.freeze({
  "uk-sten":{label:"Sten",file:"uk-sten.glb",source:"GLB · Muster WW2",
    support:{min:.15,max:.399,ready:.255,aim:.285,drop:.034,x:-.006},grip:[-.010,-.036,-.043],fingerDir:[0,-.92,.40],angle:[.19,.67,.08,.62]},
  "uk-bren":{label:"Bren",file:"uk-bren.glb",source:"GLB · Muster WW2",
-   support:{min:.145,max:.315,ready:.24,aim:.27,drop:.049,x:-.014},grip:[-.019,-.057,-.080],fingerDir:[0,-.95,.31],angle:[.25,.66,.12,.58]},
+   support:{min:.095,max:.315,ready:.22,aim:.24,drop:.039,x:.055},grip:[-.019,-.057,-.080],fingerDir:[0,-.95,.31],angle:[.25,.66,.12,.58]},
  "uk-piat":{label:"PIAT",file:null,source:"Procedural · original Battlefield",
-   support:{min:.027,max:.155,ready:.10,aim:.125,drop:.025,x:-.010},grip:[-.015,-.048,-.035],fingerDir:[0,-.94,.34],angle:[.22,.60,.08,.52]}
+   support:{min:.027,max:.155,ready:.095,aim:.115,drop:.020,x:.065},grip:[-.015,-.048,-.035],fingerDir:[0,-.94,.34],angle:[.22,.60,.08,.52]}
 });
 const PIAT={
  trigger:[0,-.155,-.15],support:[0,-.115,.11],
@@ -32,6 +32,8 @@ const PIAT={
  triggerPalm:[-.8,0,-.6],supportPalm:[.8,0,-.6]
 };
   function proceduralPiat(scene,parent){
+    const B=window.BABYLON;
+    const v=a=>new B.Vector3(a[0],a[1],a[2]);
     const meshes=[],mats=[];
     const makeMat=(name,hex,metallic)=>{
       const m=new B.PBRMaterial(name,scene);
