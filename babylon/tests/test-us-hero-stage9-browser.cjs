@@ -36,6 +36,32 @@ const BASE="http://127.0.0.1:8799/babylon/us-hero-stage9-iphone.html";
      first.battle.targets.length!==3||first.actors.visualActors!==3||
      first.twoWayAmmo)throw Error("Stage9 duplicate simulation or invalid UI");
   await page.screenshot({path:dir+"/initial-range-mobile.png",fullPage:true});
+  // Inspect actual composition without the mobile control drawer.
+  // Camera experiments are visual QA only; restore the live view afterward.
+  const cameraSaved=await page.evaluate(()=>{
+   const c=window.BABYLON.EngineStore.LastCreatedScene.activeCamera;
+   return {alpha:c.alpha,beta:c.beta,radius:c.radius,target:c.target.asArray()};
+  });
+  for(const [label,alpha,beta,radius,target] of [
+   ["current",Math.PI/2,Math.PI*.39,6.0,[0,.98,-1.3]],
+   ["hero-and-targets",Math.PI/2,1.25,5.8,[0,.65,-.65]],
+   ["upper-angle",Math.PI/2,1.13,6.4,[0,.62,-1.15]],
+   ["three-quarter",1.15,1.17,6.1,[0,.72,-1.0]]]){
+    await page.evaluate(({alpha,beta,radius,target})=>{
+     const c=window.BABYLON.EngineStore.LastCreatedScene.activeCamera;
+     c.alpha=alpha;c.beta=beta;c.radius=radius;
+     c.setTarget(new window.BABYLON.Vector3(...target));
+     document.getElementById("panel").style.display="none";
+    },{alpha,beta,radius,target});
+    await page.waitForTimeout(250);
+    await page.screenshot({path:dir+"/composition-"+label+".png",fullPage:true});
+  }
+  await page.evaluate(saved=>{
+   const c=window.BABYLON.EngineStore.LastCreatedScene.activeCamera;
+   c.alpha=saved.alpha;c.beta=saved.beta;c.radius=saved.radius;
+   c.setTarget(new window.BABYLON.Vector3(...saved.target));
+   document.getElementById("panel").style.display="";
+  },cameraSaved);
   // Original rifle; authoritative combat with seeded RNG: kill on first shot.
   await page.locator('[data-target="enemy-b"]').click();
   await page.locator("#fire").dispatchEvent("pointerdown",{pointerId:71});
