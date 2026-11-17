@@ -48,10 +48,8 @@ const dir="babylon-qa-results/us-hero-stage8";
   let x=await read();
   if(!x.ready)throw Error("Stage8 failed boot "+JSON.stringify(x));
   check(x,"initial");
-  if(x.combat.ammoTotal!==null&&x.combat.ammoTotal!=="Infinity"){
-   // Infinity returned from page.evaluate is serialized to null.
-   if(x.combat.magazineSize!==null)throw Error("Rifle must have infinite ammo");
-  }
+  if(x.combat.ammoTotal!==Infinity||x.combat.magazineSize!==Infinity)
+   throw Error("Rifle must have infinite ammo");
   await tap();await page.waitForTimeout(130);
   x=await read();check(x,"rifle-shot");
   if(x.combat.shots!==1||x.fx.shotEvents!==1)
