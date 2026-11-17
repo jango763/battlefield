@@ -22,3 +22,20 @@ jobs:
           node --check babylon/us-hero-stage9-combat-bridge.js
           node --check babylon/us-hero-stage9-target-visuals.js
           node babylon/tests/test-us-hero-stage9-bridge.cjs
+      - name: Install mobile Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage9-qa playwright@1.58.2
+          /tmp/stage9-qa/node_modules/.bin/playwright install chromium
+      - name: Verify iPhone range: shots, damage, enemy death, reload and PIAT blast
+        run: |
+          node --check babylon/tests/test-us-hero-stage9-browser.cjs
+          python3 -m http.server 8799 --bind 127.0.0.1 >/tmp/stage9-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-us-hero-stage9-browser.cjs
+      - name: Upload stage9 browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-hero-stage9-targets-and-damage
+          path: babylon-qa-results/us-hero-stage9/
+          if-no-files-found: ignore
