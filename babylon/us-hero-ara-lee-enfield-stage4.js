@@ -183,9 +183,14 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
  for(const node of [...container.meshes,...container.transformNodes])
   if(!node.parent)node.parent=pivot;
  let mode="ready",stopped=false;
- const fingerControls={base:-1.12,middle:-.94,distal:-.50,thumbBase:-.84,thumbMiddle:-.78,thumbDistal:-.40};
+ const fingerControls={
+   base:-1.12,middle:-.94,distal:-.50,
+   thumbBase:-.84,thumbMiddle:-.78,thumbDistal:-.40,
+   // Index finger is not a fist: keep it beside the rifle trigger.
+   triggerIndexBase:-.31,triggerIndexMiddle:-.24,triggerIndexDistal:-.14
+ };
  const state={ready:true,mode,armChannelsRemoved:stoppedTracks,fingerControls,
-  rightDirPreset:"donor",  // v9 QA: source-proven right hand finger frame can be changed in-place
+  rightDirPreset:"gunForward", // v10: winner of six visually tested right-hand frames
   rightGripMeters:Infinity,leftGripMeters:Infinity,
   rightPalmErrorDeg:Infinity,leftPalmErrorDeg:Infinity,
   rightFingerErrorDeg:Infinity,leftFingerErrorDeg:Infinity,
@@ -262,9 +267,12 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
   const wanted=kind==="thumb"?palm.clone():palm.scale(-1);
   const hinge=B.Vector3.Cross(direction,wanted);
   if(hinge.lengthSquared()<1e-8)return;
+  const triggerIndex=side==="right"&&kind==="index";
   const angle=kind==="thumb"
     ?(seg===1?fingerControls.thumbBase:seg===2?fingerControls.thumbMiddle:fingerControls.thumbDistal)
-    :(seg===1?fingerControls.base:seg===2?fingerControls.middle:fingerControls.distal);
+    :triggerIndex
+      ?(seg===1?fingerControls.triggerIndexBase:seg===2?fingerControls.triggerIndexMiddle:fingerControls.triggerIndexDistal)
+      :(seg===1?fingerControls.base:seg===2?fingerControls.middle:fingerControls.distal);
   const localAxis=rotate(hinge.normalize(),worldRot(node).conjugate()).normalize();
   node.rotationQuaternion=node.rotationQuaternion.multiply(B.Quaternion.RotationAxis(localAxis,angle)).normalize();
   if(next)refresh(next);
