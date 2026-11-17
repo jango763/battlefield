@@ -182,7 +182,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
  for(const node of [...container.meshes,...container.transformNodes])
   if(!node.parent)node.parent=pivot;
  let mode="ready",stopped=false;
- const state={ready:true,mode,armChannelsRemoved:stoppedTracks,
+ const state={ready:true,mode,armChannelsRemoved:stoppedTracks,fingerControls,
   rightGripMeters:Infinity,leftGripMeters:Infinity,
   rightPalmErrorDeg:Infinity,leftPalmErrorDeg:Infinity,
   rightFingerErrorDeg:Infinity,leftFingerErrorDeg:Infinity,
@@ -204,7 +204,9 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
   // Ara supplies elbow/finger stance. The actual Lee-Enfield author supplies
   // the trigger and handguard palm normals. Do not face both open palms outward.
   const dir=side==="right"?V(target.dir,bQ).normalize():V(m.supportAxis,gQ).normalize();
-  const palm=side==="right"?V(m.triggerPalm,gQ).normalize():V(m.supportPalm,gQ).normalize();
+  // SUPPORT: the left hand must CUP the underside of the wooden fore-end.
+  // Previous v5 used manifest's downward normal and posed the palm ON TOP.
+  const palm=side==="right"?V(m.triggerPalm,gQ).normalize():V(m.supportPalm,gQ).scale(-1).normalize();
   const anatomical=basis(dir,palm);
   const boneWorld=anatomical.multiply(calibrations[side].localBasis.conjugate()).normalize();
   const gripOffset=rotate(calibrations[side].socketLocalOffset,boneWorld);
@@ -221,23 +223,36 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
   if(B.Vector3.Dot(palm,arm.thumb.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()))<0)palm.scaleInPlace(-1);
   return {forward,palm};
  }
+ // Curl around the real two-handed rifle grip. Each phalanx has real vertex
+ // weights now; use proximal/middle/distal degrees of freedom independently.
+ // Critical: fingers bend into the palm, the thumb opposes the four fingers.
+ const fingerControls={base:1.03,middle:.93,distal:.38,thumbBase:.53,thumbMiddle:.63,thumbDistal:.28};
  function foldFinger(name){
   const match=/^(right|left)hand(index|middle|ring|pinky|thumb)([123])$/.exec(name);
   if(!match)return;
   const side=match[1],kind=match[2],seg=Number(match[3]);
-  if(seg===3)return;
-  const node=byName.get(name),next=byName.get(name.slice(0,-1)+(seg+1));
-  if(!node||!next||!rest.has(node))return;
-  refresh(node);refresh(next);
-  const direction=next.getAbsolutePosition().subtract(node.getAbsolutePosition()).normalize();
-  const wanted=calibrations[side].lastPalm.scale(-1);
-  const axis=B.Vector3.Cross(direction,wanted);
-  if(axis.lengthSquared()<1e-8)return;
-  const angle=kind==="thumb"?(.52-.08*seg):(seg===1?.78:.65);
-  const localAxis=rotate(axis.normalize(),worldRot(node).conjugate()).normalize();
+  const node=byName.get(name);
+  const next=byName.get(name.slice(0,-1)+(seg+1));
+  const prev=seg>1?byName.get(name.slice(0,-1)+(seg-1)):byName.get(side+"hand");
+  if(!node||!rest.has(node))return;
+  refresh(node);
+  if(next)refresh(next);
+  if(prev)refresh(prev);
+  const direction=(next?next.getAbsolutePosition().subtract(node.getAbsolutePosition()):
+                          node.getAbsolutePosition().subtract(prev.getAbsolutePosition())).normalize();
+  // The finger's hinge axis in world space, projected toward its desired palm.
+  const palm=calibrations[side].lastPalm;
+  const wanted=kind==="thumb"?palm.clone():palm.scale(-1);
+  const hinge=B.Vector3.Cross(direction,wanted);
+  if(hinge.lengthSquared()<1e-8)return;
+  const angle=kind==="thumb"
+    ?(seg===1?fingerControls.thumbBase:seg===2?fingerControls.thumbMiddle:fingerControls.thumbDistal)
+    :(seg===1?fingerControls.base:seg===2?fingerControls.middle:fingerControls.distal);
+  const localAxis=rotate(hinge.normalize(),worldRot(node).conjugate()).normalize();
   node.rotationQuaternion=node.rotationQuaternion.multiply(B.Quaternion.RotationAxis(localAxis,angle)).normalize();
-  refresh(next);
+  if(next)refresh(next);
  }
+
  function update(){
   if(stopped)return;
   try{
@@ -254,7 +269,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
    refresh(pivot);
    const trigger=pivot.position.add(V(m.trigger,gunQ));
    const orientationR=goalOrientation(right,"right",gunQ,body.q);
-   const rGrip=trigger.add(V([-.009,-.01,.01],gunQ));
+   const rGrip=trigger.add(V([-.012,-.027,.002],gunQ));
    const rWrist=rGrip.subtract(orientationR.gripOffset);
    const poleR=right.upper.getAbsolutePosition()
       .add(V(DONOR[mode].right.pole,body.q).scale(.27));
@@ -265,7 +280,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
    let z=mode==="aim"?.255:.22, lGrip,lWrist;
    const leftShoulder=left.upper.getAbsolutePosition();
    for(let n=0;n<25;n++){
-    lGrip=pivot.position.add(V([0,m.support[1]-.025,z],gunQ));
+    lGrip=pivot.position.add(V([0,m.support[1]-.052,z],gunQ));
     lWrist=lGrip.subtract(orientationL.gripOffset);
     refresh(left.upper);refresh(left.fore);refresh(left.hand);
     const armReach=B.Vector3.Distance(leftShoulder,left.fore.getAbsolutePosition())+
