@@ -76,12 +76,12 @@ try{
    if(rigInstance){
     const r=rigInstance.report;
     const cm=x=>Number.isFinite(x)?(x*100).toFixed(1)+" см":"?";
-    const dg=x=>Number.isFinite(x)?x.toFixed(1)+"°":"?";
-    $("metrics").textContent="Хват: правая "+cm(r.rightGripMeters)+
-     ", левая "+cm(r.leftGripMeters)+
+    // Curling bends phalanx landmarks; a palm normal recomputed from them
+    // can flip 180°, so do NOT show it as a visual-quality score.
+    $("metrics").textContent="Сокеты кистей (техническая проверка): правая "+
+     cm(r.rightGripMeters)+", левая "+cm(r.leftGripMeters)+
      " · приклад "+cm(r.stockToShoulderMeters)+
-     " · ладони "+dg(r.rightPalmErrorDeg)+"/"+dg(r.leftPalmErrorDeg)+
-     " · пальцы "+dg(r.rightFingerErrorDeg)+"/"+dg(r.leftFingerErrorDeg)+
+     " · оценка самого хвата — визуально"+
      (r.error?" · Ошибка: "+r.error:"")+
      " · "+Math.round(engine.getFps())+" FPS";
    }
