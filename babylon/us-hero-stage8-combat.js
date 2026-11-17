@@ -23,7 +23,7 @@ function create({weapon="uk-lee-enfield",onEvent=()=>{}}={}){
  if(!PROFILES[weapon])throw Error("Unknown Allied weapon "+weapon);
  if(typeof onEvent!=="function")throw Error("onEvent must be a function");
  const inventory={};
- let time=0,nextFireAt=0,active=weapon,motion="idle",triggerHeld=false;
+ let time=0,nextFireAt=0,active=weapon,motion="idle",triggerHeld=false,semiArmed=false;
  let reload=null,totalShots=0,totalReloads=0;
  const events=[];
  const slot=id=>{
@@ -86,6 +86,7 @@ function create({weapon="uk-lee-enfield",onEvent=()=>{}}={}){
   }
   if(Number.isFinite(s.loaded))s.loaded--;
   s.shots++;totalShots++;
+  if(!c.automatic)semiArmed=false;
   nextFireAt=time+c.interval;
   emit("shot",{seq:totalShots,loaded:s.loaded,reserve:s.reserve,kind:c.kind});
   if(s.loaded===0){
@@ -98,7 +99,10 @@ function create({weapon="uk-lee-enfield",onEvent=()=>{}}={}){
   return {ok:true,shot:totalShots,weapon:active};
  }
  function setTrigger(held){
-  triggerHeld=!!held;
+  const requested=!!held;
+  if(requested&&!triggerHeld)semiArmed=true;
+  if(!requested)semiArmed=false;
+  triggerHeld=requested;
   return snapshot();
  }
  function setMotion(next){
@@ -111,7 +115,7 @@ function create({weapon="uk-lee-enfield",onEvent=()=>{}}={}){
  function equip(id){
   if(!PROFILES[id])throw Error("Unknown Allied weapon "+id);
   if(id===active)return snapshot();
-  triggerHeld=false;reload=null;active=id;slot(active);nextFireAt=time;
+  triggerHeld=false;semiArmed=false;reload=null;active=id;slot(active);nextFireAt=time;
   emit("equipped",{loaded:slot(active).loaded,reserve:slot(active).reserve});
   return snapshot();
  }
@@ -124,8 +128,7 @@ function create({weapon="uk-lee-enfield",onEvent=()=>{}}={}){
   while(steps++<2500){
    const c=PROFILES[active],s=slot(active);
    const finishAt=reload?reload.endsAt:Infinity;
-   const eligible=triggerHeld&&
-     (c.automatic||s.shots===0||true)&&
+   const eligible=triggerHeld&&(c.automatic||semiArmed)&&
      (c.canFireMoving||motion==="idle")&&!reload&&s.loaded>0;
    const shotAt=eligible?Math.max(time,nextFireAt):Infinity;
    const due=Math.min(finishAt,shotAt);
@@ -143,7 +146,7 @@ function create({weapon="uk-lee-enfield",onEvent=()=>{}}={}){
  }
  function reset(){
   for(const id of Object.keys(inventory))delete inventory[id];
-  time=0;nextFireAt=0;reload=null;triggerHeld=false;
+  time=0;nextFireAt=0;reload=null;triggerHeld=false;semiArmed=false;
   motion="idle";active=weapon;slot(active);totalShots=0;totalReloads=0;
   events.length=0;
   emit("reset");
