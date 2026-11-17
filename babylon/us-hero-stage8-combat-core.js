@@ -107,7 +107,7 @@ function create({balance,onEvent=()=>{}}={}){
   let left=dt,limit=0;
   simTime+=dt;
   const eps=1e-9;
-  while(limit++<200){
+  while(limit++<2000){
    if(w.reloadRemaining>eps){
     const step=Math.min(left,w.reloadRemaining);
     w.reloadRemaining=Math.max(0,w.reloadRemaining-step);
@@ -133,7 +133,7 @@ function create({balance,onEvent=()=>{}}={}){
    shoot(w);
    if(left<=eps)break;
   }
-  ensure(limit<200,"Combat state machine exceeded shot safety bound");
+  ensure(limit<2000,"Combat state machine exceeded shot safety bound");
   return snapshot();
  }
  function reset(){
