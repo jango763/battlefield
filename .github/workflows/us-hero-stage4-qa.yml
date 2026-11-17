@@ -1,0 +1,37 @@
+name: US hero Lee-Enfield stage 4 isolated QA
+on:
+  push:
+    branches:
+      - feature/us-hero-lee-enfield-ready-ara-20261117
+    paths:
+      - 'babylon/us-hero-ara-lee-enfield-stage4.js'
+      - 'babylon/us-hero-lee-enfield-ara-stage4-iphone.html'
+      - 'babylon/tests/test-us-hero-stage4-*.cjs'
+      - '.github/workflows/us-hero-stage4-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mobile-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static guard (no duplicate hands; auto-load original GLB)
+        run: node babylon/tests/test-us-hero-stage4-static.cjs
+      - name: Install browser
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage4-qa playwright@1.58.2
+          /tmp/stage4-qa/node_modules/.bin/playwright install chromium
+      - name: Browser rendering, two rifle poses, grip/palm metrics
+        run: |
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/stage4-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-us-hero-stage4-browser.cjs
+      - name: Upload QA screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-hero-stage4-mobile-screenshots
+          path: babylon-qa-results/stage4/
+          if-no-files-found: ignore
