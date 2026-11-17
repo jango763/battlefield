@@ -49,7 +49,12 @@ const base="http://127.0.0.1:8758/babylon/us-hero-lee-enfield-finger-contact-v10
     });
     await page.waitForTimeout(400);
     await page.screenshot({path:"babylon-qa-results/finger-contact-v10/"+pose+"-legacy-front.png"});
-    await page.evaluate(()=>window.__US_HERO_STAGE4_QA__.rig.fingerMode="surface");
+    await page.evaluate(()=>{
+      window.__US_HERO_STAGE4_QA__.rig.fingerMode="surface";
+      document.getElementById("panel").style.display="";
+      const B=window.BABYLON,c=B.EngineStore.LastCreatedScene.activeCamera;
+      c.alpha=Math.PI/2;c.beta=1.38;c.radius=2.95;c.setTarget(new B.Vector3(0,.96,0));
+    });
     if(metrics.error)throw Error(pose+" IK error "+metrics.error);
     if(metrics.fingerMode!=="surface"||metrics.processedFingerChains!==8)
       throw Error("All 8 anatomically weighted finger chains must be solved");
