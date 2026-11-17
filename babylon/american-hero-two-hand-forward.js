@@ -1,7 +1,7 @@
 /* Battlefield / American hero / ONE skin + TWO anatomical hands.
  * This is an independent, iPhone-only experiment; it never uses German pose presets.
  * Babylon glTF joints are linked TransformNodes. Target upper/forearm nodes only.
- * Weapon anchored to live shoulder midpoint, not chest; right wrist drives trigger,
+ * Weapon anchored to right shoulder stock socket, not chest; right wrist drives trigger,
  * left wrist solves fore-end IK. Never add extra hand meshes.
  */
 (function(root,factory){
@@ -16,7 +16,7 @@ const ARMS=new Set(["leftshoulder","leftarm","leftforearm","lefthand",
 const GUNS=Object.freeze({
  "uk-lee-enfield":{label:"Lee-Enfield",file:"uk-lee-enfield.glb",supportZ:.20},
  "uk-sten":{label:"Sten",file:"uk-sten.glb",supportZ:.18},
- "uk-bren":{label:"Bren",file:"uk-bren.glb",supportZ:.20}
+ "uk-bren":{label:"Bren",file:"uk-bren.glb",supportZ:.17}
 });
 function stripArmTracks(groups){
  let removed=0;
@@ -176,22 +176,20 @@ function create({scene,imported,root:actorRoot,state,weaponRoot="../assets/ww2-w
    refresh(chest);
    const body=torsoAxes();
    const running=mode==="run";
-   // Source GLB bind pose measured: upper arms at x = +/- 0.277,
-   // y = 0.565, z = -0.065. Previous chest-origin solution placed
-   // trigger around y=0.41 near torso, hence hands were folded on chest.
-   // Anchor to the LIVE shoulder midpoint, never Spine2 or arbitrary world origin.
-   // Diagonal low-ready yaw brings the stock toward the RIGHT shoulder,
-   // while moving the fore-end under the LEFT palm.
+   // Source GLB bind pose: shoulder joints +/-0.205, y=0.598,
+   // upper arms +/-0.277, y=0.565. Old code put trigger on the chest.
+   // Correct production order: shoulder stock SOCKET determines the weapon;
+   // trigger follows the weapon and BOTH original hands solve to its grips.
+   // Positive yaw points the muzzle across the body toward the left forearm.
    const gunQ=body.q.multiply(B.Quaternion.FromEulerAngles(
      running?.27:.18, running?.65:.70, 0)).normalize();
-   const shoulderMid=right.upper.getAbsolutePosition()
-     .add(left.upper.getAbsolutePosition()).scale(.5);
-   const origin=shoulderMid
-     .add(body.x.scale(-.025))
-     .add(body.y.scale(running?-.14:-.115))
-     .add(body.z.scale(running?.17:.21));
+   const shoulderSocket=right.shoulder.getAbsolutePosition()
+     .add(body.x.scale(.030))
+     .add(body.y.scale(-.010))
+     .add(body.z.scale(.040));
    pivot.rotationQuaternion.copyFrom(gunQ);
-   pivot.position.copyFrom(origin.subtract(rotate(V(...currentMeta.trigger),gunQ)));
+   pivot.position.copyFrom(shoulderSocket.subtract(
+     rotate(V(...currentMeta.shoulder),gunQ)));
    refresh(pivot);
    let trigger=pivot.position.add(rotate(V(...currentMeta.trigger),gunQ));
    // The right hand is the weapon's dominant control point. Its wrist is
@@ -224,7 +222,7 @@ function create({scene,imported,root:actorRoot,state,weaponRoot="../assets/ww2-w
      leftGoal).toFixed(3);
    report.stockToShoulderMeters=+B.Vector3.Distance(
      pivot.position.add(rotate(V(...currentMeta.shoulder),gunQ)),
-     right.shoulder.getAbsolutePosition()).toFixed(3);
+     shoulderSocket).toFixed(3);
    report.triggerDistanceFromChestMeters=+B.Vector3.Distance(
      trigger,chest.getAbsolutePosition()).toFixed(3);
    report.rightReachable=r.reachable;
