@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#162019">
+<title>Battlefield · Американский герой · автозагрузка сохранённой модели</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#162019;color:#f3f3e9;font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+#view{width:100%;height:100%;display:block;touch-action:none;outline:0}
+header{position:fixed;z-index:2;top:calc(env(safe-area-inset-top) + 9px);left:12px;right:12px;pointer-events:none;text-shadow:0 1px 4px #000b}
+h1{font-size:16px;margin:0 0 4px}header p{font-size:11px;margin:0;color:#d1dbd0}
+#panel{position:fixed;z-index:4;bottom:calc(env(safe-area-inset-bottom) + 9px);left:8px;right:8px;margin:0 auto;max-width:660px;padding:11px;border:1px solid #708773;border-radius:13px;background:#1d2e24ef;box-shadow:0 3px 25px #0009}
+#prompt{font-weight:700;font-size:13px;margin-bottom:8px}
+#file{position:absolute;width:1px;height:1px;opacity:0;left:-9999px}
+#load-label{display:block;text-align:center;background:#c8dfad;color:#1e301e;border-radius:9px;padding:13px 8px;font-weight:750;cursor:pointer}
+#weapons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
+#weapons button{min-height:43px;border:1px solid #809c81;border-radius:8px;background:#385342;color:#f4f8f0;font:700 12px system-ui;touch-action:manipulation}
+#weapons button:disabled{opacity:.42}
+#weapons button[aria-pressed=true]{background:#d3e5b2;color:#18251b}
+#motions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:8px}
+#motions button{min-height:48px;font-size:12px;border:1px solid #809c81;border-radius:8px;background:#36553c;color:#f6f8ed;font-weight:700;touch-action:manipulation}
+#motions button:disabled{opacity:.42}
+#motions button[aria-pressed=true]{background:#d3e5b2;color:#18251b}
+#status{font-size:12px;line-height:1.38;color:#f0dba6;margin-top:9px;min-height:32px;white-space:pre-line;overflow-wrap:anywhere}
+#info{font-size:11px;margin-top:4px;color:#c6d6c9}
+@media(max-width:385px){#panel{padding:8px}#motions button{font-size:11px;padding:8px 0}h1{font-size:14px}}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./native-clip-blend.js"></script>
+<script src="./american-hero-two-hand-forward.js"></script>
+</head>
+<body>
+<canvas id="view" aria-label="Американский герой Battlefield, 3D-просмотр"></canvas>
+<header>
+<h1>Battlefield · Герой без повторной загрузки</h1>
+<p>Babylon.js · модель с 65 костями · Quaternius · проверка на iPhone</p>
+</header>
+<section id="panel" aria-label="Проверка движения героя">
+<div id="prompt">Проверяю сохранённую модель героя на iPhone…</div>
+<input type="file" id="file" accept=".glb,model/gltf-binary,application/octet-stream">
+<label for="file" id="load-label">Выбрать GLB один раз</label>
+<div id="motions">
+<button data-clip="Idle_Quaternius" aria-pressed="true" disabled>Стойка</button>
+<button data-clip="Walk_Quaternius" disabled>Ходьба</button>
+<button data-clip="Jog_Quaternius" disabled>Бег</button>
+<button data-clip="Sprint_Quaternius" disabled>Спринт</button>
+</div>
+<div id="weapons" aria-label="Оружие героя">
+<button data-weapon="uk-lee-enfield" aria-pressed="true" disabled>Lee-Enfield</button>
+<button data-weapon="uk-sten" disabled>Sten</button>
+<button data-weapon="uk-bren" disabled>Bren</button>
+</div>
+<div id="status" role="status" aria-live="polite">Повторно выбирать GLB не потребуется, если Safari сохранит модель.</div>
+<div id="ik" role="status" aria-live="off" style="margin-top:6px;color:#d7eac8;font-size:11px">Проверка положения оружия относительно правого плеча</div>
+<div id="info">Модель сохраняется только в локальном хранилище Safari, не отправляется на сторонние сайты. При удалении данных сайта или смене браузера нужно выбрать GLB заново.</div>
+</section>
+<script>
+(async function () {
+"use strict";
+const B=window.BABYLON,blend=window.BattlefieldNativeClipBlend;
+const $=id=>document.getElementById(id),status=$("status"),buttons=[...document.querySelectorAll("[data-clip]")];
+const qa={ready:false,error:null,clipCount:0,bones:0,framesPerSecond:0,selected:null,transitions:0,weaponId:null};
+window.__US_HERO_QUATERNIUS_QA__=qa;
+const say=message=>{status.textContent=message;};
+if(!B?.SceneLoader || !blend || !window.BattlefieldAmericanTwoHandIK) {
+ qa.error="Babylon.js не загрузился";say(qa.error+". Проверь подключение к интернету.");return;
+}
+let engine,scene,camera,active=null,loading=false;
+try{
+ engine=new B.Engine($("view"),true,{powerPreference:"high-performance",stencil:true});
+ engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.6));
+ scene=new B.Scene(engine);
+ scene.useRightHandedSystem=true;
+ scene.clearColor=new B.Color4(.08,.12,.10,1);
+ const hemi=new B.HemisphericLight("ambient",new B.Vector3(0,1,0),scene);hemi.intensity=1.5;
+ const front=new B.DirectionalLight("key",new B.Vector3(-.6,-1,-.65),scene);front.intensity=1.25;
+ const rim=new B.DirectionalLight("rim",new B.Vector3(.7,-.4,.8),scene);rim.intensity=.65;
+ camera=new B.ArcRotateCamera("orbit",Math.PI/2,Math.PI*.44,3.35,new B.Vector3(0,.93,0),scene);
+ camera.lowerRadiusLimit=1.2;camera.upperRadiusLimit=7;camera.lowerBetaLimit=.22;camera.upperBetaLimit=Math.PI*.84;
+ camera.pinchDeltaPercentage=.016;camera.wheelDeltaPercentage=.016;camera.attachControl($("view"),true);
+ const ground=B.MeshBuilder.CreateDisc("ground",{radius:1.45,tessellation:64},scene);
+ ground.rotation.x=Math.PI/2;ground.position.y=-.025;ground.isPickable=false;
+ const groundMaterial=new B.StandardMaterial("groundMat",scene);
+ groundMaterial.diffuseColor=new B.Color3(.18,.24,.18);groundMaterial.specularColor=new B.Color3(.04,.04,.04);
+ ground.material=groundMaterial;
+ let sampled=0,diagnosticTime=0;
+ engine.runRenderLoop(()=>{
+  const dt=Math.min(.06,engine.getDeltaTime()/1000);
+  if(active)blend.update(active,dt);
+  sampled+=dt;diagnosticTime+=dt;
+  if(diagnosticTime>.7 && qa.weaponRig) {
+   diagnosticTime=0;
+   const w=qa.weaponRig;
+   const fmt=v=>Number.isFinite(v)?Math.round(v*100)+" см":"?";
+   $("ik").textContent="2 кисти · хват: правая "+fmt(w.rightGripMeters)+
+     " · левая "+fmt(w.leftGripMeters)+
+     " · приклад: "+fmt(w.stockToShoulderMeters)+
+     " · спуск от груди: "+fmt(w.triggerDistanceFromChestMeters)+
+     (w.error?" | Ошибка: "+w.error:"");
+  }
+  if(sampled>.7){qa.framesPerSecond=Math.round(engine.getFps());sampled=0;}
+  scene.render();
+ });
+ window.addEventListener("resize",()=>engine.resize());
+}catch(e){qa.error=String(e?.message||e);say("Не удалось запустить 3D: "+qa.error);return;}
+function play(name){
+ if(!active)return;
+ const clip=active.clips.get(name);
+ if(!clip)throw Error("Нет анимации "+name);
+ blend.play(active,clip,name.includes("Idle")?"ready":"run",{loop:true,duration:.22});
+ qa.setWeaponPose?.(name.includes("Idle")?"ready":"run");
+ qa.selected=name;qa.transitions++;
+ for(const button of buttons)button.setAttribute("aria-pressed",String(button.dataset.clip===name));
+ say("Герой: "+name.replace("_Quaternius","")+" · оружие "+({ "uk-lee-enfield":"Lee-Enfield","uk-sten":"Sten","uk-bren":"Bren" }[qa.weaponId]||"не выбрано")+"\n"+qa.bones+" костей · "+qa.clipCount+" клипа · "+qa.framesPerSecond+" FPS. Вращай камеру и проверяй хват.");
+}
+for(const button of document.querySelectorAll("[data-weapon]"))button.addEventListener("click",async()=>{
+  if(!qa.ready||!qa.equipWeapon)return;
+  const id=button.dataset.weapon;
+  for(const b of document.querySelectorAll("[data-weapon]"))b.disabled=true;
+  say("Загружаю оружие "+button.textContent+"…");
+  try{
+    await qa.equipWeapon(id);
+    qa.weaponId=id;
+    for(const b of document.querySelectorAll("[data-weapon]"))b.setAttribute("aria-pressed",String(b.dataset.weapon===id));
+    say("Оружие: "+button.textContent+" · Готово. Проверяй хват двумя руками, положение приклада и движение.");
+  }catch(error){qa.error=String(error?.message||error);say("Ошибка оружия: "+qa.error);}
+  finally{for(const b of document.querySelectorAll("[data-weapon]"))b.disabled=false;}
+ });
+for(const button of buttons)button.addEventListener("click",()=>{
+ try{play(button.dataset.clip)}catch(e){qa.error=String(e?.message||e);say(qa.error);}
+});
+const CACHE_DB="battlefield-american-hero-v1";
+const CACHE_KEY="american-hero-quaternius-4motions";
+function openModelDB(){
+ return new Promise((resolve,reject)=>{
+  if(!window.indexedDB){reject(Error("На этом устройстве нет IndexedDB"));return;}
+  const req=indexedDB.open(CACHE_DB,1);
+  req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains("models"))req.result.createObjectStore("models");};
+  req.onerror=()=>reject(req.error||Error("Ошибка хранилища Safari"));
+  req.onblocked=()=>reject(Error("Хранилище Safari заблокировано"));
+  req.onsuccess=()=>resolve(req.result);
+ });
+}
+async function readSavedHero(){
+ let db;
+ try{
+  db=await openModelDB();
+  return await new Promise((resolve,reject)=>{
+   const tx=db.transaction("models","readonly");
+   const req=tx.objectStore("models").get(CACHE_KEY);
+   req.onerror=()=>reject(req.error);
+   req.onsuccess=()=>resolve(req.result?.blob instanceof Blob?req.result.blob:null);
+  });
+ }catch(e){console.warn("Cached hero unavailable",e);return null;}
+ finally{db?.close();}
+}
+async function saveHero(file){
+ let db;
+ try{
+  db=await openModelDB();
+  await new Promise((resolve,reject)=>{
+   const tx=db.transaction("models","readwrite");
+   tx.objectStore("models").put({blob:file,name:file.name||"american_hero_quaternius_4motions.glb"},CACHE_KEY);
+   tx.oncomplete=()=>resolve();
+   tx.onerror=()=>reject(tx.error);
+   tx.onabort=()=>reject(tx.error);
+  });
+  return true;
+ }catch(e){console.warn("Cannot persist hero locally",e);return false;}
+ finally{db?.close();}
+}
+async function loadHeroFile(file,fromCache=false){
+ if(!file||loading||qa.ready)return;
+ const fileName=file.name||"american_hero_quaternius_4motions.glb";
+ if(!/\.glb$/i.test(fileName)){say("Нужен файл .glb, а не ZIP или HTML.");return;}
+ if(file.size>25*1024*1024){say("Файл слишком большой для этого теста (максимум 25 МБ).");return;}
+ if(!/\.glb$/i.test(file.name)){say("Нужен файл .glb, а не ZIP или HTML.");return;}
+ if(file.size>25*1024*1024){say("Файл слишком большой для этого теста (максимум 25 МБ).");return;}
+ loading=true;$("load-label").textContent="Загружаю модель…";
+ let objectUrl;
+ try{
+  if(file.size<1000000)throw Error("Файл слишком маленький: это не наша модель героя");
+  say((fromCache?"Автоматически открываю сохранённого героя: ":"Проверяю модель: ")+fileName+"…");
+  objectUrl=URL.createObjectURL(file);
+  // The blob URL has no .glb suffix: explicitly select the glTF binary loader.
+  const imported=await B.SceneLoader.ImportMeshAsync(null,"",objectUrl,scene,undefined,".glb");
+  const meshes=imported.meshes.filter(m=>m.getTotalVertices?.()>0);
+  if(!meshes.length)throw Error("В GLB нет геометрии бойца");
+  const boneCount=Math.max(0,...(imported.skeletons||[]).map(s=>s.bones.length));
+  if(boneCount!==65)throw Error("Нужен скелет героя на 65 костей. В файле: "+boneCount);
+  const clips=new Map((imported.animationGroups||[]).map(g=>[g.name,g]));
+  const names=["Idle_Quaternius","Walk_Quaternius","Jog_Quaternius","Sprint_Quaternius"];
+  const missing=names.filter(n=>!clips.has(n));
+  if(missing.length)throw Error("Это не 4-motion Quaternius GLB. Нет: "+missing.join(", "));
+  for(const group of imported.animationGroups)group.stop();
+  const min=new B.Vector3(Infinity,Infinity,Infinity),max=new B.Vector3(-Infinity,-Infinity,-Infinity);
+  for(const mesh of meshes){
+    mesh.computeWorldMatrix(true);
+    const bounds=mesh.getBoundingInfo().boundingBox;
+    min.minimizeInPlace(bounds.minimumWorld);max.maximizeInPlace(bounds.maximumWorld);
+  }
+  const height=max.y-min.y;
+  if(!Number.isFinite(height)||height<=0)throw Error("Неправильные размеры модели");
+  const stage=new B.TransformNode("approved-american-hero-display",scene);
+  for(const mesh of imported.meshes)if(!mesh.parent)mesh.parent=stage;
+  for(const node of imported.transformNodes||[])if(!node.parent)node.parent=stage;
+  const scale=1.8/height;stage.scaling.setAll(scale);
+  stage.position.set(-(min.x+max.x)*.5*scale,-min.y*scale,-(min.z+max.z)*.5*scale);
+  camera.setTarget(new B.Vector3(0,.93,0));camera.radius=2.95;
+  const weaponState={};
+  if(!window.BattlefieldAmericanTwoHandIK)throw Error("Новая система IK не загрузилась");
+  await window.BattlefieldAmericanTwoHandIK.create({
+    scene,imported,root:stage,state:weaponState,
+    weaponRoot:"../assets/ww2-weapons/"
+  });
+  if(!weaponState.weaponRigReady)throw Error("Модуль оружия не инициализировался");
+  qa.weaponRig=weaponState.weaponRig;
+  qa.equipWeapon=weaponState.equipWeapon;
+  qa.setWeaponPose=weaponState.setWeaponPose;
+  qa.weaponId="uk-lee-enfield";
+  active={clips,clip:null,motionBlend:null};
+  qa.bones=boneCount;qa.clipCount=clips.size;qa.ready=true;
+  for(const button of buttons)button.disabled=false;
+  for(const button of document.querySelectorAll("[data-weapon]"))button.disabled=false;
+  $("prompt").textContent="Наш герой загружен. Переключай движения.";
+  $("load-label").textContent="Модель загружена";
+  $("load-label").style.display="none";
+  play("Idle_Quaternius");
+  const cached=fromCache||await saveHero(file);
+  $("prompt").textContent=cached?"Герой загружается автоматически. Файл сохранён на этом iPhone.":"Герой загружен. Safari не разрешил сохранить файл для следующего визита.";
+  qa.savedLocally=cached;
+ }catch(err){
+  qa.error=String(err?.message||err);
+  say("Ошибка модели: "+qa.error+"\nНужен american_hero_quaternius_4motions.glb");
+  $("load-label").textContent="Выбрать GLB ещё раз";
+  $("file").value="";
+ }finally{
+  loading=false;
+  if(objectUrl)URL.revokeObjectURL(objectUrl);
+ }
+}
+$("file").addEventListener("change",e=>{void loadHeroFile(e.target.files?.[0],false);});
+void (async()=>{
+ const saved=await readSavedHero();
+ if(saved){await loadHeroFile(saved,true);return;}
+ $("prompt").textContent="Выбери GLB один раз — Safari сохранит его для следующих открытий.";
+ $("load-label").textContent="Выбрать GLB героя";
+ say("Модель ещё не сохранена в этом браузере. После первого выбора попробую открывать её автоматически.");
+})();
+})();
+</script>
+</body></html>
