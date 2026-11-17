@@ -12,7 +12,7 @@ const {chromium,devices}=require('/tmp/babylon-qa/node_modules/playwright');
  const dest=path.resolve('babylon-qa-results/us-hero');
  fs.mkdirSync(dest,{recursive:true});
  try{
-  await page.goto('http://127.0.0.1:8758/babylon/us-combat-iphone-v3.html',
+  await page.goto('http://127.0.0.1:8758/babylon/us-combat-iphone-v4.html',
    {waitUntil:'domcontentloaded',timeout:90000});
   await page.waitForFunction(()=>window.__BATTLEFIELD_US_COMBAT_QA__?.ready||
    window.__BATTLEFIELD_US_COMBAT_QA__?.error,{timeout:150000});
