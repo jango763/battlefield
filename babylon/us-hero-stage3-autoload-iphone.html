@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#162019">
+<title>Battlefield · Автозагрузка американского героя · этап 3</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#162019;color:#f3f3e9;font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+#view{width:100%;height:100%;display:block;touch-action:none;outline:0}
+header{position:fixed;z-index:2;top:calc(env(safe-area-inset-top) + 9px);left:12px;right:12px;pointer-events:none;text-shadow:0 1px 4px #000b}
+h1{font-size:16px;margin:0 0 4px}header p{font-size:11px;margin:0;color:#d1dbd0}
+#panel{position:fixed;z-index:4;bottom:calc(env(safe-area-inset-bottom) + 9px);left:8px;right:8px;margin:0 auto;max-width:660px;padding:11px;border:1px solid #708773;border-radius:13px;background:#1d2e24ef;box-shadow:0 3px 25px #0009}
+#prompt{font-weight:700;font-size:13px;margin-bottom:8px}
+#motions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:8px}
+#motions button{min-height:48px;font-size:12px;border:1px solid #809c81;border-radius:8px;background:#36553c;color:#f6f8ed;font-weight:700;touch-action:manipulation}
+#motions button:disabled{opacity:.42}
+#motions button[aria-pressed=true]{background:#d3e5b2;color:#18251b}
+#status{font-size:12px;line-height:1.38;color:#f0dba6;margin-top:9px;min-height:32px;white-space:pre-line;overflow-wrap:anywhere}
+#info{font-size:11px;margin-top:4px;color:#c6d6c9}
+@media(max-width:385px){#panel{padding:8px}#motions button{font-size:11px;padding:8px 0}h1{font-size:14px}}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./native-clip-blend.js"></script>
+</head>
+<body>
+<canvas id="view" aria-label="Американский герой Battlefield, 3D-просмотр"></canvas>
+<header>
+<h1>Battlefield · Американский герой</h1>
+<p>Babylon.js · модель с 65 костями · Quaternius · проверка на iPhone</p>
+</header>
+<section id="panel" aria-label="Проверка движения героя">
+<div id="prompt">Загружаю американского героя напрямую из GitHub…</div>
+<div id="motions">
+<button data-clip="Idle_Quaternius" aria-pressed="true" disabled>Стойка</button>
+<button data-clip="Walk_Quaternius" disabled>Ходьба</button>
+<button data-clip="Jog_Quaternius" disabled>Бег</button>
+<button data-clip="Sprint_Quaternius" disabled>Спринт</button>
+</div>
+<div id="status" role="status" aria-live="polite">Автозагрузка модели из репозитория. Выбирать файл на iPhone не нужно.</div>
+<div id="info">Этап 3/10: только автоматическая загрузка и четыре анимации Quaternius. Хват оружия исправляем на следующих этапах.</div>
+</section>
+<script>
+(async function () {
+"use strict";
+const B=window.BABYLON,blend=window.BattlefieldNativeClipBlend;
+const $=id=>document.getElementById(id),status=$("status"),buttons=[...document.querySelectorAll("[data-clip]")];
+const qa={ready:false,error:null,clipCount:0,bones:0,framesPerSecond:0,selected:null,transitions:0};
+window.__US_HERO_QUATERNIUS_QA__=qa;
+const say=message=>{status.textContent=message;};
+if(!B?.SceneLoader || !blend) {
+ qa.error="Babylon.js не загрузился";say(qa.error+". Проверь подключение к интернету.");return;
+}
+let engine,scene,camera,active=null;
+try{
+ engine=new B.Engine($("view"),true,{powerPreference:"high-performance",stencil:true});
+ engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.6));
+ scene=new B.Scene(engine);
+ scene.useRightHandedSystem=true;
+ scene.clearColor=new B.Color4(.08,.12,.10,1);
+ const hemi=new B.HemisphericLight("ambient",new B.Vector3(0,1,0),scene);hemi.intensity=1.5;
+ const front=new B.DirectionalLight("key",new B.Vector3(-.6,-1,-.65),scene);front.intensity=1.25;
+ const rim=new B.DirectionalLight("rim",new B.Vector3(.7,-.4,.8),scene);rim.intensity=.65;
+ camera=new B.ArcRotateCamera("orbit",Math.PI/2,Math.PI*.44,3.35,new B.Vector3(0,.93,0),scene);
+ camera.lowerRadiusLimit=1.2;camera.upperRadiusLimit=7;camera.lowerBetaLimit=.22;camera.upperBetaLimit=Math.PI*.84;
+ camera.pinchDeltaPercentage=.016;camera.wheelDeltaPercentage=.016;camera.attachControl($("view"),true);
+ const ground=B.MeshBuilder.CreateDisc("ground",{radius:1.45,tessellation:64},scene);
+ ground.rotation.x=Math.PI/2;ground.position.y=-.025;ground.isPickable=false;
+ const groundMaterial=new B.StandardMaterial("groundMat",scene);
+ groundMaterial.diffuseColor=new B.Color3(.18,.24,.18);groundMaterial.specularColor=new B.Color3(.04,.04,.04);
+ ground.material=groundMaterial;
+ let sampled=0;
+ engine.runRenderLoop(()=>{
+  const dt=Math.min(.06,engine.getDeltaTime()/1000);
+  if(active)blend.update(active,dt);
+  sampled+=dt;
+  if(sampled>.7){qa.framesPerSecond=Math.round(engine.getFps());sampled=0;}
+  scene.render();
+ });
+ window.addEventListener("resize",()=>engine.resize());
+}catch(e){qa.error=String(e?.message||e);say("Не удалось запустить 3D: "+qa.error);return;}
+function play(name){
+ if(!active)return;
+ const clip=active.clips.get(name);
+ if(!clip)throw Error("Нет анимации "+name);
+ blend.play(active,clip,name.includes("Idle")?"ready":"run",{loop:true,duration:.22});
+ qa.selected=name;qa.transitions++;
+ for(const button of buttons)button.setAttribute("aria-pressed",String(button.dataset.clip===name));
+ say("Герой: "+name.replace("_Quaternius","")+" · "+qa.bones+" костей · "+qa.clipCount+" клипа · "+qa.framesPerSecond+" FPS\nОцени движение и переключай кнопки.");
+}
+for(const button of buttons)button.addEventListener("click",()=>{
+ try{play(button.dataset.clip)}catch(e){qa.error=String(e?.message||e);say(qa.error);}
+});
+async function autoLoadHero(){
+ if(qa.ready)return;
+ try{
+  say("Загружаю оригинальный GLB (4,47 МБ) автоматически…");
+  // Exact original file is committed in THIS isolated GitHub branch.
+  // Same-origin, revision-pinned relative path works on rawcdn.githack.com.
+  const imported=await B.SceneLoader.ImportMeshAsync(null,"../assets/allied-soldiers/","us-hero-quaternius.glb",scene);
+  const meshes=imported.meshes.filter(m=>m.getTotalVertices?.()>0);
+  if(!meshes.length)throw Error("В GLB нет геометрии бойца");
+  const boneCount=Math.max(0,...(imported.skeletons||[]).map(s=>s.bones.length));
+  if(boneCount!==65)throw Error("Нужен скелет героя на 65 костей. В файле: "+boneCount);
+  const clips=new Map((imported.animationGroups||[]).map(g=>[g.name,g]));
+  const names=["Idle_Quaternius","Walk_Quaternius","Jog_Quaternius","Sprint_Quaternius"];
+  const missing=names.filter(n=>!clips.has(n));
+  if(missing.length)throw Error("Это не 4-motion Quaternius GLB. Нет: "+missing.join(", "));
+  for(const group of imported.animationGroups)group.stop();
+  const min=new B.Vector3(Infinity,Infinity,Infinity),max=new B.Vector3(-Infinity,-Infinity,-Infinity);
+  for(const mesh of meshes){
+    mesh.computeWorldMatrix(true);
+    const bounds=mesh.getBoundingInfo().boundingBox;
+    min.minimizeInPlace(bounds.minimumWorld);max.maximizeInPlace(bounds.maximumWorld);
+  }
+  const height=max.y-min.y;
+  if(!Number.isFinite(height)||height<=0)throw Error("Неправильные размеры модели");
+  const stage=new B.TransformNode("approved-american-hero-display",scene);
+  for(const mesh of imported.meshes)if(!mesh.parent)mesh.parent=stage;
+  for(const node of imported.transformNodes||[])if(!node.parent)node.parent=stage;
+  const scale=1.8/height;stage.scaling.setAll(scale);
+  stage.position.set(-(min.x+max.x)*.5*scale,-min.y*scale,-(min.z+max.z)*.5*scale);
+  camera.setTarget(new B.Vector3(0,.93,0));camera.radius=3.35;
+  active={clips,clip:null,motionBlend:null};
+  qa.bones=boneCount;qa.clipCount=clips.size;qa.ready=true;
+  for(const button of buttons)button.disabled=false;
+  $("prompt").textContent="Герой автоматически загружен из GitHub. Выбирай анимацию.";
+  play("Idle_Quaternius");
+ }catch(err){
+  qa.error=String(err?.message||err);
+  say("Ошибка автоматической загрузки: "+qa.error+"\nПроверь подключение и открой ссылку в Safari.");
+ }
+}
+await autoLoadHero();
+})();
+</script>
+</body></html>
