@@ -68,7 +68,7 @@ for(const id of IDS){
 }
 {
  const c=prepare();c.weapon("uk-piat");c.setTrigger(true);
- c.tick(32);
+ for(let i=0;i<4;i++)c.tick(8);
  assert.equal(c.snapshot().shots,4);
  assert.equal(c.snapshot().total,0);
  assert(c.getEvents().some(e=>e.type==="out-of-ammo"));
