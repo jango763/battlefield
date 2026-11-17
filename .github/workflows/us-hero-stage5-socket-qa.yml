@@ -1,0 +1,41 @@
+name: US hero Lee-Enfield Stage 5 Weapon_R attachment
+on:
+  push:
+    branches:
+      - feature/us-hero-lee-enfield-weapon-socket-stage5-20261117
+    paths:
+      - 'babylon/us-hero-lee-enfield-stage5-socket.js'
+      - 'babylon/us-hero-lee-enfield-stage5-iphone.html'
+      - 'babylon/tests/test-us-hero-stage5-socket-browser.cjs'
+      - '.github/workflows/us-hero-stage5-socket-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  socket-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure v9 hero, rifle and new socket module are present
+        run: |
+          test -s assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb
+          test -s assets/ww2-weapons/uk-lee-enfield.glb
+          node --check babylon/us-hero-lee-enfield-stage5-socket.js
+          node --check babylon/tests/test-us-hero-stage5-socket-browser.cjs
+      - name: Install Chromium for iPhone-sized simulation
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage5-qa playwright@1.58.2
+          /tmp/stage5-qa/node_modules/.bin/playwright install chromium
+      - name: Test weapon-to-socket mount through stance, aim and root rotation
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/stage5-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-us-hero-stage5-socket-browser.cjs
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-hero-stage5-weapon-socket-images
+          path: babylon-qa-results/us-hero-stage5/
+          if-no-files-found: ignore
