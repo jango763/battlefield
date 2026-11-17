@@ -1,0 +1,24 @@
+name: American donor hand skeleton audit
+on:
+  push:
+    branches:
+      - feature/us-hero-lee-enfield-handfit-v6-20261117
+    paths:
+      - 'babylon/tools/compare-hand-donors.py'
+      - '.github/workflows/us-hero-hand-donors-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare existing GLB finger skinnings
+        run: |
+          python3 babylon/tools/compare-hand-donors.py \
+            assets/soldiers/german.glb \
+            babylon/animstudio-preview/models/all-animations.glb \
+            assets/native-hero-quaternius/night-striker-lite.glb \
+            assets/allied-soldiers/us-hero-quaternius.glb \
+            assets/allied-soldiers/us-hero-quaternius-finger-rig-v4.glb
