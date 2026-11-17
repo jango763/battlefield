@@ -481,7 +481,14 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    state.stockToShoulderMeters=B.Vector3.Distance(
       actualWeaponOrigin.add(V(m.shoulder,actualWeaponQ)),stockPoint);
    state.socketLocalDriftMeters=B.Vector3.Distance(pivot.position,mountLocalPosition);
-   const qDot=Math.abs(B.Quaternion.Dot(pivot.rotationQuaternion,mountLocalRotation));
+   const q0=pivot.rotationQuaternion,q1=mountLocalRotation;
+   // Babylon.js quaternions are often unit-length only within machine
+   // tolerance. Dot(q,q) can be 0.999999993 despite identical components.
+   // Normalize the DOT by both norms, otherwise a genuine zero-drift weapon
+   // intermittently fails with a fake 0.013° angular deviation.
+   const q0n=Math.hypot(q0.x,q0.y,q0.z,q0.w);
+   const q1n=Math.hypot(q1.x,q1.y,q1.z,q1.w);
+   const qDot=Math.abs(B.Quaternion.Dot(q0,q1)/(q0n*q1n));
    state.socketLocalRotationErrorDeg=2*Math.acos(B.Scalar.Clamp(qDot,-1,1))*180/Math.PI;
    if(pivot.parent!==right.socket)throw Error("Weapon detached from Weapon_R");
    if(state.socketLocalDriftMeters>.00001 || state.socketLocalRotationErrorDeg>.01)
