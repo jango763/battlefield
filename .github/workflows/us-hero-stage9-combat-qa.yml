@@ -1,0 +1,24 @@
+name: US hero stage9 authoritative damage & iPhone combat
+on:
+  push:
+    branches:
+      - feature/us-hero-stage9-targets-damage-20261118
+    paths:
+      - 'babylon/us-hero-stage9-*.js'
+      - 'babylon/us-hero-stage9-iphone.html'
+      - 'babylon/tests/test-us-hero-stage9-*.cjs'
+      - '.github/workflows/us-hero-stage9-combat-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  battle-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate authoritative Battlefield damage, hit/miss, splash, death and suppression
+        run: |
+          node --check babylon/us-hero-stage9-combat-bridge.js
+          node --check babylon/us-hero-stage9-target-visuals.js
+          node babylon/tests/test-us-hero-stage9-bridge.cjs
