@@ -159,12 +159,13 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
   const forward=arm.middle.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()).normalize();
   let palm=B.Vector3.Cross(across,forward).normalize();
   const thumb=arm.thumb.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition());
-  if(B.Vector3.Dot(palm,thumb)<0)palm.scaleInPlace(-1);
+  const palmSign=B.Vector3.Dot(palm,thumb)<0?-1:1;
+  palm.scaleInPlace(palmSign);
   const srcBasis=basis(forward,palm);
   const localBasis=handWorld.conjugate().multiply(srcBasis).normalize();
   const socketLocalOffset=rotate(arm.socket.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()),
                                   handWorld.conjugate());
-  calibrations[side]={localBasis,socketLocalOffset};
+  calibrations[side]={localBasis,socketLocalOffset,palmSign};
  }
  const stoppedTracks=stripArmTracks(imported.animationGroups);
  if(stoppedTracks!==32)throw Error("Expected 32 conflicting arm tracks, got "+stoppedTracks);
@@ -184,6 +185,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
  let mode="ready",stopped=false;
  const fingerControls={base:-1.12,middle:-.94,distal:-.50,thumbBase:-.84,thumbMiddle:-.78,thumbDistal:-.40};
  const state={ready:true,mode,armChannelsRemoved:stoppedTracks,fingerControls,
+  rightDirPreset:"donor",  // v9 QA: source-proven right hand finger frame can be changed in-place
   rightGripMeters:Infinity,leftGripMeters:Infinity,
   rightPalmErrorDeg:Infinity,leftPalmErrorDeg:Infinity,
   rightFingerErrorDeg:Infinity,leftFingerErrorDeg:Infinity,
@@ -204,7 +206,17 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
   const target=DONOR[mode][side];
   // Ara supplies elbow/finger stance. The actual Lee-Enfield author supplies
   // the trigger and handguard palm normals. Do not face both open palms outward.
-  const dir=side==="right"?V(target.dir,bQ).normalize():V(m.supportAxis,gQ).normalize();
+  const rightDirections={
+   donor:()=>V(target.dir,bQ),
+   gunDown:()=>V([0,-.95,.31],gQ),
+   gunDiagonal:()=>V([0,-.75,.66],gQ),
+   gunForward:()=>V(m.triggerAxis,gQ),
+   bodyDown:()=>V([0,-1,0],bQ),
+   across:()=>V([-.42,-.78,.46],gQ)
+  };
+  const dir=side==="right"
+     ?(rightDirections[state.rightDirPreset]||rightDirections.donor)().normalize()
+     :V(m.supportAxis,gQ).normalize();
   // SUPPORT: the left hand must CUP the underside of the wooden fore-end.
   // Previous v5 used manifest's downward normal and posed the palm ON TOP.
   const palm=side==="right"?V(m.triggerPalm,gQ).normalize():V(m.supportPalm,gQ).scale(-1).normalize();
@@ -216,12 +228,15 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
  function angleDeg(a,b){
   return Math.acos(B.Scalar.Clamp(B.Vector3.Dot(a.normalize(),b.normalize()),-1,1))*180/Math.PI;
  }
- function actualHandFrame(arm){
+ function actualHandFrame(arm,side){
   refresh(arm.hand);refresh(arm.index);refresh(arm.middle);refresh(arm.pinky);refresh(arm.thumb);
   const forward=arm.middle.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()).normalize();
   const cross=arm.index.getAbsolutePosition().subtract(arm.pinky.getAbsolutePosition()).normalize();
   let palm=B.Vector3.Cross(cross,forward).normalize();
-  if(B.Vector3.Dot(palm,arm.thumb.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()))<0)palm.scaleInPlace(-1);
+  // Use sign measured in the ORIGINAL rest pose.
+  // In v8 the bent thumb crossed the sign plane and made diagnostics flip ~180°,
+  // even when palm and wrist quaternions were stable.
+  palm.scaleInPlace(calibrations[side].palmSign);
   return {forward,palm};
  }
  // Corrected curl sign verified by seven on-screen comparisons.
@@ -298,7 +313,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
    calibrations.left.lastPalm=orientationL.palm;
    for(const name of fingerNames)foldFinger(name);
    refresh(right.socket);refresh(left.socket);
-   const rf=actualHandFrame(right),lf=actualHandFrame(left);
+   const rf=actualHandFrame(right,"right"),lf=actualHandFrame(left,"left");
    state.rightGripMeters=B.Vector3.Distance(right.socket.getAbsolutePosition(),rGrip);
    state.leftGripMeters=B.Vector3.Distance(left.socket.getAbsolutePosition(),lGrip);
    state.stockToShoulderMeters=B.Vector3.Distance(pivot.position.add(V(m.shoulder,gunQ)),stockPoint);
