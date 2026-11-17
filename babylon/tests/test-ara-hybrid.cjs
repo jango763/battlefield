@@ -1,0 +1,28 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const rig=require('../american-hero-ara-hybrid.js');
+assert.deepEqual(Object.keys(rig.GUNS),['uk-lee-enfield','uk-sten','uk-bren','uk-piat']);
+assert.equal(rig.GUNS['uk-piat'].prototype,true,'PIAT preview must be labeled prototype');
+const source=fs.readFileSync(path.join(__dirname,'..','american-hero-ara-hybrid.js'),'utf8');
+const viewer=fs.readFileSync(path.join(__dirname,'..','american-hero-ara-hybrid-iphone.html'),'utf8');
+assert(source.includes('const ARA_RIFLE='),'Rifle aim/ready direction definitions');
+assert(source.includes('calibration.Right=setupHand'),'Calibrate from REAL linked finger bones');
+assert(source.includes('poseWrist(right.hand'),'Control actual right wrist orientation');
+assert(source.includes('poseWrist(left.hand'),'Control actual left wrist orientation');
+assert(source.includes('rightFingerErrorDegrees'),'Do not trust only 0 cm IK');
+assert(source.includes('leftFingerErrorDegrees'));
+assert(source.includes('visualAccepted=false'),'Visual QA cannot be faked');
+assert(!source.includes('kar98k-user-v2.json'),'No blind German pose reuse');
+assert(viewer.includes('data-weapon="uk-piat"'));
+assert(viewer.includes('american-hero-ara-hybrid.js'));
+assert(!viewer.includes('test(file.name)'),'IndexedDB Blob auto-load regression');
+for(const c of ['Idle_Quaternius','Walk_Quaternius','Jog_Quaternius','Sprint_Quaternius'])
+  assert(viewer.includes(c),'Quaternius gait: '+c);
+const arms=['LeftShoulder','LeftArm','LeftForeArm','LeftHand','RightShoulder','RightArm','RightForeArm','RightHand'];
+const gaits=['Hips','Spine','LeftUpLeg','RightUpLeg','LeftFoot','RightFoot'];
+const groups=Array.from({length:4},()=>({targetedAnimations:[...arms,...gaits].map(name=>({target:{name:'mixamorig:'+name}}))}));
+assert.equal(rig.stripArmTracks(groups),32);
+assert(groups.every(g=>g.targetedAnimations.length===6),'Preserve every lower-body track');
+console.log('US_HERO_ARA_HYBRID_STRUCTURAL_QA_PASS');
