@@ -8,7 +8,9 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#102018;col
 #view{width:100%;height:100%;display:block;touch-action:none}
 header{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:14px;right:14px;pointer-events:none;text-shadow:0 1px 4px #000b}
 h1{font-size:16px;margin:0 0 5px}header p{font-size:11px;color:#d1dfcf;margin:0}
-#panel{position:fixed;z-index:5;bottom:calc(env(safe-area-inset-bottom) + 8px);left:8px;right:8px;max-width:680px;max-height:59vh;overflow-y:auto;margin:0 auto;background:#223a2feF;border:1px solid #738d79;border-radius:13px;padding:10px;box-shadow:0 4px 24px #0008}
+#panel{position:fixed;z-index:5;bottom:calc(env(safe-area-inset-bottom) + 8px);left:8px;right:8px;max-width:680px;max-height:47vh;overflow-y:auto;margin:0 auto;background:#223a2feF;border:1px solid #738d79;border-radius:13px;padding:10px;box-shadow:0 4px 24px #0008}
+#toggle-panel{position:fixed;z-index:8;right:12px;top:calc(env(safe-area-inset-top) + 46px);padding:7px 10px;min-height:34px;font-size:12px;background:#41634d;color:#fff;border:1px solid #98b7a0;border-radius:8px}
+body.range-fullscreen #panel{display:none}
 #prompt{font-size:13px;font-weight:700;margin:0 0 10px}
 #actions,#weapons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 #motions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:8px}
@@ -39,6 +41,7 @@ button:disabled{opacity:.4}
 <canvas id="view" aria-label="Американский герой с винтовкой Lee-Enfield"></canvas>
 <header><h1>Battlefield · Боевой полигон · этап 9</h1>
 <p>3 противника · попадания · урон · уничтожение</p></header>
+<button type="button" id="toggle-panel" aria-pressed="false" aria-label="Показать или скрыть управление">Скрыть панель</button>
 <section id="panel">
 <div id="prompt">Автоматически загружаю героя и винтовку…</div>
 <div id="actions">
@@ -84,6 +87,12 @@ const qa={ready:false,error:null,stage:9,weapon:"uk-lee-enfield",
  model:"us-hero-quaternius-donor-hands-v7.glb",
  pose:"ready",changes:0,motion:"idle",shots:0,reloads:0,fireHeld:false,authoritative:true};
 window.__US_HERO_STAGE9_QA__=qa;
+const togglePanel=document.getElementById("toggle-panel");
+togglePanel.addEventListener("click",()=>{
+ const full=document.body.classList.toggle("range-fullscreen");
+ togglePanel.textContent=full?"Показать управление":"Скрыть панель";
+ togglePanel.setAttribute("aria-pressed",String(full));
+});
 const say=s=>{$("status").textContent=s};
 if(!B?.SceneLoader||!blend||!grip||!bridge||!targetVisuals||!combatVFX||!window.BattlefieldBalance){
  qa.error="Babylon.js или модуль хвата не загружены";
