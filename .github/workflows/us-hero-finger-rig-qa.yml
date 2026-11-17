@@ -24,16 +24,35 @@ jobs:
           python-version: '3.12'
       - name: Install scientific mesh dependencies
         run: python -m pip install --disable-pip-version-check numpy scipy
-      - name: Reconstruct original finger skin weights on a COPY of the American GLB
+      - name: Reconstruct normalized U8 finger skin weights on a COPY of the American GLB
         run: python babylon/tools/repair-us-hero-finger-skinning.py
       - name: Verify 65 original bones, 36 meshes, 30 weighted phalanges
         run: |
-          python babylon/tools/audit-us-hero-finger-weights.py assets/allied-soldiers/us-hero-quaternius-finger-rig-v3.glb
+          python babylon/tools/audit-us-hero-finger-weights.py assets/allied-soldiers/us-hero-quaternius-finger-rig-v4.glb
+      - name: Verify normalized U8 skin weights sum to 255 for every hand vertex
+        run: |
+          python - <<'PY'
+          import struct,json,numpy as np
+          s=open('assets/allied-soldiers/us-hero-quaternius-finger-rig-v4.glb','rb').read()
+          j=struct.unpack_from('<I',s,12)[0]
+          doc=json.loads(s[20:20+j])
+          blob=s[28+j:]
+          for mesh_id in (21,22):
+            p=doc['meshes'][mesh_id]['primitives'][0]
+            a=doc['accessors'][p['attributes']['WEIGHTS_0']]
+            assert a['componentType']==5121 and a['normalized']
+            v=doc['bufferViews'][a['bufferView']]
+            offset=v['byteOffset']+a.get('byteOffset',0)
+            weights=np.ndarray((a['count'],4),dtype=np.uint8,buffer=blob,offset=offset)
+            totals=weights.astype(np.uint16).sum(axis=1)
+            assert np.all(totals==255), f'Skinning weights broken on mesh {mesh_id}'
+            print(mesh_id, 'vertex weights all normalized to 255:',len(totals))
+          PY
       - name: Commit ONLY the repaired American GLB to this feature branch
         run: |
           git config user.name "Battlefield model QA bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- assets/allied-soldiers/us-hero-quaternius-finger-rig-v3.glb
+          git add -- assets/allied-soldiers/us-hero-quaternius-finger-rig-v4.glb
           if ! git diff --cached --quiet; then
             git commit -m "Build experimental American hero GLB with 30 weighted phalanges"
             git push origin HEAD:feature/us-hero-fingers-rig-repair-20261117
