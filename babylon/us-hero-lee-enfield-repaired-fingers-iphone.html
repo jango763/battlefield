@@ -25,7 +25,7 @@ button:disabled{opacity:.4}
 <script src="./us-hero-ara-lee-enfield-stage4.js"></script>
 </head><body>
 <canvas id="view" aria-label="Американский герой с винтовкой Lee-Enfield"></canvas>
-<header><h1>Battlefield · Lee-Enfield · пальцы v3</h1>
+<header><h1>Battlefield · Lee-Enfield · пальцы v4</h1>
 <p>Американский герой · реконструированные веса пальцев · Babylon.js</p></header>
 <section id="panel">
 <div id="prompt">Автоматически загружаю героя и винтовку…</div>
@@ -42,7 +42,7 @@ button:disabled{opacity:.4}
 "use strict";
 const B=window.BABYLON,blend=window.BattlefieldNativeClipBlend,grip=window.BattlefieldUSLeeEnfieldStage4;
 const $=id=>document.getElementById(id);
-const qa={ready:false,error:null,stage:4,weapon:"uk-lee-enfield",model:"us-hero-quaternius-finger-rig-v3.glb",pose:"ready"};
+const qa={ready:false,error:null,stage:4,weapon:"uk-lee-enfield",model:"us-hero-quaternius-finger-rig-v4.glb",pose:"ready"};
 window.__US_HERO_STAGE4_QA__=qa;
 const say=s=>{$("status").textContent=s};
 if(!B?.SceneLoader||!blend||!grip){
@@ -101,7 +101,7 @@ try{
  });
  say("Загружаю 4,47 МБ исходного американского героя…");
  const imported=await B.SceneLoader.ImportMeshAsync(null,
-   "../assets/allied-soldiers/","us-hero-quaternius-finger-rig-v3.glb",scene);
+   "../assets/allied-soldiers/","us-hero-quaternius-finger-rig-v4.glb",scene);
  const bodies=imported.meshes.filter(m=>m.getTotalVertices?.()>0);
  if(bodies.length!==36)throw Error("Ожидаются 36 деталей героя, найдено "+bodies.length);
  if(imported.skeletons.length!==1||imported.skeletons[0].bones.length!==65)
