@@ -1,0 +1,71 @@
+name: US hero donor-rigged hands v7 mobile QA
+on:
+  push:
+    branches:
+      - feature/us-hero-lee-enfield-handfit-v6-20261117
+    paths:
+      - 'babylon/tools/build-us-hero-donor-hands.py'
+      - 'babylon/us-hero-lee-enfield-donor-hands-v7.html'
+      - 'babylon/tests/test-us-hero-donor-hands-v7-browser.cjs'
+      - '.github/workflows/us-hero-donor-hands-v7-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install mesh tools
+        run: python -m pip install --disable-pip-version-check numpy scipy
+      - name: Transplant genuine skinned hands into a COPY of American GLB
+        run: python babylon/tools/build-us-hero-donor-hands.py
+      - name: Validate model topology and all four original Quaternius clips
+        run: |
+          python - <<'PY'
+          import struct,json
+          name='assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb'
+          b=open(name,'rb').read();ln=struct.unpack_from('<I',b,12)[0]
+          j=json.loads(b[20:20+ln])
+          assert len(j['skins'][0]['joints'])==65
+          assert len(j['meshes'])==36
+          assert {x['name'] for x in j['animations']}=={
+            'Idle_Quaternius','Walk_Quaternius','Jog_Quaternius','Sprint_Quaternius'}
+          for i in (21,22):
+            p=j['meshes'][i]['primitives'][0]
+            weights=j['accessors'][p['attributes']['WEIGHTS_0']]
+            assert weights['normalized'] and weights['componentType']==5121
+            assert weights['count']>1500
+          print('DONOR_V7_TOPOLOGY_PASS',len(b))
+          PY
+      - name: Commit ONLY experimental donor-hands US GLB to feature branch
+        run: |
+          git config user.name "Battlefield character QA bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb
+          if ! git diff --cached --quiet; then
+            git commit -m "Build isolated American GLB with fully rigged approved donor hands"
+            git push origin HEAD:feature/us-hero-lee-enfield-handfit-v6-20261117
+          fi
+      - name: Install mobile Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage4-qa playwright@1.58.2
+          /tmp/stage4-qa/node_modules/.bin/playwright install chromium
+      - name: Render front/side hand grips and check runtime
+        run: |
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/stage4-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-us-hero-donor-hands-v7-browser.cjs
+      - name: Upload visual QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-hero-donor-hands-v7-render
+          path: babylon-qa-results/donor-hands-v7/
+          if-no-files-found: ignore
