@@ -1,0 +1,276 @@
+<!doctype html><html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#102018">
+<title>Battlefield · Стрельба, движение, перезарядка · этап 8</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#102018;color:#edf4e5;font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+#view{width:100%;height:100%;display:block;touch-action:none}
+header{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:14px;right:14px;pointer-events:none;text-shadow:0 1px 4px #000b}
+h1{font-size:16px;margin:0 0 5px}header p{font-size:11px;color:#d1dfcf;margin:0}
+#panel{position:fixed;z-index:5;bottom:calc(env(safe-area-inset-bottom) + 8px);left:8px;right:8px;max-width:680px;margin:0 auto;background:#223a2feF;border:1px solid #738d79;border-radius:13px;padding:12px;box-shadow:0 4px 24px #0008}
+#prompt{font-size:13px;font-weight:700;margin:0 0 10px}
+#actions,#weapons,#combat-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+#weapons,#combat-actions,#motion{margin-top:8px}
+#motion{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+#motion button{min-height:38px;font-size:12px}
+#panel{max-height:57vh;overflow-y:auto;overscroll-behavior:contain}
+#combat-actions [data-fire]{background:#a64a2d;color:#fff8f0;touch-action:none}
+#combat-actions [data-fire][aria-pressed="true"]{background:#da692d}
+#combat-actions [data-reload]{background:#5b6672}
+#ammo{font-size:13px;color:#d4ecb7;font-weight:700;padding:4px 0 0}
+#reload-bar{height:5px;background:#47634e;border-radius:4px;overflow:hidden;margin-top:5px}
+#reload-progress{height:100%;width:0%;background:#f2d492;transition:width .08s linear}
+button{font-size:14px;min-height:47px;touch-action:manipulation;border:1px solid #8ca48d;border-radius:9px;background:#385a45;color:#eff7ea;font-weight:700}
+button[aria-pressed="true"]{background:#d3e5b2;color:#20351b}
+button:disabled{opacity:.4}
+#status,#metrics{font-size:12px;line-height:1.4;margin-top:10px;overflow-wrap:anywhere}
+#status{color:#f2dfa7}#metrics{color:#e2f2dd}
+#info{font-size:11px;line-height:1.3;color:#c3d5c7;margin-top:8px}
+@media(max-width:385px){#panel{padding:9px}button{font-size:13px}h1{font-size:14px}}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./native-clip-blend.js"></script>
+<script src="./us-hero-stage8-rig.js"></script>
+<script src="./us-hero-stage8-combat.js"></script>
+<script src="./us-hero-stage8-effects.js"></script>
+</head><body>
+<canvas id="view" aria-label="Американский герой с винтовкой Lee-Enfield"></canvas>
+<header><h1>Battlefield · Стрельба и перезарядка · этап 8</h1>
+<p>4 оружия · Quaternius · удержание кнопки «Огонь»</p></header>
+<section id="panel">
+<div id="prompt">Автоматически загружаю героя и винтовку…</div>
+<div id="actions">
+<button data-pose="ready" aria-pressed="true" disabled>На изготовку</button>
+<button data-pose="aim" aria-pressed="false" disabled>Прицелиться</button>
+</div>
+<div id="motion">
+<button data-motion="idle" aria-pressed="true" disabled>Стоять</button>
+<button data-motion="walk" aria-pressed="false" disabled>Шаг</button>
+<button data-motion="jog" aria-pressed="false" disabled>Бег</button>
+<button data-motion="sprint" aria-pressed="false" disabled>Спринт</button>
+</div>
+<div id="weapons">
+<button data-weapon="uk-lee-enfield" aria-pressed="true" disabled>Lee-Enfield</button>
+<button data-weapon="uk-sten" aria-pressed="false" disabled>Sten</button>
+<button data-weapon="uk-bren" aria-pressed="false" disabled>Bren</button>
+<button data-weapon="uk-piat" aria-pressed="false" disabled>PIAT</button>
+</div>
+<div id="combat-actions">
+<button data-fire aria-pressed="false" disabled>Огонь · удерживать</button>
+<button data-reload disabled>Перезарядить</button>
+</div>
+<div id="ammo">Патроны: загрузка…</div>
+<div id="reload-bar"><div id="reload-progress"></div></div>
+<div id="status" role="status" aria-live="polite">Выбирать файлы не нужно.</div>
+<div id="metrics">Геометрия хвата ожидает загрузку.</div>
+<div id="info">Этап 8/10: стрельба и перезарядка, анимации ходьбы/бега Quaternius с оружием. Винтовка имеет бесконечные патроны и стреляет с места. Sten/Bren стреляют на ходу. PIAT имеет четыре снаряда. Эффекты выстрелов визуальные: попадания и урон в этой тестовой сцене не рассчитываются.</div>
+</section>
+<script>
+(async function(){
+"use strict";
+const B=window.BABYLON,blend=window.BattlefieldNativeClipBlend,grip=window.BattlefieldUSLeeEnfieldStage4,
+ combatApi=window.BattlefieldUSStage8Combat,effectsApi=window.BattlefieldUSStage8Effects;
+const $=id=>document.getElementById(id);
+const qa={ready:false,error:null,stage:8,weapon:"uk-lee-enfield",model:"us-hero-quaternius-donor-hands-v7.glb",pose:"ready",motion:"idle",changes:0,shots:0};
+window.__US_HERO_STAGE8_QA__=qa;
+const say=s=>{$("status").textContent=s};
+if(!B?.SceneLoader||!blend||!grip||!combatApi||!effectsApi){
+ qa.error="Babylon.js или модуль хвата не загружены";
+ say(qa.error+"; проверь соединение с интернетом");return;
+}
+try{
+ const engine=new B.Engine($("view"),true,{powerPreference:"high-performance",stencil:true});
+ engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.6));
+ const scene=new B.Scene(engine);scene.useRightHandedSystem=true;
+ scene.clearColor=new B.Color4(.066,.119,.091,1);
+ const amb=new B.HemisphericLight("ambient",new B.Vector3(0,1,0),scene);amb.intensity=1.5;
+ const front=new B.DirectionalLight("front",new B.Vector3(-.5,-1,-.65),scene);front.intensity=1.3;
+ const rim=new B.DirectionalLight("rim",new B.Vector3(.7,-.35,.75),scene);rim.intensity=.65;
+ const camera=new B.ArcRotateCamera("orbit",Math.PI/2,Math.PI*.44,3.1,
+   new B.Vector3(0,.96,0),scene);
+ camera.lowerRadiusLimit=1.0;camera.upperRadiusLimit=6;camera.lowerBetaLimit=.2;
+ camera.upperBetaLimit=Math.PI*.83;camera.pinchDeltaPercentage=.018;
+ camera.attachControl($("view"),true);
+ const ground=B.MeshBuilder.CreateDisc("ground",{radius:1.45,tessellation:48},scene);
+ ground.rotation.x=Math.PI/2;ground.position.y=-.025;ground.isPickable=false;
+ const mat=new B.StandardMaterial("ground",scene);mat.diffuseColor=new B.Color3(.18,.25,.19);
+ mat.specularColor=B.Color3.Black();ground.material=mat;
+ let active=null,rigInstance=null,combat=null,fx=null,sample=0,equipBusy=false;
+ engine.runRenderLoop(()=>{
+  const dt=Math.min(.06,engine.getDeltaTime()/1000);
+  if(active)blend.update(active,dt);
+  if(combat){
+   combat.tick(dt);
+   fx?.update(dt);
+  }
+  sample+=dt;
+  if(sample>.6){
+   sample=0;
+   if(rigInstance){
+    const r=rigInstance.report;
+    if(combat){
+     const c=combat.snapshot();
+     qa.shots=c.totalShots;
+     const fmt=n=>n===Infinity?"∞":String(n);
+     $("ammo").textContent=c.label+": "+fmt(c.loaded)+" / "+fmt(c.reserve)+
+       (c.reloading?" · перезарядка "+c.reloadRemaining.toFixed(1)+" c":
+        c.empty?" · запас исчерпан":"")+
+       " · выстрелов "+c.totalShots;
+     $("reload-progress").style.width=(c.reloading?(100*c.reloadProgress):0).toFixed(1)+"%";
+     $("status").dataset.reload=c.reloading?"true":"false";
+    }
+    const cm=x=>Number.isFinite(x)?(x*100).toFixed(1)+" см":"?";
+    // Curling bends phalanx landmarks; a palm normal recomputed from them
+    // can flip 180°, so do NOT show it as a visual-quality score.
+    $("metrics").textContent=
+     r.weaponLabel+" · "+r.weaponSource+
+     " · креплений "+r.mountCount+
+     " · смещение "+cm(r.socketLocalDriftMeters)+
+     " · хват правой "+cm(r.rightGripMeters)+
+     " · левая "+cm(r.leftGripMeters)+
+     " · цевьё "+(r.supportWithinHandguard?"в зоне":"вне зоны")+
+     " · изгиб локтя "+(Number.isFinite(r.leftElbowAngleDeg)?Math.round(r.leftElbowAngleDeg)+"°":"?")+
+     " · приклад "+cm(r.stockToShoulderMeters)+
+     (r.error?" · Ошибка: "+r.error:"")+
+     " · "+Math.round(engine.getFps())+" FPS";
+   }
+  }
+  scene.render();
+ });
+ window.addEventListener("resize",()=>engine.resize());
+ const buttons=[...document.querySelectorAll("[data-pose]")];
+ const weaponButtons=[...document.querySelectorAll("[data-weapon]")];
+ const motionButtons=[...document.querySelectorAll("[data-motion]")];
+ const fireButton=document.querySelector("[data-fire]");
+ const reloadButton=document.querySelector("[data-reload]");
+ async function changeWeapon(id){
+  if(!rigInstance||!combat||equipBusy||qa.weapon===id)return;
+  equipBusy=true;combat.setTrigger(false);
+  fireButton.setAttribute("aria-pressed","false");
+  weaponButtons.forEach(b=>b.disabled=true);
+  fireButton.disabled=true;reloadButton.disabled=true;
+  say("Загружаю "+id+" и перенастраиваю хват…");
+  try{
+   await rigInstance.equipWeapon(id);
+   combat.equip(id);qa.weapon=id;qa.changes++;
+   weaponButtons.forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.weapon===id)));
+   $("prompt").textContent="Американский герой · "+rigInstance.report.weaponLabel;
+   say(rigInstance.report.weaponLabel+" · готов. Стойка, стрельба и движение.");
+  }catch(e){qa.error=String(e?.message||e);say("Ошибка оружия: "+qa.error)}
+  finally{
+   equipBusy=false;weaponButtons.forEach(b=>b.disabled=false);
+   fireButton.disabled=false;reloadButton.disabled=false;
+  }
+ }
+ for(const btn of weaponButtons)btn.addEventListener("click",()=>{void changeWeapon(btn.dataset.weapon)});
+ const motionClips={idle:"Idle_Quaternius",walk:"Walk_Quaternius",
+  jog:"Jog_Quaternius",sprint:"Sprint_Quaternius"};
+ for(const btn of motionButtons)btn.addEventListener("click",()=>{
+  if(!combat||!active||equipBusy)return;
+  const next=btn.dataset.motion;
+  combat.setMotion(next);
+  qa.motion=next;
+  blend.play(active,active.clips.get(motionClips[next]),next,
+   {loop:true,duration:next==="sprint"?.19:.24});
+  motionButtons.forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.motion===next)));
+  say("Движение: "+btn.textContent+
+     (combat.snapshot().canFireMoving?" · можно стрелять":" · винтовка/PIAT стреляют только с места"));
+ });
+ function releaseFire(){
+  if(combat)combat.setTrigger(false);
+  fireButton.setAttribute("aria-pressed","false");
+ }
+ fireButton.addEventListener("pointerdown",e=>{
+  if(!combat||equipBusy)return;
+  e.preventDefault();
+  try{fireButton.setPointerCapture(e.pointerId)}catch(_){}
+  combat.setTrigger(true);fireButton.setAttribute("aria-pressed","true");
+  combat.tick(0);
+ });
+ for(const name of ["pointerup","pointercancel","lostpointercapture"])
+  fireButton.addEventListener(name,releaseFire);
+ window.addEventListener("blur",releaseFire);
+ document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="hidden")releaseFire();
+ });
+ reloadButton.addEventListener("click",()=>{
+  if(!combat||equipBusy)return;
+  const result=combat.beginReload({manual:true});
+  say(result.ok?"Перезарядка началась":({
+   "infinite-rifle-ammo":"У винтовки бесконечный запас: перезарядка не требуется",
+   "magazine-full":"Магазин полный",
+   "no-reserve":"Запас боеприпасов исчерпан",
+   "already-reloading":"Уже перезаряжается"
+  }[result.reason]||result.reason));
+ });
+ for(const button of buttons)button.addEventListener("click",()=>{
+  if(!rigInstance)return;
+  try{
+   const mode=button.dataset.pose;rigInstance.setPose(mode);qa.pose=mode;
+   for(const b of buttons)b.setAttribute("aria-pressed",String(b.dataset.pose===mode));
+   say(rigInstance.report.weaponLabel+" · "+(mode==="aim"?"прицел":"оружие на изготовку")+
+     ". Поверни камеру и проверь положение обеих ладоней.");
+  }catch(e){qa.error=String(e?.message||e);say("Ошибка позы: "+qa.error)}
+ });
+ say("Загружаю 4,47 МБ исходного американского героя…");
+ const imported=await B.SceneLoader.ImportMeshAsync(null,
+   "../assets/allied-soldiers/","us-hero-quaternius-donor-hands-v7.glb",scene);
+ // Keep original American face/clothing; tune ONLY the transplanted bare-hand material.
+ const donorSkin=scene.materials.find(mat=>mat.name.includes("Battlefield_US_Donor_Hands_Skin"));
+ if(donorSkin && donorSkin.albedoColor){
+  donorSkin.albedoColor=new B.Color3(.39,.275,.235);
+  donorSkin.metallic=0;donorSkin.roughness=.95;
+ }
+ const bodies=imported.meshes.filter(m=>m.getTotalVertices?.()>0);
+ if(bodies.length!==36)throw Error("Ожидаются 36 деталей героя, найдено "+bodies.length);
+ if(imported.skeletons.length!==1||imported.skeletons[0].bones.length!==65)
+  throw Error("Нужен исходный 65-костный герой");
+ const clips=new Map(imported.animationGroups.map(g=>[g.name,g]));
+ const expected=["Idle_Quaternius","Walk_Quaternius","Jog_Quaternius","Sprint_Quaternius"];
+ if(expected.some(n=>!clips.has(n)))throw Error("Не найдены 4 анимации Quaternius");
+ imported.animationGroups.forEach(g=>g.stop());
+ const min=new B.Vector3(Infinity,Infinity,Infinity),max=new B.Vector3(-Infinity,-Infinity,-Infinity);
+ for(const mesh of bodies){
+  mesh.computeWorldMatrix(true);const bb=mesh.getBoundingInfo().boundingBox;
+  min.minimizeInPlace(bb.minimumWorld);max.maximizeInPlace(bb.maximumWorld);
+ }
+ const h=max.y-min.y;
+ if(!(h>.1))throw Error("Неверный масштаб героя");
+ const stage=new B.TransformNode("us-approved-hero",scene);
+ for(const mesh of imported.meshes)if(!mesh.parent)mesh.parent=stage;
+ for(const node of imported.transformNodes)if(!node.parent)node.parent=stage;
+ const scale=1.8/h;stage.scaling.setAll(scale);
+ stage.position.set(-(min.x+max.x)*.5*scale,-min.y*scale,-(min.z+max.z)*.5*scale);
+ camera.setTarget(new B.Vector3(0,.96,0));camera.radius=2.95;
+ say("Герой загружен, выставляю приклад и две кисти…");
+ rigInstance=await grip.create({scene,imported,stage,weaponRoot:"../assets/ww2-weapons/",initialWeaponId:"uk-lee-enfield"});
+ combat=combatApi.create({weapon:"uk-lee-enfield",onEvent(event){
+  if(event.type==="shot"&&fx)fx.fire(event);
+  if(event.type==="depleted"&&event.weapon!=="uk-lee-enfield"){
+   combat.setTrigger(false);
+   void changeWeapon("uk-lee-enfield"); // existing battle-rule fallback
+  }
+ }});
+ fx=effectsApi.create({scene,rig:rigInstance,combat});
+ active={clips,clip:null,motionBlend:null};
+ blend.play(active,clips.get("Idle_Quaternius"),"ready",{loop:true,duration:.2});
+ qa.rig=rigInstance.report;qa.rigInstance=rigInstance;qa.combat=combat;
+ qa.effects=fx;qa.ready=true;qa.bones=65;
+ qa.armTracksRemoved=rigInstance.report.armChannelsRemoved;
+ buttons.forEach(b=>b.disabled=false);
+ weaponButtons.forEach(b=>b.disabled=false);
+ motionButtons.forEach(b=>b.disabled=false);
+ fireButton.disabled=false;reloadButton.disabled=false;
+ $("prompt").textContent="Герой готов · стрельба и движение";
+ say("Выбери оружие и движение. Удерживай «Огонь», нажми «Перезарядить». Выбирать GLB не нужно.");
+}catch(e){
+ qa.error=String(e?.message||e);
+ say("Ошибка загрузки или хвата: "+qa.error+
+   ". Файл выбирать не нужно — пришли скрин этой ошибки.");
+ $("prompt").textContent="Не удалось собрать боевую стойку";
+}
+})();
+</script>
+</body></html>
