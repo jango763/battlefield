@@ -1,0 +1,26 @@
+name: Export approved internal hand donor models to isolated QA
+on:
+  push:
+    branches:
+      - feature/us-hero-lee-enfield-handfit-v6-20261117
+    paths:
+      - '.github/workflows/us-hero-hand-donor-models.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package original project models for rig analysis only
+        run: |
+          mkdir -p export-models
+          cp assets/soldiers/german.glb export-models/approved-german-donor.glb
+          cp assets/native-hero-quaternius/night-striker-lite.glb export-models/alternate-donor.glb
+          ls -lh export-models/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: original-finger-donor-glb-qa
+          path: export-models/*.glb
+          if-no-files-found: error
