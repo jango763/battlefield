@@ -1,0 +1,18 @@
+name: Inspect existing Kar98k hold animation
+on:
+  push:
+    branches: [feature/us-hero-lee-enfield-handfit-v6-20261117]
+    paths: [.github/workflows/us-hero-kar98k-pose-extract.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  extract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: internal-kar98k-approved-animation-library
+          path: babylon/animstudio-preview/models/all-animations.glb
+          if-no-files-found: error
