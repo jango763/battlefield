@@ -214,6 +214,7 @@ function create({scene,imported,root:actorRoot,state,weaponRoot="../assets/ww2-w
   const parentQ=hand.parent?worldRotation(hand.parent):B.Quaternion.Identity();
   hand.rotationQuaternion=parentQ.conjugate().multiply(desiredWorld).normalize();
   refresh(hand);
+  refresh(middle); // Re-evaluate finger geometry after the wrist changed, not stale matrices.
   return {turnDegrees:Math.round(2*Math.acos(Math.min(1,Math.abs(delta.w)))*180/Math.PI),
    directionErrorDegrees:Math.round(Math.acos(B.Scalar.Clamp(B.Vector3.Dot(
     middle.getAbsolutePosition().subtract(hand.getAbsolutePosition()).normalize(),targetFinger),-1,1))*180/Math.PI)};
