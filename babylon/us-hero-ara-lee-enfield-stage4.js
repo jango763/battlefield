@@ -396,14 +396,17 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
    state.mode=mode;state.error=null;
   }catch(e){state.error=String(e?.message||e);console.error("Stage4 rifle pose",e);}
  }
- const observer=scene.onBeforeRenderObservable.add(update);
+ // Stage4 is a static pose review. Solve IK once, not 8 finger chains every
+ // render frame. Aiming triggers another solve through setPose().
+ // Future locomotion will use baked upper-body weapon clips, not full IK each frame.
+ const observer=null;
  update();
  return {
   report:state,setPose(next){
    if(!["ready","aim"].includes(next))throw Error("Stage4 supports only ready or aim");
    mode=next;update();return state;
   },
-  dispose(){stopped=true;scene.onBeforeRenderObservable.remove(observer);container.dispose();pivot.dispose();}
+  dispose(){stopped=true;if(observer)scene.onBeforeRenderObservable.remove(observer);container.dispose();pivot.dispose();}
  };
 }
 return Object.freeze({create,stripArmTracks,CANON,DONOR});
