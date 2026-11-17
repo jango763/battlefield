@@ -64,9 +64,8 @@ const dir="babylon-qa-results/us-hero-stage7";
       throw Error(id+" elbow invalid: "+x.data.leftElbowAngleDeg);
     if(x.data.socketLocalDriftMeters>1e-5||x.data.socketLocalRotationErrorDeg>.01)
       throw Error(id+" firearm local mount drift");
-    if(x.data.rightGripMeters>.02||x.data.leftGripMeters>.16)
+    if(x.data.rightGripMeters>.01||x.data.leftGripMeters>.03)
       throw Error(id+" hand is detached: "+x.data.rightGripMeters+"/"+x.data.leftGripMeters);
-    if(x.data.leftGripMeters>.03)console.warn("STAGE7_SUPPORT_REACH_NEEDS_CALIBRATION",id,pose,x.data.leftGripMeters);
     if(id==="uk-piat"){
      if(x.piatMeshes<8)throw Error("PIAT procedural mesh missing");
      if(!x.data.weaponSource.includes("Procedural"))throw Error("PIAT mislabeled as GLB");
