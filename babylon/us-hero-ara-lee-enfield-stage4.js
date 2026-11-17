@@ -197,6 +197,8 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
  const state={ready:true,mode,armChannelsRemoved:stoppedTracks,fingerControls,
   rightGripMeters:Infinity,leftGripMeters:Infinity,
   rightSocketMeters:Infinity,leftSocketMeters:Infinity,
+  fingerMode:"surface",fingerSurfaceErrorMeters:Infinity,
+  fingerActualErrorMeters:Infinity,processedFingerChains:0,
   palmTarget:"MCP-based anatomical palm center (not wrist joint)",
   rightPalmErrorDeg:Infinity,leftPalmErrorDeg:Infinity,
   rightFingerErrorDeg:Infinity,leftFingerErrorDeg:Infinity,
@@ -268,6 +270,58 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
   if(next)refresh(next);
  }
 
+
+ function surfaceFingerGrip(gunQ,supportZ){
+  // Solve four real phalanx chains against a rounded wooden grip/fore-end.
+  // Goal is on the *surface*, not at a generic finger curl angle.
+  // Source has genuine donor-skinned 3-bone fingers (no new hand meshes).
+  const zaxis=V([0,0,1],gunQ).normalize();
+  const solveSide=(side,zBase,yBase,radius)=>{
+   const shaftCenter=pivot.position.add(V([0,yBase,zBase],gunQ));
+   const arm=limbs[side],tips=[];
+   let totalSurfaceError=0,totalActualError=0,chainCount=0;
+   for(const finger of ["Index","Middle","Ring","Pinky"]){
+    const first=byName.get(side+"hand"+finger.toLowerCase()+"1");
+    const second=byName.get(side+"hand"+finger.toLowerCase()+"2");
+    const third=byName.get(side+"hand"+finger.toLowerCase()+"3");
+    if(!first||!second||!third)throw Error("Missing skinned phalanx "+side+" "+finger);
+    refresh(first);refresh(second);refresh(third);
+    const root=first.getAbsolutePosition().clone();
+    const along=B.Vector3.Dot(root.subtract(shaftCenter),zaxis);
+    const slice=shaftCenter.add(zaxis.scale(along));
+    let radial=root.subtract(slice);
+    if(radial.lengthSquared()<1e-9)radial=V([side==="right"?.02:-.02,0,0],gunQ);
+    radial.normalize();
+    // The first two phalanges curve around the cross-section toward the far side.
+    const far=slice.subtract(radial.scale(radius))
+       .add(zaxis.scale(finger==="Index"?.005:-.003));
+    const n1=B.Vector3.Distance(root,second.getAbsolutePosition());
+    const n2=B.Vector3.Distance(second.getAbsolutePosition(),third.getAbsolutePosition());
+    const farDist=B.Vector3.Distance(root,far);
+    const ideal=farDist<=n1+n2-.002?far:
+      root.add(far.subtract(root).scale((n1+n2-.003)/Math.max(farDist,1e-8)));
+    const pole=root.add(zaxis.scale(.025)).add(radial.scale(.005));
+    const solved=solveLimb({upper:first,fore:second,hand:third},ideal,pole);
+    refresh(third);
+    const result=third.getAbsolutePosition();
+    totalSurfaceError+=B.Vector3.Distance(result,far);
+    totalActualError+=solved.error;
+    chainCount++;
+   }
+   return {distance:totalSurfaceError,ik:totalActualError,count:chainCount};
+  };
+  const right=solveSide("right",-.04,m.trigger[1]-.012,.017);
+  const left=solveSide("left",supportZ,m.support[1]-.008,.022);
+  // Thumb opposes fingers: keep authentic donor thumb phalanges, with
+  // restrained angles rather than turning the entire digit into a spike.
+  for(const side of ["right","left"]){
+   for(const name of fingerNames)if(name.startsWith(side+"handthumb"))foldFinger(name);
+  }
+  const cnt=right.count+left.count;
+  return {surface:(right.distance+left.distance)/cnt,
+   error:(right.ik+left.ik)/cnt,count:cnt};
+ }
+
  function update(){
   if(stopped)return;
   try{
@@ -309,7 +363,17 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
    // Curl each original finger using joint-native axes (no duplicate hand meshes).
    calibrations.right.lastPalm=orientationR.palm;
    calibrations.left.lastPalm=orientationL.palm;
-   for(const name of fingerNames)foldFinger(name);
+   if(state.fingerMode==="surface"){
+    const grasp=surfaceFingerGrip(gunQ,z);
+    state.fingerSurfaceErrorMeters=grasp.surface;
+    state.fingerActualErrorMeters=grasp.error;
+    state.processedFingerChains=grasp.count;
+   }else{
+    for(const name of fingerNames)foldFinger(name);
+    state.fingerSurfaceErrorMeters=Infinity;
+    state.fingerActualErrorMeters=Infinity;
+    state.processedFingerChains=0;
+   }
    refresh(right.socket);refresh(left.socket);
    const rf=actualHandFrame(right),lf=actualHandFrame(left);
    // Read the actual palm center on the *deformed* skeleton, not its wrist socket.
