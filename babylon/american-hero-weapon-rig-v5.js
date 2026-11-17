@@ -16,7 +16,8 @@ const ARMS=new Set(["leftshoulder","leftarm","leftforearm","lefthand",
 const GUNS=Object.freeze({
  "uk-lee-enfield":{label:"Lee-Enfield",file:"uk-lee-enfield.glb",supportZ:.20},
  "uk-sten":{label:"Sten",file:"uk-sten.glb",supportZ:.18},
- "uk-bren":{label:"Bren",file:"uk-bren.glb",supportZ:.17}
+ "uk-bren":{label:"Bren",file:"uk-bren.glb",supportZ:.17},
+ "uk-piat":{label:"PIAT",file:null,supportZ:.13}
 });
 function stripArmTracks(groups){
  let removed=0;
@@ -157,7 +158,7 @@ function create({scene,imported,root:actorRoot,state,weaponRoot="../assets/ww2-w
   leftReachable:false,rightReachable:false,uniqueHands:2,
   suppressedConflictingArmTracks:stripped,error:null,originalMeshes:displayMeshes.length};
  state.weaponRig=report;
- let manifest=null,container=null,currentMeta=null,mode="ready",updating=false,stopped=false,generation=0;
+ let manifest=null,container=null,rocketMeshes=[],rocketMats=[],currentMeta=null,mode="ready",updating=false,stopped=false,generation=0;
  const restoreArms=()=>{
   for(const [node,q] of rest)node.rotationQuaternion=q.clone();
  };
@@ -273,6 +274,36 @@ function create({scene,imported,root:actorRoot,state,weaponRoot="../assets/ww2-w
   }catch(e){report.error=String(e?.message||e)}
   finally{updating=false}
  }
+ function clearPiat(){for(const mesh of rocketMeshes)mesh.dispose();for(const mat of rocketMats)mat.dispose();rocketMeshes=[];rocketMats=[];}
+ function createPiat(){
+   // Separate PIAT spigot-projector mockup with an open front bomb tray.
+   // This is NOT a German Panzerschreck and is intentionally marked PROTOTYPE.
+   function material(name,col){
+     const m=new B.StandardMaterial(name,scene);m.diffuseColor=B.Color3.FromHexString(col);
+     rocketMats.push(m);return m;
+   }
+   const olive=material("PIAT-olive","#59634e"),dark=material("PIAT-dark","#262b25"),
+     wood=material("PIAT-wood","#655642");
+   function put(mesh,pos,mat,rotation){
+     mesh.parent=pivot;mesh.position.set(...pos);mesh.material=mat;
+     if(rotation)mesh.rotation.set(...rotation);rocketMeshes.push(mesh);
+   }
+   function box(name,sizes,p,mat){
+     put(B.MeshBuilder.CreateBox(name,{width:sizes[0],height:sizes[1],depth:sizes[2]},scene),p,mat);
+   }
+   function tube(name,diameter,length,p,mat){
+     put(B.MeshBuilder.CreateCylinder(name,{diameter,height:length,tessellation:12},scene),
+       p,mat,[Math.PI/2,0,0]);
+   }
+   tube("PIAT spring housing",.115,.67,[0,0,-.09],olive);
+   box("PIAT open launch tray",[.11,.022,.44],[0,.06,.36],olive);
+   for(const x of [-.055,.055])box("PIAT tray side",[.018,.074,.44],[x,.083,.36],olive);
+   box("PIAT padded butt",[.135,.13,.20],[0,-.055,-.43],wood);
+   box("PIAT trigger grip",[.06,.16,.066],[0,-.17,-.15],wood);
+   box("PIAT front support",[.075,.09,.085],[0,-.11,.13],wood);
+   box("PIAT rear iron sight",[.03,.09,.03],[0,.11,-.30],dark);
+   box("PIAT folded monopod",[.022,.23,.022],[0,-.17,.36],olive);
+ }
  async function equip(id){
   if(!GUNS[id])throw Error("Unknown Allied weapon: "+id);
   const token=++generation;
@@ -282,17 +313,25 @@ function create({scene,imported,root:actorRoot,state,weaponRoot="../assets/ww2-w
    manifest=await response.json();
   }
   const spec=GUNS[id],entry=manifest.weapons?.[id];
-  if(!entry||entry.file!==spec.file||!Array.isArray(entry.trigger)||
-     !Array.isArray(entry.support)||!Array.isArray(entry.shoulder))
-   throw Error("Missing original Allied weapon metadata "+id);
-  const loaded=await B.SceneLoader.LoadAssetContainerAsync("",weaponRoot+entry.file,scene);
-  if(token!==generation){loaded.dispose();return;}
+  const piat=id==="uk-piat";
+  const PIAT={trigger:[0,-.15,-.15],support:[0,-.11,.13],
+    shoulder:[0,-.055,-.43],file:null};
+  const metadata=piat?PIAT:entry;
+  if(!metadata||metadata.file!==spec.file||!Array.isArray(metadata.trigger)||
+     !Array.isArray(metadata.support)||!Array.isArray(metadata.shoulder))
+    throw Error("Invalid British weapon sockets "+id);
+  const loaded=piat?null:await B.SceneLoader.LoadAssetContainerAsync("",weaponRoot+metadata.file,scene);
+  if(token!==generation){loaded?.dispose();return;}
   if(container){container.dispose();container=null}
-  loaded.addAllToScene();
-  for(const node of [...loaded.meshes,...loaded.transformNodes])if(!node.parent)node.parent=pivot;
-  container=loaded;
-  currentMeta={...entry,gripSupportZ:Math.min(entry.support[2],spec.supportZ)};
-  report.weapon=id;report.asset="original MIT GLB";report.ready=true;
+  clearPiat();
+  if(loaded){
+    loaded.addAllToScene();
+    for(const node of [...loaded.meshes,...loaded.transformNodes])if(!node.parent)node.parent=pivot;
+    container=loaded;
+  }else createPiat();
+  currentMeta={...metadata,gripSupportZ:Math.min(metadata.support[2],spec.supportZ)};
+  report.weapon=id;report.asset=piat?"PIAT procedural prototype":"original licensed GLB";
+  report.ready=true;
   update();
  }
  function setPose(value){mode=value==="run"?"run":"ready";update()}
@@ -300,7 +339,7 @@ function create({scene,imported,root:actorRoot,state,weaponRoot="../assets/ww2-w
  state.weaponRigReady=false;
  state.equipWeapon=equip;
  state.setWeaponPose=setPose;
- state.disposeWeaponRig=()=>{stopped=true;scene.onBeforeRenderObservable.remove(observer);container?.dispose();pivot.dispose()};
+ state.disposeWeaponRig=()=>{stopped=true;scene.onBeforeRenderObservable.remove(observer);container?.dispose();clearPiat();pivot.dispose()};
  return equip("uk-lee-enfield").then(()=>{
   state.weaponRigReady=true;
   return report;
