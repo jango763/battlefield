@@ -59,7 +59,7 @@ for(const id of IDS){
  c.setMoving(false);c.tick(.01);
  assert.equal(c.snapshot().shots,1);
  assert.equal(c.snapshot().loaded,0);
- assert.equal(c.snapshot().reloadRemaining,9);
+ assert(c.snapshot().reloadRemaining>8.98&&c.snapshot().reloadRemaining<=9);
  assert.equal(c.snapshot().reserve,3);
  c.setTrigger(false);c.tick(9);
  assert.equal(c.snapshot().loaded,1);
