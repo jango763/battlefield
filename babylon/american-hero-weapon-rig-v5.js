@@ -14,10 +14,10 @@ const CANON=n=>String(n||"").replace(/^mixamorig[:_]?/i,"").replace(/[^a-zA-Z0-9
 const ARMS=new Set(["leftshoulder","leftarm","leftforearm","lefthand",
  "rightshoulder","rightarm","rightforearm","righthand"]);
 const GUNS=Object.freeze({
- "uk-lee-enfield":{label:"Lee-Enfield",file:"uk-lee-enfield.glb",supportZ:.20},
- "uk-sten":{label:"Sten",file:"uk-sten.glb",supportZ:.18},
- "uk-bren":{label:"Bren",file:"uk-bren.glb",supportZ:.17},
- "uk-piat":{label:"PIAT",file:null,supportZ:.13}
+ "uk-lee-enfield":{label:"Lee-Enfield",file:"uk-lee-enfield.glb",supportZ:.32},
+ "uk-sten":{label:"Sten",file:"uk-sten.glb",supportZ:.30},
+ "uk-bren":{label:"Bren",file:"uk-bren.glb",supportZ:.30},
+ "uk-piat":{label:"PIAT",file:null,supportZ:.25}
 });
 function stripArmTracks(groups){
  let removed=0;
@@ -199,9 +199,12 @@ function create({scene,imported,root:actorRoot,state,weaponRoot="../assets/ww2-w
   for(const [name,node] of fingers){
    const isThumb=name.includes("thumb");
    const seg=Number(name[name.length-1]);
-   const bend=isThumb?(.18-.025*seg):seg===1?.25:seg===2?.32:.14;
+   // Original GLB finger segments extend primarily down and forward;
+   // curling around LOCAL X wraps them toward the weapon instead of
+   // twisting them sideways (old local-Z bend caused butterfly fingers).
+   const bend=isThumb?(.50-.06*seg):seg===1?.85:seg===2?1.10:.60;
    node.rotationQuaternion=rest.get(node).multiply(
-    B.Quaternion.RotationAxis(isThumb?B.Axis.X:B.Axis.Z,-bend)).normalize();
+    B.Quaternion.RotationAxis(isThumb?B.Axis.Z:B.Axis.X,-bend)).normalize();
   }
  }
  function update(){
@@ -230,7 +233,7 @@ function create({scene,imported,root:actorRoot,state,weaponRoot="../assets/ww2-w
    let trigger=pivot.position.add(rotate(V(...currentMeta.trigger),gunQ));
    // The right hand is the weapon's dominant control point. Its wrist is
    // positioned beside the trigger, never on the center of the rib cage.
-   const rightGripOffset=rotate(V(-.018,-.015,0),gunQ);
+   const rightGripOffset=rotate(V(-.015,-.040,-.010),gunQ);
    const rightGoal=trigger.add(rightGripOffset);
    const rightPole=right.upper.getAbsolutePosition()
      .add(body.x.scale(-.24)).add(body.y.scale(-.24)).add(body.z.scale(.12));
@@ -249,7 +252,7 @@ function create({scene,imported,root:actorRoot,state,weaponRoot="../assets/ww2-w
    const support=pivot.position.add(rotate(V(0,
      Number(currentMeta.support?.[1]||.04),
      Number(currentMeta.gripSupportZ)),gunQ));
-   const leftGoal=support.add(rotate(V(.015,-.013,-.016),gunQ));
+   const leftGoal=support.add(rotate(V(.015,-.055,-.005),gunQ));
    const l=solveArm(left,leftGoal,leftPole);
    const rr=orientAnatomicalHand("Right",right.hand,gunQ);
    const ll=orientAnatomicalHand("Left",left.hand,gunQ);
