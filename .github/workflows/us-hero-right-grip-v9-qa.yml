@@ -1,0 +1,37 @@
+name: American Lee-Enfield right-hand axis calibration v9
+on:
+  push:
+    branches:
+      - feature/us-hero-right-grip-axes-v9-20261117
+    paths:
+      - 'babylon/us-hero-ara-lee-enfield-stage4.js'
+      - 'babylon/us-hero-right-grip-axes-v9-iphone.html'
+      - 'babylon/tests/test-us-hero-right-axes-v9-browser.cjs'
+      - '.github/workflows/us-hero-right-grip-v9-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  calibration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage4 static regression
+        run: node babylon/tests/test-us-hero-stage4-static.cjs
+      - name: Browser dependencies
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage4-qa playwright@1.58.2
+          /tmp/stage4-qa/node_modules/.bin/playwright install chromium
+      - name: Render six right-hand grip alternatives without changing the left hand
+        run: |
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/stage4-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-us-hero-right-axes-v9-browser.cjs
+      - name: Upload all comparisons
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-hero-right-grip-v9-axes
+          path: babylon-qa-results/right-grip-v9/
+          if-no-files-found: ignore
