@@ -1,0 +1,36 @@
+name: US hero v9 anatomical palm sockets QA
+on:
+  push:
+    branches:
+      - feature/us-hero-anatomical-palm-sockets-v9-20261117
+    paths:
+      - 'babylon/us-hero-ara-lee-enfield-stage4.js'
+      - 'babylon/us-hero-lee-enfield-palm-v9-iphone.html'
+      - 'babylon/tests/test-us-hero-palm-v9-browser.cjs'
+      - '.github/workflows/us-hero-palm-v9-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static tests; ensure one model and Quaternius motion
+        run: node babylon/tests/test-us-hero-stage4-static.cjs
+      - name: Install mobile Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage4-qa playwright@1.58.2
+          /tmp/stage4-qa/node_modules/.bin/playwright install chromium
+      - name: Render ready/aim anatomical grips and closeups
+        run: |
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/stage4-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-us-hero-palm-v9-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: us-hero-anatomical-palm-v9
+          path: babylon-qa-results/palm-v9/
+          if-no-files-found: ignore
