@@ -483,7 +483,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    state.socketLocalRotationErrorDeg=2*Math.acos(B.Scalar.Clamp(qDot,-1,1))*180/Math.PI;
    if(pivot.parent!==right.socket)throw Error("Weapon detached from Weapon_R");
    if(state.socketLocalDriftMeters>.00001 || state.socketLocalRotationErrorDeg>.01)
-     throw Error("Weapon socket local attachment changed unexpectedly");
+     throw Error("Weapon socket local attachment changed unexpectedly "+weaponId+" position="+state.socketLocalDriftMeters+" rotationDeg="+state.socketLocalRotationErrorDeg+" current="+pivot.position.asArray()+" stored="+mountLocalPosition.asArray());
    state.rightIKMeters=rSolve.error;state.leftIKMeters=lSolve.error;
    state.rightReachable=rSolve.reachable;state.leftReachable=lSolve.reachable;
    state.rightPalmErrorDeg=angleDeg(rf.palm,orientationR.palm);
