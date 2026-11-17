@@ -38,6 +38,20 @@ class GLB:
  def put(self,index,values):
   a,off,stride,fmt,count=self.ref(index)
   assert values.shape==(a['count'],count)
+  if a['componentType']==5121 and a.get('normalized'):
+   # Source glTF WEIGHTS_0 is U8 normalized: 255 is 1.0.
+   # Quantize each 4-weight row to EXACTLY 255; otherwise skinning
+   # collapses toward origin and creates long spikes.
+   raw=np.clip(values.astype(float),0,1)*255
+   result=np.floor(raw).astype(np.int32)
+   remainder=255-result.sum(axis=1)
+   decimals=raw-result
+   for i in range(len(remainder)):
+    for j in np.argsort(-decimals[i],kind='stable')[:int(remainder[i])]:
+     result[i,j]+=1
+   if not np.all(result.sum(axis=1)==255):
+    raise ValueError("Invalid normalized U8 weights")
+   values=result
   for i,row in enumerate(values):
    row=[float(x) if fmt=='f' else int(x) for x in row]
    struct.pack_into('<'+fmt*count,self.binary,off+i*stride,*row)
@@ -144,5 +158,5 @@ def repair(src,out):
 if __name__=='__main__':
  p=argparse.ArgumentParser()
  p.add_argument('--input',default='assets/allied-soldiers/us-hero-quaternius.glb')
- p.add_argument('--output',default='assets/allied-soldiers/us-hero-quaternius-finger-rig-v3.glb')
+ p.add_argument('--output',default='assets/allied-soldiers/us-hero-quaternius-finger-rig-v4.glb')
  a=p.parse_args();repair(a.input,a.output)
