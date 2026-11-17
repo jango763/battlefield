@@ -1,0 +1,142 @@
+<!doctype html><html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#102018">
+<title>Battlefield · Американский герой · проверка восстановленного skinning пальцев</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#102018;color:#edf4e5;font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+#view{width:100%;height:100%;display:block;touch-action:none}
+header{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:14px;right:14px;pointer-events:none;text-shadow:0 1px 4px #000b}
+h1{font-size:16px;margin:0 0 5px}header p{font-size:11px;color:#d1dfcf;margin:0}
+#panel{position:fixed;z-index:5;bottom:calc(env(safe-area-inset-bottom) + 8px);left:8px;right:8px;max-width:680px;margin:0 auto;background:#223a2feF;border:1px solid #738d79;border-radius:13px;padding:12px;box-shadow:0 4px 24px #0008}
+#prompt{font-size:13px;font-weight:700;margin:0 0 10px}
+#actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{font-size:14px;min-height:47px;touch-action:manipulation;border:1px solid #8ca48d;border-radius:9px;background:#385a45;color:#eff7ea;font-weight:700}
+button[aria-pressed="true"]{background:#d3e5b2;color:#20351b}
+button:disabled{opacity:.4}
+#status,#metrics{font-size:12px;line-height:1.4;margin-top:10px;overflow-wrap:anywhere}
+#status{color:#f2dfa7}#metrics{color:#e2f2dd}
+#info{font-size:11px;line-height:1.3;color:#c3d5c7;margin-top:8px}
+@media(max-width:385px){#panel{padding:9px}button{font-size:13px}h1{font-size:14px}}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./native-clip-blend.js"></script>
+<script src="./us-hero-ara-lee-enfield-stage4.js"></script>
+</head><body>
+<canvas id="view" aria-label="Американский герой с винтовкой Lee-Enfield"></canvas>
+<header><h1>Battlefield · Lee-Enfield · кисти донора v7</h1>
+<p>Американский герой · полностью привязанные кисти из готового рига · Babylon.js</p></header>
+<section id="panel">
+<div id="prompt">Автоматически загружаю героя и винтовку…</div>
+<div id="actions">
+<button data-pose="ready" aria-pressed="true" disabled>На изготовку</button>
+<button data-pose="aim" aria-pressed="false" disabled>Прицелиться</button>
+</div>
+<div id="status" role="status" aria-live="polite">Выбирать файлы не нужно.</div>
+<div id="metrics">Геометрия хвата ожидает загрузку.</div>
+<div id="info">ЭКСПЕРИМЕНТ v7: кисти с готовыми весами от утверждённого немецкого рига. Американская форма и Quaternius сохранены. Проверь пальцы спереди, сбоку, и возможные деформации. Основная игра не изменена.</div>
+</section>
+<script>
+(async function(){
+"use strict";
+const B=window.BABYLON,blend=window.BattlefieldNativeClipBlend,grip=window.BattlefieldUSLeeEnfieldStage4;
+const $=id=>document.getElementById(id);
+const qa={ready:false,error:null,stage:4,weapon:"uk-lee-enfield",model:"us-hero-quaternius-donor-hands-v7.glb",pose:"ready"};
+window.__US_HERO_STAGE4_QA__=qa;
+const say=s=>{$("status").textContent=s};
+if(!B?.SceneLoader||!blend||!grip){
+ qa.error="Babylon.js или модуль хвата не загружены";
+ say(qa.error+"; проверь соединение с интернетом");return;
+}
+try{
+ const engine=new B.Engine($("view"),true,{powerPreference:"high-performance",stencil:true});
+ engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.6));
+ const scene=new B.Scene(engine);scene.useRightHandedSystem=true;
+ scene.clearColor=new B.Color4(.066,.119,.091,1);
+ const amb=new B.HemisphericLight("ambient",new B.Vector3(0,1,0),scene);amb.intensity=1.5;
+ const front=new B.DirectionalLight("front",new B.Vector3(-.5,-1,-.65),scene);front.intensity=1.3;
+ const rim=new B.DirectionalLight("rim",new B.Vector3(.7,-.35,.75),scene);rim.intensity=.65;
+ const camera=new B.ArcRotateCamera("orbit",Math.PI/2,Math.PI*.44,3.1,
+   new B.Vector3(0,.96,0),scene);
+ camera.lowerRadiusLimit=1.0;camera.upperRadiusLimit=6;camera.lowerBetaLimit=.2;
+ camera.upperBetaLimit=Math.PI*.83;camera.pinchDeltaPercentage=.018;
+ camera.attachControl($("view"),true);
+ const ground=B.MeshBuilder.CreateDisc("ground",{radius:1.45,tessellation:48},scene);
+ ground.rotation.x=Math.PI/2;ground.position.y=-.025;ground.isPickable=false;
+ const mat=new B.StandardMaterial("ground",scene);mat.diffuseColor=new B.Color3(.18,.25,.19);
+ mat.specularColor=B.Color3.Black();ground.material=mat;
+ let active=null,rigInstance=null,sample=0;
+ engine.runRenderLoop(()=>{
+  const dt=Math.min(.06,engine.getDeltaTime()/1000);
+  if(active)blend.update(active,dt);
+  sample+=dt;
+  if(sample>.6){
+   sample=0;
+   if(rigInstance){
+    const r=rigInstance.report;
+    const cm=x=>Number.isFinite(x)?(x*100).toFixed(1)+" см":"?";
+    const dg=x=>Number.isFinite(x)?x.toFixed(1)+"°":"?";
+    $("metrics").textContent="Хват: правая "+cm(r.rightGripMeters)+
+     ", левая "+cm(r.leftGripMeters)+
+     " · приклад "+cm(r.stockToShoulderMeters)+
+     " · ладони "+dg(r.rightPalmErrorDeg)+"/"+dg(r.leftPalmErrorDeg)+
+     " · пальцы "+dg(r.rightFingerErrorDeg)+"/"+dg(r.leftFingerErrorDeg)+
+     (r.error?" · Ошибка: "+r.error:"")+
+     " · "+Math.round(engine.getFps())+" FPS";
+   }
+  }
+  scene.render();
+ });
+ window.addEventListener("resize",()=>engine.resize());
+ const buttons=[...document.querySelectorAll("[data-pose]")];
+ for(const button of buttons)button.addEventListener("click",()=>{
+  if(!rigInstance)return;
+  try{
+   const mode=button.dataset.pose;rigInstance.setPose(mode);qa.pose=mode;
+   for(const b of buttons)b.setAttribute("aria-pressed",String(b.dataset.pose===mode));
+   say("Lee-Enfield · "+(mode==="aim"?"прицел":"оружие на изготовку")+
+     ". Поверни камеру и проверь положение обеих ладоней.");
+  }catch(e){qa.error=String(e?.message||e);say("Ошибка позы: "+qa.error)}
+ });
+ say("Загружаю 4,47 МБ исходного американского героя…");
+ const imported=await B.SceneLoader.ImportMeshAsync(null,
+   "../assets/allied-soldiers/","us-hero-quaternius-donor-hands-v7.glb",scene);
+ const bodies=imported.meshes.filter(m=>m.getTotalVertices?.()>0);
+ if(bodies.length!==36)throw Error("Ожидаются 36 деталей героя, найдено "+bodies.length);
+ if(imported.skeletons.length!==1||imported.skeletons[0].bones.length!==65)
+  throw Error("Нужен исходный 65-костный герой");
+ const clips=new Map(imported.animationGroups.map(g=>[g.name,g]));
+ const expected=["Idle_Quaternius","Walk_Quaternius","Jog_Quaternius","Sprint_Quaternius"];
+ if(expected.some(n=>!clips.has(n)))throw Error("Не найдены 4 анимации Quaternius");
+ imported.animationGroups.forEach(g=>g.stop());
+ const min=new B.Vector3(Infinity,Infinity,Infinity),max=new B.Vector3(-Infinity,-Infinity,-Infinity);
+ for(const mesh of bodies){
+  mesh.computeWorldMatrix(true);const bb=mesh.getBoundingInfo().boundingBox;
+  min.minimizeInPlace(bb.minimumWorld);max.maximizeInPlace(bb.maximumWorld);
+ }
+ const h=max.y-min.y;
+ if(!(h>.1))throw Error("Неверный масштаб героя");
+ const stage=new B.TransformNode("us-approved-hero",scene);
+ for(const mesh of imported.meshes)if(!mesh.parent)mesh.parent=stage;
+ for(const node of imported.transformNodes)if(!node.parent)node.parent=stage;
+ const scale=1.8/h;stage.scaling.setAll(scale);
+ stage.position.set(-(min.x+max.x)*.5*scale,-min.y*scale,-(min.z+max.z)*.5*scale);
+ camera.setTarget(new B.Vector3(0,.96,0));camera.radius=2.95;
+ say("Герой загружен, выставляю приклад и две кисти…");
+ rigInstance=await grip.create({scene,imported,stage,weaponRoot:"../assets/ww2-weapons/"});
+ active={clips,clip:null,motionBlend:null};
+ blend.play(active,clips.get("Idle_Quaternius"),"ready",{loop:true,duration:.2});
+ qa.rig=rigInstance.report;qa.ready=true;qa.bones=65;qa.armTracksRemoved=rigInstance.report.armChannelsRemoved;
+ buttons.forEach(b=>b.disabled=false);
+ $("prompt").textContent="Герой и Lee-Enfield загружены автоматически";
+ say("Экспериментальный хват · Lee-Enfield. Нажми «Прицелиться», затем посмотри кисти спереди и сбоку.");
+}catch(e){
+ qa.error=String(e?.message||e);
+ say("Ошибка загрузки или хвата: "+qa.error+
+   ". Файл выбирать не нужно — пришли скрин этой ошибки.");
+ $("prompt").textContent="Не удалось собрать боевую стойку";
+}
+})();
+</script>
+</body></html>
