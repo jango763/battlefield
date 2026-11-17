@@ -65,6 +65,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
    socket:find("Weapon_"+p[0]),
    index:find(p+"HandIndex1"),
    middle:find(p+"HandMiddle1"),
+   ring:find(p+"HandRing1"),
    pinky:find(p+"HandPinky1"),
    thumb:find(p+"HandThumb2")
   };
@@ -162,9 +163,19 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
   if(B.Vector3.Dot(palm,thumb)<0)palm.scaleInPlace(-1);
   const srcBasis=basis(forward,palm);
   const localBasis=handWorld.conjugate().multiply(srcBasis).normalize();
-  const socketLocalOffset=rotate(arm.socket.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()),
+  // Weapon_R and Weapon_L are *wrist helper joints*, not a palm grip contact.
+  // Fit to the actual hand surface: take anatomical MCP knuckles, then choose
+  // a point about two-thirds from the wrist toward the finger roots.
+  // This can be reused when donor hands are changed without retuning coordinates.
+  for(const node of [arm.ring,arm.pinky,arm.index,arm.middle])refresh(node);
+  const wrist=arm.hand.getAbsolutePosition();
+  const knuckles=[arm.index,arm.middle,arm.ring,arm.pinky]
+    .reduce((p,n)=>p.add(n.getAbsolutePosition()),B.Vector3.Zero()).scale(0.25);
+  const palmSurface=wrist.add(knuckles.subtract(wrist).scale(0.65));
+  const palmLocalOffset=rotate(palmSurface.subtract(wrist),handWorld.conjugate());
+  const socketLocalOffset=rotate(arm.socket.getAbsolutePosition().subtract(wrist),
                                   handWorld.conjugate());
-  calibrations[side]={localBasis,socketLocalOffset};
+  calibrations[side]={localBasis,socketLocalOffset,palmLocalOffset};
  }
  const stoppedTracks=stripArmTracks(imported.animationGroups);
  if(stoppedTracks!==32)throw Error("Expected 32 conflicting arm tracks, got "+stoppedTracks);
@@ -185,6 +196,8 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
  const fingerControls={base:-1.12,middle:-.94,distal:-.50,thumbBase:-.84,thumbMiddle:-.78,thumbDistal:-.40};
  const state={ready:true,mode,armChannelsRemoved:stoppedTracks,fingerControls,
   rightGripMeters:Infinity,leftGripMeters:Infinity,
+  rightSocketMeters:Infinity,leftSocketMeters:Infinity,
+  palmTarget:"MCP-based anatomical palm center (not wrist joint)",
   rightPalmErrorDeg:Infinity,leftPalmErrorDeg:Infinity,
   rightFingerErrorDeg:Infinity,leftFingerErrorDeg:Infinity,
   rightIKMeters:Infinity,leftIKMeters:Infinity,
@@ -210,7 +223,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
   const palm=side==="right"?V(m.triggerPalm,gQ).normalize():V(m.supportPalm,gQ).scale(-1).normalize();
   const anatomical=basis(dir,palm);
   const boneWorld=anatomical.multiply(calibrations[side].localBasis.conjugate()).normalize();
-  const gripOffset=rotate(calibrations[side].socketLocalOffset,boneWorld);
+  const gripOffset=rotate(calibrations[side].palmLocalOffset,boneWorld);
   return {boneWorld,gripOffset,dir,palm};
  }
  function angleDeg(a,b){
@@ -271,7 +284,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
    refresh(pivot);
    const trigger=pivot.position.add(V(m.trigger,gunQ));
    const orientationR=goalOrientation(right,"right",gunQ,body.q);
-   const rGrip=trigger.add(V([-.012,-.027,-.040],gunQ));
+   const rGrip=trigger.add(V([-.012,-.018,-.031],gunQ));
    const rWrist=rGrip.subtract(orientationR.gripOffset);
    const poleR=right.upper.getAbsolutePosition()
       .add(V(DONOR[mode].right.pole,body.q).scale(.27));
@@ -282,7 +295,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
    let z=mode==="aim"?.255:.22, lGrip,lWrist;
    const leftShoulder=left.upper.getAbsolutePosition();
    for(let n=0;n<25;n++){
-    lGrip=pivot.position.add(V([0,m.support[1]-.052,z],gunQ));
+    lGrip=pivot.position.add(V([0,m.support[1]-.039,z],gunQ));
     lWrist=lGrip.subtract(orientationL.gripOffset);
     refresh(left.upper);refresh(left.fore);refresh(left.hand);
     const armReach=B.Vector3.Distance(leftShoulder,left.fore.getAbsolutePosition())+
@@ -299,8 +312,15 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
    for(const name of fingerNames)foldFinger(name);
    refresh(right.socket);refresh(left.socket);
    const rf=actualHandFrame(right),lf=actualHandFrame(left);
-   state.rightGripMeters=B.Vector3.Distance(right.socket.getAbsolutePosition(),rGrip);
-   state.leftGripMeters=B.Vector3.Distance(left.socket.getAbsolutePosition(),lGrip);
+   // Read the actual palm center on the *deformed* skeleton, not its wrist socket.
+   const actualPalmPoint=side=>{
+    const arm=limbs[side],c=calibrations[side];
+    return arm.hand.getAbsolutePosition().add(rotate(c.palmLocalOffset,worldRot(arm.hand)));
+   };
+   state.rightGripMeters=B.Vector3.Distance(actualPalmPoint("right"),rGrip);
+   state.leftGripMeters=B.Vector3.Distance(actualPalmPoint("left"),lGrip);
+   state.rightSocketMeters=B.Vector3.Distance(right.socket.getAbsolutePosition(),rGrip);
+   state.leftSocketMeters=B.Vector3.Distance(left.socket.getAbsolutePosition(),lGrip);
    state.stockToShoulderMeters=B.Vector3.Distance(pivot.position.add(V(m.shoulder,gunQ)),stockPoint);
    state.rightIKMeters=rSolve.error;state.leftIKMeters=lSolve.error;
    state.rightReachable=rSolve.reachable;state.leftReachable=lSolve.reachable;
