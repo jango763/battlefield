@@ -1,0 +1,43 @@
+name: US hero stage 7 four Allied weapons
+on:
+  push:
+    branches:
+      - feature/us-hero-four-weapons-stage7-20261117
+    paths:
+      - 'babylon/us-hero-stage7-four-weapons-rig.js'
+      - 'babylon/us-hero-stage7-four-weapons-iphone.html'
+      - 'babylon/tests/test-us-hero-stage7-four-weapons-browser.cjs'
+      - '.github/workflows/us-hero-stage7-four-weapons.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stage7-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate isolated four-weapon module and all assets
+        run: |
+          node --check babylon/us-hero-stage7-four-weapons-rig.js
+          node --check babylon/tests/test-us-hero-stage7-four-weapons-browser.cjs
+          test -s assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb
+          test -s assets/ww2-weapons/uk-lee-enfield.glb
+          test -s assets/ww2-weapons/uk-sten.glb
+          test -s assets/ww2-weapons/uk-bren.glb
+      - name: Install mobile Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage7-qa playwright@1.58.2
+          /tmp/stage7-qa/node_modules/.bin/playwright install chromium
+      - name: Runtime four weapons x two poses, verify mesh lifecycle and IK
+        run: |
+          python3 -m http.server 8777 --bind 127.0.0.1 >/tmp/stage7-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-us-hero-stage7-four-weapons-browser.cjs
+      - name: Save mobile screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-hero-stage7-four-weapons-visual-qa
+          path: babylon-qa-results/us-hero-stage7/
+          if-no-files-found: ignore
