@@ -183,13 +183,21 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
   if(!node.parent)node.parent=pivot;
  let mode="ready",stopped=false;
  const fingerControls={base:-1.12,middle:-.94,distal:-.50,thumbBase:-.84,thumbMiddle:-.78,thumbDistal:-.40};
+ // Rifle space (metres): move the dominant palm below and behind the trigger,
+ // so the hand itself is not occulted by the wooden stock and receiver.
+ const handFits=Object.freeze({
+   standard:{grip:[-.012,-.055,-.065],dir:[0,-.95,.31]},
+   outboard:{grip:[-.055,-.050,-.060],dir:[-.08,-.94,.30]},
+   wrapped:{grip:[-.034,-.065,-.091],dir:[0,-.85,.52]}
+ });
+ let handFit=handFits.standard;
  const state={ready:true,mode,armChannelsRemoved:stoppedTracks,fingerControls,
   rightGripMeters:Infinity,leftGripMeters:Infinity,
   rightPalmErrorDeg:Infinity,leftPalmErrorDeg:Infinity,
   rightFingerErrorDeg:Infinity,leftFingerErrorDeg:Infinity,
   rightIKMeters:Infinity,leftIKMeters:Infinity,
   supportAlongBarrelMeters:0,stockToShoulderMeters:Infinity,
-  rightReachable:false,leftReachable:false,error:null};
+  rightReachable:false,leftReachable:false,rightHandVariant:"standard",error:null};
  const V=(p,q)=>rotate(arr(p),q);
  function bodyFrame(){
   refresh(limbs.left.upper);refresh(limbs.right.upper);refresh(neck);refresh(hips);
@@ -204,7 +212,9 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
   const target=DONOR[mode][side];
   // Ara supplies elbow/finger stance. The actual Lee-Enfield author supplies
   // the trigger and handguard palm normals. Do not face both open palms outward.
-  const dir=side==="right"?V(target.dir,bQ).normalize():V(m.supportAxis,gQ).normalize();
+  // Right hand: the rifle is the reference frame, not the torso. The former
+  // Ara diagonal drove index/middle fingers sideways under the receiver.
+  const dir=side==="right"?V(handFit.dir,gQ).normalize():V(m.supportAxis,gQ).normalize();
   // SUPPORT: the left hand must CUP the underside of the wooden fore-end.
   // Previous v5 used manifest's downward normal and posed the palm ON TOP.
   const palm=side==="right"?V(m.triggerPalm,gQ).normalize():V(m.supportPalm,gQ).scale(-1).normalize();
@@ -271,7 +281,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
    refresh(pivot);
    const trigger=pivot.position.add(V(m.trigger,gunQ));
    const orientationR=goalOrientation(right,"right",gunQ,body.q);
-   const rGrip=trigger.add(V([-.012,-.027,-.040],gunQ));
+   const rGrip=trigger.add(V(handFit.grip,gunQ));
    const rWrist=rGrip.subtract(orientationR.gripOffset);
    const poleR=right.upper.getAbsolutePosition()
       .add(V(DONOR[mode].right.pole,body.q).scale(.27));
@@ -315,7 +325,12 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
  const observer=scene.onBeforeRenderObservable.add(update);
  update();
  return {
-  report:state,setPose(next){
+  report:state,
+  setRightGripVariant(id){
+   if(!Object.prototype.hasOwnProperty.call(handFits,id))throw Error("Bad right-hand variant");
+   handFit=handFits[id];state.rightHandVariant=id;update();return state;
+  },
+  setPose(next){
    if(!["ready","aim"].includes(next))throw Error("Stage4 supports only ready or aim");
    mode=next;update();return state;
   },
