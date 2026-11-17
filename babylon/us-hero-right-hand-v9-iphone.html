@@ -133,7 +133,7 @@ try{
  rigInstance=await grip.create({scene,imported,stage,weaponRoot:"../assets/ww2-weapons/"});
  active={clips,clip:null,motionBlend:null};
  blend.play(active,clips.get("Idle_Quaternius"),"ready",{loop:true,duration:.2});
- qa.rig=rigInstance.report;qa.ready=true;qa.bones=65;qa.armTracksRemoved=rigInstance.report.armChannelsRemoved;
+ qa.rig=rigInstance.report;qa.rigInstance=rigInstance;qa.ready=true;qa.bones=65;qa.armTracksRemoved=rigInstance.report.armChannelsRemoved;
  buttons.forEach(b=>b.disabled=false);
  $("prompt").textContent="Герой и Lee-Enfield загружены автоматически";
  say("Экспериментальный хват · Lee-Enfield. Нажми «Прицелиться», затем посмотри кисти спереди и сбоку.");
