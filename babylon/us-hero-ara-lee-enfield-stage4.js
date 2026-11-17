@@ -173,7 +173,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
  const gunMetaResponse=await fetch(weaponRoot+"manifest.json");
  if(!gunMetaResponse.ok)throw Error("Weapon metadata HTTP "+gunMetaResponse.status);
  const m=(await gunMetaResponse.json()).weapons?.["uk-lee-enfield"];
- if(!m||!["trigger","shoulder","support","muzzle"].every(key=>Array.isArray(m[key])))
+ if(!m||!["trigger","shoulder","support","muzzle","triggerPalm","supportPalm","supportAxis"].every(key=>Array.isArray(m[key])))
   throw Error("Lee-Enfield manifest invalid");
  const container=await B.SceneLoader.LoadAssetContainerAsync("",weaponRoot+"uk-lee-enfield.glb",scene);
  const pivot=new B.TransformNode("us-step4-Lee-Enfield-rigid-stock-root",scene);
@@ -201,8 +201,10 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
  }
  function goalOrientation(arm,side,gQ,bQ){
   const target=DONOR[mode][side];
-  const dir=side==="right"?V(target.dir,bQ).normalize():V(target.dir,gQ).normalize();
-  const palm=side==="right"?V(target.palm,bQ).normalize():V(target.palm,gQ).normalize();
+  // Ara supplies elbow/finger stance. The actual Lee-Enfield author supplies
+  // the trigger and handguard palm normals. Do not face both open palms outward.
+  const dir=side==="right"?V(target.dir,bQ).normalize():V(m.supportAxis,gQ).normalize();
+  const palm=side==="right"?V(m.triggerPalm,gQ).normalize():V(m.supportPalm,gQ).normalize();
   const anatomical=basis(dir,palm);
   const boneWorld=anatomical.multiply(calibrations[side].localBasis.conjugate()).normalize();
   const gripOffset=rotate(calibrations[side].socketLocalOffset,boneWorld);
@@ -231,7 +233,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
   const wanted=calibrations[side].lastPalm.scale(-1);
   const axis=B.Vector3.Cross(direction,wanted);
   if(axis.lengthSquared()<1e-8)return;
-  const angle=kind==="thumb"?(.30-.04*seg):(seg===1?.51:.56);
+  const angle=kind==="thumb"?(.52-.08*seg):(seg===1?.78:.65);
   const localAxis=rotate(axis.normalize(),worldRot(node).conjugate()).normalize();
   node.rotationQuaternion=node.rotationQuaternion.multiply(B.Quaternion.RotationAxis(localAxis,angle)).normalize();
   refresh(next);
