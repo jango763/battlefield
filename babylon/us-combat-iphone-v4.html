@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#17241c">
+<title>Battlefield • США • готовый GLB Quaternius и четыре оружия</title>
+<style>
+*{box-sizing:border-box}
+html,body{padding:0;margin:0;width:100%;height:100%;overflow:hidden;color:#eef3e7;background:#152019;font:13px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+canvas{width:100%;height:100%;display:block;touch-action:none;outline:none}
+header{position:fixed;z-index:2;top:calc(env(safe-area-inset-top) + 8px);left:12px;right:12px;pointer-events:none;text-shadow:0 2px 6px #000b}
+h1{font-size:16px;margin:0 0 4px}header p{margin:0;font-size:11px;color:#d5dfd1}
+#panel{position:fixed;z-index:3;bottom:calc(env(safe-area-inset-bottom) + 9px);left:8px;right:8px;max-width:600px;margin:auto;padding:10px;border:1px solid #829b82;border-radius:12px;background:#1c3225ed;box-shadow:0 2px 24px #0008}
+#status{font-size:12px;min-height:24px;color:#f8e6b6;white-space:pre-line;line-height:1.36}
+.buttons{display:grid;gap:5px;margin-top:7px;grid-template-columns:repeat(4,minmax(0,1fr))}
+button{touch-action:manipulation;background:#35553c;color:#e9f0e5;border:1px solid #91aa90;border-radius:7px;font:700 12px system-ui;padding:9px 2px;min-height:44px}
+button:disabled{opacity:.35}
+button[aria-pressed=true]{background:#d8e9ba;color:#182a1b}
+#stats{font-size:10px;color:#c6dbcb;margin-top:6px;white-space:pre-line}
+#help{font-size:10px;color:#a9bdad;margin-top:5px}
+@media(min-width:800px){#panel{right:20px;left:auto;width:430px}}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./us-combat-rig-v3.js"></script>
+</head>
+<body>
+<canvas id="viewport" aria-label="Американский герой с четырьмя образцами оружия"></canvas>
+<header><h1>Battlefield • Американский герой • 4 оружия</h1>
+<p>Готовая Quaternius-модель + оружейные позы Ara 3D Gen • тест</p></header>
+<section id="panel">
+<div id="status" role="status" aria-live="polite">Загружаю героя автоматически. Выбирать GLB больше не нужно.</div>
+<div class="buttons" id="weapons">
+<button data-weapon="uk-lee-enfield" disabled aria-pressed="true">Lee-Enfield</button>
+<button data-weapon="uk-sten" disabled>Sten</button>
+<button data-weapon="uk-bren" disabled>Bren</button>
+<button data-weapon="uk-piat" disabled>PIAT</button>
+</div>
+<div class="buttons" id="poses">
+<button data-pose="aim" disabled aria-pressed="true">Прицел</button>
+<button data-pose="ready" disabled>Стойка</button>
+<button data-pose="run" disabled>Бег</button>
+<button data-pose="sprint" disabled>Спринт</button>
+</div>
+<div id="stats">Загрузка модели…</div>
+<div id="help">Вращай одним пальцем, увеличивай двумя. PIAT — временная модель, остальные стволы — оригинальные GLB.</div>
+</section>
+<script>
+(async()=>{
+"use strict";
+const B=window.BABYLON,$=id=>document.getElementById(id);
+const els={status:$("status"),stats:$("stats"),weapons:[...document.querySelectorAll("[data-weapon]")],
+ poses:[...document.querySelectorAll("[data-pose]")]};
+const qa={ready:false,error:null,heroLoaded:false,heroBones:0,heroMeshes:0,
+ chunks:1,weapon:null,pose:"aim",clip:null,clips:0,fps:0,source:"Quaternius",automatic:true};
+window.__BATTLEFIELD_US_COMBAT_QA__=qa;
+const say=(s)=>{els.status.textContent=s};
+if(!B?.SceneLoader||!window.BattlefieldUSCombatRig){
+ qa.error="Babylon.js или оружейный модуль не загрузился.";
+ say(qa.error+" Проверь интернет и открой ссылку в Safari.");return;
+}
+const engine=new B.Engine($("viewport"),true,{stencil:true,powerPreference:"high-performance"});
+engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.6));
+const scene=new B.Scene(engine);scene.useRightHandedSystem=true;scene.clearColor=new B.Color4(.075,.115,.085,1);
+const hemi=new B.HemisphericLight("fill",new B.Vector3(0,1,0),scene);hemi.intensity=1.4;
+const key=new B.DirectionalLight("key",new B.Vector3(-.6,-1,-.5),scene);key.intensity=1.5;
+const camera=new B.ArcRotateCamera("orbit",Math.PI*.52,Math.PI*.43,2.75,new B.Vector3(0,1.04,0),scene);
+camera.lowerRadiusLimit=1.0;camera.upperRadiusLimit=7;camera.lowerBetaLimit=.2;camera.upperBetaLimit=Math.PI*.82;
+camera.pinchDeltaPercentage=.014;camera.wheelDeltaPercentage=.014;camera.attachControl($("viewport"),true);
+const ground=B.MeshBuilder.CreateDisc("ground",{radius:1.45,tessellation:48},scene);
+ground.rotation.x=Math.PI/2;ground.position.y=-.02;
+const gm=new B.StandardMaterial("ground",scene);gm.diffuseColor=new B.Color3(.15,.19,.15);ground.material=gm;
+let player=null,rig=null,clips=new Map(),active=null,old=null,fade=0,clock=0,changing=false;
+engine.runRenderLoop(()=>{
+ const dt=Math.min(.05,engine.getDeltaTime()/1000);clock+=dt;
+ if(old&&active){fade+=dt;const t=Math.min(1,fade/.18),w=t*t*(3-2*t);
+  old.setWeightForAllAnimatables(1-w);active.setWeightForAllAnimatables(w);
+  if(w>=1){old.stop();old=null;}}
+ if(clock>.7){clock=0;qa.fps=Math.round(engine.getFps());
+  const wr=rig?.weaponRig;
+  const fmt=v=>Number.isFinite(v)?Math.round(v*100)+" см":"—";
+  els.stats.textContent=(qa.ready?"65 костей · "+qa.heroMeshes+" деталей · "+qa.fps+" FPS":"Загрузка модели")+
+    (wr?"\nIK: правая "+fmt(wr.rightError)+" · левая "+fmt(wr.leftError)+
+    " · приклад "+fmt(wr.stockToShoulder)+
+    "\nОтключено "+(wr.upperTracksDisabled||0)+" конфликтующих каналов рук"+(wr.error?"\nОшибка: "+wr.error:""):"");
+ }
+ scene.render();
+});
+window.addEventListener("resize",()=>engine.resize());
+function mark(list,attr,value){for(const b of list)b.setAttribute("aria-pressed",String(b.dataset[attr]===value))}
+function play(mode){
+ if(!qa.ready)return;
+ qa.pose=mode;rig.setWeaponPose(mode);
+ const clipName={aim:"Idle_Quaternius",ready:"Idle_Quaternius",run:"Jog_Quaternius",sprint:"Sprint_Quaternius"}[mode];
+ const group=clips.get(clipName);
+ if(!group){say("Не найден готовый клип "+clipName);return;}
+ if(active!==group){
+  if(old){old.stop();old=null;}
+  const prev=active;
+  group.stop();group.start(true,1,group.from,group.to,false);
+  group.setWeightForAllAnimatables(prev?.isPlaying?0:1);
+  if(prev&&prev!==group&&prev.isPlaying){old=prev;old.setWeightForAllAnimatables(1);fade=0;}
+  else if(prev!==group)prev?.stop();
+  active=group;
+ }
+ qa.clip=clipName;mark(els.poses,"pose",mode);
+ say("Герой вооружён • "+mode+" • "+({ "uk-lee-enfield":"Lee-Enfield","uk-sten":"Sten","uk-bren":"Bren","uk-piat":"PIAT"}[qa.weapon]||"оружие"));
+}
+for(const b of els.poses)b.addEventListener("click",()=>play(b.dataset.pose));
+for(const b of els.weapons)b.addEventListener("click",async()=>{
+ if(!qa.ready||changing)return;changing=true;
+ els.weapons.forEach(x=>x.disabled=true);
+ try{say("Переключаю оружие: "+b.textContent+"…");
+  await rig.equipWeapon(b.dataset.weapon);qa.weapon=b.dataset.weapon;
+  mark(els.weapons,"weapon",qa.weapon);
+  say("Оружие: "+b.textContent+" • проверяй кисти и приклад.");}
+ catch(e){qa.error=String(e?.message||e);say("Ошибка оружия: "+qa.error);}
+ finally{changing=false;els.weapons.forEach(x=>x.disabled=false);}
+});
+async function loadEmbeddedHero(){
+ say("Автоматически загружаю готовый GLB героя с четырьмя анимациями…");
+ return B.SceneLoader.ImportMeshAsync("","","../assets/allied-soldiers/us-hero-quaternius.glb",
+  scene,undefined,".glb");
+}
+try{
+ say("Загружаю американского героя — без выбора файлов…");
+ player=await loadEmbeddedHero();
+ const skeleton=player.skeletons[0];
+ if(!skeleton||skeleton.bones.length!==65)throw Error("Нужен скелет на 65 костей");
+ qa.heroBones=skeleton.bones.length;
+ const meshes=player.meshes.filter(m=>m.getTotalVertices?.()>0);
+ qa.heroMeshes=meshes.length;
+ if(meshes.length!==36)throw Error("Неожиданное число мешей: "+meshes.length);
+ const mn=new B.Vector3(Infinity,Infinity,Infinity),mx=new B.Vector3(-Infinity,-Infinity,-Infinity);
+ for(const m of meshes){m.computeWorldMatrix(true);const bb=m.getBoundingInfo().boundingBox;
+  mn.minimizeInPlace(bb.minimumWorld);mx.maximizeInPlace(bb.maximumWorld);}
+ const height=mx.y-mn.y;if(!Number.isFinite(height)||height<=0)throw Error("Высота героя некорректна");
+ const actor=new B.TransformNode("US Hero Approved Visual",scene);
+ for(const n of player.meshes)if(!n.parent)n.parent=actor;
+ for(const n of player.transformNodes)if(!n.parent)n.parent=actor;
+ const scale=1.8/height;actor.scaling.setAll(scale);
+ actor.position.set(-.5*(mn.x+mx.x)*scale,-mn.y*scale,-.5*(mn.z+mx.z)*scale);
+ camera.setTarget(new B.Vector3(0,1.05,0));camera.radius=2.75;
+ qa.heroLoaded=true;
+ say("Американец загружен. Проверяю встроенные анимации Quaternius…");
+ for(const g of player.animationGroups)g.stop();
+ for(const name of ["Idle_Quaternius","Walk_Quaternius","Jog_Quaternius","Sprint_Quaternius"]){
+  const clip=player.animationGroups.find(g=>g.name===name);
+  if(!clip)throw Error("В GLB нет утверждённого клипа "+name);
+  clip.stop();clips.set(name,clip);
+ }
+ qa.clips=clips.size;
+ rig={};
+ await window.BattlefieldUSCombatRig.armPose({scene,imported:player,root:actor,state:rig});
+ rig.stripUpperTracks([...clips.values()]);
+ qa.weapon="uk-lee-enfield";qa.ready=true;
+ els.poses.forEach(x=>x.disabled=false);els.weapons.forEach(x=>x.disabled=false);
+ play("aim");
+}catch(err){
+ qa.error=String(err?.message||err);
+ say("Не удалось открыть тест: "+qa.error+"\nМодель выбира́ть вручную не нужно. Проверь Safari и пришли скрин ошибки.");
+ console.error("US combat rig",err);
+}
+})();
+</script>
+</body>
+</html>
