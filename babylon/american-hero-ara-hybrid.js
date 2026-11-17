@@ -224,6 +224,17 @@ function create({scene,imported,root:actorRoot,state,weaponRoot="../assets/ww2-w
   hand.rotationQuaternion=B.Quaternion.Slerp(old,local,.80).normalize();
   refresh(hand);return true;
  }
+ function angularError(a,b){
+  if(a.lengthSquared()<1e-7||b.lengthSquared()<1e-7)return null;
+  return +(Math.acos(B.Scalar.Clamp(B.Vector3.Dot(a.normalize(),b.normalize()),-1,1))*180/Math.PI).toFixed(1);
+ }
+ function handDirectionError(side,hand,bodyQ,mode){
+  const mid=jointMap.get(CANON(side+"HandMiddle2"));if(!mid)return null;
+  refresh(mid);refresh(hand);
+  const actual=mid.getAbsolutePosition().subtract(hand.getAbsolutePosition());
+  const expected=rotate(V(...ARA_RIFLE[mode==="ready"?"ready":"aim"][side].dir),bodyQ);
+  return angularError(actual,expected);
+ }
  const fingerRotations=new Map();
  function prepareFingerBends(){
   for(const [name,node] of fingers){
@@ -335,6 +346,9 @@ function create({scene,imported,root:actorRoot,state,weaponRoot="../assets/ww2-w
    const leftOriented=poseWrist(left.hand,"Left",body.q,mode);
    applyFingerCurl();
    report.palmCalibration={right:rightOriented,left:leftOriented};
+   report.rightFingerErrorDegrees=handDirectionError("Right",right.hand,body.q,mode);
+   report.leftFingerErrorDegrees=handDirectionError("Left",left.hand,body.q,mode);
+   report.visualAccepted=false; // Numerical contact is NOT artistic acceptance.
    report.rightGripMeters=+B.Vector3.Distance(right.hand.getAbsolutePosition(),
      trigger.add(rightGripOffset)).toFixed(3);
    report.leftGripMeters=+B.Vector3.Distance(left.hand.getAbsolutePosition(),
