@@ -1,0 +1,41 @@
+name: US hero stage 6 left hand fore-end IK
+on:
+  push:
+    branches:
+      - feature/us-hero-left-support-ik-stage6-20261117
+    paths:
+      - 'babylon/us-hero-lee-enfield-stage6-left-ik.js'
+      - 'babylon/us-hero-lee-enfield-stage6-iphone.html'
+      - 'babylon/tests/test-us-hero-stage6-left-ik-browser.cjs'
+      - '.github/workflows/us-hero-stage6-left-ik.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  support-ik:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check isolated rig and required original assets
+        run: |
+          node --check babylon/us-hero-lee-enfield-stage6-left-ik.js
+          node --check babylon/tests/test-us-hero-stage6-left-ik-browser.cjs
+          test -s assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb
+          test -s assets/ww2-weapons/uk-lee-enfield.glb
+      - name: Install Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage6-qa playwright@1.58.2
+          /tmp/stage6-qa/node_modules/.bin/playwright install chromium
+      - name: Test both hand sockets through ready/aim and rotated hero
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/stage6-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-us-hero-stage6-left-ik-browser.cjs
+      - name: Upload screenshots for artistic approval
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-hero-stage6-left-hand-visual-qa
+          path: babylon-qa-results/us-hero-stage6/
+          if-no-files-found: ignore
