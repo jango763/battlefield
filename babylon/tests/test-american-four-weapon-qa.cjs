@@ -1,0 +1,24 @@
+"use strict";
+const fs=require("node:fs"),assert=require("node:assert/strict");
+const path=require("node:path");
+const rig=fs.readFileSync(path.join(__dirname,"../american-hero-production-weapon-rig.js"),"utf8");
+const view=fs.readFileSync(path.join(__dirname,"../american-hero-four-weapons-iphone-v5.html"),"utf8");
+const previous=require("../american-hero-two-hand-ik.js");
+const guns=["uk-lee-enfield","uk-sten","uk-bren","uk-piat"];
+for(const gun of guns){assert(rig.includes('"'+gun+'"'),"Missing "+gun);assert(view.includes('data-weapon="'+gun+'"'),"No UI for "+gun)}
+assert(rig.includes("function proceduralPiat("),"PIAT geometry missing");
+assert(rig.includes("B.Axis.X"),"Finger flex must use local X, not old Z spread");
+assert(rig.includes("function alignPalm("),"True hand orientation step missing");
+assert(rig.includes("sourceFinger"),"Palm axis must be derived from original skeleton");
+assert(rig.includes("displayMeshes.length!==36"),"Mesh preservation check missing");
+assert(rig.includes("skeleton.bones.length!==65"),"Single approved skeleton required");
+assert(!rig.includes("kar98k-user-v2"),"German pose preset must not drive American");
+assert(view.includes("Idle_Quaternius")&&view.includes("Sprint_Quaternius"));
+const arms=["LeftShoulder","LeftArm","LeftForeArm","LeftHand","RightShoulder","RightArm","RightForeArm","RightHand"];
+const torso=["Hips","Spine","Spine2","Neck","Head","LeftUpLeg","RightUpLeg"];
+const groups=Array.from({length:4},()=>({targetedAnimations:[...arms,...torso].map(n=>({target:{name:"mixamorig:"+n}}))}));
+assert.equal(previous.stripArmTracks(groups),32);
+assert(groups.every(g=>g.targetedAnimations.length===torso.length));
+new Function(rig);
+for(const m of [...view.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)])if(m[1].trim())new Function(m[1]);
+console.log("FOUR_WEAPON_STATIC_QA_PASS");
