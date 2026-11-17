@@ -22,7 +22,7 @@ footer{font-size:10px;color:#becfbb;margin-top:5px}
 </head><body>
 <canvas id="view" aria-label="Американский герой с оружием"></canvas>
 <header><h1>Battlefield · герой · четыре вида оружия</h1><p>Babylon.js · Quaternius · без ручной загрузки модели</p></header>
-<section id="panel"><div id="status" role="status" aria-live="polite">Загружаю оригинальную модель из GitHub…</div>
+<section id="panel"><div id="status" role="status" aria-live="polite">Автоматически загружаю героя из GitHub…</div>
 <div id="actions">
 <button data-motion="Idle_Quaternius" aria-pressed="true" disabled>Стойка</button>
 <button data-motion="Walk_Quaternius" disabled>Ходьба</button>
@@ -74,26 +74,26 @@ try{
  window.addEventListener('resize',()=>engine.resize());
 }catch(e){qa.error=String(e?.message||e);say('3D не запустилось: '+qa.error);return}
 async function fetchHero(){
- const urls=Array.from({length:16},(_,i)=>'../assets/allied-soldiers/quaternius-us-hero.parts/part'+String(i+1).padStart(2,'0')+'.b64');
- let next=0;const chunks=Array(16);
- async function worker(){while(next<16){const i=next++;const r=await fetch(urls[i]);
-  if(!r.ok)throw Error('GLB '+(i+1)+'/16: HTTP '+r.status);
-  const data=(await r.text()).trim();const expected=i===15?206584:384000;
-  if(data.length!==expected)throw Error('Повреждена часть '+(i+1)+' длина '+data.length);
-  const bytes=atob(data),out=new Uint8Array(bytes.length);
-  for(let j=0;j<bytes.length;j++)out[j]=bytes.charCodeAt(j);
-  chunks[i]=out;qa.downloadParts++;say('Автоматическая загрузка героя '+qa.downloadParts+'/16…');
- }}
- await Promise.all(Array.from({length:4},()=>worker()));
- const blob=new Blob(chunks,{type:'model/gltf-binary'});
- if(blob.size!==4474936)throw Error('Неверный размер GLB '+blob.size);
+ const source="../assets/allied-soldiers/us-hero-quaternius.glb";
+ say("Загружаю героя из GitHub (4,3 МБ)…");
+ const response=await fetch(source);
+ if(!response.ok)throw Error("GLB героя в GitHub: HTTP "+response.status);
+ const blob=await response.blob();
+ if(blob.size!==4474936)throw Error("Неверный размер GLB: "+blob.size);
  const magic=new DataView(await blob.slice(0,12).arrayBuffer());
- if(magic.getUint32(0,true)!==0x46546c67||magic.getUint32(8,true)!==blob.size)throw Error('Неверный заголовок GLB');
- if(window.crypto?.subtle){const raw=await blob.arrayBuffer();const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',raw))).map(v=>v.toString(16).padStart(2,'0')).join('');
-  if(digest!=='082869ab37145cfc583fb4ad2e95c4ef3564e1a50d39137e085535670ed61f33')throw Error('SHA-256 оригинальной модели не совпал');
+ if(magic.getUint32(0,true)!==0x46546c67||magic.getUint32(8,true)!==blob.size)
+   throw Error("Неправильный заголовок GLB");
+ if(window.crypto?.subtle){
+  const raw=await blob.arrayBuffer();
+  const digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",raw)))
+    .map(v=>v.toString(16).padStart(2,"0")).join("");
+  if(digest!=="082869ab37145cfc583fb4ad2e95c4ef3564e1a50d39137e085535670ed61f33")
+    throw Error("Контрольная сумма GLB не совпадает");
  }
- qa.modelBytes=blob.size;return blob;
+ qa.downloadParts=1;qa.modelBytes=blob.size;
+ return blob;
 }
+
 const motionButtons=[...document.querySelectorAll('[data-motion]')];
 const weaponButtons=[...document.querySelectorAll('[data-weapon]')];
 function play(name){
