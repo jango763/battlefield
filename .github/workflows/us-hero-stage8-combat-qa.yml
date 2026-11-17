@@ -1,0 +1,23 @@
+name: US hero stage 8 combat & movement QA
+on:
+  push:
+    branches:
+      - feature/us-hero-combat-animation-stage8-20261117
+    paths:
+      - 'babylon/us-hero-stage8-*.js'
+      - 'babylon/us-hero-stage8-iphone.html'
+      - 'babylon/tests/test-us-hero-stage8-*.cjs'
+      - '.github/workflows/us-hero-stage8-combat-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  combat-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test ammo, reload, moving fire and frame-rate independence
+        run: |
+          node --check babylon/us-hero-stage8-combat-core.js
+          node babylon/tests/test-us-hero-stage8-combat.cjs
