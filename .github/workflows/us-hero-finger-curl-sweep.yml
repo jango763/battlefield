@@ -1,0 +1,32 @@
+name: US hero live finger curl sign sweep
+on:
+  push:
+    branches:
+      - feature/us-hero-lee-enfield-handfit-v6-20261117
+    paths:
+      - 'babylon/tests/visual-sweep-rifle-finger-curl.cjs'
+      - '.github/workflows/us-hero-finger-curl-sweep.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mobile Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage4-qa playwright@1.58.2
+          /tmp/stage4-qa/node_modules/.bin/playwright install chromium
+      - name: Compare finger curling by actual rendered images
+        run: |
+          python3 -m http.server 8758 --bind 127.0.0.1 >/tmp/stage4-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/visual-sweep-rifle-finger-curl.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: us-hero-finger-curl-sweep
+          path: babylon-qa-results/hand-curl-sweep
+          if-no-files-found: ignore
