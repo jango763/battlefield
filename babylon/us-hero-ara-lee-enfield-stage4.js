@@ -182,6 +182,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
  for(const node of [...container.meshes,...container.transformNodes])
   if(!node.parent)node.parent=pivot;
  let mode="ready",stopped=false;
+ const fingerControls={base:1.03,middle:.93,distal:.38,thumbBase:.53,thumbMiddle:.63,thumbDistal:.28};
  const state={ready:true,mode,armChannelsRemoved:stoppedTracks,fingerControls,
   rightGripMeters:Infinity,leftGripMeters:Infinity,
   rightPalmErrorDeg:Infinity,leftPalmErrorDeg:Infinity,
@@ -226,7 +227,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/"}
  // Curl around the real two-handed rifle grip. Each phalanx has real vertex
  // weights now; use proximal/middle/distal degrees of freedom independently.
  // Critical: fingers bend into the palm, the thumb opposes the four fingers.
- const fingerControls={base:1.03,middle:.93,distal:.38,thumbBase:.53,thumbMiddle:.63,thumbDistal:.28};
+ 
  function foldFinger(name){
   const match=/^(right|left)hand(index|middle|ring|pinky|thumb)([123])$/.exec(name);
   if(!match)return;
