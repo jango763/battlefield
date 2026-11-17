@@ -21,3 +21,22 @@ jobs:
         run: |
           node --check babylon/us-hero-stage8-combat-core.js
           node babylon/tests/test-us-hero-stage8-combat.cjs
+      - name: Install mobile Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/stage8-qa playwright@1.58.2
+          /tmp/stage8-qa/node_modules/.bin/playwright install chromium
+      - name: Validate stage 8 four weapons and authored locomotion in mobile browser
+        run: |
+          node --check babylon/us-hero-stage8-rig.js
+          node --check babylon/us-hero-stage8-vfx.js
+          node --check babylon/tests/test-us-hero-stage8-browser.cjs
+          python3 -m http.server 8788 --bind 127.0.0.1 >/tmp/stage8-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-us-hero-stage8-browser.cjs
+      - name: Save combat preview screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-hero-stage8-mobile-combat-shots
+          path: babylon-qa-results/us-hero-stage8/
+          if-no-files-found: ignore
