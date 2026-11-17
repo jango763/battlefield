@@ -13,9 +13,8 @@ function tap(c){c.setTrigger(true);c.tick(0);c.setTrigger(false)}
 {
  const c=create();c.setMotion("jog");tap(c);
  assert.equal(c.snapshot().shots,0,"Lee-Enfield must stop to shoot");
- c.setMotion("idle");tap(c);
- assert.equal(c.snapshot().shots,1);
- c.setTrigger(true);c.tick(24);c.setTrigger(false);
+ c.setMotion("idle");
+ c.setTrigger(true);c.tick(0);c.tick(24);c.setTrigger(false);
  assert.equal(c.snapshot().shots,1,"Lee-Enfield is semi-auto, held trigger must not repeat");
  tap(c);assert.equal(c.snapshot().shots,2);
  assert.equal(c.snapshot().ammoTotal,Infinity);
