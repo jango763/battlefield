@@ -1,14 +1,14 @@
 # Battlefield — закреплённые британские персонажи
 
 Дата: 18.11.2026. Рабочая ветка: `feature/british-army-10-stages-20261118`.
-**Статус:** утверждён набор кандидатов, но **ни один оригинальный британский 3D-персонаж ещё не установлен или не готов к спавну в игре**.
+**Статус:** выбранные персонажи закреплены. **Статическая оптимизированная копия George Jakeli физически опубликована в экспериментальной ветке GitHub**, но ни один британский солдат ещё не имеет игрового скелета/анимаций, поэтому спавн запрещён.
 
 ## Закреплённые исходники (НЕ заменять новым паком)
 
 | ID | Автор и исходная модель | Зафиксированный файл | Фактически получен | Риг / анимация |
 |---|---|---|---|---|
 | `britishDanoob` | [Danoob — British Soldier WW2](https://sketchfab.com/3d-models/british-soldier-ww2-9891e15cad0245639cf5f52c5f1f6b7c) | `uk-danoob.glb` | Нет, источник требует загрузки через Sketchfab; условия скачивания не подтверждены | Неизвестно |
-| `britishJakeli` | [George Jakeli — British Army Soldier WW2](https://sketchfab.com/3d-models/british-army-soldier-ww2-c3d6038952914362b897138deda762ef) | `uk-jakeli.glb` | **Да, файл загружен пользователем в чат** как `british_army_soldier_ww2.glb`; **не загружен в GitHub** | 0 skins / 0 animations |
+| `britishJakeli` | [George Jakeli — British Army Soldier WW2](https://sketchfab.com/3d-models/british-army-soldier-ww2-c3d6038952914362b897138deda762ef) | `uk-jakeli.glb` | **Да, исходник загружен пользователем в чат** как `british_army_soldier_ww2.glb`; **уменьшенный статический GLB уже есть в GitHub** | 0 skins / 0 animations |
 | `britishFab` | [Pathum Tharaka (Patromes) — WWII British Soldier](https://www.fab.com/listings/fcb951be-af2e-402f-96d7-2e190e27121b) | `uk-fab-optimized.glb` | Нет; бесплатно на Fab, но оригинал предоставлен как Blender/FBX и загрузка требует доступа к Fab | Не подтверждены |
 
 Это именно ранее записанные кандидаты в `babylon/allied-model-catalog.js`, а не новые модели из поиска.
@@ -35,7 +35,9 @@
 - SHA-256: `e86dc27fdb763092ad80391ea79c3f83f20c7b81195d2132dc1b68cf3634d7a0`.
 - Геометрия (14 meshes) и glTF-структура сохранены; встроенные текстуры понижены до 512px, качество будет отличаться.
 - Проверка загрузки с `trimesh` пройдена, но **нет скелета/анимаций**. Этот файл **не** должен автоматически проходить `rigCompatible` и использоваться для боевых отрядов.
-- Копия подготовлена в рабочем хранилище текущего чата, **не записана в GitHub**: GitHub-коннектор позволяет редактировать текст и Git-объекты, но не принимает локальный бинарный файл напрямую. Не ставить `installed:true`.
+- **Установлена для визуального просмотра в GitHub**, путь: [`assets/allied-soldiers/uk-jakeli-mobile-static.glb`](./uk-jakeli-mobile-static.glb). Загрузка произведена строго в экспериментальную ветку через сборку GitHub Actions, проверку SHA-256 и GLB-манифеста; 22 временных фрагмента автоматически удалены.
+- На iPhone работает [просмотр фактической модели](../../babylon/british-jakeli-intake-iphone.html) с проверкой точного SHA-256. В игру **не внедрять** и по-прежнему **не** ставить `installed:true`: 65-костный skinning и Quaternius отсутствуют.
+- [Атрибуция George Jakeli, CC BY 4.0](./ATTRIBUTION_JAKELI.md).
 
 ## Порядок фактической установки
 
