@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "note": "Three source candidates locked. Only Jakeli original supplied through chat; NO British rigged/animated GLBs installed in GitHub. Keep installed:false and rightsCleared:false until verified sources, 65-bone skinning and role headgear acceptance.",
+  "note": "Selected source candidates fixed; actual Jakeli static 5.2MB preview installed into isolated branch, SHA256 e86dc27fdb763092ad80391ea79c3f83f20c7b81195d2132dc1b68cf3634d7a0; original remains unrigged (skins=0, animations=0). Game-ready installed:false for all. Danoob and Fab originals still absent. Hero/main protected.",
   "models": {
     "americanHero": {
       "file": "us-hero.glb",
@@ -36,9 +36,12 @@
         "glbAnimations": 0,
         "optimizedPreviewSizeBytes": 5200624,
         "optimizedPreviewSha256": "e86dc27fdb763092ad80391ea79c3f83f20c7b81195d2132dc1b68cf3634d7a0",
-        "optimizedPreviewStatus": "prepared-in-chat-not-installed",
-        "authorization": "Author attribution CC BY 4.0 embedded in GLB; confirm source page terms"
-      }
+        "optimizedPreviewStatus": "installed-in-experimental-branch-static-only",
+        "authorization": "Author attribution CC BY 4.0 embedded in GLB; confirm source page terms",
+        "optimizedPreviewRepoPath": "assets/allied-soldiers/uk-jakeli-mobile-static.glb",
+        "verifiedInGithub": true
+      },
+      "visualPreviewInstalled": true
     },
     "britishFab": {
       "file": "uk-fab-optimized.glb",
