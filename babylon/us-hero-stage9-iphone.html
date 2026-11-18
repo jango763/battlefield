@@ -118,6 +118,43 @@ try{
  let active=null,rigInstance=null,battleInstance=null,targetView=null,effects=null,
  clipMap=null,recoilTime=0,sample=0,equipBusy=false,fireHeld=false,fallbackPending=false;
  let lastBattleMessage="";
+ let stageRoot=null;
+ // Hero asset originally points +Z, while stage9 targets are placed at -Z.
+ // Turn the character ROOT, including the original 65-bone skeleton, Weapon_R
+ // mounted weapon and muzzle, towards the actual selected enemy.
+ function faceSelectedTarget(){
+  if(!stageRoot||!rigInstance||!battleInstance)return null;
+  const enemy=battleInstance.currentTarget();
+  if(!enemy)return null;
+  const scale=battleInstance.SCALE;
+  let dot=-1;
+  // The muzzle is offset from the root. Recalculate after each turn to keep
+  // the visible barrel aligned with the target, not only its initial bearing.
+  for(let i=0;i<8;i++){
+   const m=rigInstance.getMuzzleWorld();
+   const toward=new B.Vector3(enemy.x/scale-m.position[0],0,
+     enemy.z/scale-m.position[2]);
+   const forward=new B.Vector3(m.direction[0],0,m.direction[2]);
+   if(toward.lengthSquared()<1e-6||forward.lengthSquared()<1e-6)
+    throw Error("Неверное направление оружия");
+   const delta=Math.atan2(
+    Math.sin(Math.atan2(toward.x,toward.z)-Math.atan2(forward.x,forward.z)),
+    Math.cos(Math.atan2(toward.x,toward.z)-Math.atan2(forward.x,forward.z)));
+   dot=B.Vector3.Dot(toward.normalize(),forward.normalize());
+   if(Math.abs(delta)<.008)break;
+   stageRoot.rotation.y+=delta;
+   stageRoot.computeWorldMatrix(true);
+  }
+  const m=rigInstance.getMuzzleWorld();
+  const toward=new B.Vector3(enemy.x/scale-m.position[0],0,
+    enemy.z/scale-m.position[2]).normalize();
+  const forward=new B.Vector3(m.direction[0],0,m.direction[2]).normalize();
+  dot=B.Vector3.Dot(toward,forward);
+  qa.facing={targetId:enemy.id,barrelDot:dot,heroYaw:stageRoot.rotation.y,
+    muzzle:m.position,barrel:m.direction};
+  if(dot<.97)throw Error("Оружие направлено от цели: "+dot.toFixed(3));
+  return qa.facing;
+ }
  const ball=window.BattlefieldBalance;
  const labelOfSource={Kar98k:"Lee-Enfield",MP40:"Sten",MG42:"Bren",Panzerschreck:"PIAT"};
  const balanceSourceFor={"uk-lee-enfield":"Kar98k","uk-sten":"MP40",
@@ -158,6 +195,7 @@ try{
     throw Error("Оружие недоступно: "+result.reason);
    }
    qa.weapon=id;qa.changes++;effects?.reset();recoilTime=0;
+   faceSelectedTarget();
    for(const b of weaponButtons)b.setAttribute("aria-pressed",String(b.dataset.weapon===id));
    say((automatic?"Автоматически возвращена ":"Выбрана ")+rigInstance.report.weaponLabel+
      " · боезапас ведёт BattlefieldBalance.");
@@ -168,6 +206,7 @@ try{
  }
  function fireOnce(){
   if(!qa.ready||!battleInstance||!targetView||equipBusy||fallbackPending)return;
+  faceSelectedTarget();
   const result=battleInstance.fire(qa.weapon,{moving:qa.motion!=="idle"});
   if(!result.ok){
    if(result.reason==="cooldown"||result.reason==="reloading"||
@@ -252,12 +291,12 @@ try{
   button.addEventListener("click",()=>{
    if(!battleInstance||!qa.ready)return;
    const r=battleInstance.selectTarget(button.dataset.target);
-   if(r.ok){targetView?.setSelected(r.id);say("Цель выбрана: "+r.id);updateRangeHUD();}
+   if(r.ok){faceSelectedTarget();targetView?.setSelected(r.id);say("Цель выбрана: "+r.id);updateRangeHUD();}
   });
  }
  $("reset-range").addEventListener("click",()=>{
   if(!targetView||!battleInstance)return;
-  fireHeld=false;qa.fireHeld=false;targetView.reset();
+  fireHeld=false;qa.fireHeld=false;targetView.reset();faceSelectedTarget();
   qa.shots=0;lastBattleMessage="";
   if(qa.weapon!=="uk-lee-enfield")equipVisual("uk-lee-enfield");
   say("Три цели восстановлены. Можно продолжать стрельбу.");
@@ -335,6 +374,7 @@ try{
  const h=max.y-min.y;
  if(!(h>.1))throw Error("Неверный масштаб героя");
  const stage=new B.TransformNode("us-approved-hero",scene);
+ stageRoot=stage;
  for(const mesh of imported.meshes)if(!mesh.parent)mesh.parent=stage;
  for(const node of imported.transformNodes)if(!node.parent)node.parent=stage;
  const scale=1.8/h;stage.scaling.setAll(scale);
@@ -353,8 +393,9 @@ try{
  });
  targetView=targetVisuals.create({
   scene,bridge:battleInstance,rig:rigInstance,
-  onSelect:id=>{say("Выбрана цель "+id);updateRangeHUD();}
+  onSelect:id=>{faceSelectedTarget();say("Выбрана цель "+id);updateRangeHUD();}
  });
+ faceSelectedTarget();
  qa.rig=rigInstance.report;qa.rigInstance=rigInstance;
  qa.battle=battleInstance;qa.targets=targetView;qa.effects=effects;
  qa.ready=true;qa.bones=65;qa.armChannelsRemoved=rigInstance.report.armChannelsRemoved;
