@@ -36,8 +36,10 @@ a{color:#dcf1ba}
 <p>Оригинал George Jakeli под CC BY 4.0 содержит форму, каску Mk II и детали снаряжения, но <strong>не содержит скелета и анимаций</strong>. Здесь проверяем внешний вид и исходный файл, не выдавая статический 3D за готового бойца. Другие выбранные британские модели не подменяем.</p>
 </section>
 <section class="panel">
-<h2>1. Открой файл из приложения «Файлы»</h2>
-<p>Рекомендуется уменьшенная копия <code>uk-jakeli-mobile-static.glb</code> (5,2 МБ). Допускается и оригинал <code>british_army_soldier_ww2.glb</code> (26,7 МБ). Файл остаётся на телефоне и не отправляется на сервер.</p>
+<h2>1. Открой установленную статическую копию Jakeli</h2>
+<p>Облегчённый <code>uk-jakeli-mobile-static.glb</code> (5,2 МБ) уже находится в нашей экспериментальной ветке GitHub. Можно открыть его сразу — без загрузки файлов вручную.</p>
+<button id="load-repo">Показать настоящего Jakeli в 3D</button>
+<p>Либо открой исходный GLB с телефона (оригинал 26,7 МБ): файл остаётся на iPhone и никуда не отправляется.</p>
 <input id="file" type="file" accept=".glb,model/gltf-binary,application/octet-stream" aria-label="Выбрать модель GLB"/>
 <div id="asset" aria-live="polite">Ничего не выбрано.</div>
 </section>
@@ -163,6 +165,20 @@ async function show(file){
   "Источник указан как George Jakeli, но файл изменён или не совпадает с проверенным оригиналом. Не допущен к игре.";
  installStatus();
 }
+$("load-repo").addEventListener("click",async()=>{
+ const button=$("load-repo");button.disabled=true;
+ $("status").textContent="Загружаю сохранённый оригинальный Jakeli из экспериментальной ветки GitHub…";
+ try{
+  const response=await fetch("../assets/allied-soldiers/uk-jakeli-mobile-static.glb");
+  if(!response.ok)throw Error("Файл Jakeli в GitHub недоступен: HTTP "+response.status);
+  const b=await response.blob();
+  if(b.size!==5200624)throw Error("Размер загруженного GLB не совпадает с утверждённым");
+  await show(new File([b],"uk-jakeli-mobile-static.glb",{type:"model/gltf-binary"}));
+ }catch(e){
+  qa.error=String(e?.message||e);
+  $("status").textContent="Ошибка: "+qa.error;
+ }finally{button.disabled=false;}
+});
 $("file").addEventListener("change",async()=>{
  const f=$("file").files?.[0];if(!f)return;
  try{await show(f)}catch(e){
