@@ -1,0 +1,27 @@
+name: British army 10 stages - source and combat QA
+on:
+  push:
+    branches:
+      - 'feature/british-army-10-stages-*'
+    paths:
+      - 'babylon/british-army-pipeline.js'
+      - 'babylon/tests/test-british-army-stage1.cjs'
+      - 'babylon/BRITISH_ARMY_10_STAGES.md'
+      - 'assets/allied-soldiers/manifest.json'
+      - '.github/workflows/british-army-10-stages-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stage1:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify British infantry and commando source-model contract
+        run: |
+          node --check babylon/british-army-pipeline.js
+          node --check babylon/tests/test-british-army-stage1.cjs
+          node babylon/tests/test-british-army-stage1.cjs
+      - name: Guard approved hero damage and ammo
+        run: |
+          node babylon/tests/test-us-hero-stage9-bridge.cjs
