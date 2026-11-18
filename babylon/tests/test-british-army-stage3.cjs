@@ -17,7 +17,7 @@ const bones=keys.slice(0,65).map(name=>({
 assert.equal(bones.length,65);
 const m=motion.mapBones({bones});
 assert.equal(m.size,65);
-const source=new Map(bones.map(x=>[motion.mapBones({bones:[x]}).keys().next().value,x]));
+const source=new Map(bones.map(x=>[x.name.replace(/^mixamorig:/,""),x]));
 const groups=Object.values(motion.CLIPS).map(name=>({
  name,targetedAnimations:bones.map(x=>({
   target:{name:x.name},animation:{targetProperty:"rotationQuaternion"}
