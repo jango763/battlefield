@@ -26,6 +26,30 @@ const dir="babylon-qa-results/british-jakeli";
    !initial.files.includes(".glb")||initial.scrollWidth>initial.width+4)
    throw Error("Jakeli mobile intake initial state untrusted "+JSON.stringify(initial));
   await page.screenshot({path:dir+"/real-asset-needed.png",fullPage:true});
+  // Load the actual user-supplied, optimized model distributed in THIS branch.
+  await page.locator("#load-repo").click();
+  await page.waitForFunction(()=>{
+   const q=window.__BRITISH_JAKELI_INTAKE_QA__;
+   return q?.loaded||q?.error
+  },null,{timeout:110000});
+  const british=await page.evaluate(()=>{
+   const q=window.__BRITISH_JAKELI_INTAKE_QA__;
+   return {loaded:q.loaded,verified:q.sourceVerified,
+    original:q.modelIsBritish,skins:q.skins,bones:q.bones,
+    clips:q.clips,meshes:q.meshes,canInstall:q.canInstall,
+    bytes:q.bytes,sha:q.sha256,error:q.error,
+    canvasVisible:getComputedStyle(document.querySelector("#canvas")).display!=="none"};
+  });
+  console.log("BRITISH_JAKELI_ACTUAL_GLB",JSON.stringify(british));
+  if(!british.loaded||!british.verified||!british.original||
+   british.skins!==0||british.bones!==0||british.clips!==0||
+   british.meshes!==14||british.canInstall||british.bytes!==5200624||
+   !british.canvasVisible||
+   british.sha!=="e86dc27fdb763092ad80391ea79c3f83f20c7b81195d2132dc1b68cf3634d7a0"||
+   british.error)
+   throw Error("Actual optimized Jakeli GLB load/integrity or static-rig truth failed "+
+    JSON.stringify(british));
+  await page.screenshot({path:dir+"/real-jakeli-3d-not-yet-rigged.png",fullPage:true});
   // A fully rigged US control model must NOT be accepted as George Jakeli.
   await page.locator("#file").setInputFiles({
    name:"not-our-jakeli.glb",mimeType:"model/gltf-binary",
@@ -47,6 +71,7 @@ const dir="babylon-qa-results/british-jakeli";
   console.log("BRITISH_JAKELI_INTAKE_MOBILE_PASS",JSON.stringify({
    screen:"390x844",realModelRequired:true,originalUploadedToGithub:false,
    hero65BonesNotAcceptedAsBritish:true,sourceSHA256Gate:true,
+   githubActualGLBLoaded:true,meshCount:14,authenticStaticRig0:true,
    localFilePicker:true,visualRigNotFaked:true,errors:0
   }));
  }catch(e){
