@@ -139,7 +139,8 @@
     mappedChannels:stats.map(x=>({motion:x.motion,joints:x.mappedJoints})),
     sourceAndTargetWereDifferent:true,
     skeletonBones:target.skeletons[0].bones.length,
-    readyForBritishDeployment:role!=="control"
+    motionTransferSucceeded:true,
+    readyForBritishDeployment:false // requires licensed British asset + visual and combat QA
   });
   }
   function dispose(){
