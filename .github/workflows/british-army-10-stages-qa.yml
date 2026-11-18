@@ -5,7 +5,10 @@ on:
       - 'feature/british-army-10-stages-*'
     paths:
       - 'babylon/british-army-pipeline.js'
+      - 'babylon/british-stage2-rig-audit.js'
+      - 'babylon/british-stage2-iphone.html'
       - 'babylon/tests/test-british-army-stage1.cjs'
+      - 'babylon/tests/test-british-army-stage2*.cjs'
       - 'babylon/BRITISH_ARMY_10_STAGES.md'
       - 'assets/allied-soldiers/manifest.json'
       - '.github/workflows/british-army-10-stages-qa.yml'
@@ -13,15 +16,38 @@ on:
 permissions:
   contents: read
 jobs:
-  stage1:
+  british-army-qa:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Verify British infantry and commando source-model contract
+      - name: Validate British army identities and both headwear roles
         run: |
           node --check babylon/british-army-pipeline.js
           node --check babylon/tests/test-british-army-stage1.cjs
           node babylon/tests/test-british-army-stage1.cjs
+      - name: Test stage2 65-bone, skin weights and original source gate
+        run: |
+          node --check babylon/british-stage2-rig-audit.js
+          node --check babylon/tests/test-british-army-stage2.cjs
+          node babylon/tests/test-british-army-stage2.cjs
       - name: Guard approved hero damage and ammo
         run: |
           node babylon/tests/test-us-hero-stage9-bridge.cjs
+      - name: Install mobile Chromium
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/british-stage2-qa playwright@1.58.2
+          /tmp/british-stage2-qa/node_modules/.bin/playwright install chromium
+      - name: Verify iPhone-sized original-GLB inspector against real hero control rig
+        run: |
+          node --check babylon/tests/test-british-army-stage2-browser.cjs
+          python3 -m http.server 8799 --bind 127.0.0.1 >/tmp/british-stage2-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-british-army-stage2-browser.cjs
+      - name: Upload mobile stage2 inspection screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: british-stage2-iphone-control-and-source-gates
+          path: babylon-qa-results/british-stage2/
+          if-no-files-found: ignore
