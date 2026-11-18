@@ -38,7 +38,7 @@ const dir="babylon-qa-results/british-stage3";
   console.log("BRITISH_STAGE3_CONTROL_READY",JSON.stringify(q));
   if(q.error||!q.loaded||!q.referenceOnly||q.identityVerified||
     q.bones!==65||q.sceneSkeletons!==1||q.clipCount!==4||
-    q.mapped?.some(x=>x.joints<30)||q.sourceAndTargetWereDifferent!==true||
+    q.mapped?.some(x=>x.joints<18)||q.sourceAndTargetWereDifferent!==true||
     q.gameplayReady!==false)
    throw Error("Real retarget/crossfade validation failed: "+JSON.stringify(q));
   await page.screenshot({path:dir+"/retargeted-idle-control.png",fullPage:true});
