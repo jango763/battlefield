@@ -85,5 +85,5 @@ assert.throws(()=>rifle.create({scene,stance:{...stance,
 console.log("BRITISH_STAGE5_LEE_ENFIELD_CONTRACT_PASS",JSON.stringify({
  source:"BattlefieldBalance",cooldown:balance.WEAPONS.Kar98k.interval,
  movingBlocked:true,acceptedShots:2,infiniteAmmo:true,
- 2handWeaponMount:"mixamorig:Weapon_R",reset:true,visualEvents:visualShots
+ twoHandWeaponMount:"mixamorig:Weapon_R",reset:true,visualEvents:visualShots
 }));
