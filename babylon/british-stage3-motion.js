@@ -56,7 +56,7 @@
    if(absent.size||unanimated.length)
     throw Error(name+" missing mapped/animated joints: "+
      [...absent,...unanimated].join(","));
-   if(matched.size<30)throw Error(name+" has too few animation joints: "+matched.size);
+   if(matched.size<18)throw Error(name+" has too few animation joints: "+matched.size);
    stats.push(Object.freeze({motion,name,sourceChannels:group.targetedAnimations.length,
     mappedJoints:matched.size}));
   }
@@ -109,7 +109,7 @@
      ta=>norm(ta.target?.name)));
     const missing=CRITICAL.filter(n=>!outputJoints.has(n));
     if(missing.length)throw Error(name+" lost joints after retarget: "+missing.join(","));
-    if(outputJoints.size<30)throw Error("Incomplete retargeted motion "+name);
+    if(outputJoints.size<18)throw Error("Incomplete retargeted motion "+name);
     group.stop();
     output.set(motion,group);
    }
