@@ -30,6 +30,14 @@ const BASE="http://127.0.0.1:8799/babylon/us-hero-stage9-iphone.html";
      battle:q.battle.status(),actors:q.targets.status(),weapon:q.rig.weaponId,
      twoWayAmmo:!!q.combat};
   });
+  const facing=await page.evaluate(()=>{
+    const q=window.__US_HERO_STAGE9_QA__,m=q.rigInstance.getMuzzleWorld(),t=q.battle.currentTarget();
+    const to=[t.x/q.battle.SCALE-m.position[0],1.4-m.position[1],t.z/q.battle.SCALE-m.position[2]];
+    const len=Math.hypot(...to),dir=m.direction;
+    const forwardDot=(to[0]*dir[0]+to[1]*dir[1]+to[2]*dir[2])/(len*Math.hypot(...dir));
+    return {muzzle:m,target:[t.x/q.battle.SCALE,t.z/q.battle.SCALE],to,forwardDot};
+  });
+  console.log("STAGE9_INITIAL_FACING",JSON.stringify(facing));
   console.log("STAGE9_INITIAL",JSON.stringify(first));
   if(first.stage!==9||first.bones!==65||first.skeletons!==1||
      first.weapons!==4||first.motionButtons!==4||first.targetButtons!==3||
