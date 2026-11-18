@@ -74,8 +74,13 @@
   const actualSafari=!!deviceActual&&isSafariUA(safariUA);
   if(!actualSafari)blockers.push("Physical iPhone Safari check not confirmed");
   if(!allManual)blockers.push("Safari visual/touch checklist incomplete");
-  if(!measured3d||measured3d.controlOnly!==false)
-   blockers.push("No full-scene measured performance on real British models");
+  const fullSceneMeasured=!!measured3d&&measured3d.controlOnly===false&&
+   measured3d.actors===EXPECTED.armySlots&&
+   Number.isFinite(measured3d.fpsP10)&&measured3d.fpsP10>=30&&
+   Number.isFinite(measured3d.observedSeconds)&&measured3d.observedSeconds>=10&&
+   measured3d.contextLosses===0;
+  if(!fullSceneMeasured)
+   blockers.push("No passing 12-actor Safari load test (10s, P10 FPS ≥30, no WebGL context loss)");
   if(visualAcceptance!==true)blockers.push("Actual gameplay integration not visually accepted");
   const ready=blockers.length===0&&p.britishVisualsReady&&!!rigAudit?.ok;
   return Object.freeze({
@@ -88,7 +93,7 @@
    safariUserAgent:isSafariUA(safariUA),
    physicalSafariTested:actualSafari,
    safariChecklist:checklist,
-   fullSceneMeasured:!!measured3d&&measured3d.controlOnly===false,
+   fullSceneMeasured,
    readyToMergeMain:ready,
    army:{slots:p.total,infantry:p.infantry,commando:p.commando,
     fireteams:p.fireteams.map(x=>({id:x.id,size:x.slots.length}))},
