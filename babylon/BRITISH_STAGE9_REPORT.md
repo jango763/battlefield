@@ -2,7 +2,7 @@
 
 Дата: 18 ноября 2026.
 Ветка: `feature/british-army-10-stages-20261118`.
-Тест: [GitHub Actions #44301946695](https://github.com/jango763/battlefield/actions/runs/44301946695) — **success**.
+Тест: [GitHub Actions #44303565985](https://github.com/jango763/battlefield/actions/runs/44303565985) — **success**.
 
 ## Что сделано
 
@@ -40,7 +40,7 @@
 
 ## Подтверждённые тесты
 
-GitHub Actions #44301946695 — **success**. Экран 390×844,
+GitHub Actions #44303565985 — **success**. Экран 390×844,
 мобильный Chromium, автотесты Node.js и браузера.
 
 | Критерий | Результат |
