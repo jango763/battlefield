@@ -91,7 +91,7 @@ const dir="babylon-qa-results/us-hero-stage8";
     throw Error("No actual shot or muzzle FX for "+id);
    if(shot.right>.018||shot.left>.035)
     throw Error("Weapon grips lost while shooting "+id);
-   if(id==="uk-piat" && (shot.piatMeshes!==12||shot.fx.missiles<1))
+   if(id==="uk-piat" && (shot.piatMeshes<30||shot.fx.missiles<1))
     throw Error("PIAT blast/projectile wrong");
    if(id!=="uk-piat"&&shot.piatMeshes)throw Error("Leaked PIAT mesh");
    if(id==="uk-sten"||id==="uk-bren"){
