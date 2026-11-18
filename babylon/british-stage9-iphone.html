@@ -32,6 +32,10 @@ button,select{width:100%;min-height:41px;padding:8px 6px;background:#335741;colo
 button:disabled,select:disabled{opacity:.45}
 button[aria-pressed=true]{background:#d9e7b6;color:#183022}
 select{appearance:auto}
+#fireteams{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-bottom:9px}
+.fireteam{border:1px solid #58785c;border-radius:8px;background:#274131;padding:8px 5px;font-size:10px;line-height:1.4;min-height:55px}
+.fireteam strong{display:block;color:#e4efd9;font-size:11px}
+.fireteam em{font-style:normal;color:#c6d6c2}
 #roster{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
 .roster-item{padding:8px 4px;min-height:65px;border:1px solid #5f7a61;border-radius:8px;background:#223c2c;display:flex;flex-direction:column;gap:3px;text-align:center;justify-content:center;cursor:pointer;font-size:11px;color:#eef3e9}
 .roster-item[aria-pressed=true]{background:#566d3e;border-color:#f2dc86}
@@ -49,7 +53,7 @@ a{color:#d8edc7}
 </head>
 <body>
 <h1>Британская армия · этап 9/10</h1>
-<p>12 отдельных боевых слотов: 1 герой, 8 пехотинцев, 3 коммандос · строй и совместимость вооружения</p>
+<p>Герой и три малых отряда: 4 + 4 пехотинца, 3 коммандос · строй и вооружение</p>
 <div id="warning" role="note">Это <strong>схема строя и симуляция боя</strong>, а не готовые британские 3D-солдаты. Ранее выбранные GLB и разрешения на их использование пока не подтверждены. Каски Mk II и береты ещё не установлены на моделях.</div>
 <div id="status" role="status" aria-live="polite">Сверяю каталог и боевую систему…</div>
 <div id="layout">
@@ -76,6 +80,8 @@ a{color:#d8edc7}
  </div>
  <div>
   <section class="panel">
+   <h2>Три малых отряда (4 + 4 + 3)</h2>
+   <div id="fireteams" aria-label="Отряды британской армии"></div>
    <h2>Бойцы и головные уборы</h2>
    <div id="roster"></div>
    <div id="details">Выберите слот.</div>
@@ -114,10 +120,11 @@ const selectSlot=n=>{
  selected=n;QA.selectedSlot=n;
  const role=api.roleForSlot(n);
  const candidate=plan.slots[n];
+ const team=api.fireteamForSlot(n);
  $("details").textContent=n===0?
   "Герой — уже утверждённый персонаж. Его внешний вид не заменяем.":
   (role==="infantry"?"Пехота · нужна каска Mk II. ":"Коммандос · нужен берет. ")+
-  "Кандидат: "+candidate.candidateModelId+
+  "Отряд: "+team.label+". Кандидат: "+candidate.candidateModelId+
   ". Оригинальный 3D-файл и права требуют подтверждения.";
  $("weapon").disabled=n===0||sim?.snapshot().active;
  $("equip").disabled=n===0||sim?.snapshot().active;
@@ -172,8 +179,23 @@ function roster(){
   b.onclick=()=>selectSlot(actor.slot);el.appendChild(b);
  }
 }
+function fireteamSummary(st){
+ const el=$("fireteams");el.replaceChildren();
+ for(const group of st.fireteams){
+  const node=document.createElement("div");
+  node.className="fireteam";node.dataset.team=group.id;
+  const label=document.createElement("strong");
+  label.textContent=group.label;
+  const count=document.createElement("em");
+  count.textContent="Живы "+group.alive+"/"+group.size+
+   " · бойцы "+group.slots.join(", ");
+  node.append(label,count);el.appendChild(node);
+ }
+}
 function status(){
  const st=sim.snapshot();
+ QA.fireteams=st.fireteams;
+ fireteamSummary(st);
  QA.active=st.active;QA.liveSimulation=st.active;
  QA.alliesAlive=st.alliesAlive;QA.axisAlive=st.enemiesAlive;
  QA.trainingShots=st.totalShots;
