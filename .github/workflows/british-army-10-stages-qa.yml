@@ -27,6 +27,9 @@ on:
       - 'babylon/british-stage9-army.js'
       - 'babylon/british-stage9-iphone.html'
       - 'babylon/tests/test-british-army-stage9*.cjs'
+      - 'babylon/british-stage10-release-audit.js'
+      - 'babylon/british-stage10-iphone.html'
+      - 'babylon/tests/test-british-army-stage10*.cjs'
       - 'babylon/tests/test-british-army-stage3*.cjs'
       - 'babylon/tests/test-british-army-stage1.cjs'
       - 'babylon/tests/test-british-army-stage2*.cjs'
@@ -87,6 +90,11 @@ jobs:
           node --check babylon/british-stage9-army.js
           node --check babylon/tests/test-british-army-stage9.cjs
           node babylon/tests/test-british-army-stage9.cjs
+      - name: Validate final Safari release gate and original GLB weight budgets
+        run: |
+          node --check babylon/british-stage10-release-audit.js
+          node --check babylon/tests/test-british-army-stage10.cjs
+          node babylon/tests/test-british-army-stage10.cjs
       - name: Guard approved hero damage and ammo
         run: |
           node babylon/tests/test-us-hero-stage9-bridge.cjs
@@ -128,7 +136,11 @@ jobs:
         run: |
           node --check babylon/tests/test-british-army-stage9-browser.cjs
           node babylon/tests/test-british-army-stage9-browser.cjs
-      - name: Upload mobile stage2-stage9 inspection screenshots
+      - name: Verify iPhone stage10 preview hub, release blockers and 65-bone 3D benchmark
+        run: |
+          node --check babylon/tests/test-british-army-stage10-browser.cjs
+          node babylon/tests/test-british-army-stage10-browser.cjs
+      - name: Upload mobile stage2-stage10 inspection screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -142,4 +154,5 @@ jobs:
             babylon-qa-results/british-stage7/
             babylon-qa-results/british-stage8/
             babylon-qa-results/british-stage9/
+            babylon-qa-results/british-stage10/
           if-no-files-found: ignore
