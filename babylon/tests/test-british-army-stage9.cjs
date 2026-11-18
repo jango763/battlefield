@@ -27,6 +27,25 @@ assert.equal(missing.total,12);
 assert.equal(missing.hero,1);
 assert.equal(missing.infantry,8);
 assert.equal(missing.commando,3);
+assert.equal(army.FIRETEAMS.length,3);
+assert.deepEqual(army.FIRETEAMS.map(g=>g.slots.length),[4,4,3]);
+assert.deepEqual(missing.fireteams.map(g=>g.id),
+ ["rifle-alpha","rifle-bravo","commando-charlie"]);
+assert.equal(army.fireteamForSlot(0),null);
+assert.equal(army.fireteamForSlot(3).id,"rifle-alpha");
+assert.equal(army.fireteamForSlot(5).id,"rifle-bravo");
+assert.equal(army.fireteamForSlot(10).id,"commando-charlie");
+assert.throws(()=>army.fireteamForSlot(12),/Unknown/);
+const allAssigned=army.FIRETEAMS.flatMap(g=>g.slots);
+assert.equal(new Set(allAssigned).size,11);
+assert.deepEqual(allAssigned.slice().sort((a,b)=>a-b),
+ [1,2,3,4,5,6,7,8,9,10,11]);
+const wounded=Array(12).fill(true);
+wounded[2]=false;wounded[6]=false;wounded[10]=false;
+const teams=army.fireteamStatus(wounded);
+assert.deepEqual(teams.map(g=>g.alive),[3,3,2]);
+assert.deepEqual(teams.map(g=>g.casualties),[1,1,1]);
+assert.throws(()=>army.fireteamStatus(Array(11).fill(true)),/12/);
 assert.equal(missing.britishVisualsReady,false);
 assert(missing.slots.every(x=>!x.visualReady));
 assert.equal(missing.slots[0].modelId,"americanHero");
@@ -66,6 +85,8 @@ assert.equal(new Set(sim.allies.map(x=>x.id)).size,12);
 assert(sim.allies.every(x=>x.weapon==="Kar98k"));
 assert.equal(sim.snapshot().alliesAlive,12);
 assert.equal(sim.snapshot().enemiesAlive,4);
+assert.deepEqual(sim.snapshot().fireteams.map(g=>g.size),[4,4,3]);
+assert.deepEqual(sim.snapshot().fireteams.map(g=>g.alive),[4,4,3]);
 assert.equal(sim.snapshot().soldiers.filter(x=>x.role==="commando").length,3);
 assert.equal(sim.equip(9,"uk-sten",{atBase:false}).reason,"return-to-base");
 assert.equal(sim.equip(9,"uk-sten").ok,true);
@@ -118,6 +139,7 @@ sim.dispose();
 assert.throws(()=>sim.tick(.05),/disposed/);
 console.log("BRITISH_STAGE9_ARMY_CONTRACT_PASS",JSON.stringify({
  slots:12,hero:1,infantry:8,commando:3,
+ independentFireteams:army.FIRETEAMS.map(g=>g.slots.length),
  sourceModelFilesInstalled:0,realBritish3DSpawned:false,
  independentVisualRigRequirements:verified.uniqueSkeletons,
  independentMotionClipsRequired:verified.uniqueClips,
