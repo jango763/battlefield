@@ -99,11 +99,11 @@ const dir="babylon-qa-results/british-stage9";
    shots:window.__BRITISH_STAGE9_QA__.getSnapshot().totalShots,
    allAlive:window.__BRITISH_STAGE9_QA__.getSnapshot().alliesAlive,
    noneLoaded:!window.__BRITISH_STAGE9_QA__.originalBritishSkin,
-   3dActors:window.__BRITISH_STAGE9_QA__.modelSpawns
+   model3dActors:window.__BRITISH_STAGE9_QA__.modelSpawns
   }));
   if(reset.active||reset.mode!=="turtle"||reset.selected!==1||
    reset.shots!==0||reset.allAlive!==12||!reset.noneLoaded||
-   reset["3dActors"]!==0||errors.length)
+   reset.model3dActors!==0||errors.length)
    throw Error("Army stage9 reset/3D honesty regression "+
     JSON.stringify({reset,errors}));
   await page.screenshot({path:dir+"/reset-all-army-slots.png",fullPage:true});
