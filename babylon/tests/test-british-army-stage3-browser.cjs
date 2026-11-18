@@ -1,5 +1,5 @@
 "use strict";
-const {chromium}=require("/tmp/british-stage3-qa/node_modules/playwright");
+const {chromium}=require("/tmp/british-stage2-qa/node_modules/playwright");
 const fs=require("node:fs");
 const dir="babylon-qa-results/british-stage3";
 (async()=>{
