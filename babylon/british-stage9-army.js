@@ -19,6 +19,40 @@
  const HEADWEAR=Object.freeze({
   infantry:"steel-mk2-helmet",commando:"beret"
  });
+ // Three independent tactical teams of 3–4 soldiers; the approved hero
+ // remains the 12th actor and is never cloned into a British team.
+ const FIRETEAMS=Object.freeze([
+  Object.freeze({id:"rifle-alpha",label:"Пехота «Альфа»",role:"infantry",
+   slots:Object.freeze([1,2,3,4])}),
+  Object.freeze({id:"rifle-bravo",label:"Пехота «Браво»",role:"infantry",
+   slots:Object.freeze([5,6,7,8])}),
+  Object.freeze({id:"commando-charlie",label:"Коммандос «Чарли»",role:"commando",
+   slots:Object.freeze([9,10,11])})
+ ]);
+ const assigned=FIRETEAMS.flatMap(group=>group.slots);
+ if(assigned.length!==ARMY_SLOTS-1||
+    new Set(assigned).size!==ARMY_SLOTS-1||
+    assigned.some(slot=>slot<1||slot>=ARMY_SLOTS))
+  throw Error("Fireteams must assign each British soldier exactly once");
+ function fireteamForSlot(slot){
+  if(!Number.isInteger(slot)||slot<0||slot>=ARMY_SLOTS)
+   throw Error("Unknown fireteam slot "+slot);
+  return slot===HERO_SLOT?null:FIRETEAMS.find(g=>g.slots.includes(slot));
+ }
+ function fireteamStatus(alive){
+  if(!Array.isArray(alive)||alive.length!==ARMY_SLOTS||
+   alive.some(v=>typeof v!=="boolean"))
+   throw Error("Need 12 living states for British fireteams");
+  return Object.freeze(FIRETEAMS.map(g=>Object.freeze({
+   id:g.id,label:g.label,role:g.role,
+   slots:g.slots,size:g.slots.length,
+   alive:g.slots.filter(i=>alive[i]).length,
+   casualties:g.slots.filter(i=>!alive[i]).length,
+   members:Object.freeze(g.slots.map(slot=>Object.freeze({
+    slot,alive:alive[slot]
+   })))
+  })));
+ }
  function roleForSlot(slot){
   if(!Number.isInteger(slot)||slot<0||slot>=ARMY_SLOTS)
    throw Error("Unknown British army slot "+slot);
@@ -58,6 +92,7 @@
   if(infantry!==INFANTRY_SLOTS||commando!==COMMANDO_SLOTS)
    throw Error("Army casting: expected 8 infantry and 3 commando slots");
   return Object.freeze({slots,sourceModels:rows,
+   fireteams:FIRETEAMS,
    total:slots.length,hero:1,infantry,commando,
    britishVisualsReady:slots.slice(1).every(x=>x.visualReady),
    readyForGame:false,codeReady:true});
@@ -167,6 +202,7 @@
     formation,...base,
     alive:allies.map(a=>a.alive),
     fronts:frontline(allies.map(a=>a.alive),formation),
+    fireteams:fireteamStatus(allies.map(a=>a.alive)),
     totalShots:shots.length,events:shots.slice(-6),
     soldiers:base.soldiers.map((s,i)=>Object.freeze({
      ...s,slot:i<ARMY_SLOTS?i:null,
@@ -211,6 +247,7 @@
    uniqueWeaponMounts:mounts.size});
  }
  return Object.freeze({HERO_SLOT,ARMY_SLOTS,INFANTRY_SLOTS,COMMANDO_SLOTS,
-  ROLES,SOURCE_WEAPONS,HEADWEAR,roleForSlot,plan,positions,frontline,
+  ROLES,SOURCE_WEAPONS,HEADWEAR,FIRETEAMS,fireteamForSlot,
+  fireteamStatus,roleForSlot,plan,positions,frontline,
   simulation,verifyUniqueVisualActors});
 });
