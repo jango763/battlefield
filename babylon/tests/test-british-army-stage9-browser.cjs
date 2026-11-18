@@ -25,12 +25,17 @@ const dir="babylon-qa-results/british-stage9";
     icons:document.querySelectorAll("#board .marker").length,
     roles:document.querySelectorAll("#roster .roster-item").length,
     alliesAlive:s.alliesAlive,enemiesAlive:s.enemiesAlive,
+    teams:s.fireteams.map(g=>({id:g.id,size:g.size,alive:g.alive})),
+    teamCards:document.querySelectorAll("#fireteams .fireteam").length,
     active:s.active};
   });
   console.log("BRITISH_STAGE9_INITIAL",JSON.stringify(initial));
   if(initial.error||!initial.ready||initial.stage!==9||initial.slots!==12||
    initial.hero!==1||initial.infantry!==8||initial.commando!==3||
    initial.verified||initial.visualSpawns!==0||initial.icons!==16||
+   initial.teamCards!==3||
+   JSON.stringify(initial.teams.map(x=>x.size))!=="[4,4,3]"||
+   initial.teams.some(x=>x.alive!==x.size)||
    initial.roles!==12||initial.active||initial.alliesAlive!==12||
    initial.enemiesAlive!==4||
    initial.headwear.filter(x=>x==="steel-mk2-helmet").length!==8||
@@ -61,7 +66,8 @@ const dir="babylon-qa-results/british-stage9";
    slot:window.__BRITISH_STAGE9_QA__.selectedSlot,
    details:document.getElementById("details").textContent
   }));
-  if(actor.slot!==9||!actor.details.includes("берет"))
+  if(actor.slot!==9||!actor.details.includes("берет")||
+   !actor.details.includes("«Чарли»"))
    throw Error("Commando is not independent visual role "+JSON.stringify(actor));
   await page.locator("#weapon").selectOption("uk-sten");
   await page.locator("#equip").click();
@@ -83,11 +89,13 @@ const dir="babylon-qa-results/british-stage9";
    active:window.__BRITISH_STAGE9_QA__.active,
    equipDisabled:document.getElementById("equip").disabled,
    roles:window.__BRITISH_STAGE9_QA__.getSnapshot().soldiers.slice(0,12).map(s=>s.role),
+   teams:window.__BRITISH_STAGE9_QA__.getSnapshot().fireteams.map(g=>g.size),
    scene:document.querySelectorAll("#board .marker").length,
    shots:window.__BRITISH_STAGE9_QA__.getSnapshot().totalShots
   }));
   if(!active.active||!active.equipDisabled||active.scene!==16||
-   active.roles.filter(x=>x==="commando").length!==3)
+   active.roles.filter(x=>x==="commando").length!==3||
+   JSON.stringify(active.teams)!=="[4,4,3]")
    throw Error("British trial battle lost independent roles "+JSON.stringify(active));
   await page.screenshot({path:dir+"/squad-combat-simulation.png",fullPage:true});
   await page.locator("#stop").click();
@@ -109,6 +117,7 @@ const dir="babylon-qa-results/british-stage9";
   await page.screenshot({path:dir+"/reset-all-army-slots.png",fullPage:true});
   console.log("BRITISH_STAGE9_MOBILE_PASS",JSON.stringify({
    hero:1,infantry:8,commando:3,trainingSlots:12,
+   independentFireteams:[4,4,3],
    modelActorsInstalled:0,turtle:true,semicircle:true,
    separateWeaponInventory:true,authenticBattleCore:true,
    unsafe3dSpawnBlocked:true,reset:true
