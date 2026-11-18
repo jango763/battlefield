@@ -7,6 +7,9 @@ on:
       - 'babylon/british-army-pipeline.js'
       - 'babylon/british-stage2-rig-audit.js'
       - 'babylon/british-stage2-iphone.html'
+      - 'babylon/british-stage3-motion.js'
+      - 'babylon/british-stage3-iphone.html'
+      - 'babylon/tests/test-british-army-stage3*.cjs'
       - 'babylon/tests/test-british-army-stage1.cjs'
       - 'babylon/tests/test-british-army-stage2*.cjs'
       - 'babylon/BRITISH_ARMY_10_STAGES.md'
@@ -31,6 +34,11 @@ jobs:
           node --check babylon/british-stage2-rig-audit.js
           node --check babylon/tests/test-british-army-stage2.cjs
           node babylon/tests/test-british-army-stage2.cjs
+      - name: Validate four Quaternius locomotion clips and target mappings
+        run: |
+          node --check babylon/british-stage3-motion.js
+          node --check babylon/tests/test-british-army-stage3.cjs
+          node babylon/tests/test-british-army-stage3.cjs
       - name: Guard approved hero damage and ammo
         run: |
           node babylon/tests/test-us-hero-stage9-bridge.cjs
@@ -44,10 +52,16 @@ jobs:
           python3 -m http.server 8799 --bind 127.0.0.1 >/tmp/british-stage2-http.log 2>&1 &
           sleep 2
           node babylon/tests/test-british-army-stage2-browser.cjs
-      - name: Upload mobile stage2 inspection screenshots
+      - name: Verify source-to-target retargeting and four motions on mobile
+        run: |
+          node --check babylon/tests/test-british-army-stage3-browser.cjs
+          node babylon/tests/test-british-army-stage3-browser.cjs
+      - name: Upload mobile stage2 and stage3 inspection screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: british-stage2-iphone-control-and-source-gates
-          path: babylon-qa-results/british-stage2/
+          name: british-stage2-stage3-mobile-skeleton-motion
+          path: |
+            babylon-qa-results/british-stage2/
+            babylon-qa-results/british-stage3/
           if-no-files-found: ignore
