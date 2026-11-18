@@ -322,7 +322,10 @@ try{
  const ids=pipeline.MODEL_IDS;
  const present=[];
  for(const id of ids){
-  const file=manifest.models[id]?.file;
+  const row=manifest.models[id],file=row?.file;
+  // Missing known source assets are an expected release blocker. Do not
+  // issue HEAD requests that create benign but noisy 404 console errors.
+  if(!row?.installed||!row?.rightsCleared||!row?.optimized)continue;
   if(!/^[a-z0-9-]+\.glb$/.test(file||""))continue;
   try{
    const r=await fetch("../assets/allied-soldiers/"+file,
