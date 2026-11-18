@@ -31,39 +31,97 @@ const PIAT={
  triggerAxis:[0,.97,.24],supportAxis:[0,.92,.40],
  triggerPalm:[-.8,0,-.6],supportPalm:[.8,0,-.6]
 };
+  // Stage9 PIAT Mk I silhouette: spring cylinder, open spigot bomb cradle,
+  // shoulder cushion, trigger/guard, folding monopod, sights and canvas sling.
+  // Hand/muzzle/shoulder sockets remain EXACTLY the approved PIAT metadata above.
   function proceduralPiat(scene,parent){
     const B=window.BABYLON;
     const v=a=>new B.Vector3(a[0],a[1],a[2]);
     const meshes=[],mats=[];
-    const makeMat=(name,hex,metallic)=>{
+    const makeMat=(name,hex,metallic,roughness)=>{
       const m=new B.PBRMaterial(name,scene);
-      m.albedoColor=B.Color3.FromHexString(hex);m.metallic=metallic;m.roughness=.73;
+      m.albedoColor=B.Color3.FromHexString(hex);
+      m.metallic=metallic;m.roughness=roughness;
       mats.push(m);return m;
     };
-    const steel=makeMat('uk-piat-steel','#515b48',.55);
-    const dark=makeMat('uk-piat-dark','#252b25',.28);
-    const canvas=makeMat('uk-piat-pad','#615f4d',.03);
-    function put(mesh,xyz,material,rotation){
-      mesh.parent=parent;mesh.position.copyFrom(v(xyz));
-      if(rotation)mesh.rotation.copyFrom(v(rotation));
-      mesh.material=material;meshes.push(mesh);
-    }
+    const steel=makeMat("uk-piat-parkerized-steel","#545b47",.48,.8);
+    const worn=makeMat("uk-piat-worn-steel","#797b65",.55,.73);
+    const dark=makeMat("uk-piat-black-steel","#29302b",.5,.76);
+    const canvas=makeMat("uk-piat-canvas","#766f4e",.02,.95);
+    const gripRubber=makeMat("uk-piat-rubber","#30372f",.02,.92);
+    const put=(mesh,at,material,rot)=>{
+      mesh.parent=parent;mesh.position.copyFrom(v(at));
+      if(rot)mesh.rotation.copyFrom(v(rot));
+      mesh.material=material;meshes.push(mesh);return mesh;
+    };
     const box=(n,size,at,mat,rot)=>put(B.MeshBuilder.CreateBox(n,{
       width:size[0],height:size[1],depth:size[2]},scene),at,mat,rot);
-    const tube=(n,diam,len,at,mat)=>put(B.MeshBuilder.CreateCylinder(n,{
-      diameter:diam,height:len,tessellation:12},scene),at,mat,[Math.PI/2,0,0]);
-    tube('PIAT spring body',.125,.67,[0,0,-.075],steel);
-    tube('PIAT forward mortar spigot',.065,.29,[0,0,.40],dark);
-    box('PIAT open bomb tray',[.145,.034,.31],[0,-.055,.365],steel);
-    box('PIAT tray left wall',[.025,.075,.31],[-.067,-.011,.365],steel);
-    box('PIAT tray right wall',[.025,.075,.31],[.067,-.011,.365],steel);
-    box('PIAT shoulder stock',[.165,.125,.23],[0,-.040,-.40],steel);
-    box('PIAT rubber butt',[.17,.17,.040],[0,-.045,-.525],canvas);
-    box('PIAT trigger assembly',[.085,.095,.14],[0,-.122,-.16],dark);
-    box('PIAT grip',[.060,.155,.055],[0,-.204,-.16],canvas);
-    box('PIAT forward support',[.075,.095,.07],[0,-.145,.11],canvas);
-    box('PIAT folding monopod',[.022,.28,.022],[0,-.175,.38],steel);
-    box('PIAT rear sight',[.025,.070,.020],[0,.10,-.28],dark);
+    const tube=(n,diam,len,at,mat,taper)=>{
+      const opts={height:len,tessellation:18};
+      if(taper){opts.diameterTop=diam;opts.diameterBottom=taper;}
+      else opts.diameter=diam;
+      return put(B.MeshBuilder.CreateCylinder(n,opts,scene),at,mat,[Math.PI/2,0,0]);
+    };
+    const ring=(n,diam,thick,at,mat)=>put(B.MeshBuilder.CreateTorus(n,{
+      diameter:diam,thickness:thick,tessellation:18},scene),at,mat,[Math.PI/2,0,0]);
+    const line=(n,points,thickness,mat)=>put(B.MeshBuilder.CreateTube(n,{
+      path:points.map(v),radius:thickness,tessellation:6},scene),[0,0,0],mat);
+    // Main spring tube follows the 1942 PIAT profile, rather than a bazooka tube.
+    tube("PIAT main spring cylinder",.139,.66,[0,0,-.09],steel);
+    tube("PIAT rear spring sleeve",.146,.14,[0,0,-.35],dark);
+    ring("PIAT rear retaining band",.151,.013,[0,0,-.396],worn);
+    ring("PIAT spring housing collar",.148,.013,[0,0,.14],worn);
+    tube("PIAT forward spigot",.051,.28,[0,-.005,.374],dark);
+    ring("PIAT forward spigot collar",.078,.012,[0,-.005,.23],worn);
+    // The open U-shaped bomb tray is a defining PIAT feature.
+    box("PIAT open bomb tray",[.150,.018,.355],[0,-.057,.383],steel);
+    box("PIAT tray left wall",[.019,.072,.355],[-.068,-.016,.383],steel);
+    box("PIAT tray right wall",[.019,.072,.355],[.068,-.016,.383],steel);
+    box("PIAT tray muzzle bridge",[.15,.021,.019],[0,-.057,.55],worn);
+    box("PIAT tray bottom reinforcement",[.082,.013,.28],[0,-.073,.385],dark);
+    // Broad fabric-covered butt and recessed metal backing.
+    box("PIAT rear buttplate frame",[.178,.181,.030],[0,-.040,-.505],dark);
+    const cushion=put(B.MeshBuilder.CreateSphere("PIAT padded shoulder rest",{
+      diameter:1,segments:12},scene),[0,-.040,-.535],canvas);
+    cushion.scaling.set(.092,.096,.022);
+    box("PIAT shoulder canvas seam",[.157,.014,.024],[0,.025,-.531],worn);
+    // Trigger housing / shaped grip, intentionally under the rear tube.
+    box("PIAT pistol trigger housing",[.100,.080,.148],[0,-.110,-.16],dark);
+    box("PIAT shaped vertical handgrip",[.055,.145,.061],[0,-.212,-.153],gripRubber);
+    box("PIAT lower handgrip heel",[.066,.023,.069],[0,-.285,-.151],dark);
+    line("PIAT curved trigger guard",[
+      [0,-.155,-.105],[0,-.266,-.105],[0,-.282,-.202],[0,-.161,-.202]
+    ],.007,worn);
+    line("PIAT exposed trigger",[[0,-.159,-.166],[0,-.197,-.184]],.006,dark);
+    // Under-barrel support, folded monopod and its flat ground foot.
+    box("PIAT forearm support",[.085,.067,.087],[0,-.144,.11],canvas);
+    tube("PIAT monopod hinge",.060,.040,[0,-.082,.377],dark);
+    line("PIAT folded monopod leg",[[0,-.104,.39],[0,-.29,.435]],.015,steel);
+    box("PIAT monopod foot",[.104,.019,.038],[0,-.292,.437],dark);
+    ring("PIAT monopod lock",.054,.010,[0,-.104,.385],worn);
+    // Raised iron sights and simple adjustment guards.
+    box("PIAT rear sight block",[.075,.024,.055],[0,.081,-.245],dark);
+    box("PIAT rear sight leaf",[.017,.077,.018],[0,.128,-.246],worn);
+    box("PIAT forward sight base",[.065,.018,.045],[0,.068,.235],dark);
+    box("PIAT foresight blade",[.013,.055,.014],[0,.108,.238],worn);
+    // Real-world sling and the small attachment loops visually break up
+    // the otherwise featureless cylinder at normal iPhone viewing distance.
+    ring("PIAT rear sling swivel",.042,.008,[.082,-.026,-.34],dark);
+    ring("PIAT front sling swivel",.042,.008,[.082,-.026,.205],dark);
+    line("PIAT canvas shoulder sling",[
+      [.089,-.040,-.34],[.128,-.12,-.29],[.125,-.23,-.12],
+      [.119,-.255,.015],[.109,-.15,.17],[.09,-.040,.205]
+    ],.011,canvas);
+    line("PIAT sling edge trim",[
+      [.10,-.043,-.32],[.139,-.126,-.26],[.136,-.225,-.1],
+      [.13,-.247,.015],[.118,-.147,.16]
+    ],.004,worn);
+    // Fasteners on the steel tube provide readable size cues.
+    for(const [index,z] of [-.285,-.105,.091].entries()){
+      const rivet=put(B.MeshBuilder.CreateSphere("PIAT receiver rivet "+(index+1),{
+        diameter:.023,segments:8},scene),[-.066,.018,z],worn);
+      rivet.scaling.set(1,.55,1);
+    }
     return ()=>{for(const mesh of meshes)mesh.dispose();
       for(const mat of mats)mat.dispose();};
   }
