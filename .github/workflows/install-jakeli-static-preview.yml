@@ -1,0 +1,55 @@
+name: Assemble and verify agreed Jakeli static GLB
+on:
+  push:
+    branches:
+      - 'feature/british-army-10-stages-20261118'
+    paths:
+      - 'assets-source-staging/jakeli/**'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-install:
+    if: github.ref == 'refs/heads/feature/british-army-10-stages-20261118'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble approved Jakeli GLB from transfer-only chunks and verify SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=$(find assets-source-staging/jakeli -type f -name 'chunk-*.b64' | wc -l)
+          test "$count" -eq 22
+          mkdir -p assets/allied-soldiers
+          cat assets-source-staging/jakeli/chunk-*.b64 |
+            tr -d '[:space:]' | base64 --decode > assets/allied-soldiers/uk-jakeli-mobile-static.glb
+          test "$(stat -c%s assets/allied-soldiers/uk-jakeli-mobile-static.glb)" -eq 5200624
+          echo 'e86dc27fdb763092ad80391ea79c3f83f20c7b81195d2132dc1b68cf3634d7a0  assets/allied-soldiers/uk-jakeli-mobile-static.glb' | sha256sum --check
+          python3 - <<'PY'
+          import json,struct,pathlib
+          p=pathlib.Path('assets/allied-soldiers/uk-jakeli-mobile-static.glb')
+          b=p.read_bytes()
+          assert b[:4]==b'glTF', 'Invalid GLB magic'
+          assert struct.unpack_from('<I',b,8)[0]==len(b), 'Invalid GLB length'
+          length=struct.unpack_from('<I',b,12)[0]
+          j=json.loads(b[20:20+length])
+          assert len(j.get('meshes',[]))==14, 'Changed 3D mesh count'
+          assert not j.get('skins'), 'This is a static preview, must never be presented as rigged'
+          assert not j.get('animations'), 'Animation is NOT installed'
+          meta=j['asset']['extras']
+          assert meta['author'].startswith('George Jakeli'), 'Author attribution removed'
+          assert 'CC-BY-4.0' in meta['license'], 'CC-BY label removed'
+          assert meta['source'].endswith('c3d6038952914362b897138deda762ef'), 'Wrong original source'
+          print('JAKELI_STATIC_ASSET_INTEGRITY_PASS: 5,200,624 bytes, 14 meshes, 0 skins, 0 animations')
+          PY
+      - name: Commit static preview asset and remove temporary transport chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -r assets-source-staging/jakeli
+          git add assets/allied-soldiers/uk-jakeli-mobile-static.glb
+          git commit -m 'Install verified Jakeli static preview GLB (not skinned, not deployed)'
+          git push origin HEAD:refs/heads/feature/british-army-10-stages-20261118
