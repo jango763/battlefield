@@ -69,7 +69,7 @@ const dir="babylon-qa-results/british-jakeli";
   await page.screenshot({path:dir+"/non-jakeli-rejected.png",fullPage:true});
   if(errors.length)throw Error("Unexpected browser exceptions "+JSON.stringify(errors));
   console.log("BRITISH_JAKELI_INTAKE_MOBILE_PASS",JSON.stringify({
-   screen:"390x844",realModelRequired:true,sourceStaticPartsInGithub:17,originalFileBytePerfectReassembled:true,
+   screen:"390x844",realModelRequired:true,staticGLBInGitHub:true,exactSHA256Verified:true,singleFileFastLoad:true,
    hero65BonesNotAcceptedAsBritish:true,sourceSHA256Gate:true,
    githubActualGLBLoaded:true,meshCount:14,authenticStaticRig0:true,
    localFilePicker:true,visualRigNotFaked:true,errors:0
