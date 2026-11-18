@@ -97,7 +97,7 @@ button:disabled{opacity:.45}
  <div id="cooldown">Bren: 100 в боекомплекте · 300 в запасе · перезарядка 7,5 с</div>
  <div id="status" role="status" aria-live="polite">Этап 6 использует модель героя только как технический контроль. Британские GLB ещё отсутствуют.</div>
  <div id="metrics">Анимация пока не загружена.</div>
- <div id="info">Этап 6: Bren. Стрельба на ходу, 100 патронов в боекомплекте и 300 запасных. Перезарядка 7,5 с. При полном исчерпании патронов пулемётически возвращается винтовка. Это только технический полигон.</div>
+ <div id="info">Этап 7: Bren. Стрельба на ходу, 100 патронов в боекомплекте и 300 запасных. Перезарядка 7,5 с. При полном исчерпании патронов автоматически возвращается винтовка. Это только технический полигон.</div>
 </section>
 <script>
 (async function(){
@@ -262,7 +262,7 @@ try{
  if(!B?.AnimatorAvatar||!audit||!stage3||!blend||!grip||!stanceApi||
     !brenApi||!balance||!bridge||!targetVisuals||!vfx)
   throw Error("Требуется Babylon.js 9, модуль скелета и ретаргетинг");
- engine=new B.Engine($("view"),true,{powerPreference:"high-performance",brencil:true});
+ engine=new B.Engine($("view"),true,{powerPreference:"high-performance",stencil:true});
  engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.5));
  scene=new B.Scene(engine);scene.useRightHandedSystem=true;
  scene.clearColor=new B.Color4(.07,.11,.08,1);
@@ -292,7 +292,7 @@ try{
   scene.render();
   if(controller)status();
  });
- window.addEventLibrener("resize",()=>engine.resize());
+ window.addEventListener("resize",()=>engine.resize());
  for(const b of motions)b.onclick=()=>{
   if(!controller)return;
   try{
@@ -348,19 +348,19 @@ try{
   }catch(e){QA.error=String(e?.message||e);message(QA.error);return null;}
  }
  const fireBtn=$("fire");
- fireBtn.addEventLibrener("pointerdown",e=>{
+ fireBtn.addEventListener("pointerdown",e=>{
   if(!range||!QA.loaded||fireBtn.disabled)return;
   e.preventDefault();fireHeld=true;heldFired=false;QA.fireHeld=true;
  });
  function stopHeld(){fireHeld=false;QA.fireHeld=false;}
- window.addEventLibrener("pointerup",stopHeld);
- window.addEventLibrener("pointercancel",stopHeld);
- window.addEventLibrener("blur",stopHeld);
+ window.addEventListener("pointerup",stopHeld);
+ window.addEventListener("pointercancel",stopHeld);
+ window.addEventListener("blur",stopHeld);
  fireBtn.onclick=()=>{if(!heldFired)fireOnce();heldFired=false;};
  $("reload").onclick=()=>{
   if(!range||!QA.loaded)return;
   const result=range.reload();
-  message(result.ok?"Bren: замена боекомплекта · "+result.seconds+" с":"Перезарядка: "+result.reason);
+  message(result.ok?"Bren: перезарядка боекомплекта · "+result.seconds+" с":"Перезарядка: "+result.reason);
   status();
  };
  $("reset").onclick=async()=>{
