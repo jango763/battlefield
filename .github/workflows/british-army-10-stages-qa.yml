@@ -9,6 +9,9 @@ on:
       - 'babylon/british-stage2-iphone.html'
       - 'babylon/british-stage3-motion.js'
       - 'babylon/british-stage3-iphone.html'
+      - 'babylon/british-stage4-stance.js'
+      - 'babylon/british-stage4-iphone.html'
+      - 'babylon/tests/test-british-army-stage4*.cjs'
       - 'babylon/tests/test-british-army-stage3*.cjs'
       - 'babylon/tests/test-british-army-stage1.cjs'
       - 'babylon/tests/test-british-army-stage2*.cjs'
@@ -39,6 +42,11 @@ jobs:
           node --check babylon/british-stage3-motion.js
           node --check babylon/tests/test-british-army-stage3.cjs
           node babylon/tests/test-british-army-stage3.cjs
+      - name: Validate original Weapon_R grip and full-body target facing
+        run: |
+          node --check babylon/british-stage4-stance.js
+          node --check babylon/tests/test-british-army-stage4.cjs
+          node babylon/tests/test-british-army-stage4.cjs
       - name: Guard approved hero damage and ammo
         run: |
           node babylon/tests/test-us-hero-stage9-bridge.cjs
@@ -56,7 +64,11 @@ jobs:
         run: |
           node --check babylon/tests/test-british-army-stage3-browser.cjs
           node babylon/tests/test-british-army-stage3-browser.cjs
-      - name: Upload mobile stage2 and stage3 inspection screenshots
+      - name: Verify iPhone-sized two-hand IK, rifle aim and anti-backwards-shooting
+        run: |
+          node --check babylon/tests/test-british-army-stage4-browser.cjs
+          node babylon/tests/test-british-army-stage4-browser.cjs
+      - name: Upload mobile stage2, stage3 and stage4 inspection screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -64,4 +76,5 @@ jobs:
           path: |
             babylon-qa-results/british-stage2/
             babylon-qa-results/british-stage3/
+            babylon-qa-results/british-stage4/
           if-no-files-found: ignore
