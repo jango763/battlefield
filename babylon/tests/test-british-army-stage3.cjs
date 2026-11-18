@@ -8,9 +8,9 @@ assert.equal(motion.CLIPS.walk,"Walk_Quaternius");
 assert.equal(motion.CLIPS.jog,"Jog_Quaternius");
 assert.equal(motion.CLIPS.sprint,"Sprint_Quaternius");
 assert.equal(motion.CRITICAL.length,15);
-const keys=[...motion.CRITICAL,
- "leftshoulder","rightshoulder","leftupleg","rightupleg",
- ...Array.from({length:46},(_,i)=>"extra"+i)];
+const keys=[...new Set([...motion.CRITICAL,
+ "leftshoulder","rightshoulder",
+ ...Array.from({length:65},(_,i)=>"extra"+i)])].slice(0,65);
 const bones=keys.slice(0,65).map(name=>({
  name:"mixamorig:"+name,getTransformNode:()=>({name:"mixamorig:"+name})
 }));
