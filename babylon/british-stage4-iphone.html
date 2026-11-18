@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#15251c">
+<title>Battlefield — британская армия, боевая стойка 4/10</title>
+<style>
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;color:#f0f5eb;background:#112018;font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+#view{display:block;width:100%;height:100%;touch-action:none}
+header{position:fixed;left:12px;top:calc(env(safe-area-inset-top) + 8px);right:12px;pointer-events:none;text-shadow:0 2px 7px #000}
+h1{font-size:18px;margin:0}header p{font-size:12px;margin:3px 0;color:#c5e1c9}
+#controls{position:fixed;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 8px);
+max-width:650px;margin:auto;border:1px solid #829b7d;border-radius:13px;background:#1d3326ef;padding:10px;max-height:49vh;overflow:auto;box-shadow:0 7px 30px #0008}
+#show-controls{position:fixed;top:calc(env(safe-area-inset-top) + 46px);right:12px;min-width:80px;padding:7px 10px;border-radius:8px;background:#355d40;color:white;border:1px solid #96ac89;z-index:2}
+body.full #controls{display:none}
+#motions{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:7px 0}
+#poses{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+#targets{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:5px 0}
+.group-label{font-size:11px;color:#e4ebd9;font-weight:700;margin:8px 0 2px}
+#options{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:7px}
+label{display:block;color:#cadfc7;font-size:11px;font-weight:700;margin-bottom:4px}
+select,input[type=file],button{width:100%;border:1px solid #789277;border-radius:8px;min-height:39px;background:#35573f;color:#fff;font:600 12px system-ui;padding:7px}
+button{cursor:pointer}
+button[aria-pressed=true]{background:#d4e4b1;color:#192e1f}
+button:disabled{opacity:.45}
+#reference{width:100%;margin:4px 0}
+#file{font-size:10px}
+#status{color:#f1e6b7;font-size:12px;line-height:1.4;margin:8px 0 0;white-space:pre-line}
+#metrics{color:#cde5ca;font-size:11px;line-height:1.4;margin:6px 0}
+#info{color:#c4d5c3;font-size:10px;line-height:1.25}
+@media(max-width:450px){header h1{font-size:16px}#controls{max-height:52vh;padding:8px}button{font-size:11px}}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./british-stage2-rig-audit.js"></script>
+<script src="./native-clip-blend.js"></script>
+<script src="./british-stage3-motion.js"></script>
+<script src="./us-hero-stage8-rig.js"></script>
+<script src="./british-stage4-stance.js"></script>
+</head>
+<body>
+<canvas id="view" aria-label="3D-контрольный персонаж с анимациями Quaternius"></canvas>
+<header>
+ <h1>Британская армия · этап 4/10</h1>
+ <p>65 костей · двуручный IK · Weapon_R · правильный разворот к врагу</p>
+</header>
+<button id="show-controls">Скрыть меню</button>
+<section id="controls">
+ <div id="options">
+  <div><label for="role">Подразделение</label>
+  <select id="role"><option value="infantry">Пехота · каска Mk II</option>
+    <option value="commando">Коммандос · берет</option></select></div>
+  <div><label for="source">Ранее выбранная модель</label>
+   <select id="source">
+    <option value="britishDanoob">British Soldier · Danoob</option>
+    <option value="britishJakeli">British Army · Jakeli</option>
+    <option value="britishFab">WWII British Soldier · Fab</option>
+   </select></div>
+ </div>
+ <label for="file">Оригинальный GLB британского бойца (если он у вас есть)</label>
+ <input id="file" type="file" accept=".glb,model/gltf-binary">
+ <button id="reference">Проверить на скелете героя (технический эталон)</button>
+ <div id="motions">
+  <button data-motion="idle" aria-pressed="true" disabled>Стойка</button>
+  <button data-motion="walk" aria-pressed="false" disabled>Шаг</button>
+  <button data-motion="jog" aria-pressed="false" disabled>Бег</button>
+  <button data-motion="sprint" aria-pressed="false" disabled>Спринт</button>
+ </div>
+ <div class="group-label">Боевая стойка (винтовка Lee-Enfield)</div>
+ <div id="poses">
+  <button data-pose="ready" aria-pressed="true" disabled>Оружие наготове</button>
+  <button data-pose="aim" aria-pressed="false" disabled>Прицелиться</button>
+ </div>
+ <div class="group-label">Выбор противника · боец разворачивается всем телом</div>
+ <div id="targets">
+  <button data-target="enemy-a" disabled>Левый</button>
+  <button data-target="enemy-b" disabled>Центр</button>
+  <button data-target="enemy-c" disabled>Правый</button>
+ </div>
+ <div id="status" role="status" aria-live="polite">Оригинальные британские GLB пока отсутствуют в GitHub. Эталон героя позволяет проверить руки, приклад и прицел, но не является британским скином.</div>
+ <div id="metrics">Анимация пока не загружена.</div>
+ <div id="info">Этап 4 проверяет двуручный IK на винтовке Lee-Enfield. Sten, Bren, PIAT — отдельные этапы 6–8. Источник героя — только контроль; британские скины и головные уборы должны пройти самостоятельную приёмку.</div>
+</section>
+<script>
+(async function(){
+"use strict";
+const $=id=>document.getElementById(id),B=window.BABYLON,
+ audit=window.BattlefieldBritishStage2RigAudit,
+ stage3=window.BattlefieldBritishStage3Motion,
+ blend=window.BattlefieldNativeClipBlend,
+ grip=window.BattlefieldUSLeeEnfieldStage4,
+ stanceApi=window.BattlefieldBritishStage4Stance;
+const QA={stage:4,ready:false,loaded:false,error:null,referenceOnly:false,
+ controlsEnabled:false,modelIdentityVerified:false,motion:null,rigAudit:null,
+ stance:null,source:"none",selectedTarget:"enemy-b",selectedPose:"ready"};
+window.__BRITISH_STAGE4_QA__=QA;
+let scene,engine,camera,avatar=null,controller=null,root=null,stance=null,busy=false;
+const motions=[...document.querySelectorAll("[data-motion]")];
+const poses=[...document.querySelectorAll("[data-pose]")];
+const targets=[...document.querySelectorAll("[data-target]")];
+const AIM_TARGETS=Object.freeze({
+ "enemy-a":{id:"enemy-a",x:-.88,z:-2.9},
+ "enemy-b":{id:"enemy-b",x:0,z:-3.2},
+ "enemy-c":{id:"enemy-c",x:.85,z:-2.9}
+});
+const message=s=>{$("status").textContent=s;};
+function status(){
+ if(!controller)return null;
+ const s=controller.status();
+ QA.motion=s.motion;QA.animation=s;
+ QA.sceneSkeletons=scene.skeletons.length;
+ if(stance){QA.stance=stance.status();QA.aim=QA.stance.aim;
+  QA.grip=QA.stance.quality;}
+ $("metrics").textContent=
+  "Скелет: "+s.skeletonBones+" костей · анимации: "+s.clipCount+"/4 · "+s.activeClip+
+  " · переходы: "+s.animationChanges+
+  " · загруженных скелетов: "+scene.skeletons.length+
+  " · FPS "+Math.round(engine.getFps())+
+  (QA.stance?"\nХват: "+(QA.grip.ok?"OK":"ОШИБКА")+
+   " · правая "+QA.grip.rightGripMeters.toFixed(3)+" м"+
+   " · левая "+QA.grip.leftGripMeters.toFixed(3)+" м"+
+   " · приклад "+QA.grip.stockToShoulderMeters.toFixed(3)+" м"+
+   " · ствол на противника "+QA.aim.barrelDot.toFixed(3):"");
+ return s;
+}
+function frame(model){
+ const meshes=model.meshes.filter(m=>(m?.getTotalVertices?.()||0)>0);
+ const min=new B.Vector3(Infinity,Infinity,Infinity),max=new B.Vector3(-Infinity,-Infinity,-Infinity);
+ for(const mesh of meshes){
+  mesh.computeWorldMatrix(true);
+  const bb=mesh.getBoundingInfo().boundingBox;
+  min.minimizeInPlace(bb.minimumWorld);
+  max.maximizeInPlace(bb.maximumWorld);
+ }
+ const diff=max.subtract(min),extent=Math.max(diff.x,diff.y,diff.z);
+ if(Number.isFinite(extent)&&extent>.1){
+  camera.setTarget(min.add(max).scale(.5));
+  camera.radius=Math.max(1.75,extent*2.0);
+  camera.lowerRadiusLimit=Math.max(.9,extent*.45);
+  camera.upperRadiusLimit=Math.max(10,extent*7);
+ }
+}
+const REFERENCE="../assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb";
+async function show(url,label,isControl){
+ if(busy)return;
+ busy=true;QA.error=null;QA.loaded=false;QA.controlsEnabled=false;
+ motions.forEach(b=>b.disabled=true);
+ poses.forEach(b=>b.disabled=true);
+ targets.forEach(b=>b.disabled=true);
+ $("file").disabled=true;$("reference").disabled=true;
+ message("Загружаю "+label+" и оригинальные анимации Quaternius…");
+ let nextAvatar=null,nextSource=null,nextRoot=null,nextController=null,nextStance=null;
+ try{
+  nextAvatar=await B.SceneLoader.LoadAssetContainerAsync("",url,scene,undefined,".glb");
+  nextAvatar.addAllToScene();
+  const role=isControl?"control":$("role").value;
+  const verification=audit.audit(nextAvatar,{B,role:isControl?"infantry":role});
+  if(!verification.rigCompatible)
+   throw Error("Скин не прошёл этап 2: "+verification.problems.join("; "));
+  nextRoot=new B.TransformNode("british-stage3-target-root",scene);
+  for(const node of [...nextAvatar.meshes,...nextAvatar.transformNodes]){
+   if(node&&!node.parent)node.parent=nextRoot;
+  }
+  nextSource=await B.SceneLoader.LoadAssetContainerAsync("",REFERENCE,scene,undefined,".glb");
+  nextSource.addAllToScene();
+  for(const mesh of nextSource.meshes)mesh.isVisible=false;
+  nextController=stage3.create({
+   B,scene,source:nextSource,target:nextAvatar,avatarRoot:nextRoot,
+   blend,role,tag:isControl?"control":$("source").value
+  });
+  // No second skeleton or hidden duplicate hero left after transfer.
+  nextSource.dispose();nextSource=null;
+  for(const group of nextAvatar.animationGroups)group.dispose();
+  nextAvatar.animationGroups=[];
+  nextStance=await stanceApi.create({
+   scene,actor:nextAvatar,stage:nextRoot,
+   tag:isControl?"control":$("source").value,
+   grip,weaponRoot:"../assets/ww2-weapons/",
+   target:AIM_TARGETS[QA.selectedTarget],controlOnly:isControl
+  });
+  nextController.select("idle");
+  if(stance)stance.dispose();
+  if(controller)controller.dispose();
+  if(avatar)avatar.dispose();
+  if(root)root.dispose();
+  avatar=nextAvatar;root=nextRoot;controller=nextController;stance=nextStance;
+  nextAvatar=null;nextRoot=null;nextController=null;nextStance=null;
+  frame(avatar);
+  camera.setTarget(new B.Vector3(0,.78,-1.05));camera.radius=5.4;
+  QA.referenceOnly=isControl;QA.modelIdentityVerified=false;
+  QA.loaded=true;QA.controlsEnabled=true;QA.rigAudit=verification;
+  QA.source=isControl?"hero-technical-control":label;
+  QA.targetSkeleton=scene.skeletons[0];
+  motions.forEach(b=>b.disabled=false);
+  poses.forEach(b=>b.disabled=false);
+  targets.forEach(b=>b.disabled=false);
+  poses.forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.pose==="ready")));
+  targets.forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.target===QA.selectedTarget)));
+  motions.forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.motion==="idle")));
+  status();
+  if(scene.skeletons.length!==1)
+   throw Error("После переноса в сцене должен оставаться только один скелет");
+  message(isControl?
+   "ГЕРОЙ — технический эталон, НЕ британский солдат. Винтовка закреплена на Weapon_R, две кисти на оружии, ствол направлен на выбранную цель.":
+   "Двуручный хват подключён к выбранному GLB. Происхождение, лицензия, каска или берет и вид рук требуют отдельной приёмки. В армию модель не встроена.");
+ }catch(e){
+  QA.error=String(e?.message||e);
+  message("Не удалось выполнить перенос: "+QA.error);
+  console.error("British stage3",e);
+ }finally{
+  nextStance?.dispose();
+  nextController?.dispose();
+  nextSource?.dispose();
+  nextAvatar?.dispose();
+  nextRoot?.dispose();
+  busy=false;$("file").disabled=false;$("reference").disabled=false;
+ }
+}
+try{
+ if(!B?.AnimatorAvatar||!audit||!stage3||!blend||!grip||!stanceApi)
+  throw Error("Требуется Babylon.js 9, модуль скелета и ретаргетинг");
+ engine=new B.Engine($("view"),true,{powerPreference:"high-performance",stencil:true});
+ engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.5));
+ scene=new B.Scene(engine);scene.useRightHandedSystem=true;
+ scene.clearColor=new B.Color4(.07,.11,.08,1);
+ const ambient=new B.HemisphericLight("ambient",new B.Vector3(0,1,0),scene);
+ ambient.intensity=1.55;
+ const light=new B.DirectionalLight("key",new B.Vector3(-.5,-1,-.6),scene);
+ light.intensity=1.1;
+ camera=new B.ArcRotateCamera("orbit",Math.PI*.70,Math.PI*.49,4,
+  new B.Vector3(0,1,0),scene);
+ camera.lowerRadiusLimit=1;camera.upperRadiusLimit=15;
+ camera.attachControl($("view"),true);
+ const ground=B.MeshBuilder.CreateGround("ground",{width:40,height:40},scene);
+ ground.isPickable=false;ground.position.y=-.025;
+ const mat=new B.StandardMaterial("soil",scene);mat.diffuseColor=new B.Color3(.18,.23,.18);
+ ground.material=mat;
+ const targetMat=new B.StandardMaterial("stage4-target-mat",scene);
+ targetMat.diffuseColor=new B.Color3(.58,.22,.16);
+ for(const t of Object.values(AIM_TARGETS)){
+  const marker=B.MeshBuilder.CreateCylinder("target-"+t.id,
+   {diameter:.32,height:1.65,tessellation:10},scene);
+  marker.position.set(t.x,.85,t.z);
+  marker.material=targetMat;marker.isPickable=false;
+ }
+ engine.runRenderLoop(()=>{
+  const dt=Math.min(.06,engine.getDeltaTime()/1000);
+  controller?.tick(dt);
+  scene.render();
+  if(controller)status();
+ });
+ window.addEventListener("resize",()=>engine.resize());
+ for(const b of motions)b.onclick=()=>{
+  if(!controller)return;
+  try{
+   controller.select(b.dataset.motion);
+   stance?.sync();
+   motions.forEach(x=>x.setAttribute("aria-pressed",
+    String(x.dataset.motion===b.dataset.motion)));
+   status();
+   message("Quaternius: "+b.textContent+
+    " · переход плавный, одновременно не более двух клипов.");
+  }catch(e){QA.error=String(e?.message||e);message(QA.error)}
+ };
+ for(const b of poses)b.onclick=()=>{
+  if(!stance)return;
+  try{
+   const s=stance.setPose(b.dataset.pose);
+   QA.selectedPose=b.dataset.pose;QA.stance=s;
+   poses.forEach(x=>x.setAttribute("aria-pressed",
+    String(x.dataset.pose===b.dataset.pose)));
+   status();message("Стойка: "+b.textContent+
+    " · оружие жёстко закреплено на Weapon_R, обе кисти в IK.");
+  }catch(e){QA.error=String(e?.message||e);message(QA.error)}
+ };
+ for(const b of targets)b.onclick=()=>{
+  if(!stance)return;
+  try{
+   QA.stance=stance.targetAt(AIM_TARGETS[b.dataset.target]);
+   QA.selectedTarget=b.dataset.target;
+   targets.forEach(x=>x.setAttribute("aria-pressed",
+    String(x.dataset.target===b.dataset.target)));
+   status();message("Противник выбран · поворот всей модели и оружия к цели.");
+  }catch(e){QA.error=String(e?.message||e);message(QA.error)}
+ };
+ $("show-controls").onclick=()=>{
+  const hidden=document.body.classList.toggle("full");
+  $("show-controls").textContent=hidden?"Показать меню":"Скрыть меню";
+ };
+ $("reference").onclick=()=>show(REFERENCE,"Контрольный герой (НЕ британец)",true);
+ $("file").onchange=async()=>{
+  const file=$("file").files?.[0];if(!file)return;
+  if(!/\.glb$/i.test(file.name)){message("Только исходный .glb");return;}
+  if(file.size>80*1024*1024){message("Файл слишком тяжёлый для iPhone");return;}
+  const url=URL.createObjectURL(file);
+  try{await show(url,file.name,false)}finally{URL.revokeObjectURL(url)}
+ };
+ QA.ready=true;QA.loadReference=()=>show(REFERENCE,"Контрольный герой (НЕ британец)",true);
+ QA.sync=()=>{if(!stance)return null;const s=stance.sync();status();return s;};
+}catch(e){QA.error=String(e?.message||e);message("Ошибка запуска: "+QA.error);}
+})();
+</script>
+</body>
+</html>
