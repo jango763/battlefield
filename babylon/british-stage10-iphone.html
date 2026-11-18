@@ -286,9 +286,8 @@ async function benchmark(){
   const renderFps=frames/(elapsed/1000);
   const mem=qaApi.canMeasureMemory(performance)?
    performance.memory.usedJSHeapSize:null;
-  qa.perf=qaApi.probeSummary({loadMs,renderFps,bones,
-   memoryBytes:mem,source:"control-hero"});
-  qa.perf.vertices=vertices;qa.perf.triangles=triangles;
+  qa.perf=Object.freeze({...qaApi.probeSummary({loadMs,renderFps,bones,
+   memoryBytes:mem,source:"control-hero"}),vertices,triangles});
   $("performance").textContent=[
    "Контрольный герой — НЕ британский солдат.",
    "Скелет: "+bones+" костей, геометрия: "+vertices+" вершин / "+triangles+" треугольников.",
