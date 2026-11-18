@@ -105,7 +105,7 @@
     infiniteAmmo:s.magazine===Infinity&&s.reserve===Infinity,
     // Lee-Enfield is unlimited-ammo: its 2.1s shot interval is NOT a
     // magazine reload. Do not invent a clip/magazine counter.
-    cooldownRemaining:battle.getPlayer().cooldown,
+    cooldownRemaining:Math.max(0,battle.getPlayer().cooldown),
     interval:profile.interval,canFireMoving:profile.canFireMoving,
     reloading:s.reloadRemaining>0,
     recoil:recoilRemaining/RECOIL_SECONDS,
