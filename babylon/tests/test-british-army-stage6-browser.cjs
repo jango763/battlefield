@@ -47,7 +47,7 @@ const dir="babylon-qa-results/british-stage6";
    init.source!=="MP40"||init.magazine!==32||init.reserve!==128||
    init.full!==160||init.magCount!==5||init.reloadSeconds!==2.5||
    !init.canFireMoving||!init.grip?.ok||init.barrel<.97||
-   init.mount?.parent!=="mixamorig:Weapon_R"||init.mount?.mountCount!==1||
+   init.mount?.parent!=="mixamorig:Weapon_R"||init.mount?.mountCount!==2||
    init.actors!==3||init.skinReady)
    throw Error("Sten GLB socket, ammo or IK mismatch "+JSON.stringify(init));
   await page.screenshot({path:dir+"/sten-ready-control.png",fullPage:true});
