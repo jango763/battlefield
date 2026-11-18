@@ -140,6 +140,7 @@
     throw Error("Only British bots have test loadout controls");
    const weapon=SOURCE_WEAPONS[weaponId];
    if(!weapon)throw Error("Only four approved British weapons");
+   if(squad.snapshot().active)return {ok:false,reason:"return-to-base"};
    if(weapon==="Kar98k")return battle.switchWeapon(allies[slot],weapon);
    return battle.buyWeapon(allies[slot],weapon,{atBase});
   }
