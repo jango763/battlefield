@@ -56,7 +56,10 @@ const dir="babylon-qa-results/british-stage3";
      snap.skeletons!==1||!snap.clip.includes("_Quaternius")||snap.playing.length>2)
     throw Error("Movement transition failed "+JSON.stringify(snap));
    changes=snap.changes;
-   await page.waitForTimeout(240);
+   // Headless software GL renders at variable FPS: wait for the actual
+   // frame-time-based crossfade, not an arbitrary wall-clock 240 ms.
+   await page.waitForFunction(()=>!window.__BRITISH_STAGE3_QA__?.animation?.blending,
+     null,{timeout:15000});
    const settled=await page.evaluate(()=>{
     const a=window.__BRITISH_STAGE3_QA__.animation,
      scene=window.BABYLON.EngineStore.LastCreatedScene;
