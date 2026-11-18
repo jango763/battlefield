@@ -107,11 +107,23 @@
    errors.push("Оружие не закреплено на Weapon_R");
   if(report?.armChannelsRemoved!==32)
    errors.push("Конфликтующие анимации рук не отключены");
+  // This is the actual palm/finger geometry diagnostic, not just contact.
+  for(const [part,value] of [
+   ["правая ладонь",report?.rightPalmErrorDeg],
+   ["левая ладонь",report?.leftPalmErrorDeg],
+   ["пальцы правой",report?.rightFingerErrorDeg],
+   ["пальцы левой",report?.leftFingerErrorDeg]
+  ]){
+   if(!Number.isFinite(value)||value>25)
+    errors.push("Неверная ориентация "+part+": "+value+"°");
+  }
   if(report?.socketLocalDriftMeters>.001||
     report?.socketLocalRotationErrorDeg>1)
    errors.push("Крепление оружия изменилось во время движения");
   return Object.freeze({ok:errors.length===0,rightGripMeters:right,
    leftGripMeters:left,stockToShoulderMeters:stock,
+   rightPalmErrorDeg:report?.rightPalmErrorDeg,
+   leftPalmErrorDeg:report?.leftPalmErrorDeg,
    socketParent:weaponMount?.parent||null,errors});
  }
  async function create({scene,actor,stage,tag,grip,weaponRoot,
@@ -141,7 +153,7 @@
   function status(){
    const mount=mounted.getWeaponMount();
    return Object.freeze({
-    pose,weaponId:mounted.weaponId,controlOnly,
+    pose,weaponId:mounted.report.weaponId,controlOnly,
     targetId:selected.id||null,aim:aimStatus,
     quality:gripQuality(mounted.report,mount),
     mounted:mount,report:mounted.report,
@@ -158,9 +170,14 @@
     throw Error("Invalid target coordinates");
    selected=t;return sync();
   }
-  const initial=sync();
-  if(!initial.quality.ok)throw Error("Approved 2-hand IK calibration failed: "+
-   initial.quality.errors.join("; "));
+  try{
+   const initial=sync();
+   if(!initial.quality.ok)throw Error("Approved 2-hand IK calibration failed: "+
+    initial.quality.errors.join("; "));
+  }catch(e){
+   mounted.dispose();
+   throw e;
+  }
   return Object.freeze({setPose,targetAt,sync,status,
    getMuzzleWorld:()=>mounted.getMuzzleWorld(),
    dispose(){disposed=true;mounted.dispose();}});
