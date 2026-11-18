@@ -95,10 +95,14 @@
    throw Error("Expected twelve explicit living states");
   const pos=positions(formation),front=[1,2,3],roster=[];
   const used=new Set([HERO_SLOT]);
+  // Living original frontliners must retain their slots. Otherwise the
+  // first vacancy could steal soldier #3 and duplicate them on two positions.
+  const reserved=new Set(front.filter(slot=>active[slot]));
   for(const slot of front){
    if(active[slot]){roster.push({slot,replaces:slot});used.add(slot);continue;}
    const point=pos[slot];
-   const replacement=pos.slice(1).filter(x=>active[x.slot]&&!used.has(x.slot))
+   const replacement=pos.slice(1).filter(x=>
+    active[x.slot]&&!used.has(x.slot)&&!reserved.has(x.slot))
     .sort((a,b)=>
       Math.hypot(a.x-point.x,a.z-point.z)-
       Math.hypot(b.x-point.x,b.z-point.z)||a.slot-b.slot)[0];
