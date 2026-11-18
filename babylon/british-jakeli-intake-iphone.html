@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1a2c20">
+<title>Battlefield · исходный британец Jakeli · проверка на iPhone</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;padding:calc(env(safe-area-inset-top) + 14px) 12px calc(env(safe-area-inset-bottom) + 22px);background:#16261d;color:#f0f5e7}
+main{max-width:850px;margin:auto}
+h1{font-size:21px;margin:0 0 5px}
+h2{font-size:14px;margin:0 0 7px}
+p{font-size:12px;color:#d5ddce;line-height:1.6;margin:8px 0}
+.panel{border:1px solid #71856d;border-radius:12px;background:#1d3827;padding:12px;margin:12px 0}
+.warning{background:#373122;border-color:#aa9168}
+.warning strong{color:#ffe0a4}
+input[type=file]{width:100%;padding:12px;border:1px dashed #bad6a4;border-radius:9px;font-size:14px;background:#304b38}
+button{min-height:44px;padding:9px 15px;background:#476c4f;color:#fff;border:1px solid #aec3a2;border-radius:9px;font-weight:650;width:100%}
+button:disabled{opacity:.45}
+#canvas{display:none;width:100%;height:365px;border-radius:9px;background:#17261d;touch-action:none}
+#status,#result{font-size:12px;white-space:pre-wrap;word-break:break-word;line-height:1.6;background:#112318;border-radius:9px;padding:11px;min-height:50px}
+#asset{font-size:11px;color:#e0e9d2;line-height:1.5}
+.kv{display:grid;grid-template-columns:1fr auto;gap:7px;border-bottom:1px solid #48644a;padding:7px 0;font-size:12px}
+a{color:#dcf1ba}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+</head>
+<body><main>
+<h1>Британский пехотинец · Jakeli</h1>
+<p>Этап приёмки оригинала на iPhone. Просмотр именно твоей модели, а не контрольного американца или сгенерированного солдата.</p>
+<section class="panel warning">
+<strong>Модель ещё не установлена в Battlefield.</strong>
+<p>Оригинал George Jakeli под CC BY 4.0 содержит форму, каску Mk II и детали снаряжения, но <strong>не содержит скелета и анимаций</strong>. Здесь проверяем внешний вид и исходный файл, не выдавая статический 3D за готового бойца. Другие выбранные британские модели не подменяем.</p>
+</section>
+<section class="panel">
+<h2>1. Открой файл из приложения «Файлы»</h2>
+<p>Рекомендуется уменьшенная копия <code>uk-jakeli-mobile-static.glb</code> (5,2 МБ). Допускается и оригинал <code>british_army_soldier_ww2.glb</code> (26,7 МБ). Файл остаётся на телефоне и не отправляется на сервер.</p>
+<input id="file" type="file" accept=".glb,model/gltf-binary,application/octet-stream" aria-label="Выбрать модель GLB"/>
+<div id="asset" aria-live="polite">Ничего не выбрано.</div>
+</section>
+<section class="panel">
+<h2>2. Оригинальный 3D-обзор</h2>
+<canvas id="canvas" aria-label="3D-вид британской модели, вращение пальцем"></canvas>
+<div id="status" aria-live="polite">Выбери GLB, чтобы увидеть настоящую британскую модель и проверить её параметры.</div>
+</section>
+<section class="panel">
+<h2>3. Контроль установки в игру</h2>
+<div class="kv"><span>Идентичность George Jakeli</span><strong id="identity">Не проверено</strong></div>
+<div class="kv"><span>65-костный скелет</span><strong id="rig">Не проверено</strong></div>
+<div class="kv"><span>Quaternius Idle / Walk / Jog / Sprint</span><strong id="animation">Не проверено</strong></div>
+<div class="kv"><span>Настоящая установка в GitHub</span><strong id="installed">Нет</strong></div>
+<div id="result">Проверка ещё не запущена.</div>
+</section>
+<p>Источник: <a href="https://sketchfab.com/3d-models/british-army-soldier-ww2-c3d6038952914362b897138deda762ef">British Army Soldier WW2 — George Jakeli</a>. Лицензия: CC BY 4.0 с обязательной атрибуцией. Это частный визуальный стенд; в основную ветку ничего не переносится.</p>
+</main>
+<script>
+(async()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const expected={
+ source:"https://sketchfab.com/3d-models/british-army-soldier-ww2-c3d6038952914362b897138deda762ef",
+ shaOriginal:"87721085648885f28e2d3ee54cc6ee769c9a01511733164d6709d0922025d708",
+ shaOptimized:"e86dc27fdb763092ad80391ea79c3f83f20c7b81195d2132dc1b68cf3634d7a0"
+};
+const qa={ready:false,sourceName:"",loaded:false,sourceVerified:false,
+  bytes:0,sha256:"",meshes:0,skins:0,bones:0,clips:0,
+  canInstall:false,modelIsBritish:false,controls:false,error:null};
+window.__BRITISH_JAKELI_INTAKE_QA__=qa;
+let engine=null,scene=null,url=null,imported=null;
+function glbJSON(buffer){
+ const dv=new DataView(buffer);
+ if(buffer.byteLength<20||dv.getUint32(0,true)!==0x46546c67)
+  throw Error("Это не GLB-файл");
+ const len=dv.getUint32(12,true),type=dv.getUint32(16,true);
+ if(type!==0x4e4f534a||len>buffer.byteLength-20)
+  throw Error("Не найден корректный glTF JSON");
+ return JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,20,len)));
+}
+async function hash(buffer){
+ if(!crypto.subtle)return "";
+ const digest=await crypto.subtle.digest("SHA-256",buffer);
+ return Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,"0")).join("");
+}
+function installStatus(){
+ $("identity").textContent=qa.sourceVerified?"Подтверждён":"Не подтверждён";
+ $("rig").textContent=qa.skins===1&&qa.bones===65?"Да":
+  qa.loaded?"Нет · "+qa.skins+" skins / "+qa.bones+" костей":"Не проверено";
+ $("animation").textContent=qa.clips>=4?"Есть "+qa.clips+" клипа":
+  qa.loaded?"Нет · "+qa.clips+" клипов":"Не проверено";
+ $("result").textContent="Выбран файл: "+qa.sourceName+
+  "\nТреугольники и визуальное качество оцениваются на самой модели."+
+  "\nGLB: "+qa.bytes+" байт, meshes: "+qa.meshes+
+  "\nСкелет: "+qa.skins+" skins, "+qa.bones+" костей, анимаций: "+qa.clips+
+  "\nИдентичность исходника: "+(qa.sourceVerified?"подтверждена контрольной суммой":
+   "не подтверждена — другой файл или изменённые байты")+
+  "\nГотовность для армии: "+(qa.canInstall?"Допускается к дальнейшему аудиту":
+   "Нет; требуется настоящая привязка к 65 костям и Quaternius")+
+  "\nGitHub: исходный двоичный файл ещё не опубликован.";
+}
+async function show(file){
+ qa.error=null;qa.loaded=false;qa.canInstall=false;qa.sourceName=file.name;
+ $("status").textContent="Открываю файл и проверяю исходник…";
+ $("asset").textContent=file.name+" · "+(file.size/1048576).toFixed(2)+" МБ";
+ imported?.dispose();imported=null;
+ if(url)URL.revokeObjectURL(url);
+ const buffer=await file.arrayBuffer();
+ const info=glbJSON(buffer);
+ qa.bytes=buffer.byteLength;qa.sha256=await hash(buffer);
+ qa.sourceVerified=[expected.shaOriginal,expected.shaOptimized].includes(qa.sha256)&&
+  info?.asset?.extras?.source===expected.source;
+ qa.modelIsBritish=info?.asset?.extras?.source===expected.source;
+ if(!qa.modelIsBritish)throw Error("GLB не принадлежит закреплённой модели George Jakeli");
+ qa.skins=(info.skins||[]).length;
+ qa.bones=qa.skins===1?(info.skins[0].joints||[]).length:0;
+ qa.clips=(info.animations||[]).length;
+ qa.meshes=(info.meshes||[]).length;
+ if(!window.BABYLON?.Engine||!window.BABYLON.SceneLoader)
+  throw Error("Babylon.js не загрузился; проверьте интернет");
+ if(!engine){
+  const B=window.BABYLON,canvas=$("canvas");
+  canvas.style.display="block";
+  engine=new B.Engine(canvas,true,{preserveDrawingBuffer:false,stencil:false});
+  scene=new B.Scene(engine);
+  scene.useRightHandedSystem=true;
+  scene.clearColor=new B.Color4(.09,.15,.11,1);
+  const light=new B.HemisphericLight("ambient",new B.Vector3(0,1,0),scene);
+  light.intensity=1.45;
+  const key=new B.DirectionalLight("key",new B.Vector3(-.5,-1,-.35),scene);
+  key.intensity=1.0;
+  const camera=new B.ArcRotateCamera("view",Math.PI*.48,Math.PI*.43,4,
+   new B.Vector3(0,1,0),scene);
+  camera.attachControl(canvas,true);
+  scene.activeCamera=camera;
+  engine.runRenderLoop(()=>scene.render());
+  window.addEventListener("resize",()=>engine.resize());
+ }
+ const B=window.BABYLON;
+ url=URL.createObjectURL(file);
+ imported=await B.SceneLoader.LoadAssetContainerAsync("",url,scene,undefined,".glb");
+ imported.addAllToScene();
+ for(const c of imported.animationGroups)c.stop();
+ const meshes=imported.meshes.filter(m=>m.getTotalVertices?.()>0);
+ if(!meshes.length)throw Error("GLB не содержит видимой геометрии");
+ let lo=new B.Vector3(Infinity,Infinity,Infinity);
+ let hi=new B.Vector3(-Infinity,-Infinity,-Infinity);
+ for(const mesh of meshes){
+  mesh.computeWorldMatrix(true);
+  const bb=mesh.getBoundingInfo().boundingBox;
+  lo.minimizeInPlace(bb.minimumWorld);hi.maximizeInPlace(bb.maximumWorld);
+ }
+ const span=hi.subtract(lo),camera=scene.activeCamera;
+ camera.setTarget(lo.add(hi).scale(.5));
+ camera.radius=Math.max(1.3,Math.max(span.x,span.y,span.z)*1.9);
+ engine.resize();
+ qa.loaded=true;
+ qa.controls=true;
+ qa.canInstall=qa.sourceVerified&&qa.skins===1&&qa.bones===65&&qa.clips>=4;
+ $("status").textContent=qa.sourceVerified?
+  "George Jakeli подтверждён по SHA-256. Модель загружена: вращай пальцем. Скелет и анимации отсутствуют — это визуальная приёмка, НЕ боевая версия.":
+  "Источник указан как George Jakeli, но файл изменён или не совпадает с проверенным оригиналом. Не допущен к игре.";
+ installStatus();
+}
+$("file").addEventListener("change",async()=>{
+ const f=$("file").files?.[0];if(!f)return;
+ try{await show(f)}catch(e){
+  qa.error=String(e?.message||e);
+  $("status").textContent="Ошибка: "+qa.error;
+  $("identity").textContent="Не подтверждён";
+  $("result").textContent="Модель не допущена. "+qa.error;
+ }
+});
+qa.ready=true;
+})();
+</script>
+</body>
+</html>
