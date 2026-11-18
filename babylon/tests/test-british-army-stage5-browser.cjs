@@ -123,7 +123,7 @@ const dir="babylon-qa-results/british-stage5";
    errors.length)throw Error("Reset/asset safety regression "+JSON.stringify({reset,errors}));
   await page.screenshot({path:dir+"/rifle-reset.png",fullPage:true});
   console.log("BRITISH_STAGE5_IPHONE_PASS",JSON.stringify({
-   65boneRigs:true,weapon:"Lee-Enfield",shots:2,cooldown:2.1,
+   rig65Bones:true,weapon:"Lee-Enfield",shots:2,cooldown:2.1,
    rifleInfiniteAmmo:true,preventsMovingShot:true,realDamage:true,
    recoilFX:true,threeTargets:true,originalBritishSkin:false
   }));
