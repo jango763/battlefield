@@ -21,6 +21,9 @@ on:
       - 'babylon/british-stage7-bren.js'
       - 'babylon/british-stage7-iphone.html'
       - 'babylon/tests/test-british-army-stage7*.cjs'
+      - 'babylon/british-stage8-piat.js'
+      - 'babylon/british-stage8-iphone.html'
+      - 'babylon/tests/test-british-army-stage8*.cjs'
       - 'babylon/tests/test-british-army-stage3*.cjs'
       - 'babylon/tests/test-british-army-stage1.cjs'
       - 'babylon/tests/test-british-army-stage2*.cjs'
@@ -71,6 +74,11 @@ jobs:
           node --check babylon/british-stage7-bren.js
           node --check babylon/tests/test-british-army-stage7.cjs
           node babylon/tests/test-british-army-stage7.cjs
+      - name: Verify PIAT four grenades, 9s automatic reload, splash and rifle fallback
+        run: |
+          node --check babylon/british-stage8-piat.js
+          node --check babylon/tests/test-british-army-stage8.cjs
+          node babylon/tests/test-british-army-stage8.cjs
       - name: Guard approved hero damage and ammo
         run: |
           node babylon/tests/test-us-hero-stage9-bridge.cjs
@@ -104,7 +112,11 @@ jobs:
         run: |
           node --check babylon/tests/test-british-army-stage7-browser.cjs
           node babylon/tests/test-british-army-stage7-browser.cjs
-      - name: Upload mobile stage2-stage7 inspection screenshots
+      - name: Verify iPhone PIAT two-handed IK, grenade explosion and 9s auto reload
+        run: |
+          node --check babylon/tests/test-british-army-stage8-browser.cjs
+          node babylon/tests/test-british-army-stage8-browser.cjs
+      - name: Upload mobile stage2-stage8 inspection screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -116,4 +128,5 @@ jobs:
             babylon-qa-results/british-stage5/
             babylon-qa-results/british-stage6/
             babylon-qa-results/british-stage7/
+            babylon-qa-results/british-stage8/
           if-no-files-found: ignore
