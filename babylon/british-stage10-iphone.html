@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14271c">
+<title>Battlefield · Британия · итоговый аудит 10/10</title>
+<style>
+:root{color-scheme:dark;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body{background:#14251c;color:#f2f4e8;margin:0;padding:calc(env(safe-area-inset-top) + 16px) 14px calc(env(safe-area-inset-bottom) + 30px)}
+main{max-width:850px;margin:auto}
+h1{font-size:23px;margin:0 0 4px}
+h2{font-size:16px;margin:0 0 10px}
+h3{font-size:13px;margin:10px 0 6px}
+p,small{line-height:1.48}
+p{margin:5px 0 12px;color:#cbd8c9}
+small{font-size:11px;color:#cbd9c5;display:block}
+strong{font-weight:750}
+a{color:#e7f5ba}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid #f5e4a4;outline-offset:2px}
+.panel{border:1px solid #637c65;border-radius:13px;background:#1b3425;padding:13px;margin:12px 0;min-width:0}
+.warning{border-color:#b49861;background:#372d1d}
+.warning strong{color:#ffe4a6}
+.ok{color:#b8e4a9}
+.no{color:#ffe2ac}
+#stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:8px 0}
+.stat{border:1px solid #53785d;border-radius:10px;padding:9px 7px;background:#244531;text-align:center}
+.stat .number{font-weight:800;font-size:21px;display:block}
+.stat .sub{font-size:10px;color:#d2e3c9;display:block}
+#stage-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.stage{display:flex;align-items:center;gap:8px;min-height:53px;padding:10px;background:#2b4b35;border:1px solid #6c8a6e;border-radius:9px;text-decoration:none;color:#f3f4ea;font-size:12px;font-weight:700}
+.stage .num{border-radius:50%;background:#d5e1ab;color:#192c1f;min-width:23px;height:23px;display:grid;place-items:center}
+.stage .meta{display:block;font-size:10px;color:#cadbc5;font-weight:400;margin-top:3px}
+#source-list{font-size:12px;line-height:1.65}
+#source-list .item{padding:5px 0;border-bottom:1px solid #466148}
+.checklist{display:grid;gap:5px}
+.checkrow{display:flex;align-items:flex-start;gap:9px;padding:8px 7px;background:#254331;border:1px solid #557258;border-radius:8px;min-height:42px}
+.checkrow input{accent-color:#a4c37e;width:19px;height:19px;margin:0;flex-shrink:0}
+.checkrow span{font-size:12px}
+button{min-height:44px;width:100%;background:#4b7951;color:#fff;border:1px solid #98b28e;border-radius:8px;padding:10px;font:700 13px system-ui;cursor:pointer}
+button:disabled{opacity:.5}
+.buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+#hero-canvas{width:100%;height:216px;display:none;touch-action:none;background:#101c16;border-radius:8px}
+pre{white-space:pre-wrap;word-break:break-word;background:#102117;padding:9px;border-radius:9px;font:11px/1.5 ui-monospace,SFMono-Regular,monospace;color:#d8e0d2;max-height:255px;overflow:auto}
+code{font-size:11px}
+#notice{border-left:3px solid #b99b60;padding:7px 10px;margin:9px 0;color:#f5d7a6;background:#2d2c20;font-size:12px;line-height:1.5}
+footer{color:#b9cab8;font-size:10px;margin-top:18px}
+@media(max-width:480px){h1{font-size:20px}.panel{padding:10px}#stage-list{grid-template-columns:1fr 1fr}.stage{gap:5px;padding:7px;min-height:64px;font-size:11px}.stage .num{min-width:22px}#stats{gap:4px}.stat{padding:7px 4px}.stat .number{font-size:19px}}
+</style>
+<script src="./allied-model-catalog.js"></script>
+<script src="./british-army-pipeline.js"></script>
+<script src="./british-stage9-army.js"></script>
+<script src="./british-stage10-release-audit.js"></script>
+</head>
+<body>
+<main>
+<h1>Британская армия · этап 10/10</h1>
+<p>Финальная проверка технологий и готовности к выпуску · Battlefield на iPhone</p>
+<section class="panel warning">
+ <h2>Статус выпуска</h2>
+ <strong id="release">Проверяю оригинальные британские 3D-модели…</strong>
+ <p id="summary">Технический прототип и настоящая британская 3D-армия — разные степени готовности.</p>
+ <div id="stats">
+  <div class="stat"><span class="number">9</span><span class="sub">этапов технологии</span></div>
+  <div class="stat"><span class="number" id="skin-count">—</span><span class="sub">оригинальных GLB из 3</span></div>
+  <div class="stat"><span class="number">0</span><span class="sub">готовых 3D-британцев</span></div>
+ </div>
+ <div id="blockers"></div>
+</section>
+<section class="panel">
+ <h2>Полигон всех этапов</h2>
+ <small>Каждая ссылка открывает отдельную проверку. В 3D-полигонах пока используется герой как технический эталон; на странице 9 — тактическая схема, не модели солдат.</small>
+ <div id="stage-list"></div>
+</section>
+<section class="panel">
+ <h2>Файлы настоящих британских бойцов</h2>
+ <p>Проверяется наличие файла в репозитории и статус лицензии/оптимизации в манифесте. Файл на вашем iPhone сам по себе не делает скин установленным в игру.</p>
+ <div id="source-list">Получаю манифест…</div>
+</section>
+<section class="panel">
+ <h2>Контрольная 3D-нагрузка</h2>
+ <p>Кнопка загружает только утверждённый 65-костный технический эталон героя (≈4,7 МБ), показывает его и измеряет время импорта и частоту кадров <strong>на данном устройстве</strong>. Это не тест FPS двенадцати британских бойцов.</p>
+ <button id="benchmark">Измерить 3D на этом устройстве</button>
+ <canvas id="hero-canvas" aria-label="3D-предпросмотр контрольного скелета героя"></canvas>
+ <pre id="performance">Тест ещё не запускался. На iPhone Safari память JavaScript может быть недоступна для измерения; отсутствие показателя не означает отсутствие расхода памяти.</pre>
+</section>
+<section class="panel">
+ <h2>Ручная проверка Safari на iPhone</h2>
+ <p>После открытия полигонов отмечайте только реально проверенные пункты. Галочки фиксируют наблюдения, но <strong>не разрешают выпуск</strong> без оригинальных моделей, лицензий и отдельного теста всей армии.</p>
+ <div id="manual" class="checklist"></div>
+ <div id="notice">Автоматические тесты выполнялись в мобильном Chromium. Успех Chromium не доказывает исправность Safari, а отметки здесь не меняют основную игру.</div>
+ <div class="buttons">
+  <button id="copy">Скопировать отчёт</button>
+  <button id="clear">Очистить отметки</button>
+ </div>
+ <pre id="report">Загружаю итоговый аудит…</pre>
+</section>
+<footer>Ветка экспериментальная, управление Battlefield, Вермахт, герой и основная ветка main не меняются. Оригиналы британских GLB не заменяются контрольным героем.</footer>
+</main>
+<script>
+(async()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const qaApi=window.BattlefieldBritishStage10Audit,
+ pipeline=window.BattlefieldBritishArmyPipeline,
+ catalog=window.BattlefieldAlliedModels,
+ army=window.BattlefieldBritishStage9Army;
+const qa={stage:10,ready:false,error:null,releaseReady:false,
+ originalBritishModelsReady:0,originalBritish3dActors:0,
+ presentFiles:[],manual:{},perf:null,report:"",mobileViewport:false,
+ technicalPrototypeReady:false,stageLinks:0,safariLikely:false,
+ memoryAvailable:false};
+window.__BRITISH_STAGE10_QA__=qa;
+const checkList=qaApi?.SAFARI_MANUAL||[];
+let manifest=null,evaluation=null,benchmarking=false;
+function emit(){
+ qa.report=[
+  "Battlefield · Британия · этап 10/10",
+  "Статус: "+(evaluation?.releaseReady?"ГОТОВО К ИНТЕГРАЦИИ":"НЕ ГОТОВО К ВЫПУСКУ"),
+  "Оригинальные британские GLB: "+qa.originalBritishModelsReady+"/3",
+  "Британские 3D-персонажи: "+qa.originalBritish3dActors,
+  "Устройство: "+navigator.userAgent,
+  "Счётчик Safari: "+(qa.safariLikely?"похоже на Safari (не подтверждает физический тест)":"не установлен Safari"),
+  "Ручные проверки: "+checkList.filter(x=>qa.manual[x.id]).length+"/"+checkList.length,
+  "Контрольная 3D-модель: "+(qa.perf?
+   qa.perf.bones+" костей, "+qa.perf.loadMs.toFixed(0)+" мс загрузка, "+qa.perf.renderFps.toFixed(1)+" FPS": "не измерялась"),
+  "Это НЕ тест полной британской армии и не разрешение на релиз.",
+  "Блокеры:",...(evaluation?.blockers||["Аудит ещё загружается"]).map(x=>"• "+x)
+ ].join("\n");
+ $("report").textContent=qa.report;
+}
+function update(){
+ if(!manifest)return;
+ evaluation=qaApi.evaluate({catalog,pipeline,army,manifest,
+  presentFiles:qa.presentFiles,assignments:{},
+  headwearApproved:{},actors:[],safariManual:qa.manual,
+  safariUA:navigator.userAgent,
+  deviceActual:/iPhone|iPad/.test(navigator.userAgent)&&!navigator.webdriver,
+  measured3d:qa.perf});
+ qa.releaseReady=evaluation.releaseReady;
+ qa.technicalPrototypeReady=evaluation.technicalPrototypeReady;
+ qa.originalBritishModelsReady=evaluation.originalBritishModelsReady;
+ qa.originalBritish3dActors=evaluation.realBritish3dSpawns;
+ $("skin-count").textContent=String(evaluation.originalBritishModelsReady)+"/3";
+ $("release").textContent=evaluation.releaseReady?
+  "Все ограничения устранены — требуется финальная интеграционная приёмка":
+  "Технология протестирована · выпуск британских 3D-отрядов заблокирован";
+ $("summary").textContent="Герой + 8 пехотинцев + 3 коммандос. Три отряда 4/4/3. "+
+  "Двуручный хват, анимации и четыре вида оружия проверены отдельно, "+
+  "но исходные британские скины не допущены к спавну.";
+ const blockers=$("blockers");blockers.replaceChildren();
+ const title=document.createElement("strong");title.textContent=
+  "Открытые требования ("+evaluation.blockers.length+"):";
+ blockers.appendChild(title);
+ const box=document.createElement("ul");
+ box.style.cssText="font-size:11px;line-height:1.5;padding-left:20px";
+ for(const reason of evaluation.blockers){
+  const li=document.createElement("li");li.textContent=reason;box.appendChild(li);
+ }
+ blockers.appendChild(box);
+ emit();
+}
+function resourceStatus(){
+ const rows=evaluation?.originalModelAudit||[];
+ const el=$("source-list");el.replaceChildren();
+ for(const row of rows){
+  const box=document.createElement("div");box.className="item";
+  const title=document.createElement("strong");
+  title.textContent=row.title+" · "+row.filename;
+  const note=document.createElement("div");
+  note.className=row.ready?"ok":"no";
+  note.textContent=row.ready?
+   "Источник и допуск в манифесте подтверждены":"Недопущен: "+row.reasons.join("; ");
+  box.append(title,note);el.appendChild(box);
+ }
+}
+function controls(){
+ $("stage-list").replaceChildren();
+ for(const item of qaApi.STAGE_PAGES){
+  const a=document.createElement("a");
+  a.className="stage";a.href="./"+item.path;
+  a.dataset.step=String(item.step);
+  const number=document.createElement("span");
+  number.className="num";number.textContent=String(item.step);
+  const title=document.createElement("span");
+  const t=document.createElement("span");t.textContent=item.label;
+  const description=document.createElement("span");
+  description.className="meta";description.textContent=item.kind;
+  title.append(t,description);a.append(number,title);$("stage-list").append(a);
+ }
+ qa.stageLinks=qaApi.STAGE_PAGES.length;
+ const manual=$("manual");manual.replaceChildren();
+ for(const c of checkList){
+  const label=document.createElement("label");label.className="checkrow";
+  const input=document.createElement("input");
+  input.type="checkbox";input.dataset.check=c.id;
+  const t=document.createElement("span");t.textContent=c.label;
+  input.addEventListener("change",()=>{
+   qa.manual[c.id]=input.checked;
+   update();
+  });
+  label.append(input,t);manual.append(label);
+ }
+ $("clear").onclick=()=>{
+  qa.manual={};
+  for(const box of manual.querySelectorAll("input"))box.checked=false;
+  update();
+ };
+ $("copy").onclick=async()=>{
+  try{
+   await navigator.clipboard.writeText(qa.report);
+   $("copy").textContent="Отчёт скопирован";
+  }catch(e){
+   $("copy").textContent="Выделите текст отчёта ниже для копирования";
+  }
+ };
+ $("benchmark").onclick=benchmark;
+}
+function loadScript(src){
+ return new Promise((resolve,reject)=>{
+  const script=document.createElement("script");
+  script.src=src;script.onload=()=>resolve();script.onerror=()=>reject(Error("Не загружен "+src));
+  document.head.appendChild(script);
+ });
+}
+async function benchmark(){
+ if(benchmarking)return;benchmarking=true;
+ $("benchmark").disabled=true;
+ $("performance").textContent="Загрузка контрольного героя и проверка 3D-рендеринга…";
+ let engine=null,container=null;
+ try{
+  if(!window.BABYLON)await loadScript("https://cdn.babylonjs.com/babylon.js");
+  if(!window.BABYLON.SceneLoader?.LoadAssetContainerAsync||
+     !window.BABYLON.GLTFFileLoader)
+   await loadScript("https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js");
+  const B=window.BABYLON;
+  if(!B?.Engine?.isSupported?.())throw Error("WebGL на устройстве недоступен");
+  const canvas=$("hero-canvas");canvas.style.display="block";
+  engine=new B.Engine(canvas,true,{powerPreference:"low-power",
+   preserveDrawingBuffer:false,stencil:false});
+  engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.5));
+  const scene=new B.Scene(engine);scene.clearColor=new B.Color4(.08,.13,.09,1);
+  scene.useRightHandedSystem=true;
+  const light=new B.HemisphericLight("light",new B.Vector3(0,1,0),scene);
+  light.intensity=1.45;
+  const camera=new B.ArcRotateCamera("orbit",Math.PI*.72,Math.PI*.48,3,
+   new B.Vector3(0,1,0),scene);
+  camera.attachControl(canvas,true);
+  const start=performance.now();
+  container=await B.SceneLoader.LoadAssetContainerAsync("",
+   "../assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb",
+   scene,undefined,".glb");
+  container.addAllToScene();
+  for(const clip of container.animationGroups)clip.stop();
+  const loadMs=performance.now()-start;
+  const bones=container.skeletons.length===1?
+   container.skeletons[0].bones.length:0;
+  const rendered=container.meshes.filter(m=>m.getTotalVertices?.()>0);
+  const vertices=rendered.reduce((sum,m)=>sum+m.getTotalVertices(),0);
+  const triangles=rendered.reduce((sum,m)=>
+   sum+Math.ceil((m.getTotalIndices()||m.getTotalVertices())/3),0);
+  if(bones!==65||!rendered.length)throw Error("Контрольный скелет не совпадает с 65 костями");
+  let lo=new B.Vector3(Infinity,Infinity,Infinity);
+  let hi=new B.Vector3(-Infinity,-Infinity,-Infinity);
+  for(const mesh of rendered){
+   mesh.computeWorldMatrix(true);
+   const bb=mesh.getBoundingInfo().boundingBox;
+   lo.minimizeInPlace(bb.minimumWorld);hi.maximizeInPlace(bb.maximumWorld);
+  }
+  const span=hi.subtract(lo);
+  camera.setTarget(lo.add(hi).scale(.5));
+  camera.radius=Math.max(1.6,Math.max(span.x,span.y,span.z)*2);
+  engine.resize();
+  // Real animation-frame timing on the current browser; CI emulation results
+  // must NOT be interpreted as performance of a physical iPhone.
+  const begin=performance.now();let frames=0;
+  await new Promise(resolve=>{
+   const step=()=>{
+    scene.render();frames++;
+    if(performance.now()-begin<1400)requestAnimationFrame(step);
+    else resolve();
+   };requestAnimationFrame(step);
+  });
+  const elapsed=performance.now()-begin;
+  const renderFps=frames/(elapsed/1000);
+  const mem=qaApi.canMeasureMemory(performance)?
+   performance.memory.usedJSHeapSize:null;
+  qa.perf=qaApi.probeSummary({loadMs,renderFps,bones,
+   memoryBytes:mem,source:"control-hero"});
+  qa.perf.vertices=vertices;qa.perf.triangles=triangles;
+  $("performance").textContent=[
+   "Контрольный герой — НЕ британский солдат.",
+   "Скелет: "+bones+" костей, геометрия: "+vertices+" вершин / "+triangles+" треугольников.",
+   "Импорт GLB: "+loadMs.toFixed(0)+" мс (сеть/кэш и устройство влияют).",
+   "Частота тестового рендера: "+renderFps.toFixed(1)+" FPS (1 модель, ~1.4 с).",
+   "Память JavaScript: "+(mem===null?"не поддерживается/не измерена":
+    (mem/(1024*1024)).toFixed(1)+" МБ; это НЕ суммарная память GPU."),
+   "Не означает производительность 12 3D-солдат, оружия и карты.",
+   "Интеграция в игру: ЗАБЛОКИРОВАНА до подтверждения оригиналов."
+  ].join("\n");
+  update();
+ }catch(e){
+  qa.probeError=String(e?.message||e);
+  $("performance").textContent="Ошибка теста: "+qa.probeError+
+   "\nПроверьте соединение/CDN и поддержку WebGL в Safari.";
+ }finally{
+  container?.dispose();
+  engine?.dispose();
+  benchmarking=false;$("benchmark").disabled=false;
+ }
+}
+try{
+ if(!qaApi||!pipeline||!catalog||!army)
+  throw Error("Не загрузились модули технической готовности");
+ qa.mobileViewport=window.innerWidth<=480;
+ qa.safariLikely=qaApi.isSafariUA(navigator.userAgent);
+ qa.memoryAvailable=qaApi.canMeasureMemory(performance);
+ controls();
+ const reply=await fetch("../assets/allied-soldiers/manifest.json",{cache:"no-store"});
+ if(!reply.ok)throw Error("Не доступен manifest.json");
+ manifest=await reply.json();
+ const ids=pipeline.MODEL_IDS;
+ const present=[];
+ for(const id of ids){
+  const file=manifest.models[id]?.file;
+  if(!/^[a-z0-9-]+\.glb$/.test(file||""))continue;
+  try{
+   const r=await fetch("../assets/allied-soldiers/"+file,
+    {method:"HEAD",cache:"no-store"});
+   if(r.ok)present.push("assets/allied-soldiers/"+file);
+  }catch(e){/* HEAD unsupported: do not pretend the model exists */}
+ }
+ qa.presentFiles=present;
+ qa.ready=true;
+ update();resourceStatus();
+}catch(e){
+ qa.error=String(e?.message||e);
+ $("release").textContent="Аудит недоступен — выпуск заблокирован";
+ $("summary").textContent=qa.error;
+ $("report").textContent=qa.error;
+}
+})();
+</script>
+</body>
+</html>
