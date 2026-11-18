@@ -37,7 +37,7 @@ a{color:#dcf1ba}
 </section>
 <section class="panel">
 <h2>1. Открой установленную статическую копию Jakeli</h2>
-<p>Облегчённая модель Jakeli (5,2 МБ) сохранена в экспериментальной ветке GitHub, побайтно неизменная, в 17 проверенных бинарных частях. Браузер собирает GLB автоматически.</p>
+<p>Облегчённый оригинальный GLB George Jakeli (5,2 МБ) сохранён в экспериментальной ветке GitHub. Открывается напрямую одним файлом — без ручной загрузки или сборки по частям.</p>
 <button id="load-repo">Показать настоящего Jakeli в 3D</button>
 <p>Либо открой исходный GLB с телефона (оригинал 26,7 МБ): файл остаётся на iPhone и никуда не отправляется.</p>
 <input id="file" type="file" accept=".glb,model/gltf-binary,application/octet-stream" aria-label="Выбрать модель GLB"/>
@@ -53,7 +53,7 @@ a{color:#dcf1ba}
 <div class="kv"><span>Идентичность George Jakeli</span><strong id="identity">Не проверено</strong></div>
 <div class="kv"><span>65-костный скелет</span><strong id="rig">Не проверено</strong></div>
 <div class="kv"><span>Quaternius Idle / Walk / Jog / Sprint</span><strong id="animation">Не проверено</strong></div>
-<div class="kv"><span>Статический ассет в GitHub</span><strong id="installed">Да, 17 частей</strong></div>
+<div class="kv"><span>Статический ассет в GitHub</span><strong id="installed">Да, один GLB</strong></div>
 <div class="kv"><span>Установка в боевую армию</span><strong id="game-installed">Нет — нужен риг</strong></div>
 <div id="result">Проверка ещё не запущена.</div>
 </section>
@@ -170,26 +170,10 @@ $("load-repo").addEventListener("click",async()=>{
  const button=$("load-repo");button.disabled=true;
  $("status").textContent="Загружаю сохранённый оригинальный Jakeli из экспериментальной ветки GitHub…";
  try{
-  const pieces=[],chunkSize=307200,partCount=17;
-  for(let first=1;first<=partCount;first+=4){
-   const requests=Array.from({length:Math.min(4,partCount-first+1)},
-    (_,offset)=>first+offset);
-   const loaded=await Promise.all(requests.map(async n=>{
-    const number=String(n).padStart(2,"0");
-    const response=await fetch("../assets/allied-soldiers/jakeli-mobile-parts/part-"+number+".bin");
-    if(!response.ok)throw Error("Часть модели "+number+" недоступна: HTTP "+response.status);
-    const bytes=await response.arrayBuffer();
-    const expectedSize=n===17?285424:chunkSize;
-    if(bytes.byteLength!==expectedSize)
-     throw Error("Часть "+number+" повреждена или обрезана");
-    return {n,bytes};
-   }));
-   for(const item of loaded)pieces[item.n-1]=item.bytes;
-   $("status").textContent="Загружено "+Math.min(first+3,partCount)+"/"+partCount+
-    " частей настоящего Jakeli…";
-  }
-  const b=new Blob(pieces,{type:"model/gltf-binary"});
-  if(b.size!==5200624)throw Error("Размер восстановленного GLB не совпадает с оригиналом");
+  const response=await fetch("../assets/allied-soldiers/uk-jakeli-mobile-static.glb",{cache:"force-cache"});
+  if(!response.ok)throw Error("Оригинальный GLB недоступен: HTTP "+response.status);
+  const b=await response.blob();
+  if(b.size!==5200624)throw Error("GLB повреждён: неверный размер");
   await show(new File([b],"uk-jakeli-mobile-static.glb",{type:"model/gltf-binary"}));
  }catch(e){
   qa.error=String(e?.message||e);
