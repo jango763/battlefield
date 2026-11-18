@@ -270,12 +270,15 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
   const forward=arm.middle.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()).normalize();
   let palm=B.Vector3.Cross(across,forward).normalize();
   const thumb=arm.thumb.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition());
-  if(B.Vector3.Dot(palm,thumb)<0)palm.scaleInPlace(-1);
+  // Remember the REST-pose palm side. After finger curl the moving thumb
+  // can cross the palm plane and must not flip the diagnostic.
+  const palmSign=B.Vector3.Dot(palm,thumb)<0?-1:1;
+  if(palmSign<0)palm.scaleInPlace(-1);
   const srcBasis=basis(forward,palm);
   const localBasis=handWorld.conjugate().multiply(srcBasis).normalize();
   const socketLocalOffset=rotate(arm.socket.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()),
                                   handWorld.conjugate());
-  calibrations[side]={localBasis,socketLocalOffset};
+  calibrations[side]={localBasis,socketLocalOffset,palmSign};
  }
  const stoppedTracks=stripArmTracks(imported.animationGroups);
  if(stoppedTracks!==32)throw Error("Expected 32 conflicting arm tracks, got "+stoppedTracks);
@@ -385,12 +388,14 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
  function angleDeg(a,b){
   return Math.acos(B.Scalar.Clamp(B.Vector3.Dot(a.normalize(),b.normalize()),-1,1))*180/Math.PI;
  }
- function actualHandFrame(arm){
-  refresh(arm.hand);refresh(arm.index);refresh(arm.middle);refresh(arm.pinky);refresh(arm.thumb);
+ function actualHandFrame(arm,side){
+  refresh(arm.hand);refresh(arm.index);refresh(arm.middle);refresh(arm.pinky);
   const forward=arm.middle.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()).normalize();
   const cross=arm.index.getAbsolutePosition().subtract(arm.pinky.getAbsolutePosition()).normalize();
-  let palm=B.Vector3.Cross(cross,forward).normalize();
-  if(B.Vector3.Dot(palm,arm.thumb.getAbsolutePosition().subtract(arm.hand.getAbsolutePosition()))<0)palm.scaleInPlace(-1);
+  // Source and current pose always use the same bind-pose palm side.
+  // The curled thumb may cross the plane: never use it to flip the metric.
+  const palm=B.Vector3.Cross(cross,forward).normalize()
+    .scaleInPlace(calibrations[side].palmSign);
   return {forward,palm};
  }
  // Corrected curl sign verified by seven on-screen comparisons.
@@ -536,7 +541,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    calibrations.left.lastPalm=orientationL.palm;
    for(const name of fingerNames)foldFinger(name);
    refresh(right.socket);refresh(left.socket);
-   const rf=actualHandFrame(right),lf=actualHandFrame(left);
+   const rf=actualHandFrame(right,"right"),lf=actualHandFrame(left,"left");
    const trueTrigger=actualWeaponOrigin.add(V(m.trigger,actualWeaponQ));
    const trueDominantGrip=trueTrigger.add(V(weaponId==="uk-lee-enfield"?handFit.grip:weaponProfile.grip,actualWeaponQ));
    state.rightGripMeters=B.Vector3.Distance(right.socket.getAbsolutePosition(),trueDominantGrip);
