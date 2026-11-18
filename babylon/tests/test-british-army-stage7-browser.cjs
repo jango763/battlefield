@@ -23,7 +23,7 @@ const dir="babylon-qa-results/british-stage7";
     originalVerified:q.modelIdentityVerified,error:q.error,
     fireDisabled:document.getElementById("fire").disabled};
   });
-  if(before.stage!==6||!before.ready||before.loaded||
+  if(before.stage!==7||!before.ready||before.loaded||
    before.originalVerified||!before.fireDisabled||before.error)
    throw Error("Stage7 cannot pretend to have British GLBs "+JSON.stringify(before));
   await page.screenshot({path:dir+"/british-skin-still-required.png",fullPage:true});
