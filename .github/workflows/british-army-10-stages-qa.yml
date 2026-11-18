@@ -15,6 +15,9 @@ on:
       - 'babylon/british-stage5-lee-enfield.js'
       - 'babylon/british-stage5-iphone.html'
       - 'babylon/tests/test-british-army-stage5*.cjs'
+      - 'babylon/british-stage6-sten.js'
+      - 'babylon/british-stage6-iphone.html'
+      - 'babylon/tests/test-british-army-stage6*.cjs'
       - 'babylon/tests/test-british-army-stage3*.cjs'
       - 'babylon/tests/test-british-army-stage1.cjs'
       - 'babylon/tests/test-british-army-stage2*.cjs'
@@ -55,6 +58,11 @@ jobs:
           node --check babylon/british-stage5-lee-enfield.js
           node --check babylon/tests/test-british-army-stage5.cjs
           node babylon/tests/test-british-army-stage5.cjs
+      - name: Verify Sten 160 rounds, reload and rifle fallback from original BattlefieldBalance
+        run: |
+          node --check babylon/british-stage6-sten.js
+          node --check babylon/tests/test-british-army-stage6.cjs
+          node babylon/tests/test-british-army-stage6.cjs
       - name: Guard approved hero damage and ammo
         run: |
           node babylon/tests/test-us-hero-stage9-bridge.cjs
@@ -80,7 +88,11 @@ jobs:
         run: |
           node --check babylon/tests/test-british-army-stage5-browser.cjs
           node babylon/tests/test-british-army-stage5-browser.cjs
-      - name: Upload mobile stage2-stage5 inspection screenshots
+      - name: Verify iPhone Sten two-handed IK, live moving fire and 2.5s reload
+        run: |
+          node --check babylon/tests/test-british-army-stage6-browser.cjs
+          node babylon/tests/test-british-army-stage6-browser.cjs
+      - name: Upload mobile stage2-stage6 inspection screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -90,4 +102,5 @@ jobs:
             babylon-qa-results/british-stage3/
             babylon-qa-results/british-stage4/
             babylon-qa-results/british-stage5/
+            babylon-qa-results/british-stage6/
           if-no-files-found: ignore
