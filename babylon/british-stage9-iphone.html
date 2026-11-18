@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#15251c">
+<title>Battlefield — британская армия, отряды 9/10</title>
+<style>
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#14221a;color:#eef3e8}
+body{padding:calc(env(safe-area-inset-top) + 14px) 12px calc(env(safe-area-inset-bottom) + 22px)}
+h1{margin:0 0 4px;font-size:20px}
+p{margin:5px 0;font-size:12px;line-height:1.45;color:#cad4c7}
+small{display:block;color:#bdc9bb;line-height:1.45}
+#warning{padding:10px;background:#342d1f;border:1px solid #9b875d;border-radius:10px;margin:10px 0;font-size:12px;line-height:1.45}
+#status{font-size:12px;line-height:1.5;margin:8px 0;padding:9px;background:#1d3b2b;border-radius:9px;white-space:pre-line}
+#board{position:relative;margin:9px 0 12px;min-height:310px;max-width:740px;border:1px solid #718d6c;border-radius:12px;overflow:hidden;background:repeating-linear-gradient(0deg,#182b20 0px,#182b20 37px,#213629 38px),repeating-linear-gradient(90deg,transparent 0px,transparent 36px,#34503a 37px)}
+#board:before{content:"ОТРЯД СОЮЗНИКОВ • ТАКТИЧЕСКАЯ СХЕМА, НЕ 3D-МОДЕЛИ";position:absolute;top:7px;left:8px;font-size:9px;color:#b5cbb4;z-index:1}
+.marker{position:absolute;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);width:37px;height:37px;border-radius:50%;border:2px solid #bed5b1;background:#376e48;color:#fff;font-size:11px;font-weight:700;cursor:pointer;transition:left .20s,top .20s}
+.marker[aria-pressed=true]{outline:3px solid #dfcb7e;z-index:3}
+.marker.commando{background:#415e71;border-color:#b8cdd5}
+.marker.hero{background:#8b7043;border-color:#f9dc9f}
+.marker.dead{opacity:.36;background:#6b3a37;text-decoration:line-through}
+.marker.enemy{background:#853d37;border-color:#e7aba0}
+.legend{font-size:11px;display:flex;flex-wrap:wrap;gap:12px;color:#c9d7c7}
+.panel{border:1px solid #617b62;border-radius:12px;background:#1c3024;padding:10px;margin:10px 0}
+.panel h2{font-size:14px;margin:0 0 8px}
+.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.controls.triple{grid-template-columns:repeat(3,minmax(0,1fr))}
+button,select{width:100%;min-height:41px;padding:8px 6px;background:#335741;color:#fff;border:1px solid #8cad88;border-radius:8px;font-size:12px;font-weight:650}
+button:disabled,select:disabled{opacity:.45}
+button[aria-pressed=true]{background:#d9e7b6;color:#183022}
+select{appearance:auto}
+#roster{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.roster-item{padding:8px 4px;min-height:65px;border:1px solid #5f7a61;border-radius:8px;background:#223c2c;display:flex;flex-direction:column;gap:3px;text-align:center;justify-content:center;cursor:pointer;font-size:11px;color:#eef3e9}
+.roster-item[aria-pressed=true]{background:#566d3e;border-color:#f2dc86}
+.roster-item strong{font-size:12px}
+.roster-item em{font-size:10px;color:#c3d3bf;font-style:normal}
+#details{font-size:12px;min-height:32px;margin-top:8px;line-height:1.45}
+a{color:#d8edc7}
+@media(min-width:700px){#layout{display:grid;grid-template-columns:1.1fr .9fr;gap:12px;align-items:start}#roster{grid-template-columns:repeat(4,minmax(0,1fr))}#board{min-height:400px}}
+</style>
+<script src="./allied-model-catalog.js"></script>
+<script src="./british-army-pipeline.js"></script>
+<script src="./combat-balance-core.js"></script>
+<script src="./squad-combat-core.js"></script>
+<script src="./british-stage9-army.js"></script>
+</head>
+<body>
+<h1>Британская армия · этап 9/10</h1>
+<p>12 отдельных боевых слотов: 1 герой, 8 пехотинцев, 3 коммандос · строй и совместимость вооружения</p>
+<div id="warning" role="note">Это <strong>схема строя и симуляция боя</strong>, а не готовые британские 3D-солдаты. Ранее выбранные GLB и разрешения на их использование пока не подтверждены. Каски Mk II и береты ещё не установлены на моделях.</div>
+<div id="status" role="status" aria-live="polite">Сверяю каталог и боевую систему…</div>
+<div id="layout">
+ <div>
+  <div id="board" aria-label="Схема: 12 союзных слотов и четыре красные цели"></div>
+  <div class="legend"><span>● Герой — золотой</span><span>● Пехота — зелёный</span><span>● Коммандос — синий</span><span>● Противники — красный</span></div>
+  <section class="panel">
+   <h2>Тренировочный строй</h2>
+   <div class="controls">
+    <button data-formation="turtle" aria-pressed="true">Черепаха</button>
+    <button data-formation="semicircle" aria-pressed="false">Полукруг</button>
+   </div>
+   <small>В «черепахе» герой сзади, три бойца впереди. При потере бойца его место занимает ближайший живой. Боевой полукруг и исходные игровые управления не изменяются.</small>
+  </section>
+  <section class="panel">
+   <h2>Учебная симуляция без 3D</h2>
+   <div class="controls triple">
+    <button id="start">Начать бой</button>
+    <button id="stop">Пауза</button>
+    <button id="reset">Сброс</button>
+   </div>
+   <small>Урон, стрельба, перезарядка и цели рассчитываются существующим BattlefieldBalance. Это отдельный полигон, а не изменение настоящей игры.</small>
+  </section>
+ </div>
+ <div>
+  <section class="panel">
+   <h2>Бойцы и головные уборы</h2>
+   <div id="roster"></div>
+   <div id="details">Выберите слот.</div>
+   <label for="weapon">Учебное вооружение выбранного бойца</label>
+   <select id="weapon">
+    <option value="uk-lee-enfield">Lee-Enfield</option>
+    <option value="uk-sten">Sten</option>
+    <option value="uk-bren">Bren</option>
+    <option value="uk-piat">PIAT</option>
+   </select>
+   <button id="equip">Выдать оружие на базе</button>
+   <small>В реальной игре сохраняются покупки и цены. Здесь вооружение бесплатное только для тестирования.</small>
+  </section>
+  <section class="panel">
+   <h2>Готовность настоящих скинов</h2>
+   <div id="assets">Проверка файлов…</div>
+   <small>Скелет 65 костей, четырёхклипные анимации Quaternius и отдельный Weapon_R для каждого бойца подлежат проверке перед импортом.</small>
+  </section>
+ </div>
+</div>
+<script>
+(async()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const api=window.BattlefieldBritishStage9Army,
+ pipeline=window.BattlefieldBritishArmyPipeline,
+ catalog=window.BattlefieldAlliedModels,
+ balance=window.BattlefieldBalance,
+ squad=window.BattlefieldSquadController;
+const QA={stage:9,ready:false,error:null,mode:"turtle",originalBritishSkin:false,
+ totalSlots:0,infantry:0,commando:0,hero:0,liveSimulation:false,
+ selectedSlot:1,active:false,modelSpawns:0};
+window.__BRITISH_STAGE9_QA__=QA;
+let sim=null,plan=null,selected=1,last=0;
+const selectSlot=n=>{
+ selected=n;QA.selectedSlot=n;
+ const role=api.roleForSlot(n);
+ const candidate=plan.slots[n];
+ $("details").textContent=n===0?
+  "Герой — уже утверждённый персонаж. Его внешний вид не заменяем.":
+  (role==="infantry"?"Пехота · нужна каска Mk II. ":"Коммандос · нужен берет. ")+
+  "Кандидат: "+candidate.candidateModelId+
+  ". Оригинальный 3D-файл и права требуют подтверждения.";
+ $("weapon").disabled=n===0||sim?.snapshot().active;
+ $("equip").disabled=n===0||sim?.snapshot().active;
+ for(const b of document.querySelectorAll(".roster-item,.marker:not(.enemy)"))
+  b.setAttribute("aria-pressed",String(Number(b.dataset.slot)===n));
+};
+function board(){
+ const field=$("board");field.replaceChildren();
+ const form=api.positions(QA.mode);
+ const current=sim?.snapshot();
+ const alive=current?.alive||Array(12).fill(true);
+ const activeSlots=current?.fronts?.map(x=>x.slot)||[1,2,3];
+ const assigned=(current?.soldiers||[]).slice(0,12);
+ for(const p of form){
+  const b=document.createElement("button");
+  b.type="button";b.className="marker "+p.role+(alive[p.slot]?"":" dead");
+  b.dataset.slot=String(p.slot);b.textContent=p.slot===0?"H":String(p.slot);
+  b.style.left=(6+(p.x+8)/16*63)+"%";
+  b.style.top=(14+(8-p.z)/13*68)+"%";
+  b.setAttribute("aria-label","Слот "+p.slot+", "+p.role+
+   (activeSlots.includes(p.slot)?" на переднем рубеже":""));
+  b.setAttribute("aria-pressed",String(selected===p.slot));
+  b.onclick=()=>selectSlot(p.slot);field.appendChild(b);
+ }
+ for(let i=0;i<4;i++){
+  const enemy=document.createElement("button");enemy.type="button";
+  enemy.className="marker enemy"+(!current?.soldiers[12+i]?.alive?" dead":"");
+  enemy.textContent="X"+(i+1);
+  enemy.style.left="87%";enemy.style.top=(26+i*18)+"%";
+  enemy.setAttribute("aria-label","Цель №"+(i+1));
+  enemy.onclick=()=>{
+   const r=sim.selectEnemy(i);
+   $("status").textContent=r.ok?"Цель №"+(i+1)+" выбрана.":"Цель недоступна.";
+  };
+  field.appendChild(enemy);
+ }
+}
+function roster(){
+ const el=$("roster");el.replaceChildren();
+ const snap=sim?.snapshot();
+ for(const actor of plan.slots){
+  const b=document.createElement("button");b.type="button";
+  b.className="roster-item";b.dataset.slot=String(actor.slot);
+  b.setAttribute("aria-pressed",String(selected===actor.slot));
+  const name=actor.role==="hero"?"Герой":
+   actor.role==="infantry"?"Пехота":"Коммандос";
+  const gear=actor.role==="hero"?"Утверждённый герой":
+   actor.role==="infantry"?"Mk II · нет GLB":"Берет · нет GLB";
+  const still=snap?.soldiers[actor.slot];
+  b.innerHTML="<strong>№"+actor.slot+" "+name+"</strong><em>"+gear+
+   "</em><em>"+(still?.alive===false?"Выбыл":still?.weapon||"Lee-Enfield")+"</em>";
+  b.onclick=()=>selectSlot(actor.slot);el.appendChild(b);
+ }
+}
+function status(){
+ const st=sim.snapshot();
+ QA.active=st.active;QA.liveSimulation=st.active;
+ QA.alliesAlive=st.alliesAlive;QA.axisAlive=st.enemiesAlive;
+ QA.trainingShots=st.totalShots;
+ $("status").textContent="Армия: "+st.alliesAlive+"/12 · противники: "+
+ st.enemiesAlive+"/4 · учебных выстрелов: "+st.totalShots+
+ "\nСтрой: "+(QA.mode==="turtle"?"черепаха":"полукруг")+
+ " · доступных передних позиций: "+st.fronts.length+
+ "\nНастоящих британских 3D-спавнов: 0.";
+ for(const b of document.querySelectorAll("[data-formation]"))
+  b.setAttribute("aria-pressed",String(b.dataset.formation===QA.mode));
+ $("equip").disabled=st.active||selected===0;
+ $("weapon").disabled=st.active||selected===0;
+ $("start").disabled=st.active||st.done;
+ $("stop").disabled=!st.active;
+}
+function recreate(){
+ sim?.dispose();
+ sim=api.simulation({battleCore:balance,squadCore:squad,random:()=>.18});
+ QA.mode="turtle";QA.active=false;QA.selectedSlot=1;selected=1;
+ roster();board();selectSlot(1);status();
+}
+try{
+ if(!api||!pipeline||!catalog||!balance||!squad)
+  throw Error("Модули строя или исходного баланса не загрузились");
+ const response=await fetch("../assets/allied-soldiers/manifest.json",{cache:"no-cache"});
+ if(!response.ok)throw Error("Не удалось получить каталог оригинальных британских GLB");
+ const manifest=await response.json();
+ plan=api.plan({catalog,pipeline,manifest,presentFiles:[]});
+ QA.totalSlots=plan.total;QA.hero=plan.hero;
+ QA.infantry=plan.infantry;QA.commando=plan.commando;
+ QA.originalBritishSkin=plan.britishVisualsReady;
+ $("assets").textContent=plan.sourceModels.map(x=>
+  x.title+": "+(x.ready?"проверен":"ещё не установлен / не допущен")).join("\n");
+ $("assets").style.whiteSpace="pre-line";
+ recreate();
+ for(const b of document.querySelectorAll("[data-formation]"))b.onclick=()=>{
+  const r=sim.arrange(b.dataset.formation);
+  if(!r.ok){$("status").textContent="Сначала остановите тренировочный бой.";return;}
+  QA.mode=b.dataset.formation;board();roster();status();
+ };
+ $("equip").onclick=()=>{
+  if(selected===0)return;
+  const res=sim.equip(selected,$("weapon").value,{atBase:true});
+  if(!res.ok){$("details").textContent="Не удалось выдать оружие: "+res.reason;return;}
+  roster();selectSlot(selected);status();
+ };
+ $("start").onclick=()=>{const r=sim.start();if(r.ok)status()};
+ $("stop").onclick=()=>{sim.stop();status()};
+ $("reset").onclick=()=>recreate();
+ QA.selectSlot=selectSlot;QA.getSnapshot=()=>sim.snapshot();
+ QA.getPlan=()=>plan;
+ QA.recreate=recreate;
+ QA.ready=true;last=performance.now();
+ function loop(t){
+  const dt=Math.min(.1,Math.max(0,(t-last)/1000));last=t;
+  if(sim&&sim.snapshot().active){
+   sim.tick(dt);
+   roster();board();status();
+  }
+  requestAnimationFrame(loop);
+ }
+ requestAnimationFrame(loop);
+}catch(e){QA.error=String(e.message||e);$("status").textContent="Ошибка: "+QA.error;}
+})();
+</script>
+</body>
+</html>
