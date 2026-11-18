@@ -79,7 +79,8 @@ const targets=piat.TARGETS.map(t=>({...t,hp:1000}));
  c.tick(.5);
  assert.equal(state.overlays.at(-1).reloadActive,true);
  assert(state.overlays.at(-1).reloadPhase>0);
- for(let i=0;i<86;i++)c.tick(.1);
+ // Stage8 tick deliberately caps each frame to .1 s: simulate the full 9 s.
+ for(let i=0;i<91;i++)c.tick(.1);
  st=c.status();
  assert.equal(st.reloading,false);
  assert.equal(st.magazine,1);
