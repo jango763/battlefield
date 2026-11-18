@@ -43,7 +43,7 @@ const visuals={create:({bridge:b})=>({
  assert.equal(initial.magazine,100);
  assert.equal(initial.reserve,300);
  assert.equal(initial.fullBrenAmmo,400);
- assert.equal(initial.magazineCount,5);
+ assert.equal(initial.magazineCount,4);
  assert.equal(initial.canFireMoving,true);
  const fired=c.fire({moving:true});
  assert.equal(fired.ok,true);
