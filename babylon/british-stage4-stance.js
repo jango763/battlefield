@@ -180,6 +180,7 @@
   }
   return Object.freeze({setPose,targetAt,sync,status,
    getMuzzleWorld:()=>mounted.getMuzzleWorld(),
+   setCombatOverlay:overlay=>mounted.setCombatOverlay(overlay),
    dispose(){disposed=true;mounted.dispose();}});
  }
  return Object.freeze({CANON,REQUIRED,ARM_JOINTS,MOTIONS,
