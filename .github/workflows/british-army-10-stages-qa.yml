@@ -30,6 +30,8 @@ on:
       - 'babylon/british-stage10-release-audit.js'
       - 'babylon/british-stage10-iphone.html'
       - 'babylon/tests/test-british-army-stage10*.cjs'
+      - 'babylon/british-jakeli-intake-iphone.html'
+      - 'babylon/tests/test-british-jakeli-intake-browser.cjs'
       - 'babylon/tests/test-british-army-stage3*.cjs'
       - 'babylon/tests/test-british-army-stage1.cjs'
       - 'babylon/tests/test-british-army-stage2*.cjs'
@@ -140,6 +142,10 @@ jobs:
         run: |
           node --check babylon/tests/test-british-army-stage10-browser.cjs
           node babylon/tests/test-british-army-stage10-browser.cjs
+      - name: Check iPhone Jakeli source intake and reject unrelated US hero GLB
+        run: |
+          node --check babylon/tests/test-british-jakeli-intake-browser.cjs
+          node babylon/tests/test-british-jakeli-intake-browser.cjs
       - name: Upload mobile stage2-stage10 inspection screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -155,4 +161,5 @@ jobs:
             babylon-qa-results/british-stage8/
             babylon-qa-results/british-stage9/
             babylon-qa-results/british-stage10/
+            babylon-qa-results/british-jakeli/
           if-no-files-found: ignore
