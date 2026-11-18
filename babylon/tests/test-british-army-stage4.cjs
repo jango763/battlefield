@@ -47,9 +47,18 @@ assert.throws(()=>stage4.aimAt({stage,rig:{getMuzzleWorld:()=>({
  position:[0,1,0],direction:[0,1,0]})},target:{x:0,z:3}}));
 const quality=stage4.gripQuality({rightGripMeters:.012,leftGripMeters:.02,
  stockToShoulderMeters:.09,armChannelsRemoved:32,
+ rightPalmErrorDeg:2,leftPalmErrorDeg:4,
+ rightFingerErrorDeg:1,leftFingerErrorDeg:3,
  socketLocalDriftMeters:0,socketLocalRotationErrorDeg:0},
  {attached:true,parent:"mixamorig:Weapon_R"});
 assert.equal(quality.ok,true);
+const flipped=stage4.gripQuality({rightGripMeters:.01,leftGripMeters:.01,
+ stockToShoulderMeters:.01,armChannelsRemoved:32,
+ rightPalmErrorDeg:174,leftPalmErrorDeg:180,
+ rightFingerErrorDeg:0,leftFingerErrorDeg:0},
+ {attached:true,parent:"mixamorig:Weapon_R"});
+assert.equal(flipped.ok,false);
+assert(flipped.errors.some(x=>x.includes("ладонь")));
 assert.equal(stage4.gripQuality({rightGripMeters:.5,leftGripMeters:.5,
  stockToShoulderMeters:.25,armChannelsRemoved:24},
  {attached:false,parent:null}).ok,false);
