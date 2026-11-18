@@ -38,6 +38,7 @@ const BASE="http://127.0.0.1:8799/babylon/us-hero-stage9-iphone.html";
     return {muzzle:m,target:[t.x/q.battle.SCALE,t.z/q.battle.SCALE],to,forwardDot};
   });
   console.log("STAGE9_INITIAL_FACING",JSON.stringify(facing));
+  if(!(facing.forwardDot>.90))throw Error("Hero is shooting backwards relative to the targets: "+JSON.stringify(facing));
   console.log("STAGE9_INITIAL",JSON.stringify(first));
   if(first.stage!==9||first.bones!==65||first.skeletons!==1||
      first.weapons!==4||first.motionButtons!==4||first.targetButtons!==3||
@@ -145,12 +146,14 @@ const BASE="http://127.0.0.1:8799/babylon/us-hero-stage9-iphone.html";
     mag:q.battle.getPlayer().inventory.Panzerschreck.loaded,
     reserve:q.battle.getPlayer().inventory.Panzerschreck.reserve,
     fx:q.effects.status(),view:q.targets.status(),
-    piatMeshes:sc.meshes.filter(m=>m.name.startsWith("PIAT ")).length};
+    piatMeshes:sc.meshes.filter(m=>m.name.startsWith("PIAT ")).length,
+    facing:q.facing};
   });
   console.log("STAGE9_PIAT_SPLASH",JSON.stringify(piat));
   if(piat.shots<=before||!piat.last?.impact||
     piat.mag!==0||piat.reserve!==3||piat.fx.missiles!==1||
-    piat.piatMeshes<30||!piat.last.hits.length)
+    piat.piatMeshes<30||!piat.last.hits.length||
+    piat.facing?.barrelDot<.97||!piat.facing) 
    throw Error("PIAT splash/rocket/ammo invalid");
   await page.screenshot({path:dir+"/piat-splash.png",fullPage:true});
   // Reset range, no extra skeleton or leaked PIAT geometry.
