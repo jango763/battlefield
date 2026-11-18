@@ -178,7 +178,15 @@
    mounted.dispose();
    throw e;
   }
-  return Object.freeze({setPose,targetAt,sync,status,
+  async function equipWeapon(id){
+   if(disposed)throw Error("Stage4 stance disposed");
+   await mounted.equipWeapon(id);
+   const now=sync();
+   if(!now.quality.ok)throw Error("Two-hand IK failed on "+id+": "+
+    now.quality.errors.join("; "));
+   return now;
+  }
+  return Object.freeze({setPose,targetAt,equipWeapon,sync,status,
    getMuzzleWorld:()=>mounted.getMuzzleWorld(),
    setCombatOverlay:overlay=>mounted.setCombatOverlay(overlay),
    dispose(){disposed=true;mounted.dispose();}});
