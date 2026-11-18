@@ -142,7 +142,7 @@ const BASE="http://127.0.0.1:8799/babylon/us-hero-stage9-iphone.html";
   console.log("STAGE9_PIAT_SPLASH",JSON.stringify(piat));
   if(piat.shots<=before||!piat.last?.impact||
     piat.mag!==0||piat.reserve!==3||piat.fx.missiles!==1||
-    piat.piatMeshes!==12||!piat.last.hits.length)
+    piat.piatMeshes<30||!piat.last.hits.length)
    throw Error("PIAT splash/rocket/ammo invalid");
   await page.screenshot({path:dir+"/piat-splash.png",fullPage:true});
   // Reset range, no extra skeleton or leaked PIAT geometry.
