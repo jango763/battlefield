@@ -151,17 +151,63 @@ const leftHandIndex=donorSkin.joints.findIndex(n=>/(:|^)LeftHand$/.test(s.nodes[
 const rightHandIndex=donorSkin.joints.findIndex(n=>/(:|^)RightHand$/.test(s.nodes[n].name));
 if([headIndex,torsoIndex,leftHandIndex,rightHandIndex].some(n=>n<0))
  throw Error("Missing head/torso/wrist bones");
+const digits={};
+for(const side of ["Left","Right"]){
+ digits[side]={};
+ for(const digit of ["Thumb","Index","Middle","Ring","Pinky"]){
+  const chain=[1,2,3].map(seg=>donorSkin.joints.findIndex(
+   n=>new RegExp("(:|^)"+side+"Hand"+digit+seg+"$").test(s.nodes[n].name)));
+  if(chain.some(i=>i<0))throw Error("Missing donor digit chain "+side+digit);
+  digits[side][digit]=chain;
+ }
+}
+const clamp01=x=>Math.max(0,Math.min(1,x));
+const ease01=x=>{const t=clamp01(x);return t*t*(3-2*t);};
+function blendedFinger(hand,chain,amount,progress){
+ // Smoothly distribute influence across anatomically correct finger phalanges,
+ // but keep the original palm attached to the actual wrist joint.
+ const length=clamp01(progress)*2,low=Math.min(2,Math.floor(length));
+ const high=Math.min(2,low+1),blend=ease01(length-low);
+ const result=new Map([[hand,1-amount]]);
+ result.set(chain[low],(result.get(chain[low])||0)+amount*(1-blend));
+ result.set(chain[high],(result.get(chain[high])||0)+amount*blend);
+ return [...result].filter(([,w])=>w>1e-6);
+}
+function gloveSkin(position,sourceVertex){
+ const side=position[0]>=0?"Left":"Right", hand=side==="Left"?leftHandIndex:rightHandIndex;
+ const extent=Math.abs(position[0]),z=-sourceVertex[1]*.01,y=position[1];
+ // The locked Jakeli source has distinguishable fingers in a single hand mesh.
+ // Only their genuine source vertex neighborhoods may drive donor finger bones.
+ const thumbRegion=ease01((z-.079)/.028)*ease01((.60-extent)/.037)*ease01((.212-y)/.065);
+ if(thumbRegion>.001){
+  const progress=clamp01((.20-y)/.085);
+  return blendedFinger(hand,digits[side].Thumb,Math.max(.001,thumbRegion*.92),progress);
+ }
+ const base=ease01((extent-.548)/.076),fingerLength=clamp01((extent-.563)/.061);
+ const yMask=ease01((.240-y)/.07);
+ const amount=base*yMask*.94;
+ if(amount<.001)return [[hand,1]];
+ const bands=[["Pinky",-.014],["Ring",.013],["Middle",.043],["Index",.070]];
+ const finger=bands.reduce((best,k)=>Math.abs(k[1]-z)<Math.abs(best[1]-z)?k:best,bands[0])[0];
+ return blendedFinger(hand,digits[side][finger],amount,fingerLength);
+}
 // Match original Z-up centimeter geometry into the donor's Y-up meter frame.
 // Model ankle height ~0cm -> -1m; head 185cm -> +0.85m.
 // The donor rest pose uses hips near 0, feet -1m, head near +1m.
-function aligned(v,arm=false){
+function aligned(v,arm=false,glove=false){
  const p=[v[0]*.01,v[2]*.01-1,-v[1]*.01];
  if(arm){
-  // Jakeli's source A-pose hands are ~15-17 cm lower than the donor's
-  // anatomical bind wrists. Correct source bind-space BEFORE transfer;
-  // a 1:1 nearest-vertex copy otherwise skins both hands to Pinky3.
+  // Align Jakeli's source A-pose limbs to the 65-bone rest skeleton.
   const side=Math.sign(p[0]),t=Math.max(0,Math.min(1,(Math.abs(p[0])-.22)/.43));
   p[0]-=side*.025*t;p[1]+=.17*t;
+  if(glove){
+   // The original hand surface lies behind the donor's finger joint rows.
+   // Align the source hand depth while preserving the original topology.
+   const thumbRegion=ease01((p[2]-.075)/.045)*
+     ease01((.61-Math.abs(p[0]))/.055)*ease01((.215-p[1])/.085);
+   p[2]+=.083-.043*thumbRegion;
+   p[1]+=.013*t;
+  }
  }
  return p;
 }
@@ -177,7 +223,7 @@ for(let mi=0;mi<s.meshes.length;mi++){
  for(const primitive of mesh.primitives){
   if(primitive.mode!==undefined&&primitive.mode!==4)throw Error("Nontriangular source");
   const original=primitive.attributes;
-  const p=readAccessor(src,original.POSITION),tr=p.map(v=>aligned(v,sourceArms));
+  const p=readAccessor(src,original.POSITION),tr=p.map(v=>aligned(v,sourceArms,sourceGloves));
   const pFlat=new Float32Array(tr.flat()),pBuffer=Buffer.from(pFlat.buffer);
   const min=[0,1,2].map(k=>Math.min(...tr.map(x=>x[k]))),
    max=[0,1,2].map(k=>Math.max(...tr.map(x=>x[k])));
@@ -194,12 +240,10 @@ for(let mi=0;mi<s.meshes.length;mi++){
   }
   const jointBytes=Buffer.alloc(p.length*4),weightBytes=Buffer.alloc(p.length*16);
   for(let vi=0;vi<tr.length;vi++){
-   // The source's single unsegmented glove mesh is not an individual finger rig.
-   // Do not apply the donor's distal-pinky weights to the entire hand surface.
-   // Bind each glove to its correct real wrist, until finger segmentation is
-   // authored and inspected. Do not invent deforming glove fingers.
+   // Transfer genuine original glove vertices to wrist + articulated digits.
+   // Avoid ever assigning all palm vertices to the tip of a single finger.
    const candidate=rigidHead?[[headIndex,1]]:rigidTorso?[[torsoIndex,1]]:
-    sourceGloves?[[tr[vi][0]>=0?leftHandIndex:rightHandIndex,1]]:nearest(tr[vi]);
+    sourceGloves?gloveSkin(tr[vi],p[vi]):nearest(tr[vi]);
    const total=candidate.reduce((x,v)=>x+v[1],0);
    if(!(total>0))throw Error("Unweighted British vertex");
    let weighted=0;
