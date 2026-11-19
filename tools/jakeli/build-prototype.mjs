@@ -47,8 +47,7 @@ if(d.skins?.length!==1||d.skins[0].joints?.length!==65||d.animations?.length!==4
 const clipNames=["Idle_Quaternius","Walk_Quaternius","Jog_Quaternius","Sprint_Quaternius"];
 if(clipNames.some(n=>!d.animations.find(a=>a.name===n)))throw Error("Real donor clips missing");
 
-const donorNodeBase=s.nodes.length, donorAccessorBase=s.accessors.length,
- donorViewBase=s.bufferViews.length;
+const donorNodeBase=s.nodes.length;
 const allBuffers=[src.bin],stats={meshes:0,skinnedVertices:0,skippedSourceRifle:0,missingNeighborhood:0,maxWeightError:0};
 let size=src.bin.length;
 function append(data){
@@ -64,11 +63,28 @@ function addAccessor(data,componentType,type,count,min,max){
  if(min)a.min=min;if(max)a.max=max;
  return s.accessors.push(a)-1;
 }
-// Donor binary backing is copied once for its authentic animation channels
-// and inverse-bind matrices. Source authored textures/materials remain intact.
-const donorBinOffset=append(donor.bin);
-for(const v of d.bufferViews||[])s.bufferViews.push({...structuredClone(v),buffer:0,byteOffset:(v.byteOffset||0)+donorBinOffset});
-for(const a of d.accessors||[])s.accessors.push({...structuredClone(a),bufferView:a.bufferView===undefined?undefined:a.bufferView+donorViewBase});
+// Only genuinely referenced inverse-bind and animation data is retained.
+// Do not embed donor meshes, textures or unreferenced bytes in the British GLB.
+const donorAccessorMap=new Map(),donorViewMap=new Map(),needed=new Set();
+if(d.skins[0].inverseBindMatrices!==undefined)needed.add(d.skins[0].inverseBindMatrices);
+for(const anim of d.animations)for(const sampler of anim.samplers){
+ needed.add(sampler.input);needed.add(sampler.output);
+}
+for(const oldIndex of [...needed].sort((a,b)=>a-b)){
+ const accessor=d.accessors[oldIndex];
+ if(!accessor||accessor.sparse||accessor.bufferView===undefined)
+  throw Error("Unsupported donor animation / skin accessor "+oldIndex);
+ const oldView=accessor.bufferView;
+ if(!donorViewMap.has(oldView)){
+  const view=d.bufferViews[oldView];
+  if(view.buffer!==0)throw Error("Donor used an external animation buffer");
+  const bytes=donor.bin.subarray(view.byteOffset||0,(view.byteOffset||0)+view.byteLength);
+  const offset=append(bytes);
+  donorViewMap.set(oldView,s.bufferViews.push({...structuredClone(view),buffer:0,byteOffset:offset})-1);
+ }
+ const newIndex=s.accessors.push({...structuredClone(accessor),bufferView:donorViewMap.get(oldView)})-1;
+ donorAccessorMap.set(oldIndex,newIndex);
+}
 for(const n of d.nodes){
  const nn=structuredClone(n);
  if(nn.children)nn.children=nn.children.map(i=>i+donorNodeBase);
@@ -79,11 +95,11 @@ for(const n of d.nodes){
 const donorSkin=structuredClone(d.skins[0]);
 donorSkin.joints=donorSkin.joints.map(i=>i+donorNodeBase);
 if(donorSkin.skeleton!==undefined)donorSkin.skeleton+=donorNodeBase;
-if(donorSkin.inverseBindMatrices!==undefined)donorSkin.inverseBindMatrices+=donorAccessorBase;
+if(donorSkin.inverseBindMatrices!==undefined)donorSkin.inverseBindMatrices=donorAccessorMap.get(donorSkin.inverseBindMatrices);
 s.skins=[donorSkin];
 s.animations=d.animations.map(a=>{
  const anim=structuredClone(a);
- for(const samp of anim.samplers){samp.input+=donorAccessorBase;samp.output+=donorAccessorBase;}
+ for(const samp of anim.samplers){samp.input=donorAccessorMap.get(samp.input);samp.output=donorAccessorMap.get(samp.output);}
  for(const channel of anim.channels)channel.target.node+=donorNodeBase;
  return anim;
 });
