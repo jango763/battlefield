@@ -21,10 +21,10 @@ a{color:#cbedb9}
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
-<script src="./jakeli-combat-rig.js"></script>
+<script src="./us-hero-stage8-rig.js"></script>
 </head><body><main>
-<h1>Jakeli — боец с оружием</h1>
-<p class="warn">Испытание подлинного британского меша на донорском 65-костном риге. В игре не установлен. Это проверка совместимости и двуручного IK, а не окончательно утверждённая анимация.</p>
+<h1>Jakeli — проверка на готовой системе героя</h1>
+<p class="warn">Испытание настоящего британского Jakeli на уже готовом контроллере героя Stage 8 (без нового IK и ручных поправок). В игру не установлен: требуется визуальная проверка на iPhone Safari.</p>
 <canvas id="scene" aria-label="Вооружённый британец Jakeli, вращение пальцем"></canvas>
 <div class="grid pose" role="group" aria-label="Положение камеры">
 <button id="zoom-right" type="button">Кисть и спуск крупно</button>
@@ -53,11 +53,11 @@ a{color:#cbedb9}
 "use strict";
 const qa={loaded:false,realJakeli:true,prototype:true,bones:0,meshCount:0,
  weaponId:null,weaponMeshCount:0,grip:null,clips:[],motion:null,
- error:null,releaseReady:false,actualSafariTested:false,weaponSwaps:0};
+ error:null,releaseReady:false,actualSafariTested:false,weaponSwaps:0,rigSource:"us-hero-stage8-rig.js"};
 window.__JAKELI_WEAPON_QA__=qa;
 (async()=>{
  try{
-  const B=window.BABYLON,api=window.BattlefieldJakeliWeaponRig;
+  const B=window.BABYLON,api=window.BattlefieldUSLeeEnfieldStage4;
   if(!B?.SceneLoader||!api?.create)throw Error("Нет Babylon.js / утверждённого двуручного IK");
   const canvas=document.querySelector("#scene"),out=document.querySelector("#status");
   const engine=new B.Engine(canvas,true,{powerPreference:"high-performance"});
@@ -133,17 +133,12 @@ window.__JAKELI_WEAPON_QA__=qa;
     mounted:r.socketAttached,socketName:r.socketName,
     armChannelsRemoved:r.armChannelsRemoved,
     leftSupportInHandguard:r.supportWithinHandguard,
-    fingerGripProfile:r.fingerGripProfile,
-    fingerJointCount:r.fingerJointCount,
-    triggerIndexFlexRad:r.triggerIndexFlexRad,
-    supportFingerFlexRad:r.supportFingerFlexRad,
-    rightIndex2ToTriggerMeters:r.rightIndex2ToTriggerMeters,
-    rightIndex2TriggerLocal:r.rightIndex2TriggerLocal,
-    rightThumb2ToTriggerMeters:r.rightThumb2ToTriggerMeters,
-    rightMiddle2ToTriggerMeters:r.rightMiddle2ToTriggerMeters,
-    rightPalmWeaponLocal:r.rightPalmWeaponLocal,
-    leftPalmWeaponLocal:r.leftPalmWeaponLocal,
-    leftSupportCupRollDeg:r.leftSupportCupRollDeg,
+    // Real production-case metrics: leave all hand pose and finger
+    // articulation to the already working US Stage8 module unchanged.
+    rightPalmErrorDeg:r.rightPalmErrorDeg,leftPalmErrorDeg:r.leftPalmErrorDeg,
+    rightFingerErrorDeg:r.rightFingerErrorDeg,leftFingerErrorDeg:r.leftFingerErrorDeg,
+    rightIKMeters:r.rightIKMeters,leftIKMeters:r.leftIKMeters,
+    fingerControls:r.fingerControls,
     error:r.error
    };
    qa.weaponId=r.weaponId;qa.weaponMeshCount=r.weaponMeshCount;
@@ -153,11 +148,9 @@ window.__JAKELI_WEAPON_QA__=qa;
     "\nПравая кисть: "+Number(r.rightGripMeters).toFixed(3)+" м"+
     " · левая кисть: "+Number(r.leftGripMeters).toFixed(3)+" м"+
     "\nПриклад: "+Number(r.stockToShoulderMeters).toFixed(3)+" м"+
-    "\nПальцы: "+r.fingerJointCount+" суставов · спуск: "+r.triggerIndexFlexRad.toFixed(2)+" рад"+
-    " · опора: "+r.supportFingerFlexRad.toFixed(2)+" рад"+
-    "\nНаклон опорной ладони: "+r.leftSupportCupRollDeg.toFixed(0)+"°"+
-    "\nУказательный–спуск: "+(r.rightIndex2ToTriggerMeters*100).toFixed(1)+" см"+
-    " · большой палец: "+(r.rightThumb2ToTriggerMeters*100).toFixed(1)+" см"+
+    "\nХват и пальцы: оригинальная система героя Stage 8"+
+    "\nОриентация кистей: "+Number(r.rightPalmErrorDeg).toFixed(1)+"° / "+
+      Number(r.leftPalmErrorDeg).toFixed(1)+"°"+
     "\nWeapon_R: "+(r.socketAttached?"закреплён":"не закреплён")+
     " · IK: "+(r.error||"без ошибки")+
     "\nВыпуск: НЕ РАЗРЕШЁН, нужна визуальная проверка.";
