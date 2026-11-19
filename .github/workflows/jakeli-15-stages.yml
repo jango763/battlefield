@@ -7,6 +7,7 @@ on:
       - 'tools/jakeli/**'
       - 'babylon/jakeli-65b-iphone.html'
       - 'babylon/jakeli-weapons-iphone.html'
+      - 'babylon/jakeli-combat-rig.js'
       - 'babylon/jakeli-three-squad-iphone.html'
       - 'babylon/tests/test-jakeli-*.cjs'
       - 'babylon/JAKELI_15_STAGES.md'
