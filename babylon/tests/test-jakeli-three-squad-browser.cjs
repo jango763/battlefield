@@ -21,7 +21,7 @@ const dir="babylon-qa-results/jakeli-squad";
   console.log("JAKELI_SQUAD_THREE_LOAD",JSON.stringify(q));
   if(!q.loaded||q.errors?.length||q.actors!==3||q.skeletons!==3||
    q.bones.some(x=>x!==65)||!q.uniqueSkeletons||!q.uniqueClips||
-   q.readyForDeployment!==false)throw Error("Independent Jakeli rig check failed");
+   q.readyForDeployment!==false||q.visibleActors!==3)throw Error("Independent Jakeli rig check failed");
   await page.screenshot({path:dir+"/turtle-idle.png",fullPage:true});
   await page.locator('[data-motion="Walk_Quaternius"]').click();
   await page.locator('[data-mode="semicircle"]').click();
@@ -34,13 +34,14 @@ const dir="babylon-qa-results/jakeli-squad";
   }));
   console.log("JAKELI_SQUAD_FORMATION",JSON.stringify(q));
   if(q.errors?.length||q.formation!=="semicircle"||
-   q.motion!=="Walk_Quaternius"||q.groupsPlaying!==3||q.skeletons!==3)
+   q.motion!=="Walk_Quaternius"||q.groupsPlaying!==3||q.skeletons!==3||
+   q.visibleActors!==3)
     throw Error("Independent squad formation or locomotion failed");
   await page.screenshot({path:dir+"/semicircle-walk.png",fullPage:true});
   if(errors.length)throw Error("Page errors: "+JSON.stringify(errors));
   console.log("JAKELI_THREE_SQUAD_CHROMIUM_PASS",JSON.stringify({
    realBritishModels:3,independentSkeletons:3,independentClipGroups:12,
-   formations:2,motions:["Idle_Quaternius","Walk_Quaternius"],
+   formations:2,visibleActors:3,motions:["Idle_Quaternius","Walk_Quaternius"],
    releaseApproved:false,physicalSafari:false
   }));
  }catch(e){
