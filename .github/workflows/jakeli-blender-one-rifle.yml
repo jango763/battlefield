@@ -17,7 +17,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Blender for actual skeletal rest-pose rebind
         run: |
-          sudo apt-get update -qq
+          # Ubuntu 24.04 runners already carry APT indexes; avoid slow
+          # full-index refresh on each short experimental Blender build.
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq blender
       - name: Retarget original Jakeli mesh to approved German 65-bone armature
         run: blender --background --threads 2 --python tools/jakeli/blender-rebind-german-armature.py
