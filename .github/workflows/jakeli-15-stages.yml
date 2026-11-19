@@ -13,7 +13,7 @@ permissions:
 jobs:
   build-and-verify-prototype:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,6 +37,15 @@ jobs:
           python3 -m http.server 8809 --bind 127.0.0.1 >/tmp/jakeli-http.log 2>&1 &
           sleep 2
           node babylon/tests/test-jakeli-65b-browser.cjs
+      - name: Test authentic Jakeli with four approved two-hand IK weapons
+        run: node babylon/tests/test-jakeli-weapons-browser.cjs
+      - name: Upload four Jakeli weapon grip screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakeli-four-weapons-ik-chromium
+          path: babylon-qa-results/jakeli-weapons/
+          if-no-files-found: ignore
       - name: Upload actual Jakeli pose screenshots
         if: always()
         uses: actions/upload-artifact@v4
