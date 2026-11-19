@@ -97,9 +97,12 @@ window.__JAKELI_WEAPON_QA__=qa;
   if(!focusNode)throw Error("Не найдена кость указательного пальца для крупного плана");
   document.querySelector("#zoom-right").onclick=()=>{
     focusNode.computeWorldMatrix(true);
+    // Keep enough camera clearance to avoid entering the torso/helmet.
+    // The old 0.78m close-up intersected real skinned meshes in Chromium.
     camera.setTarget(focusNode.getAbsolutePosition().clone());
-    camera.radius=.78;
-    camera.beta=Math.PI*.46;
+    camera.alpha=fullCamera.alpha;
+    camera.beta=fullCamera.beta;
+    camera.radius=1.65;
   };
   document.querySelector("#zoom-full").onclick=()=>{
     camera.setTarget(fullCamera.target.clone());
