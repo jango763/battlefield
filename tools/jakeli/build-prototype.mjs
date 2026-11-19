@@ -40,6 +40,8 @@ function readAccessor(asset,id){
  return list;
 }
 const src=parse(sourcePath),donor=parse(donorPath),s=src.doc,d=donor.doc;
+const {MeshoptSimplifier}=await import("/tmp/jakeli-meshopt/node_modules/meshoptimizer/meshopt_simplifier.js");
+await MeshoptSimplifier.ready;
 if(crypto.createHash("sha256").update(src.bytes).digest("hex")!==EXPECTED||s.meshes.length!==14||s.skins?.length||s.animations?.length)
  throw Error("Incorrect locked Jakeli GLB");
 if(d.skins?.length!==1||d.skins[0].joints?.length!==65||d.animations?.length!==4)
@@ -48,7 +50,7 @@ const clipNames=["Idle_Quaternius","Walk_Quaternius","Jog_Quaternius","Sprint_Qu
 if(clipNames.some(n=>!d.animations.find(a=>a.name===n)))throw Error("Real donor clips missing");
 
 const donorNodeBase=s.nodes.length;
-const allBuffers=[src.bin],stats={meshes:0,skinnedVertices:0,skippedSourceRifle:0,missingNeighborhood:0,maxWeightError:0};
+const allBuffers=[src.bin],stats={meshes:0,skinnedVertices:0,skippedSourceRifle:0,missingNeighborhood:0,maxWeightError:0,trianglesBefore:0,trianglesAfter:0,maxMeshSimplifyError:0};
 let size=src.bin.length;
 function append(data){
  const pad=(4-size%4)%4;
@@ -56,9 +58,9 @@ function append(data){
  const offset=size;allBuffers.push(data);size+=data.length;
  return offset;
 }
-function addAccessor(data,componentType,type,count,min,max){
+function addAccessor(data,componentType,type,count,min,max,target=34962){
  const off=append(data);
- const view=s.bufferViews.push({buffer:0,byteOffset:off,byteLength:data.length,target:34962})-1;
+ const view=s.bufferViews.push({buffer:0,byteOffset:off,byteLength:data.length,target})-1;
  const a={bufferView:view,componentType,type,count};
  if(min)a.min=min;if(max)a.max=max;
  return s.accessors.push(a)-1;
@@ -192,10 +194,41 @@ for(let mi=0;mi<s.meshes.length;mi++){
   }
   original.JOINTS_0=addAccessor(jointBytes,5121,"VEC4",p.length);
   original.WEIGHTS_0=addAccessor(weightBytes,5126,"VEC4",p.length);
+  // Meshoptimizer is an actual topology-preserving simplifier, never random
+  // triangle deletion. Retain the source UV/material/weight vertex streams.
+  const indices=primitive.indices===undefined?
+    Uint32Array.from({length:p.length},(_,k)=>k):
+    Uint32Array.from(readAccessor(src,primitive.indices),x=>x[0]);
+  const tri=indices.length/3;
+  if(!Number.isInteger(tri))throw Error("Invalid British triangle count");
+  stats.trianglesBefore+=tri;
+  const sourceName=mesh.name||"";
+  const ratio=/shoe|bag/i.test(sourceName)?.55:
+    /helmet|skullcap/i.test(sourceName)?.96:
+    /SLD_1/i.test(sourceName)?.89:.78;
+  const desired=Math.floor(indices.length*ratio/3)*3;
+  const coords=new Float32Array(tr.flat());
+  const [quality,relativeError]=MeshoptSimplifier.simplify(indices,coords,3,desired,.025);
+  let optimized=quality,error=relativeError;
+  // The relaxed solver may improve polygon budgets for high-poly accessories
+  // when the strict manifold solver gets stuck on tiny UV seams.
+  if(quality.length>desired*1.12&&/shoe|bag/i.test(sourceName)){
+   const [relaxed,relaxedErr]=MeshoptSimplifier.simplifySloppy(indices,coords,3,null,desired,.025);
+   if(relaxed.length<quality.length){optimized=relaxed;error=relaxedErr;}
+  }
+  if(!optimized.length||optimized.length%3!==0||error>.027)
+    throw Error("Unacceptable source topology simplification "+sourceName+" error="+error);
+  const newIndices=Uint16Array.from(optimized);
+  const newBytes=Buffer.from(newIndices.buffer);
+  const largest=Math.max(...newIndices);
+  primitive.indices=addAccessor(newBytes,5123,"SCALAR",newIndices.length,[0],[largest],34963);
+  stats.trianglesAfter+=newIndices.length/3;
+  stats.maxMeshSimplifyError=Math.max(stats.maxMeshSimplifyError,error);
+
  }
  stats.meshes++;
 }
-if(stats.maxWeightError>0.00001||stats.missingNeighborhood>200)
+if(stats.maxWeightError>0.00001||stats.missingNeighborhood>200||stats.trianglesAfter>65000)
  throw Error("Bad automatic skin transfer: "+JSON.stringify(stats));
 // Append British skin nodes alongside existing donor nodes in donor's skinned
 // mesh parent space. Preserve donor skeleton transforms and inverse binds.
