@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Battlefield · Jakeli три независимых пехотинца</title>
+<style>
+:root{color-scheme:dark;font:13px/1.4 system-ui,-apple-system,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:#142019;color:#f1f3e9}
+main{max-width:900px;margin:auto;padding:12px}h1{font-size:20px;margin:0 0 8px}
+p{color:#c7d9c4}.notice{background:#3c3526;border-left:3px solid #d8b57a;padding:10px}
+#view{display:block;width:100%;height:clamp(330px,60vh,620px);touch-action:none;
+border:1px solid #6a8a6d;border-radius:10px;background:#1a3228}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}
+button{min-height:44px;font:600 13px system-ui;background:#335c44;color:white;
+border-radius:9px;border:1px solid #93b69a}
+button[aria-pressed=true]{background:#adcd91;color:#142519}
+pre{white-space:pre-wrap;background:#10271a;border-radius:10px;padding:10px;font-size:12px;word-break:break-word}
+a{color:#d3efb4}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./british-stage9-army.js"></script>
+</head><body><main>
+<h1>Jakeli · пробный британский отряд</h1>
+<p class="notice">Только экспериментальный Babylon.js полигон трёх копий настоящего Jakeli. Каждая копия имеет свой 65-костный скелет и собственные анимации. Герой, коммандос, боевая система и основная игра не изменены. Это ещё не готовая армия.</p>
+<canvas id="view" aria-label="Три независимых британских пехотинца Jakeli"></canvas>
+<div class="grid">
+<button data-mode="turtle" aria-pressed="true">Черепаха</button>
+<button data-mode="semicircle" aria-pressed="false">Полукруг</button>
+<button data-motion="Idle_Quaternius" aria-pressed="true">Стойка</button>
+<button data-motion="Walk_Quaternius" aria-pressed="false">Шаг</button>
+<button data-motion="Jog_Quaternius" aria-pressed="false">Бег</button>
+<button data-motion="Sprint_Quaternius" aria-pressed="false">Спринт</button>
+</div>
+<pre id="status">Загружаю три независимых 65-костных бойца…</pre>
+<p>Контрольная проверка на твоём iPhone: вращение, ровные ряды, отсутствие дубликатов и провалов текстур. Автор оригинала — <a href="../assets/allied-soldiers/ATTRIBUTION_JAKELI.md">George Jakeli, CC BY 4.0</a>.</p>
+</main>
+<script>
+"use strict";
+const QA={loaded:false,actors:0,bones:[],uniqueSkeletons:false,
+ uniqueClips:false,motion:null,formation:"turtle",errors:[],readyForDeployment:false};
+window.__JAKELI_SQUAD_QA__=QA;
+(async()=>{
+ let engine;
+ try{
+  const B=window.BABYLON,army=window.BattlefieldBritishStage9Army;
+  if(!B?.SceneLoader||!army?.positions)throw Error("Нет Babylon.js или британской тактики");
+  const canvas=document.querySelector("#view"),status=document.querySelector("#status");
+  engine=new B.Engine(canvas,true,{stencil:false,powerPreference:"high-performance"});
+  engine.setHardwareScalingLevel(Math.max(1,(devicePixelRatio||1)/1.2));
+  const scene=new B.Scene(engine);scene.useRightHandedSystem=true;
+  scene.clearColor=new B.Color4(.08,.15,.12,1);
+  const amb=new B.HemisphericLight("ambient",new B.Vector3(0,1,0),scene);amb.intensity=1.3;
+  const key=new B.DirectionalLight("sun",new B.Vector3(-.5,-1,-.2),scene);key.intensity=1.0;
+  const camera=new B.ArcRotateCamera("view",Math.PI*.56,Math.PI*.39,12,
+    new B.Vector3(0,-.05,1),scene);
+  camera.lowerRadiusLimit=3;camera.upperRadiusLimit=30;camera.attachControl(canvas,true);
+  scene.activeCamera=camera;
+  const base=await B.SceneLoader.LoadAssetContainerAsync("",
+   "../assets/allied-soldiers/uk-jakeli-prototype-65b.glb",scene,undefined,".glb");
+  const soldierSlots=[1,2,3],actors=[];
+  for(const slot of soldierSlots){
+   const clone=base.instantiateModelsToScene(n=>"jakeli-slot-"+slot+"-"+n,false,{doNotInstantiate:true});
+   if(clone.skeletons.length!==1||clone.skeletons[0].bones.length!==65||
+    clone.animationGroups.length!==4)throw Error("Боец "+slot+" без независимого рига");
+   const pivot=new B.TransformNode("jakeli-british-unit-"+slot,scene);
+   for(const n of clone.rootNodes)n.parent=pivot;
+   actors.push({slot,root:pivot,skeleton:clone.skeletons[0],groups:clone.animationGroups});
+  }
+  QA.actors=actors.length;
+  QA.bones=actors.map(a=>a.skeleton.bones.length);
+  QA.uniqueSkeletons=new Set(actors.map(a=>a.skeleton)).size===actors.length;
+  QA.uniqueClips=new Set(actors.flatMap(a=>a.groups)).size===actors.length*4;
+  if(!QA.uniqueSkeletons||!QA.uniqueClips)throw Error("Бойцы делят скелеты или анимации");
+  const modes=["turtle","semicircle"];
+  function formation(mode){
+   if(!modes.includes(mode))throw Error("Неизвестное построение");
+   const positions=army.positions(mode);
+   for(const a of actors){
+    const pos=positions[a.slot];
+    // Original 12-person plan is 2.1m spread; center this three-person pilot.
+    a.root.position.set(pos.x,0,pos.z-1.5);
+   }
+   QA.formation=mode;
+   document.querySelectorAll("[data-mode]").forEach(b=>
+     b.setAttribute("aria-pressed",String(b.dataset.mode===mode)));
+  }
+  function motion(id){
+   for(const a of actors){
+    for(const g of a.groups)g.stop();
+    const g=a.groups.find(v=>v.name.endsWith(id));
+    if(!g)throw Error("Нет клипа "+id+" для слота "+a.slot);
+    g.start(true);
+   }
+   QA.motion=id;
+   document.querySelectorAll("[data-motion]").forEach(b=>
+    b.setAttribute("aria-pressed",String(b.dataset.motion===id)));
+  }
+  document.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>formation(b.dataset.mode));
+  document.querySelectorAll("[data-motion]").forEach(b=>b.onclick=()=>motion(b.dataset.motion));
+  formation("turtle");motion("Idle_Quaternius");
+  QA.loaded=true;
+  engine.runRenderLoop(()=>{
+   scene.render();
+   status.textContent="Реальный Jakeli: "+QA.actors+" бойца"+
+    "\nНезависимые 65-костные скелеты: "+(QA.uniqueSkeletons?"да":"НЕТ")+
+    "\n12 собственных групп анимаций: "+(QA.uniqueClips?"да":"НЕТ")+
+    "\nПостроение: "+QA.formation+" · движение: "+QA.motion+
+    "\nFPS (этот браузер): "+Math.round(engine.getFps())+
+    "\nВыпуск отряда: ЗАБЛОКИРОВАН до визуальной приёмки и Safari";
+  });
+  addEventListener("resize",()=>engine.resize());
+ }catch(e){
+  QA.errors.push(String(e?.stack||e));
+  document.querySelector("#status").textContent="Ошибка: "+QA.errors[0];
+  console.error("JAKELI_SQUAD_ERROR",e);
+ }
+})();
+</script>
+</body></html>
