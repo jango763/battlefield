@@ -141,6 +141,9 @@ window.__JAKELI_WEAPON_QA__=qa;
     rightIndex2TriggerLocal:r.rightIndex2TriggerLocal,
     rightThumb2ToTriggerMeters:r.rightThumb2ToTriggerMeters,
     rightMiddle2ToTriggerMeters:r.rightMiddle2ToTriggerMeters,
+    rightPalmWeaponLocal:r.rightPalmWeaponLocal,
+    leftPalmWeaponLocal:r.leftPalmWeaponLocal,
+    leftSupportCupRollDeg:r.leftSupportCupRollDeg,
     error:r.error
    };
    qa.weaponId=r.weaponId;qa.weaponMeshCount=r.weaponMeshCount;
@@ -152,6 +155,7 @@ window.__JAKELI_WEAPON_QA__=qa;
     "\nПриклад: "+Number(r.stockToShoulderMeters).toFixed(3)+" м"+
     "\nПальцы: "+r.fingerJointCount+" суставов · спуск: "+r.triggerIndexFlexRad.toFixed(2)+" рад"+
     " · опора: "+r.supportFingerFlexRad.toFixed(2)+" рад"+
+    "\nНаклон опорной ладони: "+r.leftSupportCupRollDeg.toFixed(0)+"°"+
     "\nУказательный–спуск: "+(r.rightIndex2ToTriggerMeters*100).toFixed(1)+" см"+
     " · большой палец: "+(r.rightThumb2ToTriggerMeters*100).toFixed(1)+" см"+
     "\nWeapon_R: "+(r.socketAttached?"закреплён":"не закреплён")+
