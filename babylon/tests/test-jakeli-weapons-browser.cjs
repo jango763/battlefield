@@ -83,6 +83,16 @@ function checkGrip(snapshot,pose){
    results.push({pose:"aim",...aim});
    console.log("JAKELI_REAL_WEAPON_AIM_CHECK",JSON.stringify(aim));
    await page.screenshot({path:dir+"/"+w+"-aim.png",fullPage:true});
+   await page.locator("#zoom-right").click();
+   await page.waitForTimeout(200);
+   const closeup=await page.evaluate(()=>{
+     const cam=window.BABYLON.EngineStore.LastCreatedScene.activeCamera;
+     return {radius:cam.radius,target:cam.target.asArray()};
+   });
+   if(closeup.radius>.9||closeup.target.some(x=>!Number.isFinite(x)))
+     throw Error("Jakeli closeup camera failed "+JSON.stringify(closeup));
+   await page.screenshot({path:dir+"/"+w+"-trigger-close.png",fullPage:true});
+   await page.locator("#zoom-full").click();
    await page.locator('[data-pose="ready"]').click();
   }
   if(errors.length)throw Error("Browser errors "+JSON.stringify(errors));
