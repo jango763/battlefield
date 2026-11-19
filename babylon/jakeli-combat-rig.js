@@ -509,6 +509,10 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    const preferredZ=mode==="aim"?(adjust?.aimZ??s.aim):(adjust?.readyZ??s.ready);
    let z=B.Scalar.Clamp(preferredZ,minZ,maxZ);
    const drop=adjust?.drop??s.drop,offsetX=adjust?.x??s.x;
+   // Contact lift corrects the donor hand socket vs Jakeli glove palm offset.
+   // Apply in WEAPON-LOCAL coordinates, so the palm follows gun orientation.
+   const contactLift={"uk-lee-enfield":.075,"uk-sten":.070,
+     "uk-bren":.052,"uk-piat":.030}[weaponId];
    // A lightweight preview reload gesture shifts the supporting hand
    // toward the breech, while its elbow follows through IK.
    // Not a replacement for licensed/authored weapon reload animations.
@@ -517,7 +521,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    z=B.Scalar.Clamp(z-.045*reachForMagazine,minZ,maxZ);
    supportSocket.position.set(
       offsetX+.012*reachForMagazine,
-      m.support[1]-drop-.033*reachForMagazine,z);
+      m.support[1]-drop+contactLift-.033*reachForMagazine,z);
    refresh(supportSocket);
    const leftShoulder=left.upper.getAbsolutePosition().clone();
    const shoulderToElbow=B.Vector3.Distance(leftShoulder,left.fore.getAbsolutePosition());
@@ -571,6 +575,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
       left.socket.getAbsolutePosition(),supportSocket.getAbsolutePosition());
    state.supportSocketLocalZ=z;
    state.supportSocketLocalDropMeters=drop;
+   state.supportPalmLiftMeters=contactLift;
    state.supportWithinHandguard=z>=minZ-1e-6&&z<=maxZ+1e-6;
    state.leftSupportProfile=supportProfile;
    if(supportSocket.parent!==pivot)throw Error("Left support grip escaped rifle parent");
