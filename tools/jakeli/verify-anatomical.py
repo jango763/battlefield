@@ -80,6 +80,40 @@ for name,anim in clips.items():
   allpos=np.vstack(allpos);bounds.append((allpos.min(0).tolist(),allpos.max(0).tolist()));assert abs(allpos).max()<2.5
  assert max_length_error<1e-4,(name,max_length_error)
  reports[name]={'seconds':float(duration),'samples':9,'maxLimbLengthErrorMeters':max_length_error,'worstMeshEdgeStretchP999':worst_stretch,'bounds':bounds}
+# The NLA exporter previously omitted the rifle's constant Aim/Ready channels.
+# Bone-to-marker contact in Blender was then correct while the actual GLB
+# showed hands 11.5 cm away from the rifle. Validate exported mesh proximity.
+gun_i=names.index('LeeEnfield')
+gun_mesh_nodes=[(i,n['mesh']) for i,n in enumerate(g.n) if 'mesh' in n and n.get('skin') is None]
+assert gun_mesh_nodes,'Exported rifle meshes missing'
+glove_parts=[(v,j,w) for v,j,w,_,_,key in arrays if 'Material #21_' in key]
+assert glove_parts,'Real textured hand surface missing'
+surface_contact={}
+for clip_name in ['Ready','Aim','Fire','Walk','Jog','Sprint']:
+ anim=clips[clip_name]
+ channels={c['target']['path'] for c in anim['channels'] if c['target']['node']==gun_i}
+ assert {'rotation','translation'} <= channels,(clip_name,'missing exported rifle pose channels',channels)
+ duration=max(g.accessor(s['input'])[-1,0] for s in anim['samplers'])
+ posed=g.pose(anim,float(duration)*.5)
+ skin_mats=posed[sk['joints']]@ib
+ gun_vertices=[]
+ for node_i,mesh_i in gun_mesh_nodes:
+  for prim in g.d['meshes'][mesh_i]['primitives']:
+   vertex=g.accessor(prim['attributes']['POSITION'])
+   gun_vertices.append((np.column_stack((vertex,np.ones(len(vertex))))@posed[node_i].T)[:,:3])
+ gun_tree=cKDTree(np.vstack(gun_vertices))
+ surface_contact[clip_name]={}
+ for side in ['Left','Right']:
+  distances=[]
+  for v,j,w in glove_parts:
+   p=np.column_stack((v,np.ones(len(v))))
+   skinned=sum(np.einsum('nij,nj->ni',skin_mats[j[:,k]],p)*w[:,k,None] for k in range(4))[:,:3]
+   original_side=(v[:,0]>0) if side=='Left' else (v[:,0]<0)
+   distances.extend(gun_tree.query(skinned[original_side])[0])
+  p5=float(np.quantile(distances,.05))
+  surface_contact[clip_name][side]=p5
+  assert p5 < .020,(clip_name,side,'real hand mesh separated from rifle',p5)
+print('JAKELI_REAL_MESH_GRIP_PASS',json.dumps(surface_contact))
 report={'bindMatrixMaxResidual':res,'originalSurfaceMaxErrorMeters':preserve_error,'sourceTexturesByteIdentical':True,'maxWeightSumError':max_weight_error,'skinBones':65,'characterMeshes':13,'clips':reports,'visualApproval':False,'iphoneSafari':False}
 q=ROOT/'babylon-qa-results/jakeli-anatomical';q.mkdir(exist_ok=True,parents=True);(q/'gltf-report.json').write_text(json.dumps(report,indent=2));print('JAKELI_GLTF_PASS',json.dumps({k:v for k,v in report.items() if k!='clips'}));print('STRETCH',[(n,r['worstMeshEdgeStretchP999']) for n,r in reports.items()])
 
