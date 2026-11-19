@@ -12,9 +12,16 @@ const dir='babylon-qa-results/jakeli-blender-lee-screen';fs.mkdirSync(dir,{recur
    await page.waitForFunction(()=>window.__BABYLON_SOLDIER__?.ready,null,{timeout:90000});
    const state=await page.evaluate(()=>window.__BABYLON_SOLDIER__);
    assert.equal(state.error,null);assert(state.loaded);assert.equal(state.skeletonBones,65);assert.equal(state.skinnedMeshes,13);assert.equal(state.animationCount,6);
+   const initialControls=await page.evaluate(()=>{const el=document.getElementById('controls'),rect=el.getBoundingClientRect();return {open:el.open,height:rect.height,bottom:rect.bottom}});
+   assert.equal(initialControls.open,false,'controls must be collapsed initially');
+   assert(initialControls.height<=65,'collapsed controls must not cover Jakeli');
+   assert(initialControls.bottom<=844 && initialControls.bottom>=780,'controls must sit near bottom of phone');
    const samples=[];
    for(const pose of ['Ready','Aim','Fire','Walk','Jog','Sprint']){
+    await page.locator('#controls summary').click();
+    assert(await page.locator('#controls').evaluate(el=>el.open));
     await page.locator(`[data-pose="${pose}"]`).click();
+    assert.equal(await page.locator('#controls').evaluate(el=>el.open),false,'pose selection must restore unobstructed soldier view');
     await page.waitForTimeout(400);
     const metric=await page.evaluate(()=>{
      const q=window.__JAKELI_QA__,B=window.BABYLON;
@@ -29,8 +36,10 @@ const dir='babylon-qa-results/jakeli-blender-lee-screen';fs.mkdirSync(dir,{recur
     await page.screenshot({path:`${dir}/${name}-${pose}.png`});
     await page.evaluate(()=>{for(const id of ['title','controls','status','credit'])document.getElementById(id).style.visibility=''});
    }
+   await page.locator('#controls summary').click();
    await page.locator('[data-pose="Aim"]').click();
-   for(const v of ['hands','right']){await page.locator(`[data-view="${v}"]`).click();await page.waitForTimeout(300);
+   for(const v of ['hands','right']){await page.locator('#controls summary').click();await page.locator(`[data-view="${v}"]`).click();
+    assert.equal(await page.locator('#controls').evaluate(el=>el.open),false,'camera switch must hide controls');await page.waitForTimeout(300);
     await page.evaluate(()=>{for(const id of ['title','controls','status','credit'])document.getElementById(id).style.visibility='hidden'});
     await page.screenshot({path:`${dir}/${name}-Aim-${v}.png`});
     await page.evaluate(()=>{for(const id of ['title','controls','status','credit'])document.getElementById(id).style.visibility=''});
