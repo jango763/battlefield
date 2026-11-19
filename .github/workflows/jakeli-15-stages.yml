@@ -7,6 +7,7 @@ on:
       - 'tools/jakeli/**'
       - 'babylon/jakeli-65b-iphone.html'
       - 'babylon/jakeli-weapons-iphone.html'
+      - 'babylon/jakeli-three-squad-iphone.html'
       - 'babylon/tests/test-jakeli-*.cjs'
       - 'babylon/JAKELI_15_STAGES.md'
       - '.github/workflows/jakeli-15-stages.yml'
@@ -46,6 +47,15 @@ jobs:
           node babylon/tests/test-jakeli-65b-browser.cjs
       - name: Test authentic Jakeli with four approved two-hand IK weapons
         run: node babylon/tests/test-jakeli-weapons-browser.cjs
+      - name: Check three independent Jakeli rigs and two squad formations
+        run: node babylon/tests/test-jakeli-three-squad-browser.cjs
+      - name: Upload experimental British Jakeli squad screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakeli-three-squad-chromium
+          path: babylon-qa-results/jakeli-squad/
+          if-no-files-found: ignore
       - name: Upload four Jakeli weapon grip screenshots
         if: always()
         uses: actions/upload-artifact@v4
