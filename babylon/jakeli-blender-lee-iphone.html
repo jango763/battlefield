@@ -28,8 +28,8 @@
   </style>
 </head>
 <body>
-  <canvas id="renderCanvas" aria-label="Немецкий солдат в 3D. Вращайте пальцем для просмотра."></canvas>
-  <div id="title"><h1>Jakeli · Blender rig</h1><div id="subtitle">Отдельный эксперимент · одна Lee-Enfield · визуально не утверждён</div></div>
+  <canvas id="renderCanvas" aria-label="Британский солдат Jakeli в 3D. Вращайте пальцем для просмотра."></canvas>
+  <div id="title"><h1>Jakeli · Lee-Enfield</h1><div id="subtitle">Проверка анатомии и хвата · отдельный стенд</div></div>
   <div id="controls" aria-label="Арсенал и проверка боевых поз">
     <div class="controls-title">Только одна винтовка · Lee-Enfield</div>
     <div class="controls-row" role="group" aria-label="Выбор оружия">
@@ -37,18 +37,19 @@
     </div>
     <div class="controls-title">Проверка удержания оружия</div>
     <div class="controls-row" role="group" aria-label="Положение бойца">
-      <button type="button" data-pose="ready" aria-pressed="true">Наготове</button>
-      <button type="button" data-pose="aim" aria-pressed="false">Прицел</button>
-      <button type="button" data-pose="fire" aria-pressed="false">Стрельба (тест)</button>
+      <button type="button" data-pose="Ready" aria-pressed="true">Наготове</button>
+      <button type="button" data-pose="Aim" aria-pressed="false">Прицел</button>
+      <button type="button" data-pose="Fire" aria-pressed="false">Стрельба (тест)</button>
     </div>
-    <div class="controls-title">Проверяем только правую кисть на спуске, левую на цевье и естественный изгиб локтей. В основную игру не включать.</div>
+    <div class="controls-title">Поверните бойца пальцем. Проверьте кисти, плечи и локти с обеих сторон.</div>
+    <div class="controls-row"><button data-pose="Walk">Шаг</button><button data-pose="Jog">Бег</button><button data-pose="Sprint">Спринт</button></div>
+    <div class="controls-title">Камера</div><div class="controls-row"><button data-view="full">Целиком</button><button data-view="hands">Кисти слева</button><button data-view="right">Кисти справа</button></div>
   </div>
   <div id="error" role="alert"></div>
   <div id="credit">George Jakeli · British Army Soldier WW2 · CC BY 4.0 · <a href="../assets/allied-soldiers/ATTRIBUTION_JAKELI.md">Атрибуция</a></div>
   <div id="status" role="status">Загрузка персонажа…</div>
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
-  <script src="./weapon-rig.js"></script>
   <script src="./jakeli-blender-lee-main.js"></script>
 </body>
 </html>

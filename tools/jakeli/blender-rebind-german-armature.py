@@ -1,181 +1,261 @@
 #!/usr/bin/env python3
-"""One-rifle Blender experiment: put authentic Jakeli geometry on approved German armature.
-
-Only experimental files are created. No edits to the approved German GLB,
-existing Jakeli model, four-weapon preview, or main branch.
-Run: blender -b -t 2 --python tools/jakeli/blender-rebind-german-armature.py
+"""Rebuild the isolated Jakeli from the locked STATIC source, not a sculpted prototype.
+Run with Blender 4.3: blender -b -t 4 --python tools/jakeli/blender-rebind-german-armature.py
+Or the official bpy==4.3.0 Python 3.11 wheel. No German/game input is written.
 """
-import bpy
-import json
-import re
+import bpy, json, math, re, hashlib, os
 from pathlib import Path
-from mathutils import Vector, Matrix
-
-ROOT=Path.cwd()
-SRC=ROOT/"assets/allied-soldiers/uk-jakeli-prototype-65b.glb"
-GER=ROOT/"assets/soldiers/german.glb"
-OUT=ROOT/"assets/allied-soldiers/uk-jakeli-blender-german-rig-v1.glb"
-PROJECT=ROOT/"babylon-qa-results/jakeli-blender-lee/jakeli-lee-rig.blend"
-REPORT=ROOT/"babylon-qa-results/jakeli-blender-lee/rebind-report.json"
-PROJECT.parent.mkdir(parents=True,exist_ok=True)
-
-def canonical(name):
-    name=name.replace("mixamorig:","")
-    name=re.sub(r"_\d+$","",name)
-    return re.sub("[^a-z0-9]","",name.lower())
-
-def import_group(path):
-    before=set(bpy.data.objects)
-    bpy.ops.import_scene.gltf(filepath=str(path))
-    new=[x for x in bpy.data.objects if x not in before]
-    arms=[x for x in new if x.type=="ARMATURE"]
-    meshes=[x for x in new if x.type=="MESH"]
-    assert len(arms)==1,(path,[x.name for x in arms])
-    return arms[0],meshes,new
-
-bpy.ops.object.select_all(action="SELECT")
-bpy.ops.object.delete(use_global=False)
-j,all_jakeli_meshes,objs_j=import_group(SRC)
-# The experimental GLB contains BOTH 13 animated skinned outfits and
-# 14 legacy static source nodes (plus one helper). Blender imports them all.
-# Keep only the 13 true Jakeli skinned parts; never export double bodies.
-meshes_j=[obj for obj in all_jakeli_meshes if obj.name.startswith("Jakeli_")
-          and any(mod.type=="ARMATURE" for mod in obj.modifiers)]
-assert len(meshes_j)==13,[(x.name,[m.type for m in x.modifiers]) for x in all_jakeli_meshes]
-for obj in all_jakeli_meshes:
-    if obj not in meshes_j:bpy.data.objects.remove(obj,do_unlink=True)
-g,meshes_g,objs_g=import_group(GER)
-assert len(meshes_g)>=4
-assert len(j.data.bones)==65 and len(g.data.bones)==65
-original_materials={m.name:len(m.material_slots) for m in meshes_j}
-jmap={canonical(b.name):b for b in j.data.bones}
-gmap={canonical(b.name):b for b in g.data.bones}
-common=set(jmap)&set(gmap)
-assert len(common)>=48,(len(common),sorted(common))
-
-def world_head(arm,bone):
-    return arm.matrix_world @ bone.head_local
-
-# Match the overall German skeleton height to Jakeli, preserving its
-# original anatomical local bone axes before editing the rest positions.
-scale=(world_head(j,jmap["head"])-world_head(j,jmap["hips"])).length / (
-       world_head(g,gmap["head"])-world_head(g,gmap["hips"])).length
-assert .005<scale<.05,scale
-g.matrix_world=Matrix.Translation(world_head(j,jmap["hips"])-
-     world_head(g,gmap["hips"])*scale) @ Matrix.Scale(scale,4) @ g.matrix_world
-bpy.context.view_layer.update()
-
-# Rest positions are taken from the real British armature, but the German
-# rig's original bone roll/axes remain the target. The German armature
-# therefore owns the actual IK chains and finger hierarchy.
-targets={key:world_head(j,jmap[key]).copy() for key in common}
-bpy.context.view_layer.objects.active=g
-bpy.ops.object.mode_set(mode="EDIT")
-ed={canonical(b.name):b for b in g.data.edit_bones}
-inv=g.matrix_world.inverted()
-old_directions={k:(b.tail-b.head).copy() for k,b in ed.items()}
-for k in common:
-    ed[k].head=inv @ targets[k]
-for k in common:
-    bone=ed[k]
-    # Use the next British joint as the tail whenever possible. It is the
-    # correct actual arm/forearm/finger segment length, not a proxy weight.
-    child=next((x for x in bone.children if canonical(x.name) in common),None)
-    if child:
-        target=inv @ targets[canonical(child.name)]
-        if (target-bone.head).length>.0001:
-            bone.tail=target
-            continue
-    direction=old_directions[k]
-    if direction.length<.001: direction=Vector((0,.5,0))
-    bone.tail=bone.head+direction.normalized()*max(.008,direction.length*.70)
-for bone in g.data.edit_bones:
-    bone.use_connect=False
-# This helper is not an anatomical joint. Blender creates its own root
-# joint in glTF export, so keep exactly 65 joints, not 66.
-neutral=g.data.edit_bones.get("neutral_bone")
-if neutral:g.data.edit_bones.remove(neutral)
-bpy.ops.object.mode_set(mode="OBJECT")
-bpy.context.view_layer.update()
-
-# Preserve all ORIGINAL British geometry, materials, UVs and skin weights.
-# Only change their bone GROUP NAMES to match the approved German rig.
-# No weight interpolation from incompatible mesh shapes is performed.
-renamed=0
-unmapped={}
-for mesh in meshes_j:
-    world=mesh.matrix_world.copy()
-    for mod in list(mesh.modifiers):
-        if mod.type=="ARMATURE":
-            mod.object=g
-    if not any(mod.type=="ARMATURE" for mod in mesh.modifiers):
-        mod=mesh.modifiers.new("German65Armature","ARMATURE")
-        mod.object=g
-    for group in list(mesh.vertex_groups):
-        key=canonical(group.name)
-        target=gmap.get(key)
-        if target is None:
-            # Donor-only finger/twist channels fall back to the closest
-            # approved ancestor; do not create fictional German bones.
-            for prefix in ("lefthand","righthand","leftforearm","rightforearm",
-                           "leftarm","rightarm","spine","hips"):
-                if key.startswith(prefix) and prefix in gmap:
-                    target=gmap[prefix];break
-        if target is None:
-            unmapped[group.name]=unmapped.get(group.name,0)+1
-            continue
-        if group.name!=target.name:
-            # If a duplicate target group exists, merge actual weights.
-            other=mesh.vertex_groups.get(target.name)
-            if other and other!=group:
-                for vertex in mesh.data.vertices:
-                    src=next((v.weight for v in vertex.groups if v.group==group.index),None)
-                    if src is None:continue
-                    previous=next((v.weight for v in vertex.groups if v.group==other.index),0.)
-                    other.add([vertex.index],min(1.,src+previous),"REPLACE")
-                mesh.vertex_groups.remove(group)
-            else:
-                group.name=target.name
-            renamed+=1
-    if mesh.parent==j:
-        mesh.parent=g
-        mesh.matrix_world=world
-
-# Delete original donor armature and German meshes, not Jakeli meshes.
-for obj in meshes_g:
-    bpy.data.objects.remove(obj,do_unlink=True)
-bpy.data.objects.remove(j,do_unlink=True)
-for obj in list(bpy.data.objects):
-    if obj.type=="MESH" and obj not in meshes_j:
-        bpy.data.objects.remove(obj,do_unlink=True)
-assert len([x for x in bpy.data.objects if x.type=="ARMATURE"])==1
-assert len([x for x in bpy.data.objects if x.type=="MESH"])==len(meshes_j)
-bpy.context.view_layer.update()
-
-report={
-    "prototype":str(SRC),"approvedReference":str(GER),
-    "skeleton":"approved German 65 bones, British rest joint positions",
-    "commonMappedBones":len(common),"germanBoneCount":len(g.data.bones),
-    "jakeliMeshCount":len(meshes_j),"scale":scale,
-    "renamedVertexGroups":renamed,"unmappedGroups":unmapped,
-    "materialsPreserved":original_materials,
-    "status":"experimental, one rifle, visual approval REQUIRED"
-}
-REPORT.write_text(json.dumps(report,indent=2,ensure_ascii=False))
-bpy.ops.wm.save_as_mainfile(filepath=str(PROJECT))
-bpy.ops.object.select_all(action="DESELECT")
-# glTF importer can place valid skinned outfit meshes in a non-active
-# collection. Link them to the export layer before selecting or saving:
-# otherwise Blender raises "can't be selected because not in ViewLayer".
-for obj in meshes_j+[g]:
-    if obj.name not in bpy.context.view_layer.objects:
-        bpy.context.scene.collection.objects.link(obj)
-bpy.context.view_layer.update()
-for obj in meshes_j+[g]:obj.select_set(True)
-bpy.context.view_layer.objects.active=g
-bpy.ops.export_scene.gltf(filepath=str(OUT),export_format="GLB",
-    use_selection=True,export_animations=False,export_skins=True,
-    export_materials="EXPORT",export_yup=True)
-assert OUT.stat().st_size>500000
-print("JAKELI_BLENDER_GERMAN_ARMATURE_EXPERIMENT_CREATED",json.dumps(report,ensure_ascii=False))
-print("JAKELI_BLENDER_GLB",str(OUT),OUT.stat().st_size)
+from mathutils import Vector, Matrix, Quaternion
+ROOT=Path(__file__).resolve().parents[2]
+SRC=ROOT/'assets/allied-soldiers/uk-jakeli-mobile-static.glb'
+OUT=ROOT/'assets/allied-soldiers/uk-jakeli-anatomical-v2.glb'
+QA=ROOT/'babylon-qa-results/jakeli-anatomical';QA.mkdir(parents=True,exist_ok=True)
+assert hashlib.sha256(SRC.read_bytes()).hexdigest()=='e86dc27fdb763092ad80391ea79c3f83f20c7b81195d2132dc1b68cf3634d7a0'
+def canon(n):return re.sub(r'_\d+$','',n.replace('mixamorig:',''))
+def load(path):
+ before=set(bpy.data.objects);bpy.ops.import_scene.gltf(filepath=str(path));return [o for o in bpy.data.objects if o not in before]
+def smooth(a,b,x):
+ t=max(0.,min(1.,(x-a)/(b-a)));return t*t*(3-2*t)
+def update():bpy.context.view_layer.update()
+bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
+source=load(SRC);meshes=[o for o in source if o.type=='MESH' and 'springfield' not in o.name.lower()]
+assert len(meshes)==13
+# Apply exactly ONE shared similarity transform. No sculpt, sleeve shift, palm shrink or decimation.
+for o in meshes:
+ w=o.matrix_world.copy();o.parent=None;o.matrix_world=w
+ bpy.ops.object.select_all(action='DESELECT');o.select_set(True);bpy.context.view_layer.objects.active=o
+ bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
+lo=min(v.co.z for o in meshes for v in o.data.vertices);hi=max(v.co.z for o in meshes for v in o.data.vertices);scale=1.8/(hi-lo)
+for o in meshes:
+ for v in o.data.vertices:v.co=Vector((v.co.x*scale,v.co.y*scale,(v.co.z-lo)*scale))
+ o.name='Jakeli_'+o.name
+for o in source:
+ if o not in meshes:bpy.data.objects.remove(o,do_unlink=True)
+original={o.name:{'vertices':len(o.data.vertices),'polygons':len(o.data.polygons),'positions':[v.co.copy() for v in o.data.vertices]} for o in meshes}
+# Coordinates below are anatomical landmarks in the ORIGINAL author's centimetre frame.
+# Front is -Y, up Z in Blender. 1.206 imported global scale cancels during normalization.
+unit=1.8/(185.15460205078125+1.5273550748825073)
+def pt(x,y,z):return Vector((x*unit,y*unit,(z+1.5273550748825073)*unit))
+ref=load(ROOT/'assets/soldiers/german.glb');rig=next(o for o in ref if o.type=='ARMATURE')
+rig.animation_data_clear();rig.parent=None;rig.matrix_world=Matrix.Identity(4)
+for o in ref:
+ if o!=rig:bpy.data.objects.remove(o,do_unlink=True)
+rig.name='Jakeli_Anatomical65'
+for b in rig.data.bones:b.name=canon(b.name)
+bpy.context.view_layer.objects.active=rig;bpy.ops.object.mode_set(mode='EDIT')
+eb=rig.data.edit_bones
+for b in eb:b.use_connect=False
+if eb.get('neutral_bone'):eb.remove(eb['neutral_bone'])
+land={
+ 'GLTF_created_0_rootJoint':(0,0,-1.5273550748825073),
+ 'Hips':(0,0,96),'Spine':(0,0,110),'Spine1':(0,0,126),'Spine2':(0,0,144),
+ 'Neck':(0,0,155),'Head':(0,0,165)}
+for side,sign in [('Left',1),('Right',-1)]:
+ for name,p in {'Shoulder':(8,0,149),'Arm':(20,0,148),'ForeArm':(38,-1,127),
+ 'Hand':(53,-2,109),'UpLeg':(11,0,95),'Leg':(18,-1,55),'Foot':(23,0,14),
+ 'ToeBase':(23,-10,5),'Toe_End':(23,-16,5)}.items():land[side+name]=(p[0]*sign,p[1],p[2])
+ for digit,y,x0,z0,length in [('Index',-6.4,60,102,7),('Middle',-3.8,61,101,6.8),('Ring',-1.3,61,101,6),('Pinky',1.0,60.5,101,5.2)]:
+  for k,t in enumerate([0,.43,.76,1]):land[f'{side}Hand{digit}{k+1}']=(sign*(x0+length*t),y,z0-8*t)
+ for k,p in enumerate([(54,-5.8,106),(56,-8.7,102),(57.4,-10,99.7),(58,-10.3,98)]):land[f'{side}HandThumb{k+1}']=(sign*p[0],p[1],p[2])
+assert set(land)==set(b.name for b in eb),(set(b.name for b in eb)-set(land))
+for n,p in land.items():eb[n].head=pt(*p)
+for b in eb:
+ children=list(b.children)
+ main={'Hips':'Spine','Spine2':'Neck','LeftHand':'LeftHandMiddle1','RightHand':'RightHandMiddle1'}.get(b.name)
+ if main:b.tail=eb[main].head
+ elif children:b.tail=children[0].head
+ else:b.tail=b.head+Vector((0,0,.015))
+ if (b.tail-b.head).length<.001:b.tail=b.head+Vector((0,0,.015))
+ if 'Hand' in b.name:
+  sign=1 if b.name.startswith('Left') else -1
+  b.align_roll(Vector((sign*.73,0,.68)))
+ else:b.align_roll(Vector((0,1,0)))
+bpy.ops.object.mode_set(mode='OBJECT');update()
+# Region-aware skin weights. Accessories are rigid; sleeves cannot acquire finger weights;
+# face/teeth/eyes cannot acquire spine weights. Adjacent bones blend across each real joint.
+def weights(name,p):
+ x,y,z=p.x/unit,p.y/unit,p.z/unit-1.5273550748825073
+ side='Left' if x>=0 else 'Right';x=abs(x)
+ if any(k in name for k in ['HELMET','SkullCap','Material #3_','Material #6_','Material #38_','Material #55_']):return {'Head':1}
+ if 'Material #21_' in name:
+  # Each finger band follows original hand geometry, not a different donor's hand.
+  if y < -7.9 and x<60:
+   t=smooth(53.5,58,x);f=side+'HandThumb';u=max(0,min(2,(x-54)/1.65))
+  else:
+   digit=min([('Index',-6.4),('Middle',-3.8),('Ring',-1.3),('Pinky',1)],key=lambda a:abs(y-a[1]))[0]
+   f=side+'Hand'+digit;t=smooth(58.5,61.3,x);u=max(0,min(2,(x-60.8)/2.5))
+  k=min(2,int(u));v=u-k
+  return {side+'Hand':1-t,f+str(k+1):t*(1-v),f+str(k+2):t*v}
+ if 'SHOE' in name:
+  t=smooth(13,22,z);return {side+'Foot':1-t,side+'Leg':t}
+ if 'Pants' in name:
+  hip=smooth(84,99,z);k=smooth(49,61,z)
+  return {'Hips':hip,side+'UpLeg':(1-hip)*k,side+'Leg':(1-hip)*(1-k)}
+ if 'BELT' in name:return {'Spine':1}
+ if 'ALL_BAG' in name:return {'Hips' if z<108 else 'Spine2':1}
+ # Shirt/torso: continuous shoulders, elbow and collar, no nearest-neighbour leakage.
+ arm=smooth(17,26,x)*smooth(112,124,z)
+ if 'T_Shirt' in name:
+  # Sleeves continue BELOW 112cm at cuff: x separates them from torso.
+  arm=smooth(17,26,x)
+ elbow=smooth(33,42,x)
+ torso={}
+ if z<110:torso={'Hips':1-smooth(96,110,z),'Spine':smooth(96,110,z)}
+ elif z<126:torso={'Spine':1-smooth(110,126,z),'Spine1':smooth(110,126,z)}
+ else:torso={'Spine1':1-smooth(126,143,z),'Spine2':smooth(126,143,z)}
+ out={n:w*(1-arm) for n,w in torso.items()};out[side+'Arm']=arm*(1-elbow);cuff=.35*smooth(49,56,x) if 'T_Shirt' in name else 0
+ out[side+'ForeArm']=arm*elbow*(1-cuff);out[side+'Hand']=arm*elbow*cuff
+ return out
+for o in meshes:
+ for vg in list(o.vertex_groups):o.vertex_groups.remove(vg)
+ groups={n:o.vertex_groups.new(name=n) for n in land}
+ for v in o.data.vertices:
+  ws={n:w for n,w in weights(o.name,v.co).items() if w>1e-7};total=sum(ws.values());assert total>0
+  for n,w in ws.items():groups[n].add([v.index],w/total,'REPLACE')
+ o.parent=rig;o.matrix_parent_inverse=Matrix.Identity(4)
+ mod=o.modifiers.new('Anatomical bind','ARMATURE');mod.object=rig;mod.use_deform_preserve_volume=False
+# Heat diffusion on the actual welded hand surface avoids hard finger-band seams.
+# Use a temporary welded copy only for weights; preserve every original render vertex.
+import bmesh
+from mathutils.kdtree import KDTree
+glove=next(o for o in meshes if 'Material #21_' in o.name)
+temp=glove.copy();temp.data=glove.data.copy();bpy.context.collection.objects.link(temp)
+for mod in list(temp.modifiers):temp.modifiers.remove(mod)
+for vg in list(temp.vertex_groups):temp.vertex_groups.remove(vg)
+bm=bmesh.new();bm.from_mesh(temp.data);bmesh.ops.remove_doubles(bm,verts=list(bm.verts),dist=0.00001);bm.to_mesh(temp.data);bm.free()
+for b in rig.data.bones:b.use_deform=('Hand' in b.name and not b.name.endswith('4')) or 'ForeArm' in b.name
+bpy.ops.object.select_all(action='DESELECT');temp.select_set(True);rig.select_set(True);bpy.context.view_layer.objects.active=rig
+bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+kdt=KDTree(len(temp.data.vertices))
+for v in temp.data.vertices:kdt.insert(v.co,v.index)
+kdt.balance()
+for v in glove.data.vertices:
+ _,idx,dist=kdt.find(v.co);assert dist<0.00002
+ ws=[(temp.vertex_groups[g.group].name,g.weight) for g in temp.data.vertices[idx].groups if g.weight>1e-6]
+ assert ws,('Heat weighting failed',idx)
+ ws=sorted(ws,key=lambda a:a[1],reverse=True)[:4];total=sum(w for _,w in ws)
+ for vg in glove.vertex_groups:vg.remove([v.index])
+ for n,w in ws:glove.vertex_groups[n].add([v.index],w/total,'REPLACE')
+bpy.data.objects.remove(temp,do_unlink=True)
+for b in rig.data.bones:b.use_deform=True
+update()
+# Assert the evaluated bind geometry equals original, independent of joint socket metrics.
+dg=bpy.context.evaluated_depsgraph_get();bind_error=0
+for o in meshes:
+ ev=o.evaluated_get(dg).to_mesh();assert len(ev.vertices)==len(o.data.vertices)
+ bind_error=max(bind_error,max((v.co-original[o.name]['positions'][i]).length for i,v in enumerate(ev.vertices)))
+ o.evaluated_get(dg).to_mesh_clear()
+assert bind_error<1e-4,bind_error
+# The rifle and both contact targets form one rigid assembly, authored once in Blender.
+weapon=load(ROOT/'assets/ww2-weapons/uk-lee-enfield.glb')
+gun=bpy.data.objects.new('LeeEnfield',None);bpy.context.scene.collection.objects.link(gun)
+for o in weapon:
+ if o.parent not in weapon:
+  w=o.matrix_world.copy();o.parent=gun;o.matrix_world=w
+update()
+bones=rig.pose.bones
+for b in bones:b.rotation_mode='QUATERNION'
+gun.rotation_mode='QUATERNION'
+rest={b.name:b.matrix.copy() for b in bones}
+# Frame rotations derive from fitted bone directions. No assumed donor wrist axis.
+def frame(forward,dorsal):
+ y=forward.normalized();z=(dorsal-y*y.dot(dorsal)).normalized();x=y.cross(z).normalized();z=x.cross(y)
+ return Matrix((x,y,z)).transposed().to_quaternion()
+def set_world(n,q):
+ b=bones[n];m=q.to_matrix().to_4x4();m.translation=b.head;b.matrix=m;update()
+def aim_bone(n,target):
+ b=bones[n];q=(b.tail-b.head).rotation_difference(target-b.head);m=q.to_matrix().to_4x4()@b.matrix;m.translation=b.head;b.matrix=m;update()
+def solve(side,goal,pole):
+ u,f,h=[bones[side+n] for n in ['Arm','ForeArm','Hand']];a=u.head.copy();l1=(f.head-a).length;l2=(h.head-f.head).length
+ delta=goal-a;d=delta.length;assert abs(l1-l2)+1e-4<d<l1+l2-1e-4,(clip,f,side,'unreachable',d,l1+l2,list(a),list(goal))
+ direction=delta/d;pv=pole-a;pv=(pv-direction*pv.dot(direction)).normalized();along=(l1*l1-l2*l2+d*d)/(2*d)
+ elbow=a+direction*along+pv*math.sqrt(max(0,l1*l1-along*along));aim_bone(side+'Arm',elbow);aim_bone(side+'ForeArm',goal)
+ return (bones[side+'Hand'].head-goal).length
+# Original source hand palm centers measured relative to fitted wrist, in bone local space.
+palm_local={s:rest[s+'Hand'].inverted()@pt(sign*58,-2.5,105) for s,sign in [('Left',1),('Right',-1)]}
+clips={};grip_max=0;elbows=[]
+scene=bpy.context.scene;scene.render.fps=30
+for clip,duration in [('Ready',2),('Aim',2),('Fire',1.2),('Walk',1.2),('Jog',.8),('Sprint',.65)]:
+ rig.animation_data_create();rig.animation_data.action=bpy.data.actions.new(clip)
+ gun.animation_data_create();gun.animation_data.action=bpy.data.actions.new(clip)
+ frames=round(duration*30)
+ for f in range(frames+1):
+  scene.frame_set(f+1);t=f/30;phase=2*math.pi*f/frames;moving=clip in ['Walk','Jog','Sprint'];fast=clip in ['Jog','Sprint']
+  for b in bones:b.matrix_basis=Matrix.Identity(4)
+  update()
+  set_world('Spine2',Quaternion((0,0,1),-.42) @ rest['Spine2'].to_quaternion())
+  set_world('Head',rest['Head'].to_quaternion())
+  # Deterministic in-place locomotion: flexed knee on recovery, counterbalanced pelvis.
+  if moving:
+   stride=.30 if clip=='Walk' else .50 if clip=='Jog' else .68
+   for s,offset in [('Left',0),('Right',math.pi)]:
+    a=phase+offset
+    bones[s+'UpLeg'].rotation_quaternion=Quaternion((1,0,0),stride*math.sin(a))
+    bones[s+'Leg'].rotation_quaternion=Quaternion((1,0,0),-max(0,math.cos(a))*(.65 if fast else .38))
+    bones[s+'Foot'].rotation_quaternion=Quaternion((1,0,0),.12*math.sin(a))
+   bones['Hips'].location.z=.012*math.cos(phase*2)
+  update()
+  # Gun stock sits in right shoulder pocket; support is on the actual fore-end.
+  lower=math.radians(24 if clip in ['Ready','Walk','Jog','Sprint'] else 0)
+  recoil=.012*max(0,math.sin(t*math.pi*8))**8 if clip=='Fire' else 0
+  gun.rotation_quaternion=Quaternion((1,0,0),lower)
+  shoulder=bones['RightArm'].head+Vector((.025,-.035,-.055))
+  stock=Vector((0,.2636,-.051387844));gun.location=shoulder-gun.rotation_quaternion@stock+Vector((0,recoil,0));update()
+  rightQ=frame(gun.rotation_quaternion@Vector((0,-.945,.326)),gun.rotation_quaternion@Vector((-1,0,0)))
+  leftQ=frame(gun.rotation_quaternion@Vector((-.32,-.947,0)),gun.rotation_quaternion@Vector((0,0,-1)))
+  # Contact markers are at the physical stock wrist and underside of the forestock.
+  contacts={'Right':gun.matrix_world@Vector((-.018,.017,-.009)),'Left':gun.matrix_world@Vector((0,-.20,.020))}
+  for s,q in [('Right',rightQ),('Left',leftQ)]:
+   goal=contacts[s]-q@palm_local[s]
+   pole=bones[s+'Arm'].head+Vector((-.25 if s=='Right' else .20,.08,-.45))
+   solve(s,goal,pole)
+   fore=bones[s+'ForeArm'];direction=bones[s+'Hand'].head-fore.head
+   set_world(s+'ForeArm',frame(direction,q@Vector((0,0,1))))
+   set_world(s+'Hand',q)
+   for digit in ['Index','Middle','Ring','Pinky','Thumb']:
+    for k in [1,2,3]:
+     n=s+'Hand'+digit+str(k);angle=([.65,.8,.65] if digit=='Index' and s=='Right' else [.95,1.20,.80])[k-1]
+     if digit=='Thumb':angle=[.35,.40,.25][k-1]
+     bones[n].rotation_quaternion=Quaternion((1,0,0),-angle)
+   update();actual=bones[s+'Hand'].matrix@palm_local[s];grip_max=max(grip_max,(actual-contacts[s]).length)
+   u,e,w=[bones[s+n].head for n in ['Arm','ForeArm','Hand']];elbows.append(math.degrees((e-u).angle(w-e)))
+  for b in bones:
+   b.keyframe_insert('rotation_quaternion',frame=f+1);b.keyframe_insert('location',frame=f+1);b.keyframe_insert('scale',frame=f+1)
+  gun.keyframe_insert('location',frame=f+1);gun.keyframe_insert('rotation_quaternion',frame=f+1)
+ for obj in [rig,gun]:
+  action=obj.animation_data.action;track=obj.animation_data.nla_tracks.new();track.name=clip;track.mute=True;strip=track.strips.new(clip,1,action);obj.animation_data.action=None
+ clips[clip]=frames+1
+# Export NLA tracks with matching names merged into six complete clips.
+for obj in [rig,gun]:
+ for tr in obj.animation_data.nla_tracks:tr.mute=True
+for b in bones:b.matrix_basis=Matrix.Identity(4)
+gun.location=(0,0,0);gun.rotation_quaternion=Quaternion();update()
+bpy.ops.object.select_all(action='DESELECT')
+for o in meshes+[rig,gun]+weapon:o.select_set(True)
+bpy.context.view_layer.objects.active=rig
+# Unmute one at a time during exporter NLA sampling (exporter ignores mute if configured).
+for obj in [rig,gun]:
+ for tr in obj.animation_data.nla_tracks:tr.mute=False
+scene.frame_set(1)
+bpy.ops.wm.save_as_mainfile(filepath=str(QA/'jakeli-anatomical.blend'))
+bpy.ops.export_scene.gltf(filepath=str(OUT),export_format='GLB',use_selection=True,export_animations=True,
+ export_animation_mode='NLA_TRACKS',export_skins=True,export_materials='EXPORT',export_yup=True,
+ export_force_sampling=True,export_anim_slide_to_zero=True,export_rest_position_armature=True)
+report={'sourceSHA256':hashlib.sha256(SRC.read_bytes()).hexdigest(),'blender':bpy.app.version_string,
+ 'bindMaxVertexErrorMeters':bind_error,'maxBakedPalmContactErrorMeters':grip_max,'elbowBendRangeDegrees':[min(elbows),max(elbows)],
+ 'sourceVertices':sum(v['vertices'] for v in original.values()),'meshes':len(meshes),'bonesBeforeGltfRoot':len(bones),
+ 'preserved':'All original source positions (one uniform transform), topology, UVs and materials; embedded Springfield excluded',
+ 'clips':clips,'locomotion':'new procedural in-place cycles; not Quaternius and not artist-approved',
+ 'visualApproval':False,'iphoneSafari':False}
+(QA/'build-report.json').write_text(json.dumps(report,indent=2));print('JAKELI_BUILD',json.dumps(report))
+# CPU reference renders of the same baked pose, with actual surface geometry visible.
+if os.environ.get('JAKELI_RENDER','1')=='1':
+ for obj in [rig,gun]:
+  for tr in obj.animation_data.nla_tracks:tr.mute=tr.name!='Aim'
+ scene.frame_set(1);update();scene.render.engine='CYCLES';scene.cycles.samples=20;scene.cycles.use_denoising=False;scene.world.color=(.3,.3,.3)
+ bpy.ops.object.camera_add(location=(2.8,-5,2.5));cam=bpy.context.object;scene.camera=cam;cam.data.type='ORTHO';cam.data.ortho_scale=2.1
+ for loc,power in [((2,-4,5),650),((-3,-2,3),400),((0,3,4),600)]:
+  bpy.ops.object.light_add(type='AREA',location=loc);l=bpy.context.object;l.data.energy=power;l.data.shape='DISK';l.data.size=4;l.rotation_euler=(Vector((0,0,1))-l.location).to_track_quat('-Z','Y').to_euler()
+ scene.render.resolution_x=1000;scene.render.resolution_y=1000;scene.render.resolution_percentage=100
+ for label,loc,target,size in [('aim-front',(2.8,-5,2.5),(0,0,.95),2.1),('aim-hands',(1.2,-2,1.9),(-.08,-.25,1.34),.8),('aim-right',(-2,-1,1.8),(-.08,-.25,1.34),.8)]:
+  cam.location=loc;cam.rotation_euler=(Vector(target)-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.ortho_scale=size;scene.render.filepath=str(QA/(label+'.png'));bpy.ops.render.render(write_still=True)

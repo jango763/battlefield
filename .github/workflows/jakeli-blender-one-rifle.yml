@@ -1,78 +1,55 @@
-name: Jakeli one-rifle Blender rebind (isolated experiment)
+name: Jakeli anatomical bind and one-rifle QA
 on:
   push:
-    branches:
-      - feature/british-army-10-stages-20261118
+    branches: [feature/british-army-10-stages-20261118]
     paths:
-      - tools/jakeli/blender-rebind-german-armature.py
-      - babylon/jakeli-blender-lee-iphone.html
-      - babylon/jakeli-blender-lee-main.js
-      - babylon/tests/test-jakeli-blender-lee-browser.cjs
-      - .github/workflows/jakeli-blender-one-rifle.yml
+      - 'tools/jakeli/**'
+      - 'babylon/jakeli-blender-lee-*'
+      - 'babylon/tests/test-jakeli-blender-lee-browser.cjs'
+      - 'assets/allied-soldiers/uk-jakeli-anatomical-v2.glb'
+      - '.github/workflows/jakeli-blender-one-rifle.yml'
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
+concurrency:
+  group: jakeli-anatomical-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   rebind:
+    if: github.ref == 'refs/heads/feature/british-army-10-stages-20261118'
     runs-on: ubuntu-24.04
-    timeout-minutes: 18
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Download official Blender 4.5 standalone (no apt or pip)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tools/jakeli/requirements-blender.txt
+      - name: Install pinned official Blender Python runtime
         run: |
-          curl --fail --location --retry 3 --connect-timeout 30 --max-time 420 \
-            https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz \
-            --output /tmp/jakeli-blender.tar.xz
-          tar -xf /tmp/jakeli-blender.tar.xz -C /tmp
-          /tmp/blender-4.5.3-linux-x64/blender --version | head -3
-      - name: Retarget original Jakeli mesh to approved German 65-bone armature
-        run: /tmp/blender-4.5.3-linux-x64/blender --background --threads 2 --python tools/jakeli/blender-rebind-german-armature.py
-      - name: Validate one-rifle experimental GLB (not visual approval)
-        run: |
-          node - <<'NODE'
-          const fs=require('fs');
-          const b=fs.readFileSync('assets/allied-soldiers/uk-jakeli-blender-german-rig-v1.glb');
-          if(b.toString('ascii',0,4)!=='glTF')throw Error('Invalid GLB');
-          const n=b.readUInt32LE(12),d=JSON.parse(b.subarray(20,20+n));
-          if(d.skins?.length!==1||d.skins[0].joints.length!==65)throw Error('Missing German 65-bone skin');
-          if((d.meshes||[]).length<13)throw Error('Lost authentic British mesh');
-          console.log('JAKELI_BLENDER_ONE_RIFLE_STRUCTURAL_PASS',JSON.stringify({meshes:d.meshes.length,bones:d.skins[0].joints.length,animations:d.animations?.length||0}));
-          NODE
-      - name: Browser QA for authentic Jakeli on one rifle (not real Safari)
+          python -m pip install --only-binary=:all: -r tools/jakeli/requirements-blender.txt
+          python -c "import bpy; assert bpy.app.version == (4,3,0); print('BLENDER', bpy.app.version_string)"
+      - name: Rebuild from locked original geometry and render actual surfaces
+        run: python tools/jakeli/blender-rebind-german-armature.py
+      - name: Verify source preservation, bind matrices, weights and every clip
+        run: python tools/jakeli/verify-anatomical.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Browser QA on mobile Chromium and WebKit
         run: |
           npm install --no-audit --no-fund --prefix /tmp/jakeli-blender-qa playwright@1.58.2
-          /tmp/jakeli-blender-qa/node_modules/.bin/playwright install chromium
-          python3 -m http.server 8810 --bind 127.0.0.1 >/tmp/jakeli-one-rifle-http.log 2>&1 &
-          sleep 2
+          /tmp/jakeli-blender-qa/node_modules/.bin/playwright install --with-deps chromium webkit
+          python -m http.server 8810 --bind 127.0.0.1 >/tmp/jakeli-http.log 2>&1 &
           node babylon/tests/test-jakeli-blender-lee-browser.cjs
-      - name: Upload one-rifle Blender browser screenshots
+      - name: Upload evidence, model and editable Blender project even on failure
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: jakeli-blender-one-lee-chromium
-          path: babylon-qa-results/jakeli-blender-lee-screen/
-          retention-days: 5
-          if-no-files-found: ignore
-      - name: Upload editable Blender project and one-rifle GLB
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: jakeli-blender-german-armature-one-rifle
+          name: jakeli-anatomical-evidence
           path: |
-            assets/allied-soldiers/uk-jakeli-blender-german-rig-v1.glb
-            babylon-qa-results/jakeli-blender-lee/
-          if-no-files-found: warn
-          retention-days: 5
-      - name: Publish only isolated Blender GLB after successful browser test
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add assets/allied-soldiers/uk-jakeli-blender-german-rig-v1.glb
-          if git diff --cached --quiet; then
-            echo 'Blender Jakeli experiment unchanged'
-          else
-            git commit -m 'Publish experimental Blender-rebound Jakeli (not game-approved)'
-            git pull --rebase origin feature/british-army-10-stages-20261118
-            git push origin HEAD:refs/heads/feature/british-army-10-stages-20261118
-          fi
+            assets/allied-soldiers/uk-jakeli-anatomical-v2.glb
+            babylon-qa-results/jakeli-anatomical/
+            babylon-qa-results/jakeli-blender-lee-screen/
+          retention-days: 14

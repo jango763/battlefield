@@ -1,0 +1,7 @@
+# Official Blender Foundation Python wheel; Python 3.11 on Linux x86_64.
+bpy==4.3.0
+numpy==1.26.4
+scipy==1.14.1
+Cython==3.0.11
+requests==2.32.3
+zstandard==0.23.0
