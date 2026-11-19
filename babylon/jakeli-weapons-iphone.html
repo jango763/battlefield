@@ -21,10 +21,10 @@ a{color:#cbedb9}
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
-<script src="./jakeli-combat-rig.js"></script>
+<script src="./us-hero-stage8-rig.js"></script>
 </head><body><main>
-<h1>Jakeli — правильный изгиб правого локтя</h1>
-<p class="warn">Готовая система героя Stage 8, изменён только изгиб правого локтя по твоему примеру. Положение кисти у спуска, винтовка, левая рука и анимации сохранены. Пока это проверка, не выпуск игры.</p>
+<h1>Jakeli — проверка на готовой системе героя</h1>
+<p class="warn">Испытание настоящего британского Jakeli на уже готовом контроллере героя Stage 8 (без нового IK и ручных поправок). В игру не установлен: требуется визуальная проверка на iPhone Safari.</p>
 <canvas id="scene" aria-label="Вооружённый британец Jakeli, вращение пальцем"></canvas>
 <div class="grid pose" role="group" aria-label="Положение камеры">
 <button id="zoom-right" type="button">Кисть и спуск крупно</button>
@@ -53,11 +53,11 @@ a{color:#cbedb9}
 "use strict";
 const qa={loaded:false,realJakeli:true,prototype:true,bones:0,meshCount:0,
  weaponId:null,weaponMeshCount:0,grip:null,clips:[],motion:null,
- error:null,releaseReady:false,actualSafariTested:false,weaponSwaps:0,rigSource:"Stage8 with Jakeli-only right elbow pole"};
+ error:null,releaseReady:false,actualSafariTested:false,weaponSwaps:0,rigSource:"us-hero-stage8-rig.js"};
 window.__JAKELI_WEAPON_QA__=qa;
 (async()=>{
  try{
-  const B=window.BABYLON,api=window.BattlefieldJakeliWeaponRig;
+  const B=window.BABYLON,api=window.BattlefieldUSLeeEnfieldStage4;
   if(!B?.SceneLoader||!api?.create)throw Error("Нет Babylon.js / утверждённого двуручного IK");
   const canvas=document.querySelector("#scene"),out=document.querySelector("#status");
   const engine=new B.Engine(canvas,true,{powerPreference:"high-performance"});
