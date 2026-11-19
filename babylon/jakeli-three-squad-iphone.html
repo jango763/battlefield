@@ -37,7 +37,7 @@ a{color:#d3efb4}
 <script>
 "use strict";
 const QA={loaded:false,actors:0,bones:[],uniqueSkeletons:false,
- uniqueClips:false,motion:null,formation:"turtle",errors:[],readyForDeployment:false};
+ uniqueClips:false,motion:null,formation:"turtle",visibleActors:0,errors:[],readyForDeployment:false};
 window.__JAKELI_SQUAD_QA__=QA;
 (async()=>{
  let engine;
@@ -51,7 +51,7 @@ window.__JAKELI_SQUAD_QA__=QA;
   scene.clearColor=new B.Color4(.08,.15,.12,1);
   const amb=new B.HemisphericLight("ambient",new B.Vector3(0,1,0),scene);amb.intensity=1.3;
   const key=new B.DirectionalLight("sun",new B.Vector3(-.5,-1,-.2),scene);key.intensity=1.0;
-  const camera=new B.ArcRotateCamera("view",Math.PI*.56,Math.PI*.39,12,
+  const camera=new B.ArcRotateCamera("view",Math.PI*.56,Math.PI*.39,8.7,
     new B.Vector3(0,-.05,1),scene);
   camera.lowerRadiusLimit=3;camera.upperRadiusLimit=30;camera.attachControl(canvas,true);
   scene.activeCamera=camera;
@@ -75,10 +75,14 @@ window.__JAKELI_SQUAD_QA__=QA;
   function formation(mode){
    if(!modes.includes(mode))throw Error("Неизвестное построение");
    const positions=army.positions(mode);
+   const select=actors.map(a=>positions[a.slot]);
+   const centerX=select.reduce((sum,p)=>sum+p.x,0)/select.length;
+   const centerZ=select.reduce((sum,p)=>sum+p.z,0)/select.length;
    for(const a of actors){
     const pos=positions[a.slot];
-    // Original 12-person plan is 2.1m spread; center this three-person pilot.
-    a.root.position.set(pos.x,0,pos.z-1.5);
+    // Original 12-person plan; recenter only the 3-person optical pilot.
+    // Otherwise the first three slots of a 12-person semicircle are off-screen.
+    a.root.position.set(pos.x-centerX,0,pos.z-centerZ);
    }
    QA.formation=mode;
    document.querySelectorAll("[data-mode]").forEach(b=>
@@ -101,9 +105,18 @@ window.__JAKELI_SQUAD_QA__=QA;
   QA.loaded=true;
   engine.runRenderLoop(()=>{
    scene.render();
+   const w=engine.getRenderWidth(),h=engine.getRenderHeight();
+   const viewport=new B.Viewport(0,0,w,h);
+   QA.visibleActors=actors.filter(a=>{
+    a.root.computeWorldMatrix(true);
+    const p=B.Vector3.Project(
+      new B.Vector3(0,.35,0),a.root.getWorldMatrix(),
+      scene.getTransformMatrix(),viewport);
+    return p.x>=w*.04&&p.x<=w*.96&&p.y>=h*.04&&p.y<=h*.96&&p.z>=0&&p.z<=1;
+   }).length;
    status.textContent="Реальный Jakeli: "+QA.actors+" бойца"+
     "\nНезависимые 65-костные скелеты: "+(QA.uniqueSkeletons?"да":"НЕТ")+
-    "\n12 собственных групп анимаций: "+(QA.uniqueClips?"да":"НЕТ")+
+    "\nВ кадре: "+QA.visibleActors+"/3 · 12 собственных групп анимаций: "+(QA.uniqueClips?"да":"НЕТ")+
     "\nПостроение: "+QA.formation+" · движение: "+QA.motion+
     "\nFPS (этот браузер): "+Math.round(engine.getFps())+
     "\nВыпуск отряда: ЗАБЛОКИРОВАН до визуальной приёмки и Safari";
