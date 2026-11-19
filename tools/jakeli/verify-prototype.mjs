@@ -43,6 +43,7 @@ for(const node of rigMeshNodes){
  }
 }
 assert(vertices>40000,"A placeholder or partial model is not acceptable");
+assert(triangles<=65000,"Jakeli must fit the real 65k triangle iPhone limit: "+triangles);
 const nodesWithAnimation=new Set();
 for(const a of j.animations)for(const ch of a.channels){
  assert(j.skins[0].joints.includes(ch.target.node),"Animation does not target the 65-bone British rig");
