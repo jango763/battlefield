@@ -22,10 +22,19 @@ const dir='babylon-qa-results/jakeli-blender-lee-screen';fs.mkdirSync(dir,{recur
      return {pose:window.__BABYLON_SOLDIER__.pose,rightLength:B.Vector3.Distance(p('RightArm'),p('RightForeArm'))+B.Vector3.Distance(p('RightForeArm'),p('RightHand')),leftLength:B.Vector3.Distance(p('LeftArm'),p('LeftForeArm'))+B.Vector3.Distance(p('LeftForeArm'),p('LeftHand')),active:q.groups.filter(g=>g.isPlaying).map(g=>g.name)};
     });
     assert.equal(metric.pose,pose);assert.deepEqual(metric.active,[pose]);assert(metric.leftLength>.45&&metric.leftLength<.55);assert(metric.rightLength>.45&&metric.rightLength<.55);samples.push(metric);
+    // Keep the actual on-screen controls tested, but remove overlays from
+    // evidence captures so faces, rifle and hands remain fully visible.
+    if(pose==='Ready')await page.screenshot({path:`${dir}/${name}-Ready-UI.png`});
+    await page.evaluate(()=>{for(const id of ['title','controls','status','credit'])document.getElementById(id).style.visibility='hidden'});
     await page.screenshot({path:`${dir}/${name}-${pose}.png`});
+    await page.evaluate(()=>{for(const id of ['title','controls','status','credit'])document.getElementById(id).style.visibility=''});
    }
    await page.locator('[data-pose="Aim"]').click();
-   for(const v of ['hands','right']){await page.locator(`[data-view="${v}"]`).click();await page.waitForTimeout(300);await page.screenshot({path:`${dir}/${name}-Aim-${v}.png`});}
+   for(const v of ['hands','right']){await page.locator(`[data-view="${v}"]`).click();await page.waitForTimeout(300);
+    await page.evaluate(()=>{for(const id of ['title','controls','status','credit'])document.getElementById(id).style.visibility='hidden'});
+    await page.screenshot({path:`${dir}/${name}-Aim-${v}.png`});
+    await page.evaluate(()=>{for(const id of ['title','controls','status','credit'])document.getElementById(id).style.visibility=''});
+   }
    assert.deepEqual(errors,[]);results.push({browser:name,status:'pass',samples,realIphoneSafari:false});
   }catch(e){await page.screenshot({path:`${dir}/${name}-FAIL.png`}).catch(()=>{});results.push({browser:name,status:'fail',error:String(e),pageErrors:errors});process.exitCode=1;}
   finally{await browser.close();}
