@@ -35,9 +35,17 @@ def import_group(path):
 
 bpy.ops.object.select_all(action="SELECT")
 bpy.ops.object.delete(use_global=False)
-j,meshes_j,objs_j=import_group(SRC)
+j,all_jakeli_meshes,objs_j=import_group(SRC)
+# The experimental GLB contains BOTH 13 animated skinned outfits and
+# 14 legacy static source nodes (plus one helper). Blender imports them all.
+# Keep only the 13 true Jakeli skinned parts; never export double bodies.
+meshes_j=[obj for obj in all_jakeli_meshes if obj.name.startswith("Jakeli_")
+          and any(mod.type=="ARMATURE" for mod in obj.modifiers)]
+assert len(meshes_j)==13,[(x.name,[m.type for m in x.modifiers]) for x in all_jakeli_meshes]
+for obj in all_jakeli_meshes:
+    if obj not in meshes_j:bpy.data.objects.remove(obj,do_unlink=True)
 g,meshes_g,objs_g=import_group(GER)
-assert len(meshes_j)>=13 and len(meshes_g)>=4
+assert len(meshes_g)>=4
 assert len(j.data.bones)==65 and len(g.data.bones)==65
 original_materials={m.name:len(m.material_slots) for m in meshes_j}
 jmap={canonical(b.name):b for b in j.data.bones}
@@ -83,6 +91,10 @@ for k in common:
     bone.tail=bone.head+direction.normalized()*max(.008,direction.length*.70)
 for bone in g.data.edit_bones:
     bone.use_connect=False
+# This helper is not an anatomical joint. Blender creates its own root
+# joint in glTF export, so keep exactly 65 joints, not 66.
+neutral=g.data.edit_bones.get("neutral_bone")
+if neutral:g.data.edit_bones.remove(neutral)
 bpy.ops.object.mode_set(mode="OBJECT")
 bpy.context.view_layer.update()
 
