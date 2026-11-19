@@ -89,10 +89,18 @@ def weights(name,p):
  if 'SHOE' in name:
   t=smooth(13,22,z);return {side+'Foot':1-t,side+'Leg':t}
  if 'Pants' in name:
-  hip=smooth(84,99,z);k=smooth(49,61,z)
+  # The two leg meshes share crotch edges near the centreline. Without a
+  # pelvis bridge, neighbouring vertices bind to opposite thighs and split
+  # apart when the legs alternate in Sprint (measured 7.78x edge stretch).
+  # Transition smoothly from Hips at the inseam into each thigh in X and Z.
+  hip=max(smooth(84,99,z),(1-smooth(0,15,x))*smooth(64,75,z));k=smooth(49,61,z)
   return {'Hips':hip,side+'UpLeg':(1-hip)*k,side+'Leg':(1-hip)*(1-k)}
  if 'BELT' in name:return {'Spine':1}
- if 'ALL_BAG' in name:return {'Hips' if z<108 else 'Spine2':1}
+ if 'ALL_BAG' in name:
+  # One continuous bag mesh crossed the old z=108 rigid-bone boundary;
+  # adjacent vertices separated by ~1mm were pulled ~60mm apart in Aim.
+  # Keep the connected kit rigid to the upper torso instead.
+  return {'Spine2':1}
  # Shirt/torso: continuous shoulders, elbow and collar, no nearest-neighbour leakage.
  arm=smooth(17,26,x)*smooth(112,124,z)
  if 'T_Shirt' in name:
