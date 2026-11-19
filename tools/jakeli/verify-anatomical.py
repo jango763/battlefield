@@ -84,3 +84,12 @@ report={'bindMatrixMaxResidual':res,'originalSurfaceMaxErrorMeters':preserve_err
 q=ROOT/'babylon-qa-results/jakeli-anatomical';q.mkdir(exist_ok=True,parents=True);(q/'gltf-report.json').write_text(json.dumps(report,indent=2));print('JAKELI_GLTF_PASS',json.dumps({k:v for k,v in report.items() if k!='clips'}));print('STRETCH',[(n,r['worstMeshEdgeStretchP999']) for n,r in reports.items()])
 
 print('MESH_STRETCH',json.dumps(worst_by_mesh))
+# A green CI status must not hide severe skin separation. The historical model
+# passed even with 7.78x trouser/crotch stretch and 6.16x pack deformation.
+# This numeric gate is a preliminary geometric safety check, NOT art approval.
+DEFORMATION_STRETCH_P999_LIMIT=3.3
+violations={clip:round(data['worstMeshEdgeStretchP999'],3) for clip,data in reports.items() if data['worstMeshEdgeStretchP999']>=DEFORMATION_STRETCH_P999_LIMIT}
+if violations:
+ print('JAKELI_DEFORMATION_GATE_FAIL',json.dumps({'limit':DEFORMATION_STRETCH_P999_LIMIT,'clips':violations,'meshes':worst_by_mesh}))
+ raise AssertionError('Jakeli skin deformation too high: '+str(violations))
+print('JAKELI_DEFORMATION_GATE_PASS',json.dumps({'limit':DEFORMATION_STRETCH_P999_LIMIT,'worst':max(data['worstMeshEdgeStretchP999'] for data in reports.values())}))
