@@ -391,10 +391,13 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
   const dir=side==="right"?V(weaponId==="uk-lee-enfield"?handFit.dir:weaponProfile.fingerDir,gQ).normalize():V(m.supportAxis,gQ).normalize();
   // SUPPORT: the left hand must CUP the underside of the wooden fore-end.
   // Previous v5 used manifest's downward normal and posed the palm ON TOP.
-  // Source triggerPalm points to the outside of the receiver. Jakeli's
-  // anatomically inside-facing glove should turn toward the gun stock.
-  // Only the dominant glove uses the reversal; supporting palm stays up.
-  const palm=side==="right"?V(m.triggerPalm,gQ).scale(-1).normalize():
+  // A full 180-degree palm flip moved Jakeli's real trigger index 7cm
+  // away from the trigger, failing browser contact tests. Instead use a
+  // bounded 18-degree inward wrist pronation around the finger axis,
+  // retaining the actual weapon-specific grip socket and finger weights.
+  const palm=side==="right"?
+    rotate(V(m.triggerPalm,gQ).normalize(),
+      B.Quaternion.RotationAxis(dir,-Math.PI/10)).normalize():
     V(m.supportPalm,gQ).scale(-1).normalize();
   const anatomical=basis(dir,palm);
   const boneWorld=anatomical.multiply(calibrations[side].localBasis.conjugate()).normalize();
