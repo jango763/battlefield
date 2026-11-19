@@ -93,7 +93,7 @@ function checkGrip(snapshot,pose){
     greatestRightGrip:Math.max(...results.map(x=>x.grip.rightGripMeters)),
     greatestLeftGrip:Math.max(...results.map(x=>x.grip.leftGripMeters)),
     greatestStockGap:Math.max(...results.map(x=>x.grip.stockToShoulderMeters)),
-    canonicalRig:"us-hero-stage8-rig.js",
+    canonicalRig:"Stage8 copied for Jakeli; right elbow pole only",
     maxRightPalmErrorDeg:Math.max(...results.map(x=>x.grip.rightPalmErrorDeg)),
     maxLeftPalmErrorDeg:Math.max(...results.map(x=>x.grip.leftPalmErrorDeg)),
     maxRightIKMeters:Math.max(...results.map(x=>x.grip.rightIKMeters)),
