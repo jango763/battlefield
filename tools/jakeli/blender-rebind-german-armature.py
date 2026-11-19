@@ -117,11 +117,10 @@ for mesh in meshes_j:
             other=mesh.vertex_groups.get(target.name)
             if other and other!=group:
                 for vertex in mesh.data.vertices:
-                    try: w=group.weight(vertex.index)
-                    except RuntimeError: continue
-                    try: w+=other.weight(vertex.index)
-                    except RuntimeError: pass
-                    other.add([vertex.index],min(1.,w),"REPLACE")
+                    src=next((v.weight for v in vertex.groups if v.group==group.index),None)
+                    if src is None:continue
+                    previous=next((v.weight for v in vertex.groups if v.group==other.index),0.)
+                    other.add([vertex.index],min(1.,src+previous),"REPLACE")
                 mesh.vertex_groups.remove(group)
             else:
                 group.name=target.name
@@ -153,6 +152,13 @@ report={
 REPORT.write_text(json.dumps(report,indent=2,ensure_ascii=False))
 bpy.ops.wm.save_as_mainfile(filepath=str(PROJECT))
 bpy.ops.object.select_all(action="DESELECT")
+# glTF importer can place valid skinned outfit meshes in a non-active
+# collection. Link them to the export layer before selecting or saving:
+# otherwise Blender raises "can't be selected because not in ViewLayer".
+for obj in meshes_j+[g]:
+    if obj.name not in bpy.context.view_layer.objects:
+        bpy.context.scene.collection.objects.link(obj)
+bpy.context.view_layer.update()
 for obj in meshes_j+[g]:obj.select_set(True)
 bpy.context.view_layer.objects.active=g
 bpy.ops.export_scene.gltf(filepath=str(OUT),export_format="GLB",
