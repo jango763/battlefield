@@ -30,7 +30,8 @@ function inspect(file) {
   skinRoot:j.skins?.[0]?.skeleton,skinJointNames:joints.map(id=>j.nodes[id]?.name),
   animations:clips,buffers,accessors:j.accessors?.length||0,
   materials:j.materials?.length||0,textures:j.textures?.length||0,
-  bounds,rootScenes:j.scenes,scene:j.scene,nodes:names};
+  bounds,rootScenes:j.scenes,scene:j.scene,nodes:names,
+  nodeRelations:(j.nodes||[]).map((n,i)=>({i,name:n.name||"",parent:(j.nodes||[]).findIndex(q=>q.children?.includes(i)),mesh:n.mesh,skin:n.skin})).filter(n=>n.i<12||n.i>104&&n.i<118)};
 }
 const [jakeli,donor]=inputs.map(inspect);
 if(jakeli.sha256!=="e86dc27fdb763092ad80391ea79c3f83f20c7b81195d2132dc1b68cf3634d7a0")
