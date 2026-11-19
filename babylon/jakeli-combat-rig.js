@@ -33,6 +33,11 @@ const JAKELI_GRIPS=Object.freeze({
  "uk-bren":       {trigger:.66,wrap:1.38,support:1.17,thumb:.89},
  "uk-piat":       {trigger:.53,wrap:1.40,support:1.09,thumb:.84}
 });
+// Cup angle in the gun's own coordinates follows the fore-end offset.
+const SUPPORT_CUP_ROLL=Object.freeze({
+ "uk-lee-enfield":0,"uk-sten":-Math.PI/15,
+ "uk-bren":Math.PI/10,"uk-piat":Math.PI/12
+});
 const PIAT={
  trigger:[0,-.155,-.15],support:[0,-.115,.11],
  muzzle:[0,.055,.49],shoulder:[0,-.045,-.40],
@@ -305,7 +310,13 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
  // A weapon-owned support socket follows right wrist automatically.
  const supportSocket=new B.TransformNode("us-stage7-allied-foreend-L",scene);
  supportSocket.parent=pivot;
- supportSocket.rotationQuaternion=basis(arr(m.supportAxis),arr(m.supportPalm).scale(-1));
+ const supportPalmBasis=(meta,id)=>{
+  const axis=arr(meta.supportAxis).normalize();
+  const palm=rotate(arr(meta.supportPalm).scale(-1),
+    B.Quaternion.RotationAxis(axis,SUPPORT_CUP_ROLL[id]));
+  return basis(axis,palm);
+ };
+ supportSocket.rotationQuaternion=supportPalmBasis(m,weaponId);
  let resource=null,weaponMeshCount=0;
  async function loadWeapon(id){
   const cfg=PROFILES[id];
@@ -397,18 +408,12 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
   // away from the trigger, failing browser contact tests. Instead use a
   // bounded 18-degree inward wrist pronation around the finger axis,
   // retaining the actual weapon-specific grip socket and finger weights.
-  // LMG/PIAT support is offset sideways from the barrel: cant the wrist
-  // inward toward the actual fore-end, instead of leaving a flat up-facing
-  // open palm. Sten support sits left of the receiver, so its sign reverses.
-  const leftCupRoll=Object.freeze({
-    "uk-lee-enfield":0,"uk-sten":-Math.PI/15,
-    "uk-bren":Math.PI/10,"uk-piat":Math.PI/12
-  })[weaponId];
+  // The right hand is calibrated here. The left hand follows the tilted,
+  // weapon-owned support target through supportPalmBasis().
   const palm=side==="right"?
     rotate(V(m.triggerPalm,gQ).normalize(),
       B.Quaternion.RotationAxis(dir,-Math.PI/10)).normalize():
-    rotate(V(m.supportPalm,gQ).scale(-1).normalize(),
-      B.Quaternion.RotationAxis(dir,leftCupRoll)).normalize();
+    V(m.supportPalm,gQ).scale(-1).normalize();
   const anatomical=basis(dir,palm);
   const boneWorld=anatomical.multiply(calibrations[side].localBasis.conjugate()).normalize();
   const gripOffset=rotate(calibrations[side].socketLocalOffset,boneWorld);
@@ -630,9 +635,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    state.leftPalmErrorDeg=angleDeg(lf.palm,orientationL.palm);
    state.rightPalmWeaponLocal=rotate(rf.palm,actualWeaponQ.conjugate()).asArray();
    state.leftPalmWeaponLocal=rotate(lf.palm,actualWeaponQ.conjugate()).asArray();
-   state.leftSupportCupRollDeg={
-     "uk-lee-enfield":0,"uk-sten":-12,"uk-bren":18,"uk-piat":15
-   }[weaponId];
+   state.leftSupportCupRollDeg=SUPPORT_CUP_ROLL[weaponId]*180/Math.PI;
    state.rightFingerErrorDeg=angleDeg(rf.forward,orientationR.dir);
    state.leftFingerErrorDeg=angleDeg(lf.forward,orientationL.dir);
    state.supportAlongBarrelMeters=z;
@@ -682,7 +685,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
     resource=pending;pending=null;
     weaponMeshCount=resource.attach();
     weaponId=nextId;weaponProfile=cfg;m=meta;
-    supportSocket.rotationQuaternion=basis(arr(m.supportAxis),arr(m.supportPalm).scale(-1));
+    supportSocket.rotationQuaternion=supportPalmBasis(m,weaponId);
     supportProfile="standard";
     state.leftSupportProfile="standard";
     state.weaponId=weaponId;
