@@ -6,6 +6,7 @@ Or the official bpy==4.3.0 Python 3.11 wheel. No German/game input is written.
 import bpy, json, math, re, hashlib, os
 from pathlib import Path
 from mathutils import Vector, Matrix, Quaternion
+from quaternius_legs import QuaterniusLowerBody
 ROOT=Path(__file__).resolve().parents[2]
 SRC=ROOT/'assets/allied-soldiers/uk-jakeli-mobile-static.glb'
 OUT=ROOT/'assets/allied-soldiers/uk-jakeli-anatomical-v2.glb'
@@ -165,6 +166,8 @@ bones=rig.pose.bones
 for b in bones:b.rotation_mode='QUATERNION'
 gun.rotation_mode='QUATERNION'
 rest={b.name:b.matrix.copy() for b in bones}
+# Genuine pre-Work Quaternius legs on the NEW anatomical skin. Arms and rifle stay baked.
+gait=QuaterniusLowerBody(ROOT/'assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb',rig)
 # Frame rotations derive from fitted bone directions. No assumed donor wrist axis.
 def frame(forward,dorsal):
  y=forward.normalized();z=(dorsal-y*y.dot(dorsal)).normalized();x=y.cross(z).normalized();z=x.cross(y)
@@ -183,7 +186,7 @@ def solve(side,goal,pole):
 palm_local={s:rest[s+'Hand'].inverted()@pt(sign*58,-2.5,105) for s,sign in [('Left',1),('Right',-1)]}
 clips={};grip_max=0;elbows=[]
 scene=bpy.context.scene;scene.render.fps=30
-for clip,duration in [('Ready',2),('Aim',2),('Fire',1.2),('Walk',1.2),('Jog',.8),('Sprint',.65)]:
+for clip,duration in [('Ready',2),('Aim',2),('Fire',1.2)]+[(c,gait.clips[c]['duration']) for c in ('Walk','Jog','Sprint')]:
  rig.animation_data_create();rig.animation_data.action=bpy.data.actions.new(clip)
  gun.animation_data_create();gun.animation_data.action=bpy.data.actions.new(clip)
  frames=round(duration*30)
@@ -193,15 +196,9 @@ for clip,duration in [('Ready',2),('Aim',2),('Fire',1.2),('Walk',1.2),('Jog',.8)
   update()
   set_world('Spine2',Quaternion((0,0,1),-.42) @ rest['Spine2'].to_quaternion())
   set_world('Head',rest['Head'].to_quaternion())
-  # Deterministic in-place locomotion: flexed knee on recovery, counterbalanced pelvis.
+  # True earlier Quaternius bone trajectories (no synthetic sine-leg animation).
   if moving:
-   stride=.30 if clip=='Walk' else .50 if clip=='Jog' else .68
-   for s,offset in [('Left',0),('Right',math.pi)]:
-    a=phase+offset
-    bones[s+'UpLeg'].rotation_quaternion=Quaternion((1,0,0),stride*math.sin(a))
-    bones[s+'Leg'].rotation_quaternion=Quaternion((1,0,0),-max(0,math.cos(a))*(.65 if fast else .38))
-    bones[s+'Foot'].rotation_quaternion=Quaternion((1,0,0),.12*math.sin(a))
-   bones['Hips'].location.z=.012*math.cos(phase*2)
+   gait.apply(clip, f/frames)
   update()
   # Gun stock sits in right shoulder pocket; support is on the actual fore-end.
   lower=math.radians(24 if clip in ['Ready','Walk','Jog','Sprint'] else 0)
@@ -257,7 +254,8 @@ report={'sourceSHA256':hashlib.sha256(SRC.read_bytes()).hexdigest(),'blender':bp
  'bindMaxVertexErrorMeters':bind_error,'maxBakedPalmContactErrorMeters':grip_max,'elbowBendRangeDegrees':[min(elbows),max(elbows)],
  'sourceVertices':sum(v['vertices'] for v in original.values()),'meshes':len(meshes),'bonesBeforeGltfRoot':len(bones),
  'preserved':'All original source positions (one uniform transform), topology, UVs and materials; embedded Springfield excluded',
- 'clips':clips,'locomotion':'new procedural in-place cycles; not Quaternius and not artist-approved',
+ 'clips':clips,'locomotion':'authentic pre-Work Quaternius Walk/Jog/Sprint legs on anatomical Jakeli; combat upper-body still custom baked',
+ 'legMotionSource':gait.path,'legMotionClips':gait.audit,
  'visualApproval':False,'iphoneSafari':False}
 (QA/'build-report.json').write_text(json.dumps(report,indent=2));print('JAKELI_BUILD',json.dumps(report))
 # CPU reference renders of the same baked pose, with actual surface geometry visible.
