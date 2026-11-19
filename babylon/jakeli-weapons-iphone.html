@@ -46,7 +46,7 @@ a{color:#cbedb9}
 <button data-motion="Jog_Quaternius" aria-pressed="false">Бег</button>
 <button data-motion="Sprint_Quaternius" aria-pressed="false">Спринт</button>
 </div>
-<p><a href="?hands=german">Кисти по весам утверждённого немца (сравнение)</a> · <a href="?hands=original">Исходный Jakeli</a></p>
+<p><a href="?hands=real">Настоящие кисти утверждённого немца (новый тест)</a> · <a href="?hands=german">Только веса (предыдущий тест)</a> · <a href="?hands=original">Исходный Jakeli</a></p>
 <pre id="status" aria-live="polite">Загружаю экспериментальный Jakeli и винтовку…</pre>
 <p>Можно вращать и приближать модель пальцем. Проверяем, чтобы не было четырёх кистей, плавающего приклада и вывернутых рук. <a href="../assets/allied-soldiers/ATTRIBUTION_JAKELI.md">George Jakeli · CC BY 4.0</a></p>
 </main>
@@ -55,8 +55,10 @@ a{color:#cbedb9}
 const qa={loaded:false,realJakeli:true,prototype:true,bones:0,meshCount:0,
  weaponId:null,weaponMeshCount:0,grip:null,clips:[],motion:null,
  error:null,releaseReady:false,actualSafariTested:false,weaponSwaps:0,rigSource:"us-hero-stage8-rig.js"};
-const germanHandWeights=new URLSearchParams(location.search).get("hands")==="german";
-qa.handWeightSource=germanHandWeights?"german":"original";
+const handVariant=new URLSearchParams(location.search).get("hands");
+const germanHandWeights=handVariant==="german";
+const realHandMesh=handVariant==="real";
+qa.handWeightSource=realHandMesh?"german-real-mesh":germanHandWeights?"german":"original";
 window.__JAKELI_WEAPON_QA__=qa;
 (async()=>{
  try{
@@ -74,7 +76,7 @@ window.__JAKELI_WEAPON_QA__=qa;
   scene.activeCamera=camera;
   const stage=new B.TransformNode("jakeli-faction-britain-stage",scene);
   const imported=await B.SceneLoader.LoadAssetContainerAsync("",
-     "../assets/allied-soldiers/"+(germanHandWeights?"uk-jakeli-german-skin-v1.glb":"uk-jakeli-prototype-65b.glb"),scene,undefined,".glb");
+     "../assets/allied-soldiers/"+(realHandMesh?"uk-jakeli-german-real-hands-v1.glb":germanHandWeights?"uk-jakeli-german-skin-v1.glb":"uk-jakeli-prototype-65b.glb"),scene,undefined,".glb");
   imported.addAllToScene();
   qa.bones=imported.skeletons[0]?.bones?.length||0;
   qa.meshCount=imported.meshes.filter(m=>(m.getTotalVertices?.()||0)>0).length;
@@ -146,7 +148,7 @@ window.__JAKELI_WEAPON_QA__=qa;
    };
    qa.weaponId=r.weaponId;qa.weaponMeshCount=r.weaponMeshCount;
    out.textContent="Подлинная модель Jakeli · "+qa.meshCount+" частей · "+qa.bones+" костей"+
-     "\nВеса кистей: "+(germanHandWeights?"авторские, перенесены с утверждённого немца":"исходный алгоритм")+
+     "\nВеса кистей: "+(realHandMesh?"настоящая геометрия немецких кистей, привязана к Jakeli":germanHandWeights?"авторские, перенесены с утверждённого немца":"исходный алгоритм")+
     "\nОружие: "+r.weaponLabel+" · геометрия оружия: "+r.weaponMeshCount+
     "\nСтойка: "+r.mode+" · движение: "+qa.motion+
     "\nПравая кисть: "+Number(r.rightGripMeters).toFixed(3)+" м"+
