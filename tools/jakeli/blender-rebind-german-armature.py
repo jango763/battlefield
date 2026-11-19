@@ -94,7 +94,10 @@ def weights(name,p):
   # pelvis bridge, neighbouring vertices bind to opposite thighs and split
   # apart when the legs alternate in Sprint (measured 7.78x edge stretch).
   # Transition smoothly from Hips at the inseam into each thigh in X and Z.
-  hip=max(smooth(84,99,z),(1-smooth(0,15,x))*smooth(64,75,z));k=smooth(49,61,z)
+  # Smooth pelvis-to-thigh blend verified against actual Quaternius Walk/Jog/Sprint.
+  # Old narrow blend stretched crotch mesh 3.384x in Jog; a 38cm-long
+  # anatomical hip transition keeps the original source gait unmodified.
+  hip=max(smooth(82,101,z),(1-smooth(0,25,x))*smooth(48,86,z));k=smooth(49,61,z)
   return {'Hips':hip,side+'UpLeg':(1-hip)*k,side+'Leg':(1-hip)*(1-k)}
  if 'BELT' in name:return {'Spine':1}
  if 'ALL_BAG' in name:
