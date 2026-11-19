@@ -1,6 +1,6 @@
 "use strict";
 const fs=require("node:fs"),vm=require("node:vm");
-const targets=["babylon/jakeli-65b-iphone.html","babylon/jakeli-weapons-iphone.html"];
+const targets=["babylon/jakeli-65b-iphone.html","babylon/jakeli-weapons-iphone.html","babylon/jakeli-three-squad-iphone.html"];
 for(const file of targets){
  const html=fs.readFileSync(file,"utf8");
  const match=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
