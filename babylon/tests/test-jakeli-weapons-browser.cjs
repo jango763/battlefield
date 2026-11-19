@@ -1,7 +1,8 @@
 "use strict";
 const {chromium}=require("/tmp/jakeli-qa/node_modules/playwright");
 const fs=require("node:fs");
-const dir="babylon-qa-results/jakeli-weapons";
+const germanHands=process.env.JAKELI_GERMAN_HANDS==="1";
+const dir="babylon-qa-results/"+(germanHands?"jakeli-weapons-german":"jakeli-weapons");
 // Match the approved British grip budget in assets/allied-soldiers/manifest.json.
 // A visible weapon mesh does not prove that either hand actually holds it.
 const GRIP_LIMITS=Object.freeze({right:0.06,left:0.06,stock:0.15});
@@ -30,12 +31,13 @@ function checkGrip(snapshot,pose){
    deviceScaleFactor:1,isMobile:true,hasTouch:true});
  const errors=[];page.on("pageerror",e=>errors.push(e.message));
  try{
-  await page.goto("http://127.0.0.1:8809/babylon/jakeli-weapons-iphone.html",
+  await page.goto("http://127.0.0.1:8809/babylon/jakeli-weapons-iphone.html"+(germanHands?"?hands=german":""),
     {waitUntil:"domcontentloaded",timeout:60000});
   await page.waitForFunction(()=>window.__JAKELI_WEAPON_QA__?.loaded||
     window.__JAKELI_WEAPON_QA__?.error,null,{timeout:120000});
   const init=await page.evaluate(()=>window.__JAKELI_WEAPON_QA__);
   console.log("JAKELI_REAL_WEAPON_INIT",JSON.stringify(init));
+  if((init.handWeightSource==="german")!==germanHands)throw Error("Wrong Jakeli skin variant "+JSON.stringify(init));
   if(!init.loaded||init.error||init.bones!==65||init.meshCount!==13||init.clips.length!==4)
    throw Error("Real Jakeli 65-bone weapon rig not loaded "+JSON.stringify(init));
   const results=[];
