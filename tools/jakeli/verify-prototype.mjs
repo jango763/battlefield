@@ -20,6 +20,8 @@ assert.equal(rigMeshNodes.length,13,"Exactly 13 original meshes must be displaye
 const handJointIndices=new Set(j.skins[0].joints.flatMap((nodeId,jointIndex)=>
  /mixamorig:(LeftHand|RightHand)$/.test(j.nodes[nodeId]?.name||"")?[jointIndex]:[]));
 assert.equal(handJointIndices.size,2,"Both genuine wrist joints must exist");
+const jointNames=j.skins[0].joints.map(n=>j.nodes[n]?.name||"");
+const gloveStats={Left:{all:0,articulated:0,thumb:0,digits:new Set()},Right:{all:0,articulated:0,thumb:0,digits:new Set()}};
 let gloveVertexCount=0;
 let skinned=0,vertices=0,triangles=0;
 for(const node of rigMeshNodes){
@@ -42,13 +44,25 @@ for(const node of rigMeshNodes){
    }
    assert(Math.abs(sum-1)<0.0001,"Unnormalized British vertex weight");
    if(/^SLD_1_Material #21_0$/.test(j.meshes[node.mesh].name)){
-    // Source Jakeli gloves are not individually segmented or hand-rigged.
-    // Reject pathological hand-to-distal-pinky weight transfer.
-    assert(handJointIndices.has(bytes.readUInt8(bin+jm+i*4)),
-      "Source glove was skinned to a finger instead of a wrist");
-    assert(bytes.readFloatLE(bin+wm+i*16)>0.999,
-      "Source glove has unstable blended finger weights");
-    gloveVertexCount++;
+    const pv=j.bufferViews[a.bufferView],po=bin+(pv.byteOffset||0)+(a.byteOffset||0)+i*12;
+    const x=bytes.readFloatLE(po);
+    const side=x>=0?"Left":"Right",stats=gloveStats[side];
+    stats.all++;gloveVertexCount++;
+    let articulated=0,thumb=0;
+    for(let k=0;k<4;k++){
+     const weight=bytes.readFloatLE(bin+wm+i*16+k*4);
+     if(weight<=1e-6)continue;
+     const joint=bytes.readUInt8(bin+jm+i*4+k);
+     const name=jointNames[joint];
+     assert(name.startsWith("mixamorig:"+side+"Hand"),
+       "British glove vertex is bound to the opposite hand or unrelated joint: "+name);
+     if(/Hand(Thumb|Index|Middle|Ring|Pinky)[123]$/.test(name)){
+      articulated+=weight;stats.digits.add(name.match(/Hand(Thumb|Index|Middle|Ring|Pinky)/)[1]);
+      if(/HandThumb/.test(name))thumb+=weight;
+     }
+    }
+    if(articulated>.12)stats.articulated++;
+    if(thumb>.12)stats.thumb++;
    }
   }
   vertices+=a.count;skinned++;
@@ -57,6 +71,12 @@ for(const node of rigMeshNodes){
 }
 assert(vertices>40000,"A placeholder or partial model is not acceptable");
 assert(gloveVertexCount>=3500,"Missing genuine original Jakeli glove geometry");
+for(const [side,stat] of Object.entries(gloveStats)){
+ assert(stat.all>=1800,"Missing complete source "+side+" glove");
+ assert(stat.articulated>=900,"Source "+side+" glove not bound to real finger bones");
+ assert(stat.thumb>=80,"Source "+side+" thumb not articulated");
+ assert(stat.digits.size===5,"Source "+side+" glove missing articulated digits: "+[...stat.digits]);
+}
 assert(triangles<=65000,"Jakeli must fit the real 65k triangle iPhone limit: "+triangles);
 const nodesWithAnimation=new Set();
 for(const a of j.animations)for(const ch of a.channels){
@@ -65,7 +85,9 @@ for(const a of j.animations)for(const ch of a.channels){
 }
 assert(nodesWithAnimation.size>=20);
 console.log("JAKELI_REAL_MESH_RIG_STRUCTURAL_PASS",JSON.stringify({skinnedParts:skinned,
- skinnedVertices:vertices,gloveVertexCount,triangles:Math.round(triangles),bones:65,animations:j.animations.map(x=>x.name),
+ skinnedVertices:vertices,gloveVertexCount,gloveStats:Object.fromEntries(Object.entries(gloveStats).map(([s,v])=>
+ [s,{vertices:v.all,articulated:v.articulated,thumb:v.thumb,digits:[...v.digits]}])),
+ triangles:Math.round(triangles),bones:65,animations:j.animations.map(x=>x.name),
  textures:j.textures.length,bytes:bytes.length,
  sha256:crypto.createHash("sha256").update(bytes).digest("hex"),
  releaseCertified:false,safariCertified:false}));
