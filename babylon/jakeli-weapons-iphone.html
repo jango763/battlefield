@@ -21,7 +21,7 @@ a{color:#cbedb9}
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
-<script src="./us-hero-stage8-rig.js"></script>
+<script src="./jakeli-combat-rig.js"></script>
 </head><body><main>
 <h1>Jakeli — боец с оружием</h1>
 <p class="warn">Испытание подлинного британского меша на донорском 65-костном риге. В игре не установлен. Это проверка совместимости и двуручного IK, а не окончательно утверждённая анимация.</p>
@@ -53,7 +53,7 @@ const qa={loaded:false,realJakeli:true,prototype:true,bones:0,meshCount:0,
 window.__JAKELI_WEAPON_QA__=qa;
 (async()=>{
  try{
-  const B=window.BABYLON,api=window.BattlefieldUSLeeEnfieldStage4;
+  const B=window.BABYLON,api=window.BattlefieldJakeliWeaponRig;
   if(!B?.SceneLoader||!api?.create)throw Error("Нет Babylon.js / утверждённого двуручного IK");
   const canvas=document.querySelector("#scene"),out=document.querySelector("#status");
   const engine=new B.Engine(canvas,true,{powerPreference:"high-performance"});
@@ -110,6 +110,10 @@ window.__JAKELI_WEAPON_QA__=qa;
     mounted:r.socketAttached,socketName:r.socketName,
     armChannelsRemoved:r.armChannelsRemoved,
     leftSupportInHandguard:r.supportWithinHandguard,
+    fingerGripProfile:r.fingerGripProfile,
+    fingerJointCount:r.fingerJointCount,
+    triggerIndexFlexRad:r.triggerIndexFlexRad,
+    supportFingerFlexRad:r.supportFingerFlexRad,
     error:r.error
    };
    qa.weaponId=r.weaponId;qa.weaponMeshCount=r.weaponMeshCount;
@@ -119,6 +123,8 @@ window.__JAKELI_WEAPON_QA__=qa;
     "\nПравая кисть: "+Number(r.rightGripMeters).toFixed(3)+" м"+
     " · левая кисть: "+Number(r.leftGripMeters).toFixed(3)+" м"+
     "\nПриклад: "+Number(r.stockToShoulderMeters).toFixed(3)+" м"+
+    "\nПальцы: "+r.fingerJointCount+" суставов · спуск: "+r.triggerIndexFlexRad.toFixed(2)+" рад"+
+    " · опора: "+r.supportFingerFlexRad.toFixed(2)+" рад"+
     "\nWeapon_R: "+(r.socketAttached?"закреплён":"не закреплён")+
     " · IK: "+(r.error||"без ошибки")+
     "\nВыпуск: НЕ РАЗРЕШЁН, нужна визуальная проверка.";
