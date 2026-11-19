@@ -23,6 +23,7 @@ assert.equal(handJointIndices.size,2,"Both genuine wrist joints must exist");
 const jointNames=j.skins[0].joints.map(n=>j.nodes[n]?.name||"");
 const gloveStats={Left:{all:0,articulated:0,thumb:0,digits:new Set(),rootN:0,rootProx:0,rootDistal:0,tipN:0,tipDistal:0},Right:{all:0,articulated:0,thumb:0,digits:new Set(),rootN:0,rootProx:0,rootDistal:0,tipN:0,tipDistal:0}};
 const cuffSeam={Left:{glove:[],sleeve:[]},Right:{glove:[],sleeve:[]}};
+const palmLayerY={Left:[],Right:[]};
 let gloveVertexCount=0;
 let skinned=0,vertices=0,triangles=0;
 for(const node of rigMeshNodes){
@@ -45,6 +46,8 @@ for(const node of rigMeshNodes){
    const px=bytes.readFloatLE(pOff);
    const xAbs=Math.abs(px);
    const seamSide=px>=0?"Left":"Right";
+   if(isGlove&&xAbs>=.555&&xAbs<=.585)
+    palmLayerY[seamSide].push(bytes.readFloatLE(pOff+4));
    if(isGlove&&xAbs>=.49&&xAbs<=.525||isSleeve&&xAbs>=.42&&xAbs<=.58){
     const pos=[px,bytes.readFloatLE(pOff+4),bytes.readFloatLE(pOff+8)];
     cuffSeam[seamSide][isGlove?"glove":"sleeve"].push(pos);
@@ -118,6 +121,19 @@ for(const [side,pair] of Object.entries(cuffSeam)){
  cuffGapReport[side]={gloveSamples:pair.glove.length,sleeveSamples:pair.sleeve.length,
   medianGapMeters:median,p90GapMeters:p90};
 }
+// Catch oversized source mittens: measure the actual sculpted geometry
+// in the palm section, away from the sleeve cuff and individual fingertips.
+const palmThicknessReport={};
+for(const [side,values] of Object.entries(palmLayerY)){
+ assert(values.length>=300,"Missing full palm section on "+side);
+ values.sort((a,b)=>a-b);
+ const p10=values[Math.floor(values.length*.1)];
+ const p90=values[Math.floor(values.length*.9)];
+ const spread=p90-p10;
+ assert(spread>.033&&spread<.053,
+  "Jakeli "+side+" glove palm too thick or collapsed: p10-p90="+spread);
+ palmThicknessReport[side]={samples:values.length,verticalP10P90Meters:spread};
+}
 assert(vertices>40000,"A placeholder or partial model is not acceptable");
 assert(gloveVertexCount>=3500,"Missing genuine original Jakeli glove geometry");
 for(const [side,stat] of Object.entries(gloveStats)){
@@ -138,7 +154,7 @@ for(const a of j.animations)for(const ch of a.channels){
 }
 assert(nodesWithAnimation.size>=20);
 console.log("JAKELI_REAL_MESH_RIG_STRUCTURAL_PASS",JSON.stringify({skinnedParts:skinned,
- skinnedVertices:vertices,gloveVertexCount,cuffGapReport,gloveStats:Object.fromEntries(Object.entries(gloveStats).map(([s,v])=>
+ skinnedVertices:vertices,gloveVertexCount,cuffGapReport,palmThicknessReport,gloveStats:Object.fromEntries(Object.entries(gloveStats).map(([s,v])=>
  [s,{vertices:v.all,articulated:v.articulated,thumb:v.thumb,digits:[...v.digits],
  rootCount:v.rootN,rootProxAvg:v.rootProx/v.rootN,rootDistalAvg:v.rootDistal/v.rootN,
  tipCount:v.tipN,tipDistalAvg:v.tipDistal/v.tipN}])),
