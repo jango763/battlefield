@@ -245,14 +245,32 @@ for(let mi=0;mi<s.meshes.length;mi++){
    const wrist=[side*.536,.231,.072];
    const taper=ease01((Math.abs(v[0])-.535)/.108);
    const shrink=1-.17*taper;
-   return wrist.map((x,k)=>x+(v[k]-x)*shrink);
+   const q=wrist.map((x,k)=>x+(v[k]-x)*shrink);
+   // Source palms are ~12 cm thick in Y at the cuff, larger than the
+   // donor 65-bone hand. Sculpt only the bulk of the palm, NOT its
+   // longitudinal finger length, wrist seam, or separate digit centers.
+   // Anatomical palm center follows the real donor wrist -> knuckle slope.
+   const palmTaper=ease01((Math.abs(v[0])-.510)/.060);
+   const palmCenter=.207-.61*clamp01((Math.abs(q[0])-.535)/.112)*.112;
+   q[1]=palmCenter+(q[1]-palmCenter)*(1-.28*palmTaper);
+   return q;
   });
   const pFlat=new Float32Array(tr.flat()),pBuffer=Buffer.from(pFlat.buffer);
   const min=[0,1,2].map(k=>Math.min(...tr.map(x=>x[k]))),
    max=[0,1,2].map(k=>Math.max(...tr.map(x=>x[k])));
   original.POSITION=addAccessor(pBuffer,5126,"VEC3",p.length,min,max);
   if(original.NORMAL!==undefined){
-   const norms=readAccessor(src,original.NORMAL).map(alignedNormal);
+   const norms=readAccessor(src,original.NORMAL).map((n,i)=>{
+    const nn=alignedNormal(n);
+    if(sourceGloves){
+     const palmTaper=ease01((Math.abs(skinRest[i][0])-.510)/.060);
+     // Approximate inverse-transpose of the palm-thickness sculpt.
+     nn[1]/=1-.28*palmTaper;
+     const len=Math.hypot(...nn)||1;
+     return nn.map(x=>x/len);
+    }
+    return nn;
+   });
    const floats=new Float32Array(norms.flat());
    original.NORMAL=addAccessor(Buffer.from(floats.buffer),5126,"VEC3",norms.length);
   }
