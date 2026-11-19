@@ -5,10 +5,13 @@ on:
       - feature/british-army-10-stages-20261118
     paths:
       - tools/jakeli/blender-rebind-german-armature.py
+      - babylon/jakeli-blender-lee-iphone.html
+      - babylon/jakeli-blender-lee-main.js
+      - babylon/tests/test-jakeli-blender-lee-browser.cjs
       - .github/workflows/jakeli-blender-one-rifle.yml
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   rebind:
     runs-on: ubuntu-24.04
@@ -35,6 +38,21 @@ jobs:
           if((d.meshes||[]).length<13)throw Error('Lost authentic British mesh');
           console.log('JAKELI_BLENDER_ONE_RIFLE_STRUCTURAL_PASS',JSON.stringify({meshes:d.meshes.length,bones:d.skins[0].joints.length,animations:d.animations?.length||0}));
           NODE
+      - name: Browser QA for authentic Jakeli on one rifle (not real Safari)
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/jakeli-blender-qa playwright@1.58.2
+          /tmp/jakeli-blender-qa/node_modules/.bin/playwright install chromium
+          python3 -m http.server 8810 --bind 127.0.0.1 >/tmp/jakeli-one-rifle-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-jakeli-blender-lee-browser.cjs
+      - name: Upload one-rifle Blender browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakeli-blender-one-lee-chromium
+          path: babylon-qa-results/jakeli-blender-lee-screen/
+          retention-days: 5
+          if-no-files-found: ignore
       - name: Upload editable Blender project and one-rifle GLB
         if: always()
         uses: actions/upload-artifact@v4
@@ -45,3 +63,16 @@ jobs:
             babylon-qa-results/jakeli-blender-lee/
           if-no-files-found: warn
           retention-days: 5
+      - name: Publish only isolated Blender GLB after successful browser test
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/allied-soldiers/uk-jakeli-blender-german-rig-v1.glb
+          if git diff --cached --quiet; then
+            echo 'Blender Jakeli experiment unchanged'
+          else
+            git commit -m 'Publish experimental Blender-rebound Jakeli (not game-approved)'
+            git pull --rebase origin feature/british-army-10-stages-20261118
+            git push origin HEAD:refs/heads/feature/british-army-10-stages-20261118
+          fi
