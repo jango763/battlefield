@@ -458,10 +458,9 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    const rGrip=trigger.add(V(weaponId==="uk-lee-enfield"?handFit.grip:weaponProfile.grip,gunQ))
       .add(V([0,.002*combatRecoil,-.016*combatRecoil],gunQ));
    const rWrist=rGrip.subtract(orientationR.gripOffset);
-   // Jakeli reference: shoulder -> elbow tucked down -> trigger hand.
-   // Only the right elbow pole changes. Grip target, wrist rotation,
-   // weapon mounting, left hand, and all 65 bones remain Stage 8.
-   const referenceElbow=mode==="aim"?[-.55,-1.20,-.20]:[-.55,-1.10,-.40];
+   // Keep the proven Stage8 stance. Small Jakeli right-elbow adjustment
+   // only: about 1 cm lower pole; no wrist, gun or left-hand changes.
+   const referenceElbow=mode==="aim"?[-.97,-.94,-.20]:[-.97,-.64,-.40];
    const poleR=right.upper.getAbsolutePosition()
       .add(V(referenceElbow,body.q).scale(.27));
    const rSolve=solveLimb(right,rWrist,poleR);
