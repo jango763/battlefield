@@ -9,12 +9,22 @@ function checkGrip(snapshot,pose){
  const g=snapshot.grip;
  const values={right:g?.rightGripMeters,left:g?.leftGripMeters,stock:g?.stockToShoulderMeters};
  const finite=Object.values(values).every(x=>typeof x==="number"&&Number.isFinite(x));
+ // Unlike the attachment-to-itself socket distance, this measures a genuine
+ // animated finger joint against the GLB weapon trigger marker.
+ const fingerToTrigger=g?.rightIndex2ToTriggerMeters;
+ const fingerLocal=g?.rightIndex2TriggerLocal;
+ const contactPass=Number.isFinite(fingerToTrigger)&&fingerToTrigger<=.055&&
+   Array.isArray(fingerLocal)&&fingerLocal.length===3&&
+   fingerLocal.every(Number.isFinite)&&
+   Math.abs(fingerLocal[0])<=.045&&fingerLocal[1]>=-.06&&fingerLocal[1]<=.01&&
+   Math.abs(fingerLocal[2])<=.045&&
+   Number.isFinite(g?.rightThumb2ToTriggerMeters)&&g.rightThumb2ToTriggerMeters<=.10;
  const curlPass=g?.fingerGripProfile==="jakeli-weapon-specific-v1"&&
    Number.isInteger(g?.fingerJointCount)&&g.fingerJointCount>=26&&
    Number.isFinite(g?.triggerIndexFlexRad)&&g.triggerIndexFlexRad>.40&&g.triggerIndexFlexRad<.9&&
    Number.isFinite(g?.supportFingerFlexRad)&&g.supportFingerFlexRad>.95&&
    g.triggerIndexFlexRad<g.supportFingerFlexRad;
- if(snapshot.error||g?.error||!finite||!curlPass||!g?.mounted||!g?.rightReachable||
+ if(snapshot.error||g?.error||!finite||!curlPass||!contactPass||!g?.mounted||!g?.rightReachable||
     !g?.leftReachable||!g?.leftSupportInHandguard||
     values.right>GRIP_LIMITS.right||values.left>GRIP_LIMITS.left||
     values.stock>GRIP_LIMITS.stock){
@@ -83,6 +93,8 @@ function checkGrip(snapshot,pose){
     greatestLeftGrip:Math.max(...results.map(x=>x.grip.leftGripMeters)),
     greatestStockGap:Math.max(...results.map(x=>x.grip.stockToShoulderMeters)),
     minFingerJoints:Math.min(...results.map(x=>x.grip.fingerJointCount)),
+    maxTrueIndexTriggerGap:Math.max(...results.map(x=>x.grip.rightIndex2ToTriggerMeters)),
+    maxThumbTriggerGap:Math.max(...results.map(x=>x.grip.rightThumb2ToTriggerMeters)),
     triggerIndexFlexRange:[Math.min(...results.map(x=>x.grip.triggerIndexFlexRad)),Math.max(...results.map(x=>x.grip.triggerIndexFlexRad))],
     supportFingerFlexRange:[Math.min(...results.map(x=>x.grip.supportFingerFlexRad)),Math.max(...results.map(x=>x.grip.supportFingerFlexRad))]
   }));
