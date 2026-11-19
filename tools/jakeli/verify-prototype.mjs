@@ -116,10 +116,17 @@ for(const [side,pair] of Object.entries(cuffSeam)){
  }).sort((a,b)=>a-b);
  const median=distances[Math.floor(distances.length*.5)];
  const p90=distances[Math.floor(distances.length*.9)];
+ // The imported artist mesh had its wrist cuff 0.15-0.17 m below its
+ // skeleton joint. Socket-error-only tests never detected this.
+ // The real 65-bone donor wrist rests at Y=.231m on either side.
+ const cuffY=pair.glove.map(p=>p[1]).sort((a,b)=>a-b);
+ const gloveMedianY=cuffY[Math.floor(cuffY.length/2)];
+ assert(Math.abs(gloveMedianY-.231)<.060,
+   "Jakeli "+side+" glove bind pose disconnected from real wrist Y=.231: "+gloveMedianY);
  assert(median<.026&&p90<.034,
   "Jakeli "+side+" cuff disconnected from glove: median="+median+" p90="+p90);
  cuffGapReport[side]={gloveSamples:pair.glove.length,sleeveSamples:pair.sleeve.length,
-  medianGapMeters:median,p90GapMeters:p90};
+  medianGapMeters:median,p90GapMeters:p90,gloveBindMedianYMeters:gloveMedianY};
 }
 // Catch oversized source mittens: measure the actual sculpted geometry
 // in the palm section, away from the sleeve cuff and individual fingertips.
