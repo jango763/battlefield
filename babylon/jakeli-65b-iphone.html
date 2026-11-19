@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1,viewport-fit=cover">
+<title>Battlefield · Jakeli 65 костей — экспериментальная анимация</title>
+<style>
+:root{color-scheme:dark;font:14px/1.45 system-ui,-apple-system,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:#101c18;color:#edf3e8}
+main{max-width:900px;margin:auto;padding:14px}h1{font-size:21px;margin:4px 0 8px}
+p{color:#d9e6d6}#canvas{width:100%;height:clamp(310px,59vh,590px);display:block;
+background:#1b2c27;touch-action:none;border:1px solid #607a69;border-radius:10px}
+.controls{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0}
+button{min-height:44px;border:1px solid #aec2aa;color:#fff;border-radius:9px;
+background:#315747;font-weight:650;font-size:13px}button[aria-pressed=true]{background:#668747}
+pre{white-space:pre-wrap;word-break:break-word;background:#192821;padding:12px;border-radius:9px;font-size:12px}
+.warning{background:#443b28;border-left:3px solid #f2cf7c;padding:9px}
+a{color:#d3f2ae}.minor{font-size:12px}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+</head><body><main>
+<h1>Британский Jakeli · 65-костный прототип</h1>
+<p class="warning">Экспериментальная автоматическая привязка оригинального Jakeli. Настоящая геометрия и текстуры британца, но skinning, изгибы и удержание оружия требуют визуальной приёмки. В игру не установлен.</p>
+<canvas id="canvas" aria-label="Интерактивный Jakeli, модель можно вращать пальцем"></canvas>
+<div class="controls" role="group" aria-label="Анимации Quaternius">
+<button data-motion="Idle_Quaternius" aria-pressed="true">Стойка</button>
+<button data-motion="Walk_Quaternius" aria-pressed="false">Шаг</button>
+<button data-motion="Jog_Quaternius" aria-pressed="false">Бег</button>
+<button data-motion="Sprint_Quaternius" aria-pressed="false">Спринт</button>
+</div>
+<pre id="status" aria-live="polite">Открываю фактическую модель Jakeli…</pre>
+<p class="minor">Поворачивай бойца пальцем; двумя пальцами меняй масштаб. Это предпросмотр для проверки рук, ног, формы и каски. Настоящий Safari на твоём iPhone ещё необходимо проверить.</p>
+<p class="minor"><a href="../assets/allied-soldiers/ATTRIBUTION_JAKELI.md">Автор George Jakeli · CC BY 4.0</a></p>
+</main>
+<script>
+"use strict";
+const status=document.getElementById("status"),canvas=document.getElementById("canvas");
+const qa={loaded:false,model:"jakeli",meshCount:0,bones:0,skins:0,clips:[],active:"",error:null,
+    actualSafari:false,releaseReady:false};
+window.__JAKELI_RIG_QA__=qa;
+(async()=>{
+ try{
+  if(!window.BABYLON?.Engine||!window.BABYLON?.SceneLoader)throw Error("Babylon.js недоступен");
+  const B=window.BABYLON,engine=new B.Engine(canvas,true,{stencil:false,antialias:true});
+  engine.setHardwareScalingLevel(Math.max(1,devicePixelRatio/1.75));
+  const scene=new B.Scene(engine);scene.useRightHandedSystem=true;
+  scene.clearColor=new B.Color4(.06,.11,.09,1);
+  const light=new B.HemisphericLight("ambient",new B.Vector3(0,1,0),scene);light.intensity=1.35;
+  const sun=new B.DirectionalLight("sun",new B.Vector3(-.6,-1,-.3),scene);sun.intensity=1.25;
+  const camera=new B.ArcRotateCamera("camera",Math.PI/2,Math.PI/2.35,3.6,new B.Vector3(0,0,0),scene);
+  camera.lowerRadiusLimit=.65;camera.upperRadiusLimit=9;camera.attachControl(canvas,true);
+  scene.activeCamera=camera;
+  const url="../assets/allied-soldiers/uk-jakeli-prototype-65b.glb";
+  const container=await B.SceneLoader.LoadAssetContainerAsync("",url,scene,null,".glb");
+  container.addAllToScene();
+  const skel=container.skeletons;
+  const meshes=container.meshes.filter(m=>(m.getTotalVertices?.()||0)>0);
+  const groups=container.animationGroups;
+  qa.meshCount=meshes.length;qa.skins=skel.length;
+  qa.bones=skel[0]?.bones?.length||0;
+  qa.clips=groups.map(g=>g.name);
+  if(qa.skins!==1||qa.bones!==65||qa.clips.length!==4||qa.meshCount<13)
+    throw Error("Структура GLB не соответствует 65-костному Jakeli: "+JSON.stringify(qa));
+  let min=new B.Vector3(Infinity,Infinity,Infinity),max=new B.Vector3(-Infinity,-Infinity,-Infinity);
+  for(const m of meshes){m.computeWorldMatrix(true);const box=m.getBoundingInfo().boundingBox;
+   min.minimizeInPlace(box.minimumWorld);max.maximizeInPlace(box.maximumWorld);}
+  const center=min.add(max).scale(.5),span=max.subtract(min);
+  if(span.length()>15||span.length()<.5)throw Error("Проблема масштаба оригинала: "+span.length().toFixed(3)+" м");
+  camera.setTarget(center);camera.radius=Math.max(2.4,span.length()*1.6);
+  let active=null,fade=null;
+  function select(name){
+   const next=groups.find(g=>g.name===name);if(!next)throw Error("Неизвестный клип "+name);
+   if(next===active)return;
+   const old=active; if(fade){fade.old?.stop();fade=null;}
+   next.stop();next.start(true,1);next.setWeightForAllAnimatables(old?0:1);
+   if(old){fade={old,next,elapsed:0,duration:.23};}
+   active=next;qa.active=name;
+   document.querySelectorAll("[data-motion]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.motion===name)));
+   status.textContent="Jakeli: оригинальная 3D-геометрия и текстуры\n"+
+    "Скелетов: "+qa.skins+" · костей: "+qa.bones+" · геометрических частей: "+qa.meshCount+
+    "\nQuaternius: "+qa.clips.join(", ")+"\nАктивный клип: "+name+
+    "\nВ боевую армию пока не установлен; визуальная проверка суставов обязательна.";
+  }
+  document.querySelectorAll("[data-motion]").forEach(btn=>btn.addEventListener("click",()=>select(btn.dataset.motion)));
+  scene.onBeforeRenderObservable.add(()=>{
+   if(!fade)return;
+   fade.elapsed+=Math.min(engine.getDeltaTime()/1000,.1);
+   const t=Math.min(1,fade.elapsed/fade.duration),smooth=t*t*(3-2*t);
+   fade.old.setWeightForAllAnimatables(1-smooth);
+   fade.next.setWeightForAllAnimatables(smooth);
+   if(t>=1){fade.old.stop();fade=null;}
+  });
+  select("Idle_Quaternius");qa.loaded=true;
+  engine.runRenderLoop(()=>scene.render());
+  window.addEventListener("resize",()=>engine.resize());
+ }catch(err){qa.error=String(err?.stack||err);
+  status.textContent="ОШИБКА: "+qa.error;}
+})();
+</script></body></html>
