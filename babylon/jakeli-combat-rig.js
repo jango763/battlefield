@@ -359,6 +359,8 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    fingerGripProfile:"jakeli-weapon-specific-v1",fingerJointCount:0,
    triggerIndexFlexRad:0,supportFingerFlexRad:0,
   rightPalmErrorDeg:Infinity,leftPalmErrorDeg:Infinity,
+  rightPalmWeaponLocal:[0,0,0],leftPalmWeaponLocal:[0,0,0],
+  leftSupportCupRollDeg:0,
   rightFingerErrorDeg:Infinity,leftFingerErrorDeg:Infinity,
   rightIKMeters:Infinity,leftIKMeters:Infinity,
   supportAlongBarrelMeters:0,stockToShoulderMeters:Infinity,
@@ -395,10 +397,18 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
   // away from the trigger, failing browser contact tests. Instead use a
   // bounded 18-degree inward wrist pronation around the finger axis,
   // retaining the actual weapon-specific grip socket and finger weights.
+  // LMG/PIAT support is offset sideways from the barrel: cant the wrist
+  // inward toward the actual fore-end, instead of leaving a flat up-facing
+  // open palm. Sten support sits left of the receiver, so its sign reverses.
+  const leftCupRoll=Object.freeze({
+    "uk-lee-enfield":0,"uk-sten":-Math.PI/15,
+    "uk-bren":Math.PI/10,"uk-piat":Math.PI/12
+  })[weaponId];
   const palm=side==="right"?
     rotate(V(m.triggerPalm,gQ).normalize(),
       B.Quaternion.RotationAxis(dir,-Math.PI/10)).normalize():
-    V(m.supportPalm,gQ).scale(-1).normalize();
+    rotate(V(m.supportPalm,gQ).scale(-1).normalize(),
+      B.Quaternion.RotationAxis(dir,leftCupRoll)).normalize();
   const anatomical=basis(dir,palm);
   const boneWorld=anatomical.multiply(calibrations[side].localBasis.conjugate()).normalize();
   const gripOffset=rotate(calibrations[side].socketLocalOffset,boneWorld);
@@ -618,6 +628,11 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    state.rightReachable=rSolve.reachable;state.leftReachable=lSolve.reachable;
    state.rightPalmErrorDeg=angleDeg(rf.palm,orientationR.palm);
    state.leftPalmErrorDeg=angleDeg(lf.palm,orientationL.palm);
+   state.rightPalmWeaponLocal=rotate(rf.palm,actualWeaponQ.conjugate()).asArray();
+   state.leftPalmWeaponLocal=rotate(lf.palm,actualWeaponQ.conjugate()).asArray();
+   state.leftSupportCupRollDeg={
+     "uk-lee-enfield":0,"uk-sten":-12,"uk-bren":18,"uk-piat":15
+   }[weaponId];
    state.rightFingerErrorDeg=angleDeg(rf.forward,orientationR.dir);
    state.leftFingerErrorDeg=angleDeg(lf.forward,orientationL.dir);
    state.supportAlongBarrelMeters=z;
