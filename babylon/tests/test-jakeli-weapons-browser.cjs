@@ -9,28 +9,13 @@ function checkGrip(snapshot,pose){
  const g=snapshot.grip;
  const values={right:g?.rightGripMeters,left:g?.leftGripMeters,stock:g?.stockToShoulderMeters};
  const finite=Object.values(values).every(x=>typeof x==="number"&&Number.isFinite(x));
- // Unlike the attachment-to-itself socket distance, this measures a genuine
- // animated finger joint against the GLB weapon trigger marker.
- const fingerToTrigger=g?.rightIndex2ToTriggerMeters;
- const fingerLocal=g?.rightIndex2TriggerLocal;
- const contactPass=Number.isFinite(fingerToTrigger)&&fingerToTrigger<=.055&&
-   Array.isArray(fingerLocal)&&fingerLocal.length===3&&
-   fingerLocal.every(Number.isFinite)&&
-   Math.abs(fingerLocal[0])<=.045&&fingerLocal[1]>=-.06&&fingerLocal[1]<=.01&&
-   Math.abs(fingerLocal[2])<=.045&&
-   Number.isFinite(g?.rightThumb2ToTriggerMeters)&&g.rightThumb2ToTriggerMeters<=.10;
- // Confirm the physical glove plane is defined, not merely the IK mount.
- const palmUnit=a=>Array.isArray(a)&&a.length===3&&
-   a.every(Number.isFinite)&&Math.abs(Math.hypot(...a)-1)<.03;
- const expectedCup={"uk-lee-enfield":0,"uk-sten":-12,"uk-bren":18,"uk-piat":15}[snapshot.weapon];
- const palmPass=palmUnit(g?.rightPalmWeaponLocal)&&palmUnit(g?.leftPalmWeaponLocal)&&
-   Number.isFinite(g?.leftSupportCupRollDeg)&&Math.abs(g.leftSupportCupRollDeg-expectedCup)<.1;
- const curlPass=g?.fingerGripProfile==="jakeli-weapon-specific-v1"&&
-   Number.isInteger(g?.fingerJointCount)&&g.fingerJointCount>=26&&
-   Number.isFinite(g?.triggerIndexFlexRad)&&g.triggerIndexFlexRad>.40&&g.triggerIndexFlexRad<.9&&
-   Number.isFinite(g?.supportFingerFlexRad)&&g.supportFingerFlexRad>.95&&
-   g.triggerIndexFlexRad<g.supportFingerFlexRad;
- if(snapshot.error||g?.error||!finite||!curlPass||!contactPass||!palmPass||!g?.mounted||!g?.rightReachable||
+ // Use the original Stage8 production-case pose/IK report, not
+ // measurements invented by an experimental Jakeli-only controller.
+ const orientationPass=["rightPalmErrorDeg","leftPalmErrorDeg",
+   "rightFingerErrorDeg","leftFingerErrorDeg","rightIKMeters","leftIKMeters"]
+   .every(key=>Number.isFinite(g?.[key]))&&
+   g?.fingerControls&&Number.isFinite(g.fingerControls.base);
+ if(snapshot.error||g?.error||!finite||!orientationPass||!g?.mounted||!g?.rightReachable||
     !g?.leftReachable||!g?.leftSupportInHandguard||
     values.right>GRIP_LIMITS.right||values.left>GRIP_LIMITS.left||
     values.stock>GRIP_LIMITS.stock){
@@ -108,11 +93,11 @@ function checkGrip(snapshot,pose){
     greatestRightGrip:Math.max(...results.map(x=>x.grip.rightGripMeters)),
     greatestLeftGrip:Math.max(...results.map(x=>x.grip.leftGripMeters)),
     greatestStockGap:Math.max(...results.map(x=>x.grip.stockToShoulderMeters)),
-    minFingerJoints:Math.min(...results.map(x=>x.grip.fingerJointCount)),
-    maxTrueIndexTriggerGap:Math.max(...results.map(x=>x.grip.rightIndex2ToTriggerMeters)),
-    maxThumbTriggerGap:Math.max(...results.map(x=>x.grip.rightThumb2ToTriggerMeters)),
-    triggerIndexFlexRange:[Math.min(...results.map(x=>x.grip.triggerIndexFlexRad)),Math.max(...results.map(x=>x.grip.triggerIndexFlexRad))],
-    supportFingerFlexRange:[Math.min(...results.map(x=>x.grip.supportFingerFlexRad)),Math.max(...results.map(x=>x.grip.supportFingerFlexRad))]
+    canonicalRig:"us-hero-stage8-rig.js",
+    maxRightPalmErrorDeg:Math.max(...results.map(x=>x.grip.rightPalmErrorDeg)),
+    maxLeftPalmErrorDeg:Math.max(...results.map(x=>x.grip.leftPalmErrorDeg)),
+    maxRightIKMeters:Math.max(...results.map(x=>x.grip.rightIKMeters)),
+    maxLeftIKMeters:Math.max(...results.map(x=>x.grip.leftIKMeters))
   }));
  }catch(e){
   console.error("JAKELI_REAL_WEAPONS_CHROMIUM_FAIL",e.stack||String(e));
