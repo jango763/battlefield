@@ -210,6 +210,11 @@ function aligned(v,arm=false,glove=false,sleeve=false){
    // shoulder and upper arm fully unchanged; avoid a hard wrist seam.
    const cuff=ease01((Math.abs(p[0])-.365)/.16);
    p[2]+=.085*cuff;
+   // The original Jakeli sleeve cuff was ~13 cm BELOW the donor wrist
+   // in mesh bind space, despite a correctly placed IK joint. Blend the
+   // distal sleeve into the actual donor wrist height; shoulder unchanged.
+   const wristLift=ease01((Math.abs(p[0])-.27)/.27);
+   p[1]+=.135*wristLift;
   }
   if(glove){
    // The original hand surface lies behind the donor's finger joint rows.
@@ -218,6 +223,10 @@ function aligned(v,arm=false,glove=false,sleeve=false){
      ease01((.61-Math.abs(p[0]))/.055)*ease01((.215-p[1])/.085);
    p[2]+=.083-.043*thumbRegion;
    p[1]+=.013*t;
+   // Original glove cuff sat ~16 cm BELOW its own skinned wrist bone.
+   // Move SOURCE vertices into the 65-bone bind pose before skinning,
+   // instead of making runtime wrist/elbow IK compensate for bad geometry.
+   p[1]+=.160;
   }
  }
  return p;
