@@ -1,4 +1,4 @@
-/* Battlefield · separate UK Jakeli prototype rig; original US and Wehrmacht modules are unchanged.
+/* Battlefield · Jakeli: the existing Stage 8 four-weapon rig, unchanged except right elbow pole.
  * Rifle pose derived from Ara 3D Gen MIT src/core/anim/clips/shooter.ts:
  * READY and AIM pole, finger-direction, palm-target conventions.
  * This is a new adaptation to the user's existing 65-bone glTF skeleton,
@@ -17,26 +17,13 @@ const ARMS=new Set(["leftshoulder","leftarm","leftforearm","lefthand",
 const WEAPON_IDS=Object.freeze(["uk-lee-enfield","uk-sten","uk-bren","uk-piat"]);
 const PROFILES=Object.freeze({
  "uk-lee-enfield":{label:"Lee-Enfield",file:"uk-lee-enfield.glb",source:"GLB · Muster WW2",
-   support:{min:.14,max:.313,ready:.22,aim:.255,drop:.040,x:0},grip:[-.017,.030,-.047],fingerDir:[0,-.95,.31],angle:[.24,.71,.11,.64]},
+   support:{min:.14,max:.313,ready:.22,aim:.255,drop:.052,x:0},grip:[-.012,-.055,-.065],fingerDir:[0,-.95,.31],angle:[.24,.71,.11,.64]},
  "uk-sten":{label:"Sten",file:"uk-sten.glb",source:"GLB · Muster WW2",
-   support:{min:.15,max:.399,ready:.255,aim:.285,drop:.028,x:-.006},grip:[-.014,.028,-.045],fingerDir:[0,-.92,.40],angle:[.19,.67,.08,.62]},
+   support:{min:.15,max:.399,ready:.255,aim:.285,drop:.034,x:-.006},grip:[-.010,-.036,-.043],fingerDir:[0,-.92,.40],angle:[.19,.67,.08,.62]},
  "uk-bren":{label:"Bren",file:"uk-bren.glb",source:"GLB · Muster WW2",
-   support:{min:.095,max:.315,ready:.22,aim:.24,drop:.033,x:.055},grip:[-.019,.023,-.064],fingerDir:[0,-.95,.31],angle:[.25,.66,.12,.58]},
+   support:{min:.095,max:.315,ready:.22,aim:.24,drop:.039,x:.055},grip:[-.019,-.057,-.080],fingerDir:[0,-.95,.31],angle:[.25,.66,.12,.58]},
  "uk-piat":{label:"PIAT",file:null,source:"Procedural · original Battlefield",
-   support:{min:.027,max:.155,ready:.095,aim:.115,drop:.016,x:.065},grip:[-.015,.027,-.035],fingerDir:[0,-.94,.34],angle:[.22,.60,.08,.52]}
-});
-// Jakeli-only calibrated grasp intensity for rifle, side-mag SMG, LMG, PIAT.
-// Trigger index is deliberately relaxed relative to the three gripping fingers.
-const JAKELI_GRIPS=Object.freeze({
- "uk-lee-enfield":{trigger:.54,wrap:1.36,support:1.13,thumb:.80},
- "uk-sten":       {trigger:.62,wrap:1.45,support:1.21,thumb:.87},
- "uk-bren":       {trigger:.66,wrap:1.38,support:1.17,thumb:.89},
- "uk-piat":       {trigger:.53,wrap:1.40,support:1.09,thumb:.84}
-});
-// Cup angle in the gun's own coordinates follows the fore-end offset.
-const SUPPORT_CUP_ROLL=Object.freeze({
- "uk-lee-enfield":0,"uk-sten":-Math.PI/15,
- "uk-bren":Math.PI/10,"uk-piat":Math.PI/12
+   support:{min:.027,max:.155,ready:.095,aim:.115,drop:.020,x:.065},grip:[-.015,-.048,-.035],fingerDir:[0,-.94,.34],angle:[.22,.60,.08,.52]}
 });
 const PIAT={
  trigger:[0,-.155,-.15],support:[0,-.115,.11],
@@ -310,13 +297,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
  // A weapon-owned support socket follows right wrist automatically.
  const supportSocket=new B.TransformNode("us-stage7-allied-foreend-L",scene);
  supportSocket.parent=pivot;
- const supportPalmBasis=(meta,id)=>{
-  const axis=arr(meta.supportAxis).normalize();
-  const palm=rotate(arr(meta.supportPalm).scale(-1),
-    B.Quaternion.RotationAxis(axis,SUPPORT_CUP_ROLL[id]));
-  return basis(axis,palm);
- };
- supportSocket.rotationQuaternion=supportPalmBasis(m,weaponId);
+ supportSocket.rotationQuaternion=basis(arr(m.supportAxis),arr(m.supportPalm).scale(-1));
  let resource=null,weaponMeshCount=0;
  async function loadWeapon(id){
   const cfg=PROFILES[id];
@@ -342,12 +323,12 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
  let combatRecoil=0,combatReloadPhase=0,combatReloadActive=false;
  let mountLocalPosition=null,mountLocalRotation=null;
  const fingerControls={base:-1.12,middle:-.94,distal:-.50,thumbBase:-.84,thumbMiddle:-.78,thumbDistal:-.40};
- // Per-weapon right wrist calibrated against actual RightHandIndex2-to-trigger
- // landmarks: previous right hand was 8-10 cm beneath the physical trigger.
+ // Rifle space (metres): move the dominant palm below and behind the trigger,
+ // so the hand itself is not occulted by the wooden stock and receiver.
  const handFits=Object.freeze({
-   standard:{grip:[-.017,.030,-.047],dir:[0,-.95,.31]},
-   outboard:{grip:[-.060,.020,-.042],dir:[-.08,-.94,.30]},
-   wrapped:{grip:[-.039,.005,-.073],dir:[0,-.85,.52]}
+   standard:{grip:[-.012,-.055,-.065],dir:[0,-.95,.31]},
+   outboard:{grip:[-.055,-.050,-.060],dir:[-.08,-.94,.30]},
+   wrapped:{grip:[-.034,-.065,-.091],dir:[0,-.85,.52]}
  });
  let handFit=handFits.standard;
  // Actual per-weapon offsets are derived only from the selected profile.
@@ -355,7 +336,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
  // Three experimentally bounded positions INSIDE the original Lee-Enfield
  // wooden fore-end. No new geometry / no separate arms.
  const supportProfiles=Object.freeze({
-  standard:{x:0,drop:.040,readyZ:.22,aimZ:.255},
+  standard:{x:0,drop:.052,readyZ:.22,aimZ:.255},
   near:{x:-.012,drop:.055,readyZ:.185,aimZ:.215},
   forward:{x:.008,drop:.050,readyZ:.265,aimZ:.293}
  });
@@ -365,13 +346,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
   weaponMeshCount,weaponSwitchCount:0,weaponReady:true,
   combatRecoil:0,combatReloadPhase:0,combatReloadActive:false,
   rightGripMeters:Infinity,leftGripMeters:Infinity,
-  rightIndex2ToTriggerMeters:Infinity,rightIndex2TriggerLocal:[Infinity,Infinity,Infinity],
-  rightThumb2ToTriggerMeters:Infinity,rightMiddle2ToTriggerMeters:Infinity,
-   fingerGripProfile:"jakeli-weapon-specific-v1",fingerJointCount:0,
-   triggerIndexFlexRad:0,supportFingerFlexRad:0,
   rightPalmErrorDeg:Infinity,leftPalmErrorDeg:Infinity,
-  rightPalmWeaponLocal:[0,0,0],leftPalmWeaponLocal:[0,0,0],
-  leftSupportCupRollDeg:0,
   rightFingerErrorDeg:Infinity,leftFingerErrorDeg:Infinity,
   rightIKMeters:Infinity,leftIKMeters:Infinity,
   supportAlongBarrelMeters:0,stockToShoulderMeters:Infinity,
@@ -404,16 +379,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
   const dir=side==="right"?V(weaponId==="uk-lee-enfield"?handFit.dir:weaponProfile.fingerDir,gQ).normalize():V(m.supportAxis,gQ).normalize();
   // SUPPORT: the left hand must CUP the underside of the wooden fore-end.
   // Previous v5 used manifest's downward normal and posed the palm ON TOP.
-  // A full 180-degree palm flip moved Jakeli's real trigger index 7cm
-  // away from the trigger, failing browser contact tests. Instead use a
-  // bounded 18-degree inward wrist pronation around the finger axis,
-  // retaining the actual weapon-specific grip socket and finger weights.
-  // The right hand is calibrated here. The left hand follows the tilted,
-  // weapon-owned support target through supportPalmBasis().
-  const palm=side==="right"?
-    rotate(V(m.triggerPalm,gQ).normalize(),
-      B.Quaternion.RotationAxis(dir,-Math.PI/10)).normalize():
-    V(m.supportPalm,gQ).scale(-1).normalize();
+  const palm=side==="right"?V(m.triggerPalm,gQ).normalize():V(m.supportPalm,gQ).scale(-1).normalize();
   const anatomical=basis(dir,palm);
   const boneWorld=anatomical.multiply(calibrations[side].localBasis.conjugate()).normalize();
   const gripOffset=rotate(calibrations[side].socketLocalOffset,boneWorld);
@@ -444,7 +410,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
   const node=byName.get(name);
   const next=byName.get(name.slice(0,-1)+(seg+1));
   const prev=seg>1?byName.get(name.slice(0,-1)+(seg-1)):byName.get(side+"hand");
-  if(!node||!rest.has(node))return false;
+  if(!node||!rest.has(node))return;
   refresh(node);
   if(next)refresh(next);
   if(prev)refresh(prev);
@@ -454,21 +420,13 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
   const palm=calibrations[side].lastPalm;
   const wanted=kind==="thumb"?palm.clone():palm.scale(-1);
   const hinge=B.Vector3.Cross(direction,wanted);
-  if(hinge.lengthSquared()<1e-8)return false;
-  const profile=JAKELI_GRIPS[weaponId];
-  if(!profile)throw Error("Missing Jakeli grip profile: "+weaponId);
-  const dominantIndex=side==="right"&&kind==="index";
-  const base=dominantIndex?profile.trigger:
-    kind==="thumb"?profile.thumb:side==="left"?profile.support:profile.wrap;
-  const byDigit={index:.97,middle:1,ring:1.035,pinky:.93,thumb:1}[kind];
-  const byJoint=(kind==="thumb"?[1,.89,.50]:dominantIndex?[1,.90,.63]:[1,.82,.53])[seg-1];
-  const angle=-Math.min(1.55,base*byDigit*byJoint*(mode==="aim"?1:.93));
-  if(dominantIndex&&seg===1)state.triggerIndexFlexRad=-angle;
-  if(side==="left"&&kind==="middle"&&seg===1)state.supportFingerFlexRad=-angle;
+  if(hinge.lengthSquared()<1e-8)return;
+  const angle=kind==="thumb"
+    ?(seg===1?fingerControls.thumbBase:seg===2?fingerControls.thumbMiddle:fingerControls.thumbDistal)
+    :(seg===1?fingerControls.base:seg===2?fingerControls.middle:fingerControls.distal);
   const localAxis=rotate(hinge.normalize(),worldRot(node).conjugate()).normalize();
   node.rotationQuaternion=node.rotationQuaternion.multiply(B.Quaternion.RotationAxis(localAxis,angle)).normalize();
   if(next)refresh(next);
-  return true;
  }
 
  function update(){
@@ -500,8 +458,12 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    const rGrip=trigger.add(V(weaponId==="uk-lee-enfield"?handFit.grip:weaponProfile.grip,gunQ))
       .add(V([0,.002*combatRecoil,-.016*combatRecoil],gunQ));
    const rWrist=rGrip.subtract(orientationR.gripOffset);
+   // Jakeli reference: shoulder -> elbow tucked down -> trigger hand.
+   // Only the right elbow pole changes. Grip target, wrist rotation,
+   // weapon mounting, left hand, and all 65 bones remain Stage 8.
+   const referenceElbow=mode==="aim"?[-.55,-1.20,-.20]:[-.55,-1.10,-.40];
    const poleR=right.upper.getAbsolutePosition()
-      .add(V(DONOR[mode].right.pole,body.q).scale(.27));
+      .add(V(referenceElbow,body.q).scale(.27));
    const rSolve=solveLimb(right,rWrist,poleR);
    setWorldRot(right.hand,orientationR.boneWorld);
    refresh(right.socket);
@@ -533,10 +495,6 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    const preferredZ=mode==="aim"?(adjust?.aimZ??s.aim):(adjust?.readyZ??s.ready);
    let z=B.Scalar.Clamp(preferredZ,minZ,maxZ);
    const drop=adjust?.drop??s.drop,offsetX=adjust?.x??s.x;
-   // Contact lift corrects the donor hand socket vs Jakeli glove palm offset.
-   // Apply in WEAPON-LOCAL coordinates, so the palm follows gun orientation.
-   const contactLift={"uk-lee-enfield":.075,"uk-sten":.070,
-     "uk-bren":.052,"uk-piat":.030}[weaponId];
    // A lightweight preview reload gesture shifts the supporting hand
    // toward the breech, while its elbow follows through IK.
    // Not a replacement for licensed/authored weapon reload animations.
@@ -545,7 +503,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    z=B.Scalar.Clamp(z-.045*reachForMagazine,minZ,maxZ);
    supportSocket.position.set(
       offsetX+.012*reachForMagazine,
-      m.support[1]-drop+contactLift-.033*reachForMagazine,z);
+      m.support[1]-drop-.033*reachForMagazine,z);
    refresh(supportSocket);
    const leftShoulder=left.upper.getAbsolutePosition().clone();
    const shoulderToElbow=B.Vector3.Distance(leftShoulder,left.fore.getAbsolutePosition());
@@ -585,31 +543,18 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    // Curl each original finger using joint-native axes (no duplicate hand meshes).
    calibrations.right.lastPalm=orientationR.palm;
    calibrations.left.lastPalm=orientationL.palm;
-   state.fingerJointCount=0;
-   for(const name of fingerNames)if(foldFinger(name))state.fingerJointCount++;
-   if(state.fingerJointCount<26)throw Error("Incomplete Jakeli finger articulation: "+state.fingerJointCount);
+   for(const name of fingerNames)foldFinger(name);
    refresh(right.socket);refresh(left.socket);
    const rf=actualHandFrame(right,"right"),lf=actualHandFrame(left,"left");
    const trueTrigger=actualWeaponOrigin.add(V(m.trigger,actualWeaponQ));
    const trueDominantGrip=trueTrigger.add(V(weaponId==="uk-lee-enfield"?handFit.grip:weaponProfile.grip,actualWeaponQ));
    state.rightGripMeters=B.Vector3.Distance(right.socket.getAbsolutePosition(),trueDominantGrip);
-   // True finger-to-trigger contact, unlike the trivial weapon socket identity.
-   const rightIndex2=find("RightHandIndex2");
-   const rightThumb2=find("RightHandThumb2");
-   const rightMiddle2=find("RightHandMiddle2");
-   refresh(rightIndex2);refresh(rightThumb2);refresh(rightMiddle2);
-   const indexDiff=rightIndex2.getAbsolutePosition().subtract(trueTrigger);
-   state.rightIndex2ToTriggerMeters=indexDiff.length();
-   state.rightIndex2TriggerLocal=rotate(indexDiff,actualWeaponQ.conjugate()).asArray();
-   state.rightThumb2ToTriggerMeters=B.Vector3.Distance(rightThumb2.getAbsolutePosition(),trueTrigger);
-   state.rightMiddle2ToTriggerMeters=B.Vector3.Distance(rightMiddle2.getAbsolutePosition(),trueTrigger);
    state.weaponGripDistanceMeters=state.rightGripMeters;
    state.leftGripMeters=B.Vector3.Distance(left.socket.getAbsolutePosition(),lGrip);
    state.supportSocketErrorMeters=B.Vector3.Distance(
       left.socket.getAbsolutePosition(),supportSocket.getAbsolutePosition());
    state.supportSocketLocalZ=z;
    state.supportSocketLocalDropMeters=drop;
-   state.supportPalmLiftMeters=contactLift;
    state.supportWithinHandguard=z>=minZ-1e-6&&z<=maxZ+1e-6;
    state.leftSupportProfile=supportProfile;
    if(supportSocket.parent!==pivot)throw Error("Left support grip escaped rifle parent");
@@ -633,9 +578,6 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    state.rightReachable=rSolve.reachable;state.leftReachable=lSolve.reachable;
    state.rightPalmErrorDeg=angleDeg(rf.palm,orientationR.palm);
    state.leftPalmErrorDeg=angleDeg(lf.palm,orientationL.palm);
-   state.rightPalmWeaponLocal=rotate(rf.palm,actualWeaponQ.conjugate()).asArray();
-   state.leftPalmWeaponLocal=rotate(lf.palm,actualWeaponQ.conjugate()).asArray();
-   state.leftSupportCupRollDeg=SUPPORT_CUP_ROLL[weaponId]*180/Math.PI;
    state.rightFingerErrorDeg=angleDeg(rf.forward,orientationR.dir);
    state.leftFingerErrorDeg=angleDeg(lf.forward,orientationL.dir);
    state.supportAlongBarrelMeters=z;
@@ -685,7 +627,7 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
     resource=pending;pending=null;
     weaponMeshCount=resource.attach();
     weaponId=nextId;weaponProfile=cfg;m=meta;
-    supportSocket.rotationQuaternion=supportPalmBasis(m,weaponId);
+    supportSocket.rotationQuaternion=basis(arr(m.supportAxis),arr(m.supportPalm).scale(-1));
     supportProfile="standard";
     state.leftSupportProfile="standard";
     state.weaponId=weaponId;
@@ -742,5 +684,5 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
   dispose(){stopped=true;scene.onBeforeRenderObservable.remove(observer);resource?.dispose();supportSocket.dispose();pivot.dispose();}
  };
 }
-return Object.freeze({create,stripArmTracks,CANON,DONOR,WEAPON_IDS,PROFILES,PIAT,JAKELI_GRIPS});
+return Object.freeze({create,stripArmTracks,CANON,DONOR,WEAPON_IDS,PROFILES,PIAT});
 });
