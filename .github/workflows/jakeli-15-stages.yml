@@ -1,0 +1,23 @@
+name: Jakeli 15-stage production gates
+on:
+  push:
+    branches:
+      - 'feature/british-army-10-stages-20261118'
+    paths:
+      - 'tools/jakeli/**'
+      - 'babylon/JAKELI_15_STAGES.md'
+      - '.github/workflows/jakeli-15-stages.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect-sources:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Source identity and donor rig (stages 1 and 2)
+        run: |
+          node tools/jakeli/analyze-glb.mjs \
+            assets/allied-soldiers/uk-jakeli-mobile-static.glb \
+            assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb
