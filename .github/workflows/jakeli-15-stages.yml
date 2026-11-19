@@ -23,6 +23,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
+      - name: Preserve approved German donor as inspection-only CI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: approved-german-65b-reference
+          path: assets/soldiers/german.glb
+          retention-days: 2
       - name: Validate Jakeli iPhone UI scripts before expensive browser tests
         run: node tools/jakeli/check-html-syntax.cjs
       - name: Verify model identity and 65 bone animation donor (steps 1-2)
