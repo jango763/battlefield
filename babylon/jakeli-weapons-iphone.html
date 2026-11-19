@@ -149,7 +149,7 @@ window.__JAKELI_WEAPON_QA__=qa;
       x.setAttribute("aria-pressed",String(x===b)));
    }catch(e){qa.error=String(e?.message||e);out.textContent=qa.error;}
    finally{busy=false;b.disabled=false;}
-  };
+  });
   motion("Idle_Quaternius");
   qa.loaded=true;
   engine.runRenderLoop(()=>scene.render());
