@@ -17,7 +17,7 @@ assert(j.asset.extras?.jakeliPrototype?.noHeroMeshes);
 assert(j.asset.extras?.jakeliPrototype?.notGameReady);
 const rigMeshNodes=j.nodes.filter(n=>n.skin===0&&n.mesh!==undefined);
 assert.equal(rigMeshNodes.length,13,"Exactly 13 original meshes must be displayed (embedded Springfield excluded)");
-let skinned=0,vertices=0;
+let skinned=0,vertices=0,triangles=0;
 for(const node of rigMeshNodes){
  assert(!/springfield|rifle/i.test(j.meshes[node.mesh].name),"Original embedded rifle must not conflict with weapons");
  for(const p of j.meshes[node.mesh].primitives){
@@ -39,6 +39,7 @@ for(const node of rigMeshNodes){
    assert(Math.abs(sum-1)<0.0001,"Unnormalized British vertex weight");
   }
   vertices+=a.count;skinned++;
+  triangles+=(p.indices!==undefined?j.accessors[p.indices].count:a.count)/3;
  }
 }
 assert(vertices>40000,"A placeholder or partial model is not acceptable");
@@ -49,7 +50,7 @@ for(const a of j.animations)for(const ch of a.channels){
 }
 assert(nodesWithAnimation.size>=20);
 console.log("JAKELI_REAL_MESH_RIG_STRUCTURAL_PASS",JSON.stringify({skinnedParts:skinned,
- skinnedVertices:vertices,bones:65,animations:j.animations.map(x=>x.name),
+ skinnedVertices:vertices,triangles:Math.round(triangles),bones:65,animations:j.animations.map(x=>x.name),
  textures:j.textures.length,bytes:bytes.length,
  sha256:crypto.createHash("sha256").update(bytes).digest("hex"),
  releaseCertified:false,safariCertified:false}));
