@@ -206,9 +206,13 @@ for clip,duration in [('Ready',2),('Aim',2),('Fire',1.2),('Walk',1.2),('Jog',.8)
   # Gun stock sits in right shoulder pocket; support is on the actual fore-end.
   lower=math.radians(24 if clip in ['Ready','Walk','Jog','Sprint'] else 0)
   recoil=.012*max(0,math.sin(t*math.pi*8))**8 if clip=='Fire' else 0
-  gun.rotation_quaternion=Quaternion((1,0,0),lower)
+  # The glTF NLA exporter drops animation channels that are constant within
+  # a clip, even if their values differ across clips. This left Aim using
+  # Ready's 24-degree rifle pitch and ~11cm wrong stock height in the GLB.
+  # A subtle, baked breathing arc preserves both animated gun channels.
+  gun.rotation_quaternion=Quaternion((1,0,0),lower+.008*math.sin(phase))
   shoulder=bones['RightArm'].head+Vector((.025,-.035,-.055))
-  stock=Vector((0,.2636,-.051387844));gun.location=shoulder-gun.rotation_quaternion@stock+Vector((0,recoil,0));update()
+  stock=Vector((0,.2636,-.051387844));gun.location=shoulder-gun.rotation_quaternion@stock+Vector((0,recoil+.003*math.sin(phase),0));update()
   rightQ=frame(gun.rotation_quaternion@Vector((0,-.945,.326)),gun.rotation_quaternion@Vector((-1,0,0)))
   leftQ=frame(gun.rotation_quaternion@Vector((-.32,-.947,0)),gun.rotation_quaternion@Vector((0,0,-1)))
   # Contact markers are at the physical stock wrist and underside of the forestock.
