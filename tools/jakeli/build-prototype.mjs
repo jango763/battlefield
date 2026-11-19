@@ -147,21 +147,37 @@ function nearest(pos){
 }
 const headIndex=donorSkin.joints.findIndex(n=>/(:|^)Head$/.test(s.nodes[n].name));
 const torsoIndex=donorSkin.joints.findIndex(n=>/(:|^)Spine1$/.test(s.nodes[n].name));
-if(headIndex<0||torsoIndex<0)throw Error("Missing head/torso bones");
+const leftHandIndex=donorSkin.joints.findIndex(n=>/(:|^)LeftHand$/.test(s.nodes[n].name));
+const rightHandIndex=donorSkin.joints.findIndex(n=>/(:|^)RightHand$/.test(s.nodes[n].name));
+if([headIndex,torsoIndex,leftHandIndex,rightHandIndex].some(n=>n<0))
+ throw Error("Missing head/torso/wrist bones");
 // Match original Z-up centimeter geometry into the donor's Y-up meter frame.
 // Model ankle height ~0cm -> -1m; head 185cm -> +0.85m.
 // The donor rest pose uses hips near 0, feet -1m, head near +1m.
-function aligned(v){return [v[0]*.01,v[2]*.01-1,-v[1]*.01];}
+function aligned(v,arm=false){
+ const p=[v[0]*.01,v[2]*.01-1,-v[1]*.01];
+ if(arm){
+  // Jakeli's source A-pose hands are ~15-17 cm lower than the donor's
+  // anatomical bind wrists. Correct source bind-space BEFORE transfer;
+  // a 1:1 nearest-vertex copy otherwise skins both hands to Pinky3.
+  const side=Math.sign(p[0]),t=Math.max(0,Math.min(1,(Math.abs(p[0])-.22)/.43));
+  p[0]-=side*.025*t;p[1]+=.17*t;
+ }
+ return p;
+}
 function alignedNormal(v){return [v[0],v[2],-v[1]];}
 for(let mi=0;mi<s.meshes.length;mi++){
  const mesh=s.meshes[mi];
  if(/springfield|rifle/i.test(mesh.name)){stats.skippedSourceRifle++;continue;}
  const rigidHead=/helmet|skullcap/i.test(mesh.name);
  const rigidTorso=/belt|bag/i.test(mesh.name);
+ const sourceSleeves=/1_T_Shirt/i.test(mesh.name);
+ const sourceGloves=/^SLD_1_Material #21_0$/i.test(mesh.name);
+ const sourceArms=sourceSleeves||sourceGloves;
  for(const primitive of mesh.primitives){
   if(primitive.mode!==undefined&&primitive.mode!==4)throw Error("Nontriangular source");
   const original=primitive.attributes;
-  const p=readAccessor(src,original.POSITION),tr=p.map(aligned);
+  const p=readAccessor(src,original.POSITION),tr=p.map(v=>aligned(v,sourceArms));
   const pFlat=new Float32Array(tr.flat()),pBuffer=Buffer.from(pFlat.buffer);
   const min=[0,1,2].map(k=>Math.min(...tr.map(x=>x[k]))),
    max=[0,1,2].map(k=>Math.max(...tr.map(x=>x[k])));
@@ -178,7 +194,12 @@ for(let mi=0;mi<s.meshes.length;mi++){
   }
   const jointBytes=Buffer.alloc(p.length*4),weightBytes=Buffer.alloc(p.length*16);
   for(let vi=0;vi<tr.length;vi++){
-   const candidate=rigidHead?[[headIndex,1]]:rigidTorso?[[torsoIndex,1]]:nearest(tr[vi]);
+   // The source's single unsegmented glove mesh is not an individual finger rig.
+   // Do not apply the donor's distal-pinky weights to the entire hand surface.
+   // Bind each glove to its correct real wrist, until finger segmentation is
+   // authored and inspected. Do not invent deforming glove fingers.
+   const candidate=rigidHead?[[headIndex,1]]:rigidTorso?[[torsoIndex,1]]:
+    sourceGloves?[[tr[vi][0]>=0?leftHandIndex:rightHandIndex,1]]:nearest(tr[vi]);
    const total=candidate.reduce((x,v)=>x+v[1],0);
    if(!(total>0))throw Error("Unweighted British vertex");
    let weighted=0;
