@@ -30,10 +30,15 @@ fs.mkdirSync(dir,{recursive:true});
   });
   await page.waitForTimeout(500);
   await page.screenshot({path:dir+"/03-aim-hands.png",fullPage:true});
-  console.log("JAKELI_BLENDER_ONE_RIFLE_CHROMIUM_TECHNICAL_PASS",JSON.stringify({
+  const right=state.weaponRig?.rightGripMeters, left=state.weaponRig?.leftGripMeters;
+  console.log("JAKELI_BLENDER_ONE_RIFLE_GRIP_MEASUREMENTS",JSON.stringify({rightGripMeters:right,leftGripMeters:left,maxAcceptableMeters:0.04,visualApproval:false}));
+  // A green import/screenshot test is NOT proof of correct anatomy. Reject
+  // a detached hand instead of publishing a malformed prototype as a pass.
+  if(!Number.isFinite(right)||!Number.isFinite(left)||right>0.04||left>0.04)
+   throw Error("REJECTED: Lee-Enfield hand grip outside 4 cm acceptance threshold, right="+right+" m left="+left+" m; inspect screenshots and rework bind pose / weights");
+  console.log("JAKELI_BLENDER_ONE_RIFLE_CHROMIUM_GEOMETRIC_PASS",JSON.stringify({
     skeletonBones:state.skeletonBones,skinnedMeshes:state.skinnedMeshes,
-    materials:state.materialCount,rightGripMeters:state.weaponRig?.rightGripMeters,
-    leftGripMeters:state.weaponRig?.leftGripMeters,
+    materials:state.materialCount,rightGripMeters:right,leftGripMeters:left,
     visualApproval:false,iphoneSafari:false
   }));
  }catch(err){
