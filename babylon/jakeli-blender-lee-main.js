@@ -3,7 +3,7 @@
  */
 (async()=>{
  'use strict';
- const B=window.BABYLON,status=document.getElementById('status');
+ const B=window.BABYLON,status=document.getElementById('status'),controls=document.getElementById('controls');
  const state=window.__BABYLON_SOLDIER__={loaded:false,ready:false,error:null,pose:null,model:'Jakeli anatomical v2',runtimeIK:false};
  try {
   const engine=new B.Engine(document.getElementById('renderCanvas'),true,{stencil:true});
@@ -27,12 +27,12 @@
    groups.forEach(a=>a.stop());g.start(true,1,g.from,g.to);state.pose=name;
    for(const b of document.querySelectorAll('[data-pose]'))b.setAttribute('aria-pressed',String(b.dataset.pose===name));
   };
-  document.querySelectorAll('[data-pose]').forEach(b=>b.addEventListener('click',()=>start(b.dataset.pose)));
+  document.querySelectorAll('[data-pose]').forEach(b=>b.addEventListener('click',()=>{start(b.dataset.pose);controls.open=false}));
   const view=(name)=>{
    camera.alpha=name==='right'?Math.PI*1.08:Math.PI*.32;
    camera.radius=name==='full'?3.25:1.3;camera.target.set(0,name==='full'?.95:1.35,name==='full'?0:.25);
   };
-  document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>view(b.dataset.view)));
+  document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{view(b.dataset.view);controls.open=false}));
   window.__JAKELI_QA__={scene,imported,groups,start,view,joints,gun:find('LeeEnfield')};
   start(new URLSearchParams(location.search).get('pose')||'Ready');
   state.loaded=true;state.ready=true;
