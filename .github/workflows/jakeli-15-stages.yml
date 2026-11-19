@@ -9,15 +9,35 @@ on:
       - '.github/workflows/jakeli-15-stages.yml'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
-  inspect-sources:
+  build-and-verify-prototype:
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - name: Source identity and donor rig (stages 1 and 2)
+        with:
+          persist-credentials: true
+      - name: Verify model identity and 65 bone animation donor (steps 1-2)
         run: |
           node tools/jakeli/analyze-glb.mjs \
             assets/allied-soldiers/uk-jakeli-mobile-static.glb \
-            assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb
+            assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb > /tmp/jakeli-audit.log
+          grep -F JAKELI_AUDIT_01_02_PASS /tmp/jakeli-audit.log
+      - name: Align Jakeli geometry and transfer 65-bone skinning (steps 3-5 prototype)
+        run: node tools/jakeli/build-prototype.mjs
+      - name: Verify real Jakeli mesh, weights and Quaternius clips
+        run: node tools/jakeli/verify-prototype.mjs
+      - name: Publish strictly experimental artifact without touching main
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/allied-soldiers/uk-jakeli-prototype-65b.glb
+          if git diff --cached --quiet; then
+            echo 'Jakeli prototype unchanged'
+          else
+            git commit -m 'Build 65-bone Jakeli visual prototype - not gameplay approved'
+            git pull --rebase origin feature/british-army-10-stages-20261118
+            git push origin HEAD:refs/heads/feature/british-army-10-stages-20261118
+          fi
