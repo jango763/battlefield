@@ -2,6 +2,21 @@
 const {chromium}=require("/tmp/jakeli-qa/node_modules/playwright");
 const fs=require("node:fs");
 const dir="babylon-qa-results/jakeli-weapons";
+// Match the approved British grip budget in assets/allied-soldiers/manifest.json.
+// A visible weapon mesh does not prove that either hand actually holds it.
+const GRIP_LIMITS=Object.freeze({right:0.06,left:0.06,stock:0.15});
+function checkGrip(snapshot,pose){
+ const g=snapshot.grip;
+ const values={right:g?.rightGripMeters,left:g?.leftGripMeters,stock:g?.stockToShoulderMeters};
+ const finite=Object.values(values).every(x=>typeof x==="number"&&Number.isFinite(x));
+ if(snapshot.error||g?.error||!finite||!g?.mounted||!g?.rightReachable||
+    !g?.leftReachable||!g?.leftSupportInHandguard||
+    values.right>GRIP_LIMITS.right||values.left>GRIP_LIMITS.left||
+    values.stock>GRIP_LIMITS.stock){
+   throw Error("Jakeli two-hand IK failed "+snapshot.weapon+" / "+pose+
+     " thresholds="+JSON.stringify(GRIP_LIMITS)+" values="+JSON.stringify(snapshot));
+ }
+}
 (async()=>{
  fs.mkdirSync(dir,{recursive:true});
  const browser=await chromium.launch({headless:true,args:["--no-sandbox","--use-gl=angle","--use-angle=swiftshader"]});
@@ -33,7 +48,9 @@ const dir="babylon-qa-results/jakeli-weapons";
       grip:q.grip,bones:q.bones,actors:q.meshCount,
       skeletons:s.skeletons.length,error:q.error};
    });
-   console.log("JAKELI_REAL_WEAPON_CHECK",JSON.stringify(data));results.push(data);
+   console.log("JAKELI_REAL_WEAPON_CHECK",JSON.stringify(data));
+   checkGrip(data,"ready");
+   results.push({pose:"ready",...data});
    await page.screenshot({path:dir+"/"+w+".png",fullPage:true});
    if(data.error||data.grip?.error||data.bones!==65||data.skeletons!==1||
       !data.grip?.mounted||data.grip?.armChannelsRemoved!==32||
@@ -41,15 +58,25 @@ const dir="babylon-qa-results/jakeli-weapons";
     throw Error("Weapon state failed "+JSON.stringify(data));
    await page.locator('[data-pose="aim"]').click();
    await page.waitForTimeout(300);
+   const aim=await page.evaluate(()=>{
+     const q=window.__JAKELI_WEAPON_QA__,s=window.BABYLON.EngineStore.LastCreatedScene;
+     return {weapon:q.weaponId,weaponMeshes:q.weaponMeshCount,
+       grip:q.grip,bones:q.bones,actors:q.meshCount,
+       skeletons:s.skeletons.length,error:q.error};
+   });
+   checkGrip(aim,"aim");
+   results.push({pose:"aim",...aim});
+   console.log("JAKELI_REAL_WEAPON_AIM_CHECK",JSON.stringify(aim));
    await page.screenshot({path:dir+"/"+w+"-aim.png",fullPage:true});
    await page.locator('[data-pose="ready"]').click();
   }
   if(errors.length)throw Error("Browser errors "+JSON.stringify(errors));
   console.log("JAKELI_REAL_WEAPONS_CHROMIUM_PASS",JSON.stringify({
-    weaponCount:results.length,actualBritishMesh:true,ikReused:true,
-    allMounted:true,visualApproval:false,iphoneSafari:false,
+    weaponCount:4,gripPoseChecks:results.length,actualBritishMesh:true,ikReused:true,
+    allMounted:true,gripLimitsMeters:GRIP_LIMITS,visualApproval:false,iphoneSafari:false,
     greatestRightGrip:Math.max(...results.map(x=>x.grip.rightGripMeters)),
-    greatestLeftGrip:Math.max(...results.map(x=>x.grip.leftGripMeters))
+    greatestLeftGrip:Math.max(...results.map(x=>x.grip.leftGripMeters)),
+    greatestStockGap:Math.max(...results.map(x=>x.grip.stockToShoulderMeters))
   }));
  }catch(e){
   console.error("JAKELI_REAL_WEAPONS_CHROMIUM_FAIL",e.stack||String(e));
