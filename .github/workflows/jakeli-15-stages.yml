@@ -43,6 +43,18 @@ jobs:
         run: node tools/jakeli/build-prototype.mjs
       - name: Verify real Jakeli mesh, weights and Quaternius clips
         run: node tools/jakeli/verify-prototype.mjs
+      - name: Transfer real approved German hand skin weights to separate Jakeli comparison model
+        run: |
+          python3 -m venv /tmp/jakeli-artistskin
+          /tmp/jakeli-artistskin/bin/pip install --quiet numpy scipy
+          /tmp/jakeli-artistskin/bin/python tools/jakeli/transfer-german-hand-weights.py
+      - name: Upload German-weighted hand comparison model (separate, not approved)
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakeli-german-artist-hand-skin
+          path: assets/allied-soldiers/uk-jakeli-german-skin-v1.glb
+          retention-days: 3
+          if-no-files-found: error
       - name: Upload inspectable Jakeli 65-bone rig for visual deformation audit
         if: always()
         uses: actions/upload-artifact@v4
@@ -62,6 +74,15 @@ jobs:
           node babylon/tests/test-jakeli-65b-browser.cjs
       - name: Test authentic Jakeli with four approved two-hand IK weapons
         run: node babylon/tests/test-jakeli-weapons-browser.cjs
+      - name: Test German artist hand skin on actual Jakeli with four weapons
+        run: JAKELI_GERMAN_HANDS=1 node babylon/tests/test-jakeli-weapons-browser.cjs
+      - name: Upload German-weighted Jakeli four-weapon screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakeli-german-artist-hand-qa
+          path: babylon-qa-results/jakeli-weapons-german/
+          if-no-files-found: ignore
       - name: Check three independent Jakeli rigs and two squad formations
         run: node babylon/tests/test-jakeli-three-squad-browser.cjs
       - name: Upload experimental British Jakeli squad screenshots
@@ -90,7 +111,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add assets/allied-soldiers/uk-jakeli-prototype-65b.glb
+          git add assets/allied-soldiers/uk-jakeli-prototype-65b.glb assets/allied-soldiers/uk-jakeli-german-skin-v1.glb
           if git diff --cached --quiet; then
             echo 'Jakeli prototype unchanged'
           else
