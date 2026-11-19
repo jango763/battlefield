@@ -129,6 +129,8 @@ window.__JAKELI_WEAPON_QA__=qa;
     "\nПриклад: "+Number(r.stockToShoulderMeters).toFixed(3)+" м"+
     "\nПальцы: "+r.fingerJointCount+" суставов · спуск: "+r.triggerIndexFlexRad.toFixed(2)+" рад"+
     " · опора: "+r.supportFingerFlexRad.toFixed(2)+" рад"+
+    "\nУказательный–спуск: "+(r.rightIndex2ToTriggerMeters*100).toFixed(1)+" см"+
+    " · большой палец: "+(r.rightThumb2ToTriggerMeters*100).toFixed(1)+" см"+
     "\nWeapon_R: "+(r.socketAttached?"закреплён":"не закреплён")+
     " · IK: "+(r.error||"без ошибки")+
     "\nВыпуск: НЕ РАЗРЕШЁН, нужна визуальная проверка.";
