@@ -223,7 +223,19 @@ for(let mi=0;mi<s.meshes.length;mi++){
  for(const primitive of mesh.primitives){
   if(primitive.mode!==undefined&&primitive.mode!==4)throw Error("Nontriangular source");
   const original=primitive.attributes;
-  const p=readAccessor(src,original.POSITION),tr=p.map(v=>aligned(v,sourceArms,sourceGloves));
+  const p=readAccessor(src,original.POSITION);
+  const skinRest=p.map(v=>aligned(v,sourceArms,sourceGloves));
+  // Shrink oversized Jakeli glove fingertips around each anatomical wrist.
+  // Keep cuff vertices in place; do not alter which donor finger bones
+  // control the glove's original mesh vertices.
+  const tr=skinRest.map(v=>{
+   if(!sourceGloves)return v;
+   const side=Math.sign(v[0])||1;
+   const wrist=[side*.536,.231,.072];
+   const taper=ease01((Math.abs(v[0])-.535)/.108);
+   const shrink=1-.17*taper;
+   return wrist.map((x,k)=>x+(v[k]-x)*shrink);
+  });
   const pFlat=new Float32Array(tr.flat()),pBuffer=Buffer.from(pFlat.buffer);
   const min=[0,1,2].map(k=>Math.min(...tr.map(x=>x[k]))),
    max=[0,1,2].map(k=>Math.max(...tr.map(x=>x[k])));
@@ -243,7 +255,7 @@ for(let mi=0;mi<s.meshes.length;mi++){
    // Transfer genuine original glove vertices to wrist + articulated digits.
    // Avoid ever assigning all palm vertices to the tip of a single finger.
    const candidate=rigidHead?[[headIndex,1]]:rigidTorso?[[torsoIndex,1]]:
-    sourceGloves?gloveSkin(tr[vi],p[vi]):nearest(tr[vi]);
+    sourceGloves?gloveSkin(skinRest[vi],p[vi]):nearest(tr[vi]);
    const total=candidate.reduce((x,v)=>x+v[1],0);
    if(!(total>0))throw Error("Unweighted British vertex");
    let weighted=0;
