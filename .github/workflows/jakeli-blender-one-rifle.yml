@@ -1,0 +1,44 @@
+name: Jakeli one-rifle Blender rebind (isolated experiment)
+on:
+  push:
+    branches:
+      - feature/british-army-10-stages-20261118
+    paths:
+      - tools/jakeli/blender-rebind-german-armature.py
+      - .github/workflows/jakeli-blender-one-rifle.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  rebind:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender for actual skeletal rest-pose rebind
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq blender
+      - name: Retarget original Jakeli mesh to approved German 65-bone armature
+        run: blender --background --threads 2 --python tools/jakeli/blender-rebind-german-armature.py
+      - name: Validate one-rifle experimental GLB (not visual approval)
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const b=fs.readFileSync('assets/allied-soldiers/uk-jakeli-blender-german-rig-v1.glb');
+          if(b.toString('ascii',0,4)!=='glTF')throw Error('Invalid GLB');
+          const n=b.readUInt32LE(12),d=JSON.parse(b.subarray(20,20+n));
+          if(d.skins?.length!==1||d.skins[0].joints.length!==65)throw Error('Missing German 65-bone skin');
+          if((d.meshes||[]).length<13)throw Error('Lost authentic British mesh');
+          console.log('JAKELI_BLENDER_ONE_RIFLE_STRUCTURAL_PASS',JSON.stringify({meshes:d.meshes.length,bones:d.skins[0].joints.length,animations:d.animations?.length||0}));
+          NODE
+      - name: Upload editable Blender project and one-rifle GLB
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakeli-blender-german-armature-one-rifle
+          path: |
+            assets/allied-soldiers/uk-jakeli-blender-german-rig-v1.glb
+            babylon-qa-results/jakeli-blender-lee/
+          if-no-files-found: warn
+          retention-days: 5
