@@ -36,6 +36,14 @@ jobs:
         run: node tools/jakeli/build-prototype.mjs
       - name: Verify real Jakeli mesh, weights and Quaternius clips
         run: node tools/jakeli/verify-prototype.mjs
+      - name: Upload inspectable Jakeli 65-bone rig for visual deformation audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakeli-prototype-65b-inspection
+          path: assets/allied-soldiers/uk-jakeli-prototype-65b.glb
+          retention-days: 3
+          if-no-files-found: ignore
       - name: Set up Chromium on CI (not iPhone Safari)
         run: |
           npm install --no-audit --no-fund --prefix /tmp/jakeli-qa playwright@1.58.2
