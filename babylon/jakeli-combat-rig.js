@@ -354,6 +354,8 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
   weaponMeshCount,weaponSwitchCount:0,weaponReady:true,
   combatRecoil:0,combatReloadPhase:0,combatReloadActive:false,
   rightGripMeters:Infinity,leftGripMeters:Infinity,
+  rightIndex2ToTriggerMeters:Infinity,rightIndex2TriggerLocal:[Infinity,Infinity,Infinity],
+  rightThumb2ToTriggerMeters:Infinity,rightMiddle2ToTriggerMeters:Infinity,
    fingerGripProfile:"jakeli-weapon-specific-v1",fingerJointCount:0,
    triggerIndexFlexRad:0,supportFingerFlexRad:0,
   rightPalmErrorDeg:Infinity,leftPalmErrorDeg:Infinity,
@@ -569,6 +571,16 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
    const trueTrigger=actualWeaponOrigin.add(V(m.trigger,actualWeaponQ));
    const trueDominantGrip=trueTrigger.add(V(weaponId==="uk-lee-enfield"?handFit.grip:weaponProfile.grip,actualWeaponQ));
    state.rightGripMeters=B.Vector3.Distance(right.socket.getAbsolutePosition(),trueDominantGrip);
+   // True finger-to-trigger contact, unlike the trivial weapon socket identity.
+   const rightIndex2=find("RightHandIndex2");
+   const rightThumb2=find("RightHandThumb2");
+   const rightMiddle2=find("RightHandMiddle2");
+   refresh(rightIndex2);refresh(rightThumb2);refresh(rightMiddle2);
+   const indexDiff=rightIndex2.getAbsolutePosition().subtract(trueTrigger);
+   state.rightIndex2ToTriggerMeters=indexDiff.length();
+   state.rightIndex2TriggerLocal=rotate(indexDiff,actualWeaponQ.conjugate()).asArray();
+   state.rightThumb2ToTriggerMeters=B.Vector3.Distance(rightThumb2.getAbsolutePosition(),trueTrigger);
+   state.rightMiddle2ToTriggerMeters=B.Vector3.Distance(rightMiddle2.getAbsolutePosition(),trueTrigger);
    state.weaponGripDistanceMeters=state.rightGripMeters;
    state.leftGripMeters=B.Vector3.Distance(left.socket.getAbsolutePosition(),lGrip);
    state.supportSocketErrorMeters=B.Vector3.Distance(
