@@ -7,6 +7,8 @@ on:
       - 'tools/jakeli/**'
       - 'babylon/jakeli-65b-iphone.html'
       - 'babylon/jakeli-weapons-iphone.html'
+      - 'babylon/jakeli-lee-german-controller.html'
+      - 'babylon/jakeli-lee-german-controller.js'
       - 'babylon/jakeli-combat-rig.js'
       - 'babylon/jakeli-three-squad-iphone.html'
       - 'babylon/tests/test-jakeli-*.cjs'
@@ -72,6 +74,15 @@ jobs:
           python3 -m http.server 8809 --bind 127.0.0.1 >/tmp/jakeli-http.log 2>&1 &
           sleep 2
           node babylon/tests/test-jakeli-65b-browser.cjs
+      - name: Compare ONE Lee-Enfield using unchanged approved German IK
+        run: node babylon/tests/test-jakeli-lee-german-controller.cjs
+      - name: Upload one-rifle German IK comparison screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakeli-lee-enfield-german-controller
+          path: babylon-qa-results/jakeli-lee-german-controller/
+          if-no-files-found: ignore
       - name: Test authentic Jakeli with four approved two-hand IK weapons
         run: node babylon/tests/test-jakeli-weapons-browser.cjs
       - name: Test German artist hand skin on actual Jakeli with four weapons
