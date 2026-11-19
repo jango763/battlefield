@@ -29,6 +29,8 @@ jobs:
             assets/allied-soldiers/uk-jakeli-mobile-static.glb \
             assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb > /tmp/jakeli-audit.log
           grep -F JAKELI_AUDIT_01_02_PASS /tmp/jakeli-audit.log
+      - name: Install meshoptimizer for topology-preserving mobile reduction
+        run: npm install --no-audit --no-fund --prefix /tmp/jakeli-meshopt meshoptimizer@1.1.1
       - name: Align Jakeli geometry and transfer 65-bone skinning (steps 3-5 prototype)
         run: node tools/jakeli/build-prototype.mjs
       - name: Verify real Jakeli mesh, weights and Quaternius clips
