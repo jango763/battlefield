@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Battlefield · вооружённый Jakeli — 65 костей</title>
+<style>
+:root{color-scheme:dark;font:13px system-ui,-apple-system,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:#111e18;color:#e8efdf}
+main{max-width:900px;margin:auto;padding:12px}h1{font-size:21px;margin:6px 0}
+p{line-height:1.5;color:#c8dbc5}
+.warn{background:#433b28;border-left:3px solid #e0b769;padding:8px}
+#scene{width:100%;height:clamp(310px,58vh,610px);display:block;border:1px solid #799177;
+border-radius:10px;background:#122018;touch-action:none}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:8px 0}
+.grid.pose{grid-template-columns:repeat(2,1fr)}
+button{background:#315641;color:white;border:1px solid #8eae8b;border-radius:8px;
+min-height:44px;font:600 12px system-ui}
+button[aria-pressed=true]{background:#a8c486;color:#142519}
+pre{white-space:pre-wrap;word-break:break-word;line-height:1.5;font-size:11px;
+background:#1c3022;border-radius:10px;padding:10px}
+a{color:#cbedb9}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./us-hero-stage8-rig.js"></script>
+</head><body><main>
+<h1>Jakeli — боец с оружием</h1>
+<p class="warn">Испытание подлинного британского меша на донорском 65-костном риге. В игре не установлен. Это проверка совместимости и двуручного IK, а не окончательно утверждённая анимация.</p>
+<canvas id="scene" aria-label="Вооружённый британец Jakeli, вращение пальцем"></canvas>
+<div class="grid pose">
+<button data-pose="ready" aria-pressed="true">Боевая стойка</button>
+<button data-pose="aim" aria-pressed="false">Прицеливание</button>
+</div>
+<div class="grid" role="group" aria-label="Британское оружие">
+<button data-weapon="uk-lee-enfield" aria-pressed="true">Lee-Enfield</button>
+<button data-weapon="uk-sten" aria-pressed="false">Sten</button>
+<button data-weapon="uk-bren" aria-pressed="false">Bren</button>
+<button data-weapon="uk-piat" aria-pressed="false">PIAT</button>
+</div>
+<div class="grid" role="group" aria-label="Движения">
+<button data-motion="Idle_Quaternius" aria-pressed="true">Стойка</button>
+<button data-motion="Walk_Quaternius" aria-pressed="false">Шаг</button>
+<button data-motion="Jog_Quaternius" aria-pressed="false">Бег</button>
+<button data-motion="Sprint_Quaternius" aria-pressed="false">Спринт</button>
+</div>
+<pre id="status" aria-live="polite">Загружаю экспериментальный Jakeli и винтовку…</pre>
+<p>Можно вращать и приближать модель пальцем. Проверяем, чтобы не было четырёх кистей, плавающего приклада и вывернутых рук. <a href="../assets/allied-soldiers/ATTRIBUTION_JAKELI.md">George Jakeli · CC BY 4.0</a></p>
+</main>
+<script>
+"use strict";
+const qa={loaded:false,realJakeli:true,prototype:true,bones:0,meshCount:0,
+ weaponId:null,weaponMeshCount:0,grip:null,clips:[],motion:null,
+ error:null,releaseReady:false,actualSafariTested:false,weaponSwaps:0};
+window.__JAKELI_WEAPON_QA__=qa;
+(async()=>{
+ try{
+  const B=window.BABYLON,api=window.BattlefieldUSLeeEnfieldStage4;
+  if(!B?.SceneLoader||!api?.create)throw Error("Нет Babylon.js / утверждённого двуручного IK");
+  const canvas=document.querySelector("#scene"),out=document.querySelector("#status");
+  const engine=new B.Engine(canvas,true,{powerPreference:"high-performance"});
+  engine.setHardwareScalingLevel(Math.max(1,(devicePixelRatio||1)/1.6));
+  const scene=new B.Scene(engine);scene.useRightHandedSystem=true;
+  scene.clearColor=new B.Color4(.08,.13,.09,1);
+  const ambient=new B.HemisphericLight("ambient",new B.Vector3(0,1,0),scene);ambient.intensity=1.4;
+  const sun=new B.DirectionalLight("sun",new B.Vector3(-.4,-1,-.4),scene);sun.intensity=1.15;
+  const camera=new B.ArcRotateCamera("view",Math.PI*.60,Math.PI*.43,3.2,new B.Vector3(0,0,0),scene);
+  camera.lowerRadiusLimit=.7;camera.upperRadiusLimit=8;camera.attachControl(canvas,true);
+  scene.activeCamera=camera;
+  const stage=new B.TransformNode("jakeli-faction-britain-stage",scene);
+  const imported=await B.SceneLoader.LoadAssetContainerAsync("",
+     "../assets/allied-soldiers/uk-jakeli-prototype-65b.glb",scene,undefined,".glb");
+  imported.addAllToScene();
+  qa.bones=imported.skeletons[0]?.bones?.length||0;
+  qa.meshCount=imported.meshes.filter(m=>(m.getTotalVertices?.()||0)>0).length;
+  qa.clips=imported.animationGroups.map(g=>g.name);
+  if(imported.skeletons.length!==1||qa.bones!==65||qa.meshCount!==13||qa.clips.length!==4)
+    throw Error("Не загружен корректный британский риг Jakeli");
+  for(const n of [...imported.meshes,...imported.transformNodes])
+    if(n&&!n.parent)n.parent=stage;
+  const bounds={lo:new B.Vector3(Infinity,Infinity,Infinity),hi:new B.Vector3(-Infinity,-Infinity,-Infinity)};
+  for(const mesh of imported.meshes.filter(m=>m.getTotalVertices?.()>0)){
+   mesh.computeWorldMatrix(true);
+   const bb=mesh.getBoundingInfo().boundingBox;
+   bounds.lo.minimizeInPlace(bb.minimumWorld);bounds.hi.maximizeInPlace(bb.maximumWorld);
+  }
+  camera.setTarget(bounds.lo.add(bounds.hi).scale(.5));
+  camera.radius=Math.max(2.8,bounds.hi.subtract(bounds.lo).length()*1.6);
+  // Existing weapon solver is reused, not copied or replaced.
+  const rig=await api.create({scene,imported,stage,
+   weaponRoot:"../assets/ww2-weapons/",initialWeaponId:"uk-lee-enfield"});
+  const groups=imported.animationGroups;
+  let active=null,fade=null,busy=false;
+  function motion(name){
+   const next=groups.find(x=>x.name===name);
+   if(!next)throw Error("Нет настоящего клипа "+name);
+   if(next===active)return;
+   if(fade){fade.old.stop();fade=null;}
+   const old=active;
+   next.stop();next.start(true,1);
+   next.setWeightForAllAnimatables(old?0:1);
+   if(old)fade={old,next,t:0};
+   active=next;qa.motion=name;
+   document.querySelectorAll("[data-motion]").forEach(b=>
+     b.setAttribute("aria-pressed",String(b.dataset.motion===name)));
+  }
+  function updateReport(){
+   const r=rig.report;qa.grip={
+    rightGripMeters:r.rightGripMeters,leftGripMeters:r.leftGripMeters,
+    stockToShoulderMeters:r.stockToShoulderMeters,
+    rightReachable:r.rightReachable,leftReachable:r.leftReachable,
+    mounted:r.socketAttached,socketName:r.socketName,
+    armChannelsRemoved:r.armChannelsRemoved,
+    leftSupportInHandguard:r.supportWithinHandguard,
+    error:r.error
+   };
+   qa.weaponId=r.weaponId;qa.weaponMeshCount=r.weaponMeshCount;
+   out.textContent="Подлинная модель Jakeli · "+qa.meshCount+" частей · "+qa.bones+" костей"+
+    "\nОружие: "+r.weaponLabel+" · геометрия оружия: "+r.weaponMeshCount+
+    "\nСтойка: "+r.mode+" · движение: "+qa.motion+
+    "\nПравая кисть: "+Number(r.rightGripMeters).toFixed(3)+" м"+
+    " · левая кисть: "+Number(r.leftGripMeters).toFixed(3)+" м"+
+    "\nПриклад: "+Number(r.stockToShoulderMeters).toFixed(3)+" м"+
+    "\nWeapon_R: "+(r.socketAttached?"закреплён":"не закреплён")+
+    " · IK: "+(r.error||"без ошибки")+
+    "\nВыпуск: НЕ РАЗРЕШЁН, нужна визуальная проверка.";
+  }
+  scene.onBeforeRenderObservable.add(()=>{
+   if(fade){
+    fade.t+=Math.min(.1,engine.getDeltaTime()/1000)/.22;
+    const t=Math.min(1,fade.t),w=t*t*(3-2*t);
+    fade.old.setWeightForAllAnimatables(1-w);
+    fade.next.setWeightForAllAnimatables(w);
+    if(t>=1){fade.old.stop();fade=null;}
+   }
+   updateReport();
+  });
+  document.querySelectorAll("[data-motion]").forEach(b=>b.onclick=()=>{
+   try{motion(b.dataset.motion)}catch(e){qa.error=String(e);out.textContent=qa.error;}
+  });
+  document.querySelectorAll("[data-pose]").forEach(b=>b.onclick=()=>{
+   try{rig.setPose(b.dataset.pose);
+    document.querySelectorAll("[data-pose]").forEach(x=>x.setAttribute(
+      "aria-pressed",String(x===b)));
+   }catch(e){qa.error=String(e);out.textContent=qa.error;}
+  });
+  document.querySelectorAll("[data-weapon]").forEach(b=>b.onclick=async()=>{
+   if(busy)return;busy=true;b.disabled=true;
+   try{await rig.equipWeapon(b.dataset.weapon);qa.weaponSwaps++;
+    document.querySelectorAll("[data-weapon]").forEach(x=>
+      x.setAttribute("aria-pressed",String(x===b)));
+   }catch(e){qa.error=String(e?.message||e);out.textContent=qa.error;}
+   finally{busy=false;b.disabled=false;}
+  };
+  motion("Idle_Quaternius");
+  qa.loaded=true;
+  engine.runRenderLoop(()=>scene.render());
+  addEventListener("resize",()=>engine.resize());
+ }catch(e){
+  qa.error=String(e?.stack||e);
+  document.querySelector("#status").textContent="Ошибка: "+qa.error;
+  console.error("JAKELI_WEAPON_PREVIEW",e);
+ }
+})();
+</script></body></html>
