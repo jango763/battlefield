@@ -9,7 +9,12 @@ function checkGrip(snapshot,pose){
  const g=snapshot.grip;
  const values={right:g?.rightGripMeters,left:g?.leftGripMeters,stock:g?.stockToShoulderMeters};
  const finite=Object.values(values).every(x=>typeof x==="number"&&Number.isFinite(x));
- if(snapshot.error||g?.error||!finite||!g?.mounted||!g?.rightReachable||
+ const curlPass=g?.fingerGripProfile==="jakeli-weapon-specific-v1"&&
+   Number.isInteger(g?.fingerJointCount)&&g.fingerJointCount>=26&&
+   Number.isFinite(g?.triggerIndexFlexRad)&&g.triggerIndexFlexRad>.40&&g.triggerIndexFlexRad<.9&&
+   Number.isFinite(g?.supportFingerFlexRad)&&g.supportFingerFlexRad>.95&&
+   g.triggerIndexFlexRad<g.supportFingerFlexRad;
+ if(snapshot.error||g?.error||!finite||!curlPass||!g?.mounted||!g?.rightReachable||
     !g?.leftReachable||!g?.leftSupportInHandguard||
     values.right>GRIP_LIMITS.right||values.left>GRIP_LIMITS.left||
     values.stock>GRIP_LIMITS.stock){
@@ -76,7 +81,10 @@ function checkGrip(snapshot,pose){
     allMounted:true,gripLimitsMeters:GRIP_LIMITS,visualApproval:false,iphoneSafari:false,
     greatestRightGrip:Math.max(...results.map(x=>x.grip.rightGripMeters)),
     greatestLeftGrip:Math.max(...results.map(x=>x.grip.leftGripMeters)),
-    greatestStockGap:Math.max(...results.map(x=>x.grip.stockToShoulderMeters))
+    greatestStockGap:Math.max(...results.map(x=>x.grip.stockToShoulderMeters)),
+    minFingerJoints:Math.min(...results.map(x=>x.grip.fingerJointCount)),
+    triggerIndexFlexRange:[Math.min(...results.map(x=>x.grip.triggerIndexFlexRad)),Math.max(...results.map(x=>x.grip.triggerIndexFlexRad))],
+    supportFingerFlexRange:[Math.min(...results.map(x=>x.grip.supportFingerFlexRad)),Math.max(...results.map(x=>x.grip.supportFingerFlexRad))]
   }));
  }catch(e){
   console.error("JAKELI_REAL_WEAPONS_CHROMIUM_FAIL",e.stack||String(e));
