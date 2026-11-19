@@ -1,0 +1,59 @@
+name: Jakeli experimental anatomical iPhone preview
+on:
+  push:
+    branches:
+      - feature/british-army-10-stages-20261118
+    paths:
+      - '.github/workflows/jakeli-experimental-preview.yml'
+      - 'tools/jakeli/blender-rebind-german-armature.py'
+      - 'tools/jakeli/verify-anatomical.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: jakeli-preview-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-experimental-preview:
+    if: github.ref == 'refs/heads/feature/british-army-10-stages-20261118'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tools/jakeli/requirements-blender.txt
+      - name: Install pinned official Blender runtime
+        run: |
+          python -m pip install --only-binary=:all: -r tools/jakeli/requirements-blender.txt
+          python -c "import bpy; assert bpy.app.version == (4,3,0)"
+      - name: Bake all six clips from preserved original and anatomical 65-bone rig
+        env:
+          JAKELI_RENDER: '0'
+        run: python tools/jakeli/blender-rebind-german-armature.py
+      - name: Enforce bind, deformations and real mesh grip gates
+        run: python tools/jakeli/verify-anatomical.py
+      - name: Upload experimental GLB for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakeli-experimental-mobile-glb
+          path: assets/allied-soldiers/uk-jakeli-anatomical-v2.glb
+          retention-days: 14
+      - name: Publish ONLY experimental branch GLB, never approve or merge game build
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = 'refs/heads/feature/british-army-10-stages-20261118'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/allied-soldiers/uk-jakeli-anatomical-v2.glb
+          if git diff --cached --quiet; then
+            echo 'Experimental GLB unchanged'
+          else
+            git commit -m 'Publish unapproved Jakeli anatomical iPhone preview [skip ci]'
+            git pull --rebase origin feature/british-army-10-stages-20261118
+            git push origin HEAD:refs/heads/feature/british-army-10-stages-20261118
+          fi
