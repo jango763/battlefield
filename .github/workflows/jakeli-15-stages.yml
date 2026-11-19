@@ -13,7 +13,7 @@ permissions:
 jobs:
   build-and-verify-prototype:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,6 +28,22 @@ jobs:
         run: node tools/jakeli/build-prototype.mjs
       - name: Verify real Jakeli mesh, weights and Quaternius clips
         run: node tools/jakeli/verify-prototype.mjs
+      - name: Set up Chromium on CI (not iPhone Safari)
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/jakeli-qa playwright@1.58.2
+          /tmp/jakeli-qa/node_modules/.bin/playwright install chromium
+      - name: Load actual Jakeli and test crossfades in mobile 390x844 Chromium
+        run: |
+          python3 -m http.server 8809 --bind 127.0.0.1 >/tmp/jakeli-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-jakeli-65b-browser.cjs
+      - name: Upload actual Jakeli pose screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakeli-65-bone-mobile-chromium-poses
+          path: babylon-qa-results/jakeli-65b/
+          if-no-files-found: ignore
       - name: Publish strictly experimental artifact without touching main
         run: |
           set -euo pipefail
