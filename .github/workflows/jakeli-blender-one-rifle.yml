@@ -15,13 +15,12 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
-      - name: Install Blender for actual skeletal rest-pose rebind
+      - name: Install Blender Python API without stale Ubuntu Mesa packages
         run: |
-          # Ubuntu 24.04 runners already carry APT indexes; avoid slow
-          # full-index refresh on each short experimental Blender build.
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq blender
+          python3 -m venv /tmp/jakeli-blender
+          /tmp/jakeli-blender/bin/pip install --no-cache-dir bpy
       - name: Retarget original Jakeli mesh to approved German 65-bone armature
-        run: blender --background --threads 2 --python tools/jakeli/blender-rebind-german-armature.py
+        run: /tmp/jakeli-blender/bin/python tools/jakeli/blender-rebind-german-armature.py
       - name: Validate one-rifle experimental GLB (not visual approval)
         run: |
           node - <<'NODE'
