@@ -26,6 +26,10 @@ a{color:#cbedb9}
 <h1>Jakeli — боец с оружием</h1>
 <p class="warn">Испытание подлинного британского меша на донорском 65-костном риге. В игре не установлен. Это проверка совместимости и двуручного IK, а не окончательно утверждённая анимация.</p>
 <canvas id="scene" aria-label="Вооружённый британец Jakeli, вращение пальцем"></canvas>
+<div class="grid pose" role="group" aria-label="Положение камеры">
+<button id="zoom-right" type="button">Кисть и спуск крупно</button>
+<button id="zoom-full" type="button">Весь боец</button>
+</div>
 <div class="grid pose">
 <button data-pose="ready" aria-pressed="true">Боевая стойка</button>
 <button data-pose="aim" aria-pressed="false">Прицеливание</button>
@@ -84,9 +88,25 @@ window.__JAKELI_WEAPON_QA__=qa;
   }
   camera.setTarget(bounds.lo.add(bounds.hi).scale(.5));
   camera.radius=Math.max(2.8,bounds.hi.subtract(bounds.lo).length()*1.6);
+  const fullCamera={target:camera.target.clone(),radius:camera.radius,alpha:camera.alpha,beta:camera.beta};
   // Existing weapon solver is reused, not copied or replaced.
   const rig=await api.create({scene,imported,stage,
    weaponRoot:"../assets/ww2-weapons/",initialWeaponId:"uk-lee-enfield"});
+  const indexForCloseup=imported.skeletons[0].bones.find(b=>/RightHandIndex2$/.test(b.name));
+  const focusNode=indexForCloseup?.getTransformNode?.();
+  if(!focusNode)throw Error("Не найдена кость указательного пальца для крупного плана");
+  document.querySelector("#zoom-right").onclick=()=>{
+    focusNode.computeWorldMatrix(true);
+    camera.setTarget(focusNode.getAbsolutePosition().clone());
+    camera.radius=.78;
+    camera.beta=Math.PI*.46;
+  };
+  document.querySelector("#zoom-full").onclick=()=>{
+    camera.setTarget(fullCamera.target.clone());
+    camera.radius=fullCamera.radius;
+    camera.alpha=fullCamera.alpha;
+    camera.beta=fullCamera.beta;
+  };
   const groups=imported.animationGroups;
   let active=null,fade=null,busy=false;
   function motion(name){
