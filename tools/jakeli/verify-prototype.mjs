@@ -22,6 +22,7 @@ const handJointIndices=new Set(j.skins[0].joints.flatMap((nodeId,jointIndex)=>
 assert.equal(handJointIndices.size,2,"Both genuine wrist joints must exist");
 const jointNames=j.skins[0].joints.map(n=>j.nodes[n]?.name||"");
 const gloveStats={Left:{all:0,articulated:0,thumb:0,digits:new Set(),rootN:0,rootProx:0,rootDistal:0,tipN:0,tipDistal:0},Right:{all:0,articulated:0,thumb:0,digits:new Set(),rootN:0,rootProx:0,rootDistal:0,tipN:0,tipDistal:0}};
+const cuffSeam={Left:{glove:[],sleeve:[]},Right:{glove:[],sleeve:[]}};
 let gloveVertexCount=0;
 let skinned=0,vertices=0,triangles=0;
 for(const node of rigMeshNodes){
@@ -35,7 +36,19 @@ for(const node of rigMeshNodes){
   const wview=j.bufferViews[weights.bufferView],jview=j.bufferViews[joints.bufferView],
    bin=20+bytes.readUInt32LE(12)+8,wm=(wview.byteOffset||0)+(weights.byteOffset||0),
    jm=(jview.byteOffset||0)+(joints.byteOffset||0);
+  const srcName=j.meshes[node.mesh].name;
+  const isGlove=/^SLD_1_Material #21_0$/.test(srcName);
+  const isSleeve=/1_T_Shirt/.test(srcName);
+  const pv=j.bufferViews[a.bufferView],posBase=bin+(pv.byteOffset||0)+(a.byteOffset||0);
   for(let i=0;i<a.count;i++){
+   const pOff=posBase+i*12;
+   const px=bytes.readFloatLE(pOff);
+   const xAbs=Math.abs(px);
+   const seamSide=px>=0?"Left":"Right";
+   if(isGlove&&xAbs>=.49&&xAbs<=.525||isSleeve&&xAbs>=.42&&xAbs<=.58){
+    const pos=[px,bytes.readFloatLE(pOff+4),bytes.readFloatLE(pOff+8)];
+    cuffSeam[seamSide][isGlove?"glove":"sleeve"].push(pos);
+   }
    let sum=0;
    for(let c=0;c<4;c++){
     const w=bytes.readFloatLE(bin+wm+i*16+c*4),bone=bytes.readUInt8(bin+jm+i*4+c);
@@ -86,6 +99,25 @@ for(const node of rigMeshNodes){
   triangles+=(p.indices!==undefined?j.accessors[p.indices].count:a.count)/3;
  }
 }
+// Verify a REAL mesh-to-mesh wrist seam, not two coincident IK sockets.
+const cuffGapReport={};
+for(const [side,pair] of Object.entries(cuffSeam)){
+ assert(pair.glove.length>60&&pair.sleeve.length>100,"Missing wrist cuff vertices "+side);
+ const distances=pair.glove.map(g=>{
+  let best=Infinity;
+  for(const p of pair.sleeve){
+   const d=(g[0]-p[0])**2+(g[1]-p[1])**2+(g[2]-p[2])**2;
+   if(d<best)best=d;
+  }
+  return Math.sqrt(best);
+ }).sort((a,b)=>a-b);
+ const median=distances[Math.floor(distances.length*.5)];
+ const p90=distances[Math.floor(distances.length*.9)];
+ assert(median<.026&&p90<.034,
+  "Jakeli "+side+" cuff disconnected from glove: median="+median+" p90="+p90);
+ cuffGapReport[side]={gloveSamples:pair.glove.length,sleeveSamples:pair.sleeve.length,
+  medianGapMeters:median,p90GapMeters:p90};
+}
 assert(vertices>40000,"A placeholder or partial model is not acceptable");
 assert(gloveVertexCount>=3500,"Missing genuine original Jakeli glove geometry");
 for(const [side,stat] of Object.entries(gloveStats)){
@@ -106,7 +138,7 @@ for(const a of j.animations)for(const ch of a.channels){
 }
 assert(nodesWithAnimation.size>=20);
 console.log("JAKELI_REAL_MESH_RIG_STRUCTURAL_PASS",JSON.stringify({skinnedParts:skinned,
- skinnedVertices:vertices,gloveVertexCount,gloveStats:Object.fromEntries(Object.entries(gloveStats).map(([s,v])=>
+ skinnedVertices:vertices,gloveVertexCount,cuffGapReport,gloveStats:Object.fromEntries(Object.entries(gloveStats).map(([s,v])=>
  [s,{vertices:v.all,articulated:v.articulated,thumb:v.thumb,digits:[...v.digits],
  rootCount:v.rootN,rootProxAvg:v.rootProx/v.rootN,rootDistalAvg:v.rootDistal/v.rootN,
  tipCount:v.tipN,tipDistalAvg:v.tipDistal/v.tipN}])),
