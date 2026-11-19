@@ -183,7 +183,11 @@ function gloveSkin(position,sourceVertex){
   const progress=clamp01((.20-y)/.085);
   return blendedFinger(hand,digits[side].Thumb,Math.max(.001,thumbRegion*.92),progress);
  }
- const base=ease01((extent-.548)/.076),fingerLength=clamp01((extent-.563)/.061);
+ // Source glove topology includes separate fingertips, but its first
+ // finger row begins near |X|=.59. The former .563 origin assigned the
+ // middle of almost every finger to distal bones (the "claw" distortion).
+ // Follow the three actual phalanges: root .595, middle .617, tip .64.
+ const base=ease01((extent-.548)/.076),fingerLength=clamp01((extent-.595)/.045);
  const yMask=ease01((.240-y)/.07);
  const amount=base*yMask*.94;
  if(amount<.001)return [[hand,1]];
