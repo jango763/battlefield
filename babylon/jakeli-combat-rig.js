@@ -17,13 +17,13 @@ const ARMS=new Set(["leftshoulder","leftarm","leftforearm","lefthand",
 const WEAPON_IDS=Object.freeze(["uk-lee-enfield","uk-sten","uk-bren","uk-piat"]);
 const PROFILES=Object.freeze({
  "uk-lee-enfield":{label:"Lee-Enfield",file:"uk-lee-enfield.glb",source:"GLB · Muster WW2",
-   support:{min:.14,max:.313,ready:.22,aim:.255,drop:.040,x:0},grip:[-.012,-.040,-.065],fingerDir:[0,-.95,.31],angle:[.24,.71,.11,.64]},
+   support:{min:.14,max:.313,ready:.22,aim:.255,drop:.040,x:0},grip:[-.017,.030,-.047],fingerDir:[0,-.95,.31],angle:[.24,.71,.11,.64]},
  "uk-sten":{label:"Sten",file:"uk-sten.glb",source:"GLB · Muster WW2",
-   support:{min:.15,max:.399,ready:.255,aim:.285,drop:.028,x:-.006},grip:[-.010,-.032,-.043],fingerDir:[0,-.92,.40],angle:[.19,.67,.08,.62]},
+   support:{min:.15,max:.399,ready:.255,aim:.285,drop:.028,x:-.006},grip:[-.014,.028,-.045],fingerDir:[0,-.92,.40],angle:[.19,.67,.08,.62]},
  "uk-bren":{label:"Bren",file:"uk-bren.glb",source:"GLB · Muster WW2",
-   support:{min:.095,max:.315,ready:.22,aim:.24,drop:.033,x:.055},grip:[-.019,-.043,-.080],fingerDir:[0,-.95,.31],angle:[.25,.66,.12,.58]},
+   support:{min:.095,max:.315,ready:.22,aim:.24,drop:.033,x:.055},grip:[-.019,.023,-.064],fingerDir:[0,-.95,.31],angle:[.25,.66,.12,.58]},
  "uk-piat":{label:"PIAT",file:null,source:"Procedural · original Battlefield",
-   support:{min:.027,max:.155,ready:.095,aim:.115,drop:.016,x:.065},grip:[-.015,-.043,-.035],fingerDir:[0,-.94,.34],angle:[.22,.60,.08,.52]}
+   support:{min:.027,max:.155,ready:.095,aim:.115,drop:.016,x:.065},grip:[-.015,.027,-.035],fingerDir:[0,-.94,.34],angle:[.22,.60,.08,.52]}
 });
 // Jakeli-only calibrated grasp intensity for rifle, side-mag SMG, LMG, PIAT.
 // Trigger index is deliberately relaxed relative to the three gripping fingers.
@@ -331,12 +331,12 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
  let combatRecoil=0,combatReloadPhase=0,combatReloadActive=false;
  let mountLocalPosition=null,mountLocalRotation=null;
  const fingerControls={base:-1.12,middle:-.94,distal:-.50,thumbBase:-.84,thumbMiddle:-.78,thumbDistal:-.40};
- // Rifle space (metres): move the dominant palm below and behind the trigger,
- // so the hand itself is not occulted by the wooden stock and receiver.
+ // Per-weapon right wrist calibrated against actual RightHandIndex2-to-trigger
+ // landmarks: previous right hand was 8-10 cm beneath the physical trigger.
  const handFits=Object.freeze({
-   standard:{grip:[-.012,-.040,-.065],dir:[0,-.95,.31]},
-   outboard:{grip:[-.055,-.050,-.060],dir:[-.08,-.94,.30]},
-   wrapped:{grip:[-.034,-.065,-.091],dir:[0,-.85,.52]}
+   standard:{grip:[-.017,.030,-.047],dir:[0,-.95,.31]},
+   outboard:{grip:[-.060,.020,-.042],dir:[-.08,-.94,.30]},
+   wrapped:{grip:[-.039,.005,-.073],dir:[0,-.85,.52]}
  });
  let handFit=handFits.standard;
  // Actual per-weapon offsets are derived only from the selected profile.
