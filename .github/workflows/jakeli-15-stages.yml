@@ -5,6 +5,9 @@ on:
       - 'feature/british-army-10-stages-20261118'
     paths:
       - 'tools/jakeli/**'
+      - 'babylon/jakeli-65b-iphone.html'
+      - 'babylon/jakeli-weapons-iphone.html'
+      - 'babylon/tests/test-jakeli-*.cjs'
       - 'babylon/JAKELI_15_STAGES.md'
       - '.github/workflows/jakeli-15-stages.yml'
   workflow_dispatch:
