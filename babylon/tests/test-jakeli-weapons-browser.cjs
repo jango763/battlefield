@@ -89,7 +89,7 @@ function checkGrip(snapshot,pose){
      const cam=window.BABYLON.EngineStore.LastCreatedScene.activeCamera;
      return {radius:cam.radius,target:cam.target.asArray()};
    });
-   if(closeup.radius<1.5||closeup.radius>1.8||closeup.target.some(x=>!Number.isFinite(x)))
+   if(closeup.radius<1.05||closeup.radius>1.25||closeup.target.some(x=>!Number.isFinite(x)))
      throw Error("Jakeli closeup camera failed "+JSON.stringify(closeup));
    await page.screenshot({path:dir+"/"+w+"-trigger-close.png",fullPage:true});
    await page.locator("#zoom-full").click();
