@@ -15,12 +15,15 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
-      - name: Install Blender Python API without stale Ubuntu Mesa packages
+      - name: Download official Blender 4.5 standalone (no apt or pip)
         run: |
-          python3 -m venv /tmp/jakeli-blender
-          /tmp/jakeli-blender/bin/pip install --no-cache-dir bpy
+          curl --fail --location --retry 3 --connect-timeout 30 --max-time 420 \
+            https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz \
+            --output /tmp/jakeli-blender.tar.xz
+          tar -xf /tmp/jakeli-blender.tar.xz -C /tmp
+          /tmp/blender-4.5.3-linux-x64/blender --version | head -3
       - name: Retarget original Jakeli mesh to approved German 65-bone armature
-        run: /tmp/jakeli-blender/bin/python tools/jakeli/blender-rebind-german-armature.py
+        run: /tmp/blender-4.5.3-linux-x64/blender --background --threads 2 --python tools/jakeli/blender-rebind-german-armature.py
       - name: Validate one-rifle experimental GLB (not visual approval)
         run: |
           node - <<'NODE'
