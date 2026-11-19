@@ -198,12 +198,19 @@ function gloveSkin(position,sourceVertex){
 // Match original Z-up centimeter geometry into the donor's Y-up meter frame.
 // Model ankle height ~0cm -> -1m; head 185cm -> +0.85m.
 // The donor rest pose uses hips near 0, feet -1m, head near +1m.
-function aligned(v,arm=false,glove=false){
+function aligned(v,arm=false,glove=false,sleeve=false){
  const p=[v[0]*.01,v[2]*.01-1,-v[1]*.01];
  if(arm){
   // Align Jakeli's source A-pose limbs to the 65-bone rest skeleton.
   const side=Math.sign(p[0]),t=Math.max(0,Math.min(1,(Math.abs(p[0])-.22)/.43));
   p[0]-=side*.025*t;p[1]+=.17*t;
+  if(sleeve){
+   // The imported upper sleeve ends ~8cm behind the retargeted Jakeli wrist.
+   // Blend the source fabric cuff forward over the distal forearm, leaving
+   // shoulder and upper arm fully unchanged; avoid a hard wrist seam.
+   const cuff=ease01((Math.abs(p[0])-.365)/.16);
+   p[2]+=.085*cuff;
+  }
   if(glove){
    // The original hand surface lies behind the donor's finger joint rows.
    // Align the source hand depth while preserving the original topology.
@@ -228,7 +235,7 @@ for(let mi=0;mi<s.meshes.length;mi++){
   if(primitive.mode!==undefined&&primitive.mode!==4)throw Error("Nontriangular source");
   const original=primitive.attributes;
   const p=readAccessor(src,original.POSITION);
-  const skinRest=p.map(v=>aligned(v,sourceArms,sourceGloves));
+  const skinRest=p.map(v=>aligned(v,sourceArms,sourceGloves,sourceSleeves));
   // Shrink oversized Jakeli glove fingertips around each anatomical wrist.
   // Keep cuff vertices in place; do not alter which donor finger bones
   // control the glove's original mesh vertices.
