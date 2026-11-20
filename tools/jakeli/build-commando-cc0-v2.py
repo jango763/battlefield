@@ -9,6 +9,8 @@ this prototype begins with one Sten weapon and all six original clips.
 import bpy, math, os, json
 from pathlib import Path
 from mathutils import Vector, Quaternion, Matrix
+from quaternius_legs import QuaterniusLowerBody
+from weapon_profiles import load_profile
 ROOT=Path(__file__).resolve().parents[2]
 SRC=ROOT/'babylon-qa-results/commando-ww2-source/files/LowpolySoldier/LowpolySoldier.fbx'
 IMAGE=SRC.with_name('LowpolySoldier_Texture.png')
@@ -155,78 +157,147 @@ for side in ('Left','Right'):
 bpy.ops.object.mode_set(mode='OBJECT')
 assert len(rig.data.bones)==65,len(rig.data.bones)
 for b in rig.pose.bones:b.rotation_mode='QUATERNION'
-# Donor is an animation and weapon SOCKET source only; donor full body is
-# deliberately removed before export. This retains real CC0 soldier body.
-before=set(bpy.data.objects)
-bpy.ops.import_scene.gltf(filepath=str(DONOR))
-newobjs=set(bpy.data.objects)-before
-donors=[o for o in newobjs if o.type=='ARMATURE']
-assert len(donors)==1,len(donors)
-donor=donors[0]
-assert len(donor.data.bones)==65
-# Bone orientation-aware retarget. Do not transplant source mesh weights.
-def rot_difference(a,b):
- return (a @ b.inverted()).normalized()
-rest_src={b.name:b.matrix_local.to_quaternion() for b in rig.data.bones}
-rest_donor={b.name:b.matrix_local.to_quaternion() for b in donor.data.bones}
-def canonical(n):
- return n.replace('mixamorig:','').split('.')[0]
-donor_map={canonical(b.name):b.name for b in donor.data.bones}
-assert all(n in donor_map for n in ['LeftArm','LeftHand','RightHand','LeftUpLeg','RightLeg','Head'])
-# Keep a clean imported rigid Sten root + its authored animation strips.
-weaponroot=[o for o in newobjs if o.type=='EMPTY' and o.name=='Sten']
-assert len(weaponroot)==1,[o.name for o in newobjs if o.type=='EMPTY'][:15]
-weapon=weaponroot[0]
-for obj in list(newobjs):
- if obj.type=='MESH' and any(m.type=='ARMATURE' for m in obj.modifiers):
-  bpy.data.objects.remove(obj,do_unlink=True)
-# Source original rest mesh MUST remain, never export donor infantry geometry.
-assert mesh.name in bpy.data.objects
-# Add 6 original walking / combat poses onto actual CC0 soldier's rig.
-clips=['Ready','Aim','Fire','Walk','Jog','Sprint']
+# Animate true CC0 skin via the already verified Quaternius 65-bone library.
+# Imported GLB NLA channels are not read back reliably by headless bpy, so
+# retarget the original glTF data directly rather than copying a zeroed pose.
 rig.animation_data_create()
-donor.animation_data_create()
-assert {tr.name for tr in donor.animation_data.nla_tracks}>=set(clips)
+rig.animation_data_clear()
+for b in rig.pose.bones:b.rotation_mode='QUATERNION'
+gait=QuaterniusLowerBody(ROOT/'assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb',rig)
+def load(path):
+ before=set(bpy.data.objects)
+ bpy.ops.import_scene.gltf(filepath=str(path))
+ return [o for o in bpy.data.objects if o not in before]
+profile,parts=load_profile(ROOT,'uk-sten',load)
+weapon=bpy.data.objects.new('Sten',None)
+bpy.context.scene.collection.objects.link(weapon)
+for o in parts:
+ if o.parent not in parts:
+  world=o.matrix_world.copy()
+  o.parent=weapon
+  o.matrix_world=world
+weapon.rotation_mode='QUATERNION'
+weapon.animation_data_create()
+rest={b.name:b.matrix.copy() for b in rig.pose.bones}
+palm={}
+for side in ('Left','Right'):
+ hand=rig.pose.bones[side+'Hand']
+ # Actual human CC0 hand reaches palm centre between wrist and fingers.
+ local=hand.bone.matrix_local.inverted()@(hand.bone.head_local+(hand.bone.tail_local-hand.bone.head_local)*.43)
+ palm[side]=local
+def update():bpy.context.view_layer.update()
+def frame(forward,dorsal):
+ y=forward.normalized()
+ z=(dorsal-y*y.dot(dorsal)).normalized()
+ x=y.cross(z).normalized();z=x.cross(y)
+ return Matrix((x,y,z)).transposed().to_quaternion()
+def set_world(name,quat):
+ bone=rig.pose.bones[name]
+ M=quat.to_matrix().to_4x4();M.translation=bone.head
+ bone.matrix=M
+ update()
+def aim_bone(name,point):
+ bone=rig.pose.bones[name]
+ displacement=point-bone.head
+ q=(bone.tail-bone.head).rotation_difference(displacement)
+ M=q.to_matrix().to_4x4()@bone.matrix
+ M.translation=bone.head
+ bone.matrix=M
+ update()
+def solve(side,point,pole,clip,index):
+ up,fore,hand=[rig.pose.bones[side+s] for s in ('Arm','ForeArm','Hand')]
+ shoulder=up.head.copy()
+ l1=(fore.head-shoulder).length;l2=(hand.head-fore.head).length
+ delta=point-shoulder
+ dist=delta.length
+ assert dist < l1+l2-.0005 and dist > abs(l1-l2)+.0005,(
+  'Anatomical Commando arm reach',clip,index,side,dist,l1+l2,
+  list(shoulder),list(point))
+ unit=delta/dist;pv=pole-shoulder
+ pv=(pv-unit*pv.dot(unit)).normalized()
+ along=(l1*l1-l2*l2+dist*dist)/(2*dist)
+ elbow=shoulder+unit*along+pv*math.sqrt(max(0,l1*l1-along*along))
+ aim_bone(side+'Arm',elbow)
+ aim_bone(side+'ForeArm',point)
+ return (rig.pose.bones[side+'Hand'].head-point).length
 scene=bpy.context.scene;scene.render.fps=30
-movement={}
+clips=['Ready','Aim','Fire','Walk','Jog','Sprint']
+movement={};grip_errors={c:{'Left':0,'Right':0} for c in clips}
 for clip in clips:
- for tr in donor.animation_data.nla_tracks:tr.mute=(tr.name!=clip)
- for tr in weapon.animation_data.nla_tracks:tr.mute=(tr.name!=clip)
- strip=next(tr.strips[0] for tr in donor.animation_data.nla_tracks if tr.name==clip)
- frames=max(6,round((strip.action_frame_end-strip.action_frame_start)))
- for b in rig.pose.bones:b.rotation_quaternion=Quaternion((1,0,0,0))
- action=bpy.data.actions.new('Commando_'+clip)
- rig.animation_data.action=action
- sample=[]
+ duration=gait.clips[clip]['duration'] if clip in gait.clips else (1.2 if clip=='Fire' else 2)
+ frames=max(12,round(duration*30))
+ rig.animation_data.action=bpy.data.actions.new('Commando_'+clip)
+ weapon.animation_data.action=bpy.data.actions.new('Commando_'+clip)
+ leg_samples=[]
  for f in range(frames+1):
   scene.frame_set(f+1)
-  for sb in rig.pose.bones:
-   other=donor_map.get(sb.name)
-   if not other:continue
-   db=donor.pose.bones[other]
-   qdb=db.rotation_quaternion if db.rotation_mode=='QUATERNION' else db.matrix_basis.to_quaternion()
-   world_delta=rest_donor[other]@qdb@rest_donor[other].inverted()
-   q=(rest_src[sb.name].inverted()@world_delta@rest_src[sb.name]).normalized()
-   sb.rotation_quaternion=q
-   sb.keyframe_insert('rotation_quaternion',frame=f+1)
-  if clip in ['Walk','Jog','Sprint']:
-   sample.append(rig.pose.bones['LeftUpLeg'].rotation_quaternion.copy())
-  bpy.context.view_layer.update()
- if sample:
-  degrees=math.degrees(sample[0].rotation_difference(sample[len(sample)//3]).angle)
-  assert degrees>2,(clip,'No genuine old motion',degrees)
+  phase=2*math.pi*f/frames
+  for b in rig.pose.bones:b.matrix_basis=Matrix.Identity(4)
+  update()
+  set_world('Spine2',Quaternion((0,0,1),-.38)@rest['Spine2'].to_quaternion())
+  set_world('Head',rest['Head'].to_quaternion())
+  if clip in gait.clips:
+   gait.apply(clip,f/frames)
+   leg_samples.append(rig.pose.bones['LeftUpLeg'].rotation_quaternion.copy())
+  update()
+  lower=math.radians(22 if clip in ('Ready','Walk','Jog','Sprint') else 0)
+  recoil=.013*max(0,math.sin((f/30)*math.pi*8))**8 if clip=='Fire' else 0
+  weapon.rotation_quaternion=Quaternion((1,0,0),lower+.007*math.sin(phase))
+  shoulder=rig.pose.bones['RightArm'].head+Vector((.023,-.035,-.052))
+  stock=Vector(profile['stock'])
+  weapon.location=shoulder-weapon.rotation_quaternion@stock+Vector((0,recoil+.002*math.sin(phase),0))
+  update()
+  rq=frame(weapon.rotation_quaternion@Vector(profile['right_axis']),weapon.rotation_quaternion@Vector(profile['right_dorsal']))
+  lq=frame(weapon.rotation_quaternion@Vector(profile['left_axis']),weapon.rotation_quaternion@Vector(profile['left_dorsal']))
+  contacts={'Right':weapon.matrix_world@Vector(profile['right']),
+            'Left':weapon.matrix_world@Vector(profile['left'])}
+  for side,q in (('Right',rq),('Left',lq)):
+   desired=contacts[side]-q@palm[side]
+   pole=rig.pose.bones[side+'Arm'].head+Vector((-.23 if side=='Right' else .22,.07,-.36))
+   solve(side,desired,pole,clip,f)
+   fore=rig.pose.bones[side+'ForeArm']
+   direction=rig.pose.bones[side+'Hand'].head-fore.head
+   set_world(side+'ForeArm',frame(direction,q@Vector((0,0,1))))
+   set_world(side+'Hand',q)
+   for digit in ('Thumb','Index','Middle'):
+    for n in range(1,4):
+     bone=rig.pose.bones.get(side+'Hand'+digit+str(n))
+     if bone:
+      angle=(.40 if digit=='Thumb' else .66 if digit=='Index' and side=='Right' else .91)
+      bone.rotation_quaternion=Quaternion((1,0,0),-angle)
+   update()
+   actual=rig.pose.bones[side+'Hand'].matrix@palm[side]
+   grip_errors[clip][side]=max(grip_errors[clip][side],(actual-contacts[side]).length)
+  for b in rig.pose.bones:
+   b.keyframe_insert('rotation_quaternion',frame=f+1)
+   b.keyframe_insert('location',frame=f+1)
+  weapon.keyframe_insert('location',frame=f+1)
+  weapon.keyframe_insert('rotation_quaternion',frame=f+1)
+ if leg_samples:
+  degrees=math.degrees(leg_samples[0].rotation_difference(leg_samples[len(leg_samples)//3]).angle)
+  assert degrees>3,('No true Quaternius lower body motion',clip,degrees)
   movement[clip]=round(degrees,2)
- # Export as matching NLA strips with same clip names as original.
- tr=rig.animation_data.nla_tracks.new();tr.name=clip;tr.mute=True
- tr.strips.new(clip,1,action);rig.animation_data.action=None
-# Imported weapon glTF NLA clips must be kept unmuted for six exported variants.
-for obj in (rig,weapon):
- for tr in obj.animation_data.nla_tracks:tr.mute=False
-for sb in rig.pose.bones:sb.rotation_quaternion=Quaternion((1,0,0,0))
-scene.frame_set(1);bpy.context.view_layer.update()
-# Importer created donor armature/empty parent chains; after removing donor
-# meshes keep only weapon and its parent chain (no remaining donor rig).
-bpy.data.objects.remove(donor,do_unlink=True)
+ for obj in (rig,weapon):
+  action=obj.animation_data.action
+  track=obj.animation_data.nla_tracks.new()
+  track.name=clip;track.mute=True
+  track.strips.new(clip,1,action)
+  obj.animation_data.action=None
+print('COMMANDO_CC0_STEN_ACTUAL_GRIP_ERRORS',json.dumps(grip_errors))
+assert max(v for sides in grip_errors.values() for v in sides.values())<.025,grip_errors
+for o in (rig,weapon):
+ for tr in o.animation_data.nla_tracks:tr.mute=False
+for b in rig.pose.bones:b.matrix_basis=Matrix.Identity(4)
+weapon.location=(0,0,0);weapon.rotation_quaternion=Quaternion()
+scene.frame_set(1);update()
+bpy.ops.object.select_all(action='DESELECT')
+for obj in body+[cap,band,badge,rig,weapon]+parts:obj.select_set(True)
+bpy.context.view_layer.objects.active=rig
+bpy.ops.export_scene.gltf(filepath=str(OUT),export_format='GLB',use_selection=True,
+ export_animations=True,export_animation_mode='NLA_TRACKS',export_skins=True,
+ export_yup=True,export_force_sampling=True,export_anim_slide_to_zero=True,
+ export_materials='EXPORT')
+assert OUT.exists() and OUT.stat().st_size>100000
 # Preserve original CC0 skinned soldier, new green beret, and rigid Sten mesh.
 bpy.ops.object.select_all(action='DESELECT')
 for o in bpy.data.objects:
