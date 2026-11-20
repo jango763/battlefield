@@ -372,6 +372,56 @@ print('COMMANDO_CC0_STEN_ACTUAL_GRIP_ERRORS',json.dumps(grip_errors))
 assert max(v for sides in grip_errors.values() for v in sides.values())<.025,grip_errors
 for o in (rig,weapon):
  for tr in o.animation_data.nla_tracks:tr.mute=False
+# The original FBX has a centimetre-scale rig and a real 49-bone Head.
+# Our new hat/eye meshes use world-sized vertices. A simple armature
+# modifier therefore translates them differently from the source head.
+# Fit them ONCE in the approved Ready pose using the measured 3D affine
+# transform of Head skinning; then they follow the same Head bone in all
+# six animations. This fixes the ~77cm hat offset at its root.
+for obj in (rig,weapon):
+ for tr in obj.animation_data.nla_tracks:tr.mute=(tr.name!='Ready')
+scene.frame_set(12);update()
+def evaluated_world_positions(obj):
+ ev=obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+ deformed=ev.to_mesh()
+ out=[ev.matrix_world@v.co for v in deformed.vertices]
+ ev.to_mesh_clear()
+ return out
+head_pts=evaluated_world_positions(mesh)
+head_ids=[i for i,v in enumerate(mesh.data.vertices)
+   if any(g.group==head_group.index and g.weight>.45 for g in v.groups)]
+head_pts=[head_pts[i] for i in head_ids]
+hat_pts=evaluated_world_positions(cap)
+def bounds(pts):
+ return (Vector(tuple(min(p[k] for p in pts) for k in range(3))),
+         Vector(tuple(max(p[k] for p in pts) for k in range(3))))
+ha,hb=bounds(head_pts);ca,cb=bounds(hat_pts)
+target=Vector(((ha.x+hb.x)/2,(ha.y+hb.y)/2,hb.z+.010))
+current=Vector(((ca.x+cb.x)/2,(ca.y+cb.y)/2,ca.z))
+world_delta=target-current
+indices=(0,10,20,320)
+orig=[cap.data.vertices[i].co for i in indices]
+deformed=[hat_pts[i] for i in indices]
+X=Matrix(tuple((orig[j]-orig[0]) for j in (1,2,3))).transposed()
+Y=Matrix(tuple((deformed[j]-deformed[0]) for j in (1,2,3))).transposed()
+assert abs(X.determinant())>1e-9,('Hat geometry affine basis invalid',X)
+J=Y@X.inverted()
+assert abs(J.determinant())>1e-9,('Head binding matrix singular',J)
+local_delta=J.inverted()@world_delta
+for obj in [cap,band,badge]+face_details:
+ for v in obj.data.vertices:v.co+=local_delta
+ obj.data.update()
+update()
+hat_after=evaluated_world_positions(cap)
+na,nb=bounds(hat_after)
+hat_gap=na.z-hb.z
+assert abs(hat_gap-.010)<.025,('Beret remains detached from actual Head',hat_gap)
+print('COMMANDO_FITTED_REAL_HEADWEAR',json.dumps({
+ 'beforeWorldDeltaMeters':list(round(x,4) for x in world_delta),
+ 'localRigOffset':list(round(x,4) for x in local_delta),
+ 'newBeretGapMeters':round(hat_gap,4)}),flush=True)
+for obj in (rig,weapon):
+ for tr in obj.animation_data.nla_tracks:tr.mute=False
 for b in rig.pose.bones:b.matrix_basis=Matrix.Identity(4)
 weapon.location=(0,0,0);weapon.rotation_quaternion=Quaternion()
 scene.frame_set(1);update()
