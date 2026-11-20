@@ -5,7 +5,7 @@
  */
 (function(){
 'use strict';
-const stats={version:'threejs-visual-boost-v1',base:'original-threejs',
+const stats={version:'threejs-visual-boost-v2',base:'original-threejs',
  terrain:'original',terrainSize:null,road:'original',props:0,
  mobile:false,dynamicShadows:false,error:null};
 window.__BATTLEFIELD_VISUAL_BOOST__=stats;
@@ -50,16 +50,16 @@ try{
  const x=c.getContext('2d',{alpha:false});
  if(!x)throw Error('The terrain painter could not acquire a 2D context');
  const base=x.createLinearGradient(0,0,920,768);
- base.addColorStop(0,'#676a52');base.addColorStop(.46,'#5e634d');
- base.addColorStop(1,'#555b49');
+ base.addColorStop(0,'#95917a');base.addColorStop(.46,'#868b72');
+ base.addColorStop(1,'#7e826c');
  x.fillStyle=base;x.fillRect(0,0,c.width,c.height);
  // Broad damp earth and grassy cover patches, visible from the original
  // elevated RTS camera even on an iPhone display.
- for(let i=0;i<600;i++){
+ for(let i=0;i<760;i++){
   const px=range(0,1024),py=range(0,768),rx=range(12,120),ry=range(5,56);
   const grad=x.createRadialGradient(px,py,0,px,py,rx);
-  const col=choose(['115,100,71','44,58,38','103,110,74',
-   '82,77,60','141,124,88','51,69,49']);
+  const col=choose(['125,111,87','69,91,63','119,132,89',
+   '111,100,76','172,151,111','87,105,76']);
   grad.addColorStop(0,'rgba('+col+','+range(.10,.34).toFixed(3)+')');
   grad.addColorStop(1,'rgba('+col+',0)');
   x.save();x.translate(px,py);x.scale(1,ry/rx);x.translate(-px,-py);
@@ -68,19 +68,29 @@ try{
  }
  // Dirt patches, tiny pale pebbles and clumps of dry grass read as surface
  // texture without producing a costly extra draw call for each detail.
- const fleck=['#3e4939','#7d795b','#938764','#465541','#b1a07b','#53543e'];
- for(let i=0;i<29500;i++){
+ const fleck=['#55614c','#9d9879','#c0aa7e','#657359','#d3c39a','#75785e'];
+ for(let i=0;i<11000;i++){
   const px=range(0,1024),py=range(0,768),r=range(.4,2.8);
   x.globalAlpha=range(.12,.5);
   x.fillStyle=choose(fleck);
   x.fillRect(px,py,r*range(.8,2.3),r*.72);
  }
- for(let i=0;i<4800;i++){
+ for(let i=0;i<1450;i++){
   const px=range(0,1024),py=range(0,768);
-  x.strokeStyle=choose(['#7b815e','#89906c','#424b38','#ab9a6b']);
+  x.strokeStyle=choose(['#7b815f','#9ca080','#596c51','#bca883']);
   x.globalAlpha=range(.18,.4);x.lineWidth=range(.5,1.5);
   x.beginPath();x.moveTo(px,py);x.lineTo(px+range(-4,4),py-range(1,5));x.stroke();
  }
+ // Pale worn stones and mineral flecks add the legible texture of the
+ // original battlefield without a conspicuous repeating 256px stamp.
+ for(let i=0;i<5700;i++){
+  const px=range(0,1024),py=range(0,768),r=range(1.3,8.5);
+  x.globalAlpha=range(.07,.22);
+  x.fillStyle=choose(['#d1c5a8','#484f43','#a6a38d','#786c59']);
+  x.beginPath();x.ellipse(px,py,r,r*range(.35,.9),
+   range(0,Math.PI),0,Math.PI*2);x.fill();
+ }
+ x.globalAlpha=1;
  // Scorched shell marks are softly integrated into the soil, rather than
  // drawn as bright rings. Existing 3D craters/trenches stay untouched.
  for(let i=0;i<48;i++){
