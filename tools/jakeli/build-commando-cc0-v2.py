@@ -223,6 +223,23 @@ def load(path):
  before=set(bpy.data.objects)
  bpy.ops.import_scene.gltf(filepath=str(path))
  return [o for o in bpy.data.objects if o not in before]
+# The old Jakeli rig and this genuine FBX rig have different HAND rest axes.
+# Matching a world wrist quaternion without correcting those axes left CC0's
+# palms open and vertical despite perfect zero-distance wrist IK.
+donor_objs=load(DONOR)
+donor_rigs=[o for o in donor_objs if o.type=='ARMATURE']
+assert len(donor_rigs)==1,('Expected one anatomically verified donor rig',len(donor_rigs))
+donor_rig=donor_rigs[0]
+wrist_rest_alignment={}
+for side in ('Left','Right'):
+ name=side+'Hand'
+ drest=(donor_rig.matrix_world.to_quaternion()@donor_rig.data.bones[name].matrix_local.to_quaternion()).normalized()
+ crest=(rig.matrix_world.to_quaternion()@rig.data.bones[name].matrix_local.to_quaternion()).normalized()
+ wrist_rest_alignment[side]=(drest.inverted()@crest).normalized()
+print('COMMANDO_WW2_WRIST_REST_ALIGNMENT', {k:tuple(round(z,4) for z in v) for k,v in wrist_rest_alignment.items()},flush=True)
+# Remove donor entirely, only its anatomical basis is used to fit the authentic CC0 skin.
+for obj in donor_objs:
+ bpy.data.objects.remove(obj,do_unlink=True)
 profile,parts=load_profile(ROOT,'uk-sten',load)
 # The genuine CC0 soldier has a slightly shorter left arm than the Jakeli rig.
 # Move the support hand along the REAL Sten wooden/metal fore-end, from
@@ -315,8 +332,8 @@ for clip in clips:
   stock=Vector(profile['stock'])
   weapon.location=shoulder-weapon.rotation_quaternion@stock+Vector((0,recoil+.002*math.sin(phase),0))
   update()
-  rq=rig_rot_inv@frame(weapon.rotation_quaternion@Vector(profile['right_axis']),weapon.rotation_quaternion@Vector(profile['right_dorsal']))
-  lq=rig_rot_inv@frame(weapon.rotation_quaternion@Vector(profile['left_axis']),weapon.rotation_quaternion@Vector(profile['left_dorsal']))
+  rq=(rig_rot_inv@frame(weapon.rotation_quaternion@Vector(profile['right_axis']),weapon.rotation_quaternion@Vector(profile['right_dorsal']))@wrist_rest_alignment['Right']).normalized()
+  lq=(rig_rot_inv@frame(weapon.rotation_quaternion@Vector(profile['left_axis']),weapon.rotation_quaternion@Vector(profile['left_dorsal']))@wrist_rest_alignment['Left']).normalized()
   contacts={'Right':weapon.matrix_world@Vector(profile['right']),
             'Left':weapon.matrix_world@Vector(profile['left'])}
   for side,q in (('Right',rq),('Left',lq)):
