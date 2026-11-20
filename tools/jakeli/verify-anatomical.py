@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Independent glTF checks: bind identity, source surfaces/textures, weights and all clips."""
-import json,struct,hashlib,re
+import json,struct,hashlib,re,os
 from pathlib import Path
 import numpy as np
 from scipy.spatial import cKDTree
@@ -41,7 +41,11 @@ class GLB:
   for i in self.d.get('images',[]):
    v=self.d['bufferViews'][i['bufferView']];b=self.bin[v.get('byteOffset',0):v.get('byteOffset',0)+v['byteLength']];result.append(hashlib.sha256(b).hexdigest())
   return set(result)
-src=GLB(ROOT/'assets/allied-soldiers/uk-jakeli-mobile-static.glb');g=GLB(ROOT/'assets/allied-soldiers/uk-jakeli-anatomical-v2.glb')
+WEAPON_ID=os.environ.get('JAKELI_WEAPON','uk-lee-enfield')
+suffix=WEAPON_ID.removeprefix('uk-')
+model_name='uk-jakeli-anatomical-v2.glb' if WEAPON_ID=='uk-lee-enfield' else 'uk-jakeli-anatomical-'+suffix+'.glb'
+weapon_root={'uk-lee-enfield':'LeeEnfield','uk-sten':'Sten','uk-bren':'Bren','uk-piat':'Piat'}[WEAPON_ID]
+src=GLB(ROOT/'assets/allied-soldiers/uk-jakeli-mobile-static.glb');g=GLB(ROOT/'assets/allied-soldiers'/model_name)
 assert len(g.d['skins'])==1;sk=g.d['skins'][0];assert len(sk['joints'])==65
 ib=g.accessor(sk['inverseBindMatrices']).reshape(-1,4,4).transpose(0,2,1);world=g.worlds();res=float(np.max(abs(world[sk['joints']]@ib-np.eye(4))));assert res<.0001,res
 names=[n.get('name','') for n in g.n];assert len([n for n in names if n=='LeftHand'])==1
@@ -83,7 +87,7 @@ for name,anim in clips.items():
 # The NLA exporter previously omitted the rifle's constant Aim/Ready channels.
 # Bone-to-marker contact in Blender was then correct while the actual GLB
 # showed hands 11.5 cm away from the rifle. Validate exported mesh proximity.
-gun_i=names.index('LeeEnfield')
+gun_i=names.index(weapon_root)
 gun_mesh_nodes=[(i,n['mesh']) for i,n in enumerate(g.n) if 'mesh' in n and n.get('skin') is None]
 assert gun_mesh_nodes,'Exported rifle meshes missing'
 glove_parts=[(v,j,w) for v,j,w,_,_,key in arrays if 'Material #21_' in key]
@@ -113,9 +117,9 @@ for clip_name in ['Ready','Aim','Fire','Walk','Jog','Sprint']:
   p5=float(np.quantile(distances,.05))
   surface_contact[clip_name][side]=p5
   assert p5 < .020,(clip_name,side,'real hand mesh separated from rifle',p5)
-print('JAKELI_REAL_MESH_GRIP_PASS',json.dumps(surface_contact))
-report={'bindMatrixMaxResidual':res,'originalSurfaceMaxErrorMeters':preserve_error,'sourceTexturesByteIdentical':True,'maxWeightSumError':max_weight_error,'skinBones':65,'characterMeshes':13,'clips':reports,'visualApproval':False,'iphoneSafari':False}
-q=ROOT/'babylon-qa-results/jakeli-anatomical';q.mkdir(exist_ok=True,parents=True);(q/'gltf-report.json').write_text(json.dumps(report,indent=2));print('JAKELI_GLTF_PASS',json.dumps({k:v for k,v in report.items() if k!='clips'}));print('STRETCH',[(n,r['worstMeshEdgeStretchP999']) for n,r in reports.items()])
+print('JAKELI_REAL_MESH_GRIP_PASS',json.dumps({'weaponId':WEAPON_ID,'contacts':surface_contact}))
+report={'weaponId':WEAPON_ID,'modelName':model_name,'bindMatrixMaxResidual':res,'originalSurfaceMaxErrorMeters':preserve_error,'sourceTexturesByteIdentical':True,'maxWeightSumError':max_weight_error,'skinBones':65,'characterMeshes':13,'clips':reports,'visualApproval':False,'iphoneSafari':False}
+q=ROOT/'babylon-qa-results'/('jakeli-anatomical' if WEAPON_ID=='uk-lee-enfield' else 'jakeli-anatomical-'+suffix);q.mkdir(exist_ok=True,parents=True);(q/'gltf-report.json').write_text(json.dumps(report,indent=2));print('JAKELI_GLTF_PASS',json.dumps({k:v for k,v in report.items() if k!='clips'}));print('STRETCH',[(n,r['worstMeshEdgeStretchP999']) for n,r in reports.items()])
 
 print('MESH_STRETCH',json.dumps(worst_by_mesh))
 # A green CI status must not hide severe skin separation. The historical model
