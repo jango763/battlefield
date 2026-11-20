@@ -169,6 +169,10 @@ def load(path):
  bpy.ops.import_scene.gltf(filepath=str(path))
  return [o for o in bpy.data.objects if o not in before]
 profile,parts=load_profile(ROOT,'uk-sten',load)
+# The genuine CC0 soldier has a slightly shorter left arm than the Jakeli rig.
+# Move the support hand along the REAL Sten wooden/metal fore-end, from
+# 255mm to 215mm, leaving the original gun geometry and limb length intact.
+profile=dict(profile);profile['left']=(0,-.215,.031)
 weapon=bpy.data.objects.new('Sten',None)
 bpy.context.scene.collection.objects.link(weapon)
 for o in parts:
