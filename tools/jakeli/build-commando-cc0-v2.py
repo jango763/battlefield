@@ -159,6 +159,33 @@ def attach_to_head(obj):
  group=obj.vertex_groups.new(name='Head');group.add(list(range(len(obj.data.vertices))),1.0,'REPLACE')
  arm=obj.modifiers.new('Historical commando bone skin',type='ARMATURE');arm.object=rig
 for o in (cap,band,badge):attach_to_head(o)
+# This public-domain source has a sculpted nose, cheeks and chin but no eye
+# decals in the FBX materials. Five subtle real head-bound details preserve
+# the original head mesh instead of replacing it with primitive puppet faces.
+def face_mark(label,where,scale,material):
+ bpy.ops.mesh.primitive_uv_sphere_add(segments=12,ring_count=8,location=where)
+ obj=bpy.context.object
+ obj.name=label
+ obj.scale=scale
+ bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
+ obj.data.materials.append(material)
+ attach_to_head(obj)
+ return obj
+face_details=[]
+dark_face=material('Commando subtle brows and pupils',(.045,.044,.037))
+lip_face=material('Commando natural lip shadow',(.25,.14,.115))
+mid_x=(hxmin+hxmax)*.5
+front_y=hymin+.017
+width=(hxmax-hxmin)
+for sign,side in ((-1,'Left'),(1,'Right')):
+ eye=face_mark('Commando'+side+'Eye',Vector((mid_x+sign*width*.23,front_y,hzmax-.128)),
+               (.008,.005,.005),dark_face)
+ brow=face_mark('Commando'+side+'Brow',Vector((mid_x+sign*width*.23,front_y+.001,hzmax-.108)),
+               (.027,.006,.006),dark_face)
+ face_details.extend([eye,brow])
+mouth=face_mark('CommandoMouth',Vector((mid_x,front_y-.009,hzmax-.244)),
+                (.034,.004,.004),lip_face)
+face_details.append(mouth)
 # Prepare to hold its native original skin (49 meaningful deform bones) while
 # exposing the 16 extra digit channels expected by our 65-bone animation set.
 original_bones=len(rig.data.bones);assert original_bones==49,original_bones
@@ -326,7 +353,7 @@ for b in rig.pose.bones:b.matrix_basis=Matrix.Identity(4)
 weapon.location=(0,0,0);weapon.rotation_quaternion=Quaternion()
 scene.frame_set(1);update()
 bpy.ops.object.select_all(action='DESELECT')
-for obj in body+[cap,band,badge,rig,weapon]+parts:obj.select_set(True)
+for obj in body+[cap,band,badge]+face_details+[rig,weapon]+parts:obj.select_set(True)
 bpy.context.view_layer.objects.active=rig
 bpy.ops.export_scene.gltf(filepath=str(OUT),export_format='GLB',use_selection=True,
  export_animations=True,export_animation_mode='NLA_TRACKS',export_skins=True,
