@@ -246,3 +246,38 @@ report={'model':'authentic CC0 WWII British Commando based on nisu skinned FBX',
  'visualApproval':False,'iphoneSafari':False,'bytes':OUT.stat().st_size}
 (QA/'build-report.json').write_text(json.dumps(report,indent=2))
 print('COMMANDO_REAL_CC0_BUILD',json.dumps(report))
+if os.environ.get('COMMANDO_RENDER','1')=='1':
+ # Standalone evidence of this exact exportable source before it enters the game.
+ for obj in (rig,weapon):
+  for tr in obj.animation_data.nla_tracks:tr.mute=(tr.name!='Ready')
+ scene.frame_set(12);bpy.context.view_layer.update()
+ dep=bpy.context.evaluated_depsgraph_get()
+ eva=mesh.evaluated_get(dep);dat=eva.to_mesh()
+ coords=[eva.matrix_world@v.co for v in dat.vertices];eva.to_mesh_clear()
+ mn=Vector(tuple(min(p[i] for p in coords) for i in range(3)))
+ mx=Vector(tuple(max(p[i] for p in coords) for i in range(3)))
+ mid=(mn+mx)*.5
+ H=mx.z-mn.z
+ assert 1.2<H<2.3,('Real commando animated world height',H,list(mn),list(mx))
+ world=scene.world or bpy.data.worlds.new('Commando evidence world')
+ scene.world=world;world.use_nodes=True
+ world.node_tree.nodes['Background'].inputs['Color'].default_value=(.15,.19,.16,1)
+ world.node_tree.nodes['Background'].inputs['Strength'].default_value=.65
+ bpy.ops.object.camera_add(location=mid+Vector((H*.5,-H*1.5,H*.20)))
+ camera=bpy.context.object
+ camera.data.type='ORTHO';camera.data.ortho_scale=H*1.04
+ scene.camera=camera
+ for loc,power in [(mid+Vector((H*.8,-H,H*.9)),700),(mid+Vector((-H,H*.5,H*.6)),400)]:
+  bpy.ops.object.light_add(type='AREA',location=loc)
+  light=bpy.context.object;light.data.energy=power;light.data.size=4
+  light.rotation_euler=(mid-light.location).to_track_quat('-Z','Y').to_euler()
+ scene.render.engine='CYCLES';scene.cycles.samples=12
+ scene.render.resolution_x=900;scene.render.resolution_y=1000
+ scene.render.resolution_percentage=100
+ for side,angle in [('front',0),('side',1.1)]:
+  camera.location=mid+Vector((H*.45*math.cos(angle)+H*1.35*math.sin(angle),
+     -H*1.45*math.cos(angle)+H*.15*math.sin(angle),H*.16))
+  camera.rotation_euler=(mid-camera.location).to_track_quat('-Z','Y').to_euler()
+  scene.render.filepath=str(QA/(side+'.png'))
+  bpy.ops.render.render(write_still=True)
+
