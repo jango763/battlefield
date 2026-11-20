@@ -43,6 +43,12 @@ async function verify(type,name,graphics){
       group.children.some(mesh=>mesh.isMesh&&
        String(mesh.material?.name||'').startsWith('WWII-textured-'))).length,
     forestCrowns:scene.children.filter(mesh=>mesh.name==='visual-only-live-pines-crowns').length,
+    textureSites:{
+     objectiveMeshes:PTS.filter(pt=>pt.g.children.some(m=>m?.material?.map?.name?.startsWith('battlefield-ww2-'))).length,
+     bunkers:TW.filter(t=>t.g?.children.some(m=>m?.material?.map?.name?.startsWith('battlefield-ww2-'))).length,
+     bases:scene.children.filter(g=>g.isGroup&&Math.abs(Math.abs(g.position.x)-88)<.01&&
+      g.children.some(m=>m?.material?.map?.name?.startsWith('battlefield-ww2-'))).length
+    },
     groundWidth:texture?.image?.width,
     groundHeight:texture?.image?.height,
     groundRepeat:[texture.repeat.x,texture.repeat.y],
@@ -67,13 +73,20 @@ async function verify(type,name,graphics){
    assert(result.game.ruins>0,'Ruin contact shadows missing');
    assert(result.game.pixelRatio<=1.65,'iPhone pixel ratio not capped');
    assert(result.game.worldArt,'WWII texture maps not installed');
-   assert.equal(Object.keys(result.game.worldArt.textures).length,5,
+   assert.equal(Object.keys(result.game.worldArt.textures).length,6,
     'Missing some high-resolution material maps');
    assert(result.game.worldArt.texturedWalls>=40,
     'Original ruins still use untextured flat-color materials');
    assert(result.game.worldArt.texturedRuins>=10,
     'Textured ruins missing from main scene');
    assert(result.game.forestCrowns>=1,'New forest details are invisible');
+   assert.equal(result.game.textureSites.objectiveMeshes,5,
+    'Some capture buildings still have flat walls');
+   assert(result.game.textureSites.bunkers>=5,'Bunker texture import missing');
+   assert.equal(result.game.textureSites.bases,2,
+    'Both faction HQs must be textured');
+   assert.equal(result.game.worldArt.errors.length,0,
+    'Actual game structure texture load failed');
    assert(result.game.versionLabel?.includes('HD'),'New game lacks version label');
   }else{
    assert.equal(result.game.visual,null,'Original bypass must not touch scene');
