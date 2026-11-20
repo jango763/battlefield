@@ -1,0 +1,32 @@
+name: Validate actual CC0 WWII soldier model source
+on:
+  push:
+    branches: [feature/british-army-10-stages-20261118]
+    paths:
+      - '.github/workflows/commando-cc0-ww2-source.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fetch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch historical CC0 rigged WWII soldier file
+        run: |
+          set -euo pipefail
+          mkdir -p babylon-qa-results/commando-ww2-source
+          curl -fL --retry 3 --silent --show-error \
+            'https://opengameart.org/sites/default/files/lowpolysoldier.zip' \
+            -o babylon-qa-results/commando-ww2-source/lowpolysoldier.zip
+          unzip -l babylon-qa-results/commando-ww2-source/lowpolysoldier.zip
+          unzip -o -q babylon-qa-results/commando-ww2-source/lowpolysoldier.zip -d babylon-qa-results/commando-ww2-source/files
+          find babylon-qa-results/commando-ww2-source/files -type f -printf '%p %s bytes\n'
+      - name: Upload exact untouched CC0 source for rig audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc0-ww2-rigged-original-model
+          path: babylon-qa-results/commando-ww2-source/
+          if-no-files-found: warn
