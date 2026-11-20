@@ -160,8 +160,8 @@ for b in rig.pose.bones:b.rotation_mode='QUATERNION'
 # Animate true CC0 skin via the already verified Quaternius 65-bone library.
 # Imported GLB NLA channels are not read back reliably by headless bpy, so
 # retarget the original glTF data directly rather than copying a zeroed pose.
-rig.animation_data_create()
 rig.animation_data_clear()
+rig.animation_data_create()
 for b in rig.pose.bones:b.rotation_mode='QUATERNION'
 gait=QuaterniusLowerBody(ROOT/'assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb',rig)
 def load(path):
