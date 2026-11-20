@@ -298,16 +298,6 @@ bpy.ops.export_scene.gltf(filepath=str(OUT),export_format='GLB',use_selection=Tr
  export_yup=True,export_force_sampling=True,export_anim_slide_to_zero=True,
  export_materials='EXPORT')
 assert OUT.exists() and OUT.stat().st_size>100000
-# Preserve original CC0 skinned soldier, new green beret, and rigid Sten mesh.
-bpy.ops.object.select_all(action='DESELECT')
-for o in bpy.data.objects:
- if o.type in {'MESH','ARMATURE','EMPTY'}:o.select_set(True)
-bpy.context.view_layer.objects.active=rig
-bpy.ops.export_scene.gltf(filepath=str(OUT),export_format='GLB',use_selection=True,
- export_animations=True,export_animation_mode='NLA_TRACKS',export_skins=True,
- export_yup=True,export_force_sampling=True,export_anim_slide_to_zero=True,
- export_materials='EXPORT')
-assert OUT.exists() and OUT.stat().st_size>100000
 report={'model':'authentic CC0 WWII British Commando based on nisu skinned FBX',
  'sourceTriangles':sum(len(o.data.polygons) for o in body),
  'sourceVertices':len(mesh.data.vertices),'sourceBodyMeshes':len(body),
