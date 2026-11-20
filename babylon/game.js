@@ -323,6 +323,32 @@ async function processWeaponQueue(){
    if(!view||!view.rig||view.rig.weaponRigReady)continue;
    try{
     const rig=view.rig;
+    if(view.nativeAlliedClips&&view.importedAlliedName==='americanHero'){
+     const maker=window.BattlefieldUSLeeEnfieldStage4;
+     if(typeof maker?.create!=='function')
+      throw Error('Approved American four-weapon grip controller missing');
+     const realGrip=await maker.create({
+      scene,imported:view.imported,stage:view.root,
+      weaponRoot:'../assets/ww2-weapons/',
+      initialWeaponId:weaponAsset(view,view.unit?.weapon||view.weapon)
+     });
+     rig.weaponRigReady=true;
+     rig.nativeGrip=realGrip;
+     rig.equipWeapon=id=>realGrip.equipWeapon(id);
+     rig.weaponRig={get weapon(){return realGrip.state?.weaponId||null}};
+     rig.getMuzzleWorld=()=>realGrip.getMuzzleWorld();
+     view.weaponError=null;
+     continue;
+    }
+    if(view.nativeAlliedClips&&view.importedAlliedName==='britishJakeli'){
+     // The exact pre-baked Lee-Enfield rig has physically checked hand
+     // contact. Legacy German IK would deform this licensed British mesh.
+     // Do not attach a second rifle or overwrite the approved pose.
+     rig.weaponRigReady=true;
+     rig.nativeBakedWeapon=true;
+     view.weaponError=null;
+     continue;
+    }
     await window.BattlefieldWeaponRig.create({
      scene,imported:view.imported,root:view.root,state:rig,
      animationDriven:true,bindUI:false,acceptExportSockets:true,
@@ -500,7 +526,8 @@ function drawShot({unit,target,result}){
  }
  const source=actors.get(unit),targetView=actors.get(target);
  if(!source||!targetView)return;
- const muzzle=source.rig?.weaponRig?.muzzleWorldPosition;
+ const muzzle=source.rig?.getMuzzleWorld?.()?.position||
+  source.rig?.weaponRig?.muzzleWorldPosition;
  const start=Array.isArray(muzzle)&&muzzle.length===3 ?
   new B.Vector3(...muzzle):source.anchor.position.add(new B.Vector3(0,1.5,0));
  const impact=result.impact?position(result.impact,.7):
