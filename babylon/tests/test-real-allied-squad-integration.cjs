@@ -16,7 +16,10 @@ async function inspect(browserType,name){
     null,{timeout:150000});
   let state=await page.evaluate(()=>({...window.__BATTLEFIELD_GAME__}));
   result.initialState=state;
+  result.importDiagnostics=await page.evaluate(()=>window.__BATTLEFIELD_TRIAL_IMPORT_QA__||null);
   console.log('REAL_ALLIED_INITIAL_STATE',name,JSON.stringify(state).slice(0,6000));
+  console.log('REAL_ALLIED_IMPORT_DIAGNOSTICS',name,
+   JSON.stringify(result.importDiagnostics).slice(0,7000));
   assert(!state.error,JSON.stringify({error:state.error,modelErrors:state.modelErrors}));
   assert(state.ready,'Main game never became ready');
   assert(state.importedAlliedCount>=1,'Approved real US hero missing from initial duel');
