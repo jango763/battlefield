@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - 'feature/threejs-visual-boost-*'
+      - 'feature/threejs-world-materials-*'
   workflow_dispatch:
 permissions:
   contents: read
