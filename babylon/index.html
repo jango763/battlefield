@@ -84,6 +84,9 @@ button:disabled{opacity:.5;cursor:default}
  #quick-buttons{grid-template-rows:34px 64px}
  .battle-active #panel:not(.closed){bottom:110px}
 }
+#battle-minimap{display:none;position:fixed;top:calc(env(safe-area-inset-top) + 61px);right:11px;width:116px;height:116px;z-index:5;border:2px solid #a79a70;border-radius:5px;background:#334034ed;box-shadow:0 3px 15px #0009;pointer-events:none;image-rendering:auto}
+.battle-active #battle-minimap{display:block}
+@media(max-width:700px){#battle-minimap{width:104px;height:104px}}
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -174,6 +177,7 @@ button:disabled{opacity:.5;cursor:default}
 <p class="note">🔵 Британцы против 🔴 Вермахта. Карта 300×300 с пятью золотыми фермами, семью ДОТами и тремя подбитыми БТР. После старта дополнительные 3D-бойцы появляются постепенно. Подключён загрузчик оригинальных GLB и система переноса анимаций с проверкой скелета и хвата. Для героя и Jakeli используются сохранённые GLB: это предварительная интеграция, а не одобрение проблемной анимации Jakeli. Отдельный Командос ещё не установлен: его временный прототип не является утверждённой моделью. <a href="./allied-model-review.html" target="_blank" rel="noopener" style="color:#e5d49c">Посмотреть выбранные оригинальные модели</a> · <a href="./allied-ik-lab.html" target="_blank" rel="noopener" style="color:#e5d49c">Проверить GLB и хват оружия</a>. Оружие: Lee-Enfield, Sten, Bren и временный PIAT. Снаряжение — в режиме паузы; полноценная анимация перезарядки и обход препятствий ещё не готовы.</p>
 </section>
 <div id="footer">Коснитесь земли — приказ герою · коснитесь противника — выбрать цель · камера — двумя пальцами</div>
+<canvas id="battle-minimap" width="116" height="116" role="img" aria-label="Мини-карта: позиции британцев, Вермахта, фермы и базы"></canvas>
 <div id="mobile-controls" aria-label="Управление в стиле первой игры">
  <div id="touch-stick" aria-label="Джойстик движения героя" role="application"><div id="touch-stick-knob"></div></div>
  <div id="quick-buttons">
