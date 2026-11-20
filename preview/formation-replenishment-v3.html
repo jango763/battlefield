@@ -81,7 +81,7 @@
       // after their existing game objects are created.
       html=once(html,"mkPoint('m',0,-50);mkPoint('m',0,50);mkPoint('m',-4,2);mkPoint('b',-16,24);mkPoint('b',16,-24);",
        "mkPoint('m',0,-50);mkPoint('m',0,50);mkPoint('m',-4,2);mkPoint('b',-16,24);mkPoint('b',16,-24);"+
-       "if(window.__BF_WORLD_TEXTURE_SITES__)window.__BF_WORLD_TEXTURE_SITES__({points:PTS,bunkers:TW,bases:scene.children.filter(g=>g.isGroup&&Math.abs(Math.abs(g.position.x)-88)<.01&&Math.abs(g.position.z)<.01)});");
+       "if(window.__BF_WORLD_TEXTURE_SITES__)window.__BF_WORLD_TEXTURE_SITES__({points:PTS,bunkers:TW.map(t=>({g:scene.children.find(g=>g.isGroup&&Math.abs(g.position.x-t.x)<.01&&Math.abs(g.position.z-t.z)<.01)})),bases:scene.children.filter(g=>g.isGroup&&Math.abs(Math.abs(g.position.x)-88)<.01&&Math.abs(g.position.z)<.01)});");
       html=once(html,'camUpdate(dt);hud();ambient(now/1000);mmap();R.render(scene,cam)',
        'camUpdate(dt);window.__BF_WORLD_ART_TICK__?.();hud();ambient(now/1000);mmap();R.render(scene,cam)');
       html=once(html,'for(let i=0;i<14;i++)ruin(rnd(-50,50),rnd(-60,60));',
