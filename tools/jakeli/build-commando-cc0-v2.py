@@ -53,7 +53,7 @@ jacketfold=material('Commando shaded khaki coat',(.12,.155,.095))
 trouser=material('Commando British olive-brown trousers',(.205,.205,.14))
 boots=material('Commando brown-black ankle boots',(.05,.048,.041))
 webbing=material('Commando 1937 pattern khaki webbing',(.35,.30,.19))
-clothdark=material('Commando dark green beret felt',(.046,.16,.10))
+clothdark=material('Commando dark green beret felt',(.036,.105,.063))
 clothrim=material('Commando dark rolled beret edge',(.035,.095,.070))
 dullsteel=material('Commando subdued metal badge',(.55,.56,.49),.32,.65)
 black=material('Commando dark beard and brows',(.09,.075,.058))
@@ -103,8 +103,11 @@ def beret(name,origin,radius=.12,material=clothdark):
  rings=9;segments=40
  for ring in range(rings):
   t=ring/(rings-1)
-  r=radius*(.90 + .45*math.sin(math.pi*t))*(1-.30*t**5)
-  z=origin.z + .010 + .038*t+ .020*math.sin(math.pi*t)
+  # A closed felt dome rather than a toroidal brim: crown must sit ABOVE
+  # the human scalp. The prior shallow 38mm crown left the bare head poking
+  # through an open-green-ring silhouette on the actual rendered screenshots.
+  r=radius*(.93 + .33*math.sin(math.pi*t))*(1-.18*t**5)
+  z=origin.z + .012 + .145*(t**.75) + .007*math.sin(math.pi*t)
   sx=origin.x-.024*t
   sy=origin.y+.010*t
   for k in range(segments):
