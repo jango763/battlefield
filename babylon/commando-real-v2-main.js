@@ -11,8 +11,8 @@ try{
  const engine=new B.Engine(canvas,true,{stencil:true});
  engine.setHardwareScalingLevel(Math.max(1,(devicePixelRatio||1)/1.5));
  const scene=new B.Scene(engine);scene.useRightHandedSystem=true;scene.clearColor=new B.Color4(.09,.12,.11,1);
- const cam=new B.ArcRotateCamera('camera',Math.PI*.34,Math.PI*.47,3.2,new B.Vector3(0,.94,0),scene);
- cam.lowerRadiusLimit=.65;cam.upperRadiusLimit=5;
+ const cam=new B.ArcRotateCamera('camera',Math.PI*.34,Math.PI*.47,4.35,new B.Vector3(.08,.24,0),scene);
+ cam.lowerRadiusLimit=.85;cam.upperRadiusLimit=7;
  cam.attachControl(canvas,true);cam.pinchDeltaPercentage=.015;cam.wheelDeltaPercentage=.015;
  new B.HemisphericLight('ambient',new B.Vector3(0,1,0),scene).intensity=1.12;
  new B.DirectionalLight('key',new B.Vector3(-.65,-1,-.75),scene).intensity=2.1;
@@ -33,8 +33,8 @@ try{
  }
  function view(n){
   cam.alpha=n==='right'?Math.PI*1.1:Math.PI*.34;
-  cam.radius=n==='full'?3.2:1.18;
-  cam.target.set(0,n==='full'?.94:1.34,n==='full'?0:.16);
+  cam.radius=n==='full'?4.35:1.5;
+  cam.target.set(.08,n==='full'?.24:1.28,n==='full'?0:.16);
   controls.open=false;
  }
  document.querySelectorAll('[data-pose]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.pose)));
