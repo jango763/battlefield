@@ -11,7 +11,7 @@ assert(script,'Approved old Three.js loader must remain present');
 new Function(script[1]);
 new Function(pass);
 assert(wrapper.includes("graphics!=='original'"),'Original graphics bypass missing');
-assert(wrapper.includes('visual-boost-v1.js?v=20261121-r1'));
+assert(wrapper.includes('visual-boost-v1.js?v=20261121-r2'));
 assert(wrapper.includes('if(visualPass&&graphics!=='),'Feature should be opt-in to the safe injection');
 assert(wrapper.includes('const graphicUpgrade=get('));
 assert(wrapper.includes("return null;"),'Missing fallback when optional visuals fail');
