@@ -218,9 +218,25 @@
   async function instantiate(id,tag){
    const model=await ensureAsset(id);
    if(!model)return null;
-   const entries=model.instantiateModelsToScene(name=>name+'-'+tag,false,
-    {doNotInstantiate:true});
+   // Keep the real glTF joint names stable across independent clones.
+   // Finger grip/IK and native clip targets use these exact names.
+   const jointNames=new Set((model.skeletons||[]).flatMap(sk=>sk.bones.map(b=>
+    b.getTransformNode?.()?.name||b.name)));
+   const entries=model.instantiateModelsToScene(name=>
+    jointNames.has(name)?name:name+'-'+tag,false,{doNotInstantiate:true});
    materializeEntries(entries);
+   // Some Babylon clones omit bone->TransformNode links. Reconnect ONLY
+   // to transform nodes belonging to this specific imported actor.
+   const byName=new Map();
+   for(const node of entries.transformNodes||[]){
+    const key=normalize(node.name).replace(/[0-9]+$/,'');
+    if(key&&!byName.has(key))byName.set(key,node);
+   }
+   for(const sk of entries.skeletons||[])for(const bone of sk.bones){
+    if(bone.getTransformNode?.())continue;
+    const joint=byName.get(normalize(bone.name).replace(/[0-9]+$/,''));
+    if(joint)bone.linkTransformNode(joint);
+   }
    const isTrial=featureTrial&&Object.hasOwn(FEATURE_TRIAL_FILES,id);
    const current=inspect(entries,{maxTriangles:manifest.models[id].maxTriangles});
    if(!current.ok){entries.dispose?.();const err=Error(current.issues.join('; '));
