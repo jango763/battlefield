@@ -12,13 +12,14 @@ assert(visual.PROFILE.exposure>=1 && visual.PROFILE.exposure<1.3);
 assert(html.includes('src="./legacy-visual-style.js"'),'Style module must load');
 assert(html.indexOf('src="./legacy-visual-style.js"')<html.indexOf('src="./game.js"'));
 for(const id of ['touch-stick','touch-stick-knob','quick-fire','quick-gear',
- 'quick-reload','quick-pause','quick-status']){
+ 'quick-reload','quick-pause','quick-status','battle-minimap']){
  assert(html.includes('id="'+id+'"'),'Missing mobile gameplay control '+id);
 }
 assert(game.includes("registerTouchControls();"));
+assert(game.includes("drawMiniMap(econ)"));
 assert(game.includes("state.visualProfile=legacyVisual?.apply("));
 assert(game.includes("document.body.classList.add('battle-active')"));
-assert(game.includes("camera=new B.ArcRotateCamera('camera',Math.PI*1.23,.73,43"));
+assert(game.includes("camera=new B.ArcRotateCamera('camera',Math.PI*1.23,.83,33"));
 assert(game.includes("fieldOrders.setDestination("),'Joystick must preserve movement orders');
 assert(game.includes("controller.setFocus(target)"),'Fire button uses existing targeting');
 assert(world.includes("tx.update(false)"),'Painted terrain must be GPU-uploaded');
