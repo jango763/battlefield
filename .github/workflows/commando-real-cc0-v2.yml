@@ -1,0 +1,52 @@
+name: Genuine British Commando WWII CC0 3D v2
+on:
+  push:
+    branches: [feature/british-army-10-stages-20261118]
+    paths:
+      - '.github/workflows/commando-real-cc0-v2.yml'
+      - 'tools/jakeli/build-commando-cc0-v2.py'
+      - 'tools/jakeli/test-commando-cc0-v2.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-real-commando:
+    if: github.ref == 'refs/heads/feature/british-army-10-stages-20261118'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch public-domain rigged World War II model
+        run: |
+          set -euo pipefail
+          mkdir -p babylon-qa-results/commando-ww2-source/files
+          curl -fL --retry 3 --silent --show-error \
+            'https://opengameart.org/sites/default/files/lowpolysoldier.zip' \
+            -o babylon-qa-results/commando-ww2-source/lowpolysoldier.zip
+          unzip -q -o babylon-qa-results/commando-ww2-source/lowpolysoldier.zip \
+            -d babylon-qa-results/commando-ww2-source/files
+          test -s babylon-qa-results/commando-ww2-source/files/LowpolySoldier/LowpolySoldier.fbx
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tools/jakeli/requirements-blender.txt
+      - name: Install pinned Blender 4.3 for repeatable retarget
+        run: |
+          python -m pip install --only-binary=:all: -r tools/jakeli/requirements-blender.txt
+      - name: Bind authentic original WWII mesh to 65-bone Quaternius controller
+        env:
+          COMMANDO_RENDER: '1'
+        run: python tools/jakeli/build-commando-cc0-v2.py
+      - name: Reject dummy body and invalid motion or skin
+        run: python tools/jakeli/test-commando-cc0-v2.py
+      - name: Save visual proof and rig export for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: british-commando-real-ww2-cc0-v2-evidence
+          path: |
+            assets/allied-soldiers/uk-commando-cc0-sten-v2.glb
+            babylon-qa-results/commando-cc0-v2/
+          if-no-files-found: warn
+          retention-days: 14
