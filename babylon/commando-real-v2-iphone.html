@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#161e1b">
+<title>Battlefield · британский Командос · реальная модель v2</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;background:#161e1b;color:#ecf0e6;font:14px -apple-system,system-ui,Arial;overflow:hidden}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+header{position:fixed;z-index:1;left:15px;right:15px;top:calc(env(safe-area-inset-top) + 15px);pointer-events:none;text-shadow:0 2px 6px #0008}
+header h1{font-size:17px;margin:0 0 5px}header p{font-size:11px;margin:0;color:#d8e3d7}
+#controls{position:fixed;z-index:5;right:12px;bottom:calc(env(safe-area-inset-bottom) + 12px);border:1px solid #5c715e;border-radius:13px;background:#202c23ec;box-shadow:0 8px 24px #0006;max-width:calc(100% - 24px);overflow:hidden}
+#controls summary{list-style:none;padding:14px 18px;min-height:47px;font-weight:700;cursor:pointer}
+#controls summary::-webkit-details-marker{display:none}
+#controls summary:before{content:"☰";margin-right:8px}#controls[open] summary:before{content:"✕"}
+#controls[open]{width:min(350px,calc(100% - 24px))}
+.content{padding:0 13px 12px;max-height:50dvh;overflow-y:auto}
+.line{font-size:11px;color:#c9dac6;margin:12px 0 6px}
+.buttons{display:flex;gap:6px;flex-wrap:wrap}
+button{background:#344839;color:#f5f7ee;border:1px solid #637866;border-radius:8px;min-height:44px;padding:8px 10px;font:600 12px system-ui}
+button[aria-pressed=true]{background:#dae1c6;color:#283625}
+#status{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 74px);left:12px;right:12px;color:#ecf5df;background:#223023e8;padding:10px 12px;border:1px solid #5d735e;border-radius:9px}
+#status[data-ready=true]{display:none}
+#error{position:fixed;top:calc(env(safe-area-inset-top) + 90px);left:12px;right:12px;color:#ffd7c8;font-size:12px}
+.credit{font-size:10px;color:#c4d2be;margin-top:12px;line-height:1.5}
+</style>
+</head>
+<body>
+<canvas id="renderCanvas" aria-label="Британский Командос на настоящей 3D-сетке, вращайте пальцем"></canvas>
+<header><h1>Командос · настоящая WW2-модель</h1><p>Новая форма и зелёный берет · Sten · экспериментальная v2</p></header>
+<details id="controls">
+<summary>Анимации и камера</summary>
+<div class="content">
+<div class="line">Положение бойца</div>
+<div class="buttons">
+<button data-pose="Ready" aria-pressed="true">Наготове</button>
+<button data-pose="Aim">Прицел</button>
+<button data-pose="Fire">Выстрел</button>
+</div>
+<div class="line">Настоящие Quaternius</div>
+<div class="buttons">
+<button data-pose="Walk">Шаг</button>
+<button data-pose="Jog">Бег</button>
+<button data-pose="Sprint">Спринт</button>
+</div>
+<div class="line">Камера</div>
+<div class="buttons">
+<button data-view="full">Целиком</button>
+<button data-view="hands">Кисти</button>
+<button data-view="right">Справа</button>
+</div>
+<p class="credit">Исходная модель: nisu, «Rigged Lowpoly WW2 Soldier» (CC0); британская адаптация и движения — Battlefield. Не утверждён для игры.</p>
+</div>
+</details>
+<div id="error" role="alert"></div>
+<div id="status" role="status">Загрузка настоящего 3D-бойца…</div>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./commando-real-v2-main.js"></script>
+</body>
+</html>
