@@ -46,6 +46,18 @@ const UNIT_SCALE=1,BASE_X=-150,BASE_Z=-150;
 const SCENARIOS={duel:[1,1],assault:[1,4],squads:[12,12]};
 const CLIP_POSES={ready:'Hold',aim:'Aim',fire:'Fire',run:'Run'};
 const CLIP_IDS=Object.keys(META).flatMap(w=>Object.values(CLIP_POSES).map(p=>w+'_'+p));
+// Feature-branch controlled rollout: one hero, eight real Jakeli infantry,
+// and three UNAPPROVED Commando slots still using the existing prototype.
+// Do not change the source catalog or the locked release manifest.
+const FEATURE_REAL_ALLIES=true;
+const featureCasting=slot=>slot===0?'americanHero':
+ slot>=1&&slot<=8?'britishJakeli':alliedModels.forBlueSlot(slot).id;
+const NATIVE_POSES=Object.freeze({
+ americanHero:Object.freeze({ready:'Idle_Quaternius',aim:'Idle_Quaternius',
+  fire:'Idle_Quaternius',run:'Jog_Quaternius'}),
+ britishJakeli:Object.freeze({ready:'Ready',aim:'Aim',fire:'Fire',run:'Jog'})
+});
+
 const state={ready:false, loading:true, error:null, models:0, clips:0,
  scenario:'squads',atBase:true,selected:'Kar98k',focus:null, fps:0,
  importedAlliedCount:0,modelErrors:{},alliedManifest:null};
@@ -154,7 +166,7 @@ function unitVisual(index,entries,{externalModel=null}={}){
  const meshes=unique.filter(n=>n instanceof B.AbstractMesh);
  const transforms=unique.filter(n=>n instanceof B.TransformNode);
  const drawable=meshes.filter(m=>m.getTotalVertices?.()>0);
- if(drawable.length<4||!entries.skeletons.some(s=>s.bones.length>=(externalModel?40:60)))
+ if(drawable.length<4||!entries.skeletons.some(s=>s.bones.length>=(externalModel?65:60)))
   throw Error('У отряда '+(index+1)+' не обнаружена утверждённая 65-костная модель');
  for(const node of entries.rootNodes)if(!node.parent)node.parent=root;
  const min=new B.Vector3(Infinity,Infinity,Infinity);
@@ -172,10 +184,24 @@ function unitVisual(index,entries,{externalModel=null}={}){
  root.position.set(-.5*(min.x+max.x)*factor,-min.y*factor,
   -.5*(min.z+max.z)*factor);
  const clips=new Map();
- for(const id of CLIP_IDS){
-  const matches=entries.animationGroups.filter(group=>group.name.endsWith(id));
-  if(matches.length!==1)throw Error('Отряд '+(index+1)+': отсутствует анимация '+id);
-  clips.set(id,matches[0]);
+ if(externalModel?.nativeClips){
+  const selected=NATIVE_POSES[externalModel.modelId];
+  if(!selected)throw Error('Missing native motion map for '+externalModel.modelId);
+  for(const id of CLIP_IDS){
+   const pose=id.split('_').at(-1);
+   const logical=Object.keys(CLIP_POSES).find(p=>CLIP_POSES[p]===pose);
+   const clipName=selected[logical];
+   const group=entries.animationGroups.find(g=>g.name===clipName||
+    g.name.endsWith(clipName)||g.name.startsWith(clipName+'-'));
+   if(!group)throw Error('Нет исходной анимации '+clipName+' для '+externalModel.modelId);
+   clips.set(id,group);
+  }
+ }else{
+  for(const id of CLIP_IDS){
+   const matches=entries.animationGroups.filter(group=>group.name.endsWith(id));
+   if(matches.length!==1)throw Error('Отряд '+(index+1)+': отсутствует анимация '+id);
+   clips.set(id,matches[0]);
+  }
  }
  const marker=B.MeshBuilder.CreateDisc('squad-ring-'+index,{radius:.47,tessellation:24},scene);
  marker.parent=anchor;marker.rotation.x=Math.PI/2;marker.position.y=.025;
@@ -196,11 +222,13 @@ function unitVisual(index,entries,{externalModel=null}={}){
  hpMat.disableLighting=true;hpFill.material=hpMat;hpFill.isPickable=false;
  for(const mesh of drawable)mesh.metadata={...(mesh.metadata||{}),squadSlot:index};
  return {index,faction:factions.sideForSlot(index),
-  chosenAlliedModel:index<12?alliedModels.forBlueSlot(index).id:null,
+  chosenAlliedModel:index<12?(FEATURE_REAL_ALLIES?featureCasting(index):alliedModels.forBlueSlot(index).id):null,
   importedAlliedModel:!!externalModel,
   importedAlliedName:externalModel?.modelId||null,
+  nativeAlliedClips:!!externalModel?.nativeClips,
   anchor,root,entries,clips,imported:{
-  meshes,transformNodes:transforms,skeletons:entries.skeletons
+  meshes,transformNodes:transforms,skeletons:entries.skeletons,
+  animationGroups:entries.animationGroups
  },unit:null,rig:null,clip:null,weapon:'Kar98k',lastPose:null,
   inactive:true,marker,hpBack,hpFill,healthMaterial:hpMat,
   hitEffect:0,animationChanges:0,weaponError:null};
@@ -221,7 +249,7 @@ async function ensureUnits(scenarioName){
  }
  if(!modelDepot){
   modelDepot=alliedLoader.create({B,scene,catalog:alliedModels,
-   sourceGroups:asset.animationGroups});
+   sourceGroups:asset.animationGroups,featureTrial:FEATURE_REAL_ALLIES});
   try{
    state.alliedManifest=await modelDepot.init();
   }catch(error){
@@ -238,12 +266,12 @@ async function ensureUnits(scenarioName){
   // Preserve exact Mixamo joint names in clone-local hierarchies for IK.
   let externalModel=null;
   if(i<12&&modelDepot){
-   const casting=alliedModels.forBlueSlot(i);
+   const selected=FEATURE_REAL_ALLIES?featureCasting(i):alliedModels.forBlueSlot(i).id;
    try{
-    externalModel=await modelDepot.instantiate(casting.id,i);
+    externalModel=await modelDepot.instantiate(selected,i);
    }catch(error){
-    state.modelErrors[casting.id]=String(error?.message||error);
-    console.error('Allied licensed model rejected',casting.id,error);
+    state.modelErrors[selected]=String(error?.message||error);
+    console.error('Allied licensed model rejected',selected,error);
    }
   }
   // No invented download: if the original licensed file is missing, only
@@ -252,6 +280,8 @@ async function ensureUnits(scenarioName){
    name=>name,false,{doNotInstantiate:true});
   const view=unitVisual(i,entries,{externalModel});
   if(view.faction==='british'&&!externalModel){
+   // These are ORIGINAL procedural placeholders, not new skins. Commando
+   // stays blocked until its previously selected source is actually acquired.
    const soldier=britishSoldier.create({B,scene,view});
    if(!soldier.applied)throw Error('Temporary British prototype: '+soldier.reason);
   }
@@ -262,6 +292,7 @@ async function ensureUnits(scenarioName){
     throw Error('У бойцов общий скелет: клонирование отклонено');
    const clipA=prev.clips.get('Kar98k_Run');
    const clipB=view.clips.get('Kar98k_Run');
+   if(!clipA||!clipB)throw Error('No squad run animation for comparison');
    if(clipA===clipB ||
       clipA.targetedAnimations[0]?.target===clipB.targetedAnimations[0]?.target)
     throw Error('У бойцов общая анимация бега');
@@ -270,7 +301,7 @@ async function ensureUnits(scenarioName){
   // Do not block the *entire game* on several 1.7 MB rifle loads or IK errors.
   view.rig={combatPose:{active:false,stage:'ready',crouch:0,recoilPulse:0}};
   view.anchor.setEnabled(false);
-  views[i]=view;state.models++;state.clips+=16;
+  views[i]=view;state.models++;state.clips+=new Set(view.clips.values()).size;
   weaponQueue.push(view);
   const unit=i<12?allies[i]:enemies[i-12];
   if(state.ready&&unit){
@@ -360,7 +391,7 @@ function setClip(view,pose){
   view.weaponError='Нет готовой анимации '+id;
   throw Error(view.weaponError);
  }
- const didChange=nativeBlend.play(view,target,pose,{loop:pose!=='fire'});
+ const didChange=nativeBlend.play(view,target,pose,{loop:pose!=='fire'||view.nativeAlliedClips&&view.importedAlliedName==='americanHero'});
  if(didChange)view.rig?.setWeaponPose?.(pose);
 }
 function assignView(view,unit){
@@ -415,7 +446,7 @@ function setup(scenarioName){
  for(const [i,u] of allies.entries()){
   u.economyTeam='blue';u.isHero=i===0;
   // Selected casting, not a claim that original asset has been imported.
-  u.characterModel=alliedModels.forBlueSlot(i).id;
+  u.characterModel=views[i]?.chosenAlliedModel||alliedModels.forBlueSlot(i).id;
   u.characterModelImported=!!views[i]?.importedAlliedModel;
   u.spawn={x:u.x,z:u.z};
  }
