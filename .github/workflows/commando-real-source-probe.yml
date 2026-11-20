@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/commando-real-source-probe.yml'
       - 'tools/jakeli/probe-real-commando-source.py'
+      - 'tools/jakeli/render-real-commando-source.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,6 +26,15 @@ jobs:
           test "$(wc -c < babylon-qa-results/commando-real-source/soldier_tac.glb)" = 4532132
       - name: Validate mesh material texture and rig inventory
         run: python tools/jakeli/probe-real-commando-source.py babylon-qa-results/commando-real-source/soldier_tac.glb
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tools/jakeli/requirements-blender.txt
+      - name: Install pinned Blender for source visual inspection
+        run: python -m pip install --only-binary=:all: -r tools/jakeli/requirements-blender.txt
+      - name: Render genuine whole-body source front and side
+        run: python tools/jakeli/render-real-commando-source.py
       - name: Preserve original licensed source and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
