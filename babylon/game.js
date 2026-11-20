@@ -237,7 +237,18 @@ const SCENE_SLOTS={
  duel:[0,12],assault:[0,12,13,14,15],
  squads:Array.from({length:24},(_,i)=>i)
 };
+// Prevent racing initial 12v12 load and a rapidly tapped scenario button.
+// A second request rechecks slots after the first has finished, without
+// instantiating overlapping skeletons or double-counting soldier models.
+let ensureUnitsInFlight=null;
 async function ensureUnits(scenarioName){
+ while(ensureUnitsInFlight)await ensureUnitsInFlight;
+ const task=ensureUnitsUnlocked(scenarioName);
+ ensureUnitsInFlight=task;
+ try{return await task;}
+ finally{if(ensureUnitsInFlight===task)ensureUnitsInFlight=null;}
+}
+async function ensureUnitsUnlocked(scenarioName){
  const slots=SCENE_SLOTS[scenarioName];
  if(!slots)throw Error('Неизвестный режим отряда: '+scenarioName);
  if(!asset){
