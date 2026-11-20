@@ -17,7 +17,7 @@
     const worker=async()=>{while(next<17){const i=next++;chunks[i]=await get('parts/german-'+String(i).padStart(3,'0')+'.txt');progress.textContent='Загрузка игры: '+Math.round(++done/18*100)+'%';}};
     // Optional visual pass loads concurrently. If unavailable, the first game
     // still launches with its original approved graphics and mechanics.
-    const graphicUpgrade=get('visual-boost-v1.js?v=20261121-r1').catch(e=>{
+    const graphicUpgrade=get('visual-boost-v1.js?v=20261121-r2').catch(e=>{
       console.warn('Optional graphics upgrade not loaded',e);
       return null;
     });
