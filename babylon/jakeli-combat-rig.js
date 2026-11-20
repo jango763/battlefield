@@ -742,5 +742,5 @@ async function create({scene,imported,stage,weaponRoot="../assets/ww2-weapons/",
   dispose(){stopped=true;scene.onBeforeRenderObservable.remove(observer);resource?.dispose();supportSocket.dispose();pivot.dispose();}
  };
 }
-return Object.freeze({create,stripArmTracks,CANON,DONOR,WEAPON_IDS,PROFILES,PIAT,JAKELI_GRIPS});
+return Object.freeze({create,createPiatVisual:proceduralPiat,stripArmTracks,CANON,DONOR,WEAPON_IDS,PROFILES,PIAT,JAKELI_GRIPS});
 });
