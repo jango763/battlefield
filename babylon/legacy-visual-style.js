@@ -12,10 +12,10 @@ const PROFILE=Object.freeze({
  name:'Legacy CoH3 visual parity / mobile',
  fogDensity:.0033,
  fogColor:'#919385',
- sunlight:1.85,
- ambient:.92,
- exposure:1.12,
- contrast:1.13,
+ sunlight:1.00,
+ ambient:.58,
+ exposure:1.00,
+ contrast:1.08,
  shadowMapSize:768,
  shadowCasterLimit:40
 });
