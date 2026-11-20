@@ -1,0 +1,70 @@
+name: Jakeli real mobile battle LOD 65k
+on:
+  push:
+    branches: [feature/british-army-10-stages-20261118]
+    paths:
+      - '.github/workflows/jakeli-real-mobile-lod.yml'
+      - 'tools/jakeli/verify-jakeli-battle-lod.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: jakeli-real-mobile-lod-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  optimize:
+    if: github.ref == 'refs/heads/feature/british-army-10-stages-20261118'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned official glTF-Transform simplifier
+        run: npm install --no-audit --no-fund --prefix /tmp/jakeli-mobile-lod @gltf-transform/cli@4.5.0
+      - name: Decimate original skinned British infantry without altering bind pose
+        run: |
+          set -euo pipefail
+          source=assets/allied-soldiers/uk-jakeli-anatomical-v2.glb
+          target=assets/allied-soldiers/uk-jakeli-battle-lod1.glb
+          cli=/tmp/jakeli-mobile-lod/node_modules/.bin/gltf-transform
+          passed=false
+          for config in '0.56 0.005' '0.49 0.01' '0.42 0.015' '0.36 0.025'; do
+            ratio=${config% *}
+            err=${config#* }
+            echo "Attempting skin-aware mobile LOD ratio=$ratio error=$err"
+            "$cli" simplify "$source" "$target" --ratio "$ratio" --error "$err"
+            if python3 tools/jakeli/verify-jakeli-battle-lod.py; then
+              passed=true
+              break
+            fi
+          done
+          if [ "$passed" != true ]; then
+            echo 'No safe original-skin LOD under 65k triangles' >&2
+            exit 1
+          fi
+      - name: Save reviewable original-skin mobile LOD
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakeli-actual-skin-battle-lod1
+          path: assets/allied-soldiers/uk-jakeli-battle-lod1.glb
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Publish separate unapproved mobile GLB to experimental branch only
+        run: |
+          set -euo pipefail
+          branch=feature/british-army-10-stages-20261118
+          file=assets/allied-soldiers/uk-jakeli-battle-lod1.glb
+          cp "$file" /tmp/jakeli-verified-lod1.glb
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for attempt in 1 2 3; do
+            git fetch origin "$branch"
+            git reset --hard HEAD
+            git checkout -B publish-jakeli-mobile-lod "origin/$branch"
+            cp /tmp/jakeli-verified-lod1.glb "$file"
+            git add "$file"
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m 'Publish original-skin verified 65-bone Jakeli mobile LOD [skip ci]'
+            if git push origin HEAD:refs/heads/feature/british-army-10-stages-20261118; then exit 0; fi
+          done
+          exit 1
