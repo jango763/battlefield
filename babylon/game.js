@@ -123,9 +123,9 @@ function createWorld(){
  markMaterial.emissiveColor=color('#eed58b');destinationMark.material=markMaterial;
 
  // First-game readability: elevated tactical view instead of HQ facade.
- camera=new B.ArcRotateCamera('camera',Math.PI*1.23,.73,43,
-  new B.Vector3(0,.8,-99),scene);
- camera.lowerRadiusLimit=22;camera.upperRadiusLimit=100;
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.23,.83,33,
+  new B.Vector3(0,.8,-104),scene);
+ camera.lowerRadiusLimit=18;camera.upperRadiusLimit=85;
  camera.lowerBetaLimit=.43;camera.upperBetaLimit=1.25;
  camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
  state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
@@ -622,6 +622,43 @@ function syncVisual(view){
  if(visual.stage==='reload'&&view.lastPose==='fire')
   throw Error('Reload incorrectly displaying Fire animation');
 }
+function drawMiniMap(econ){
+ const map=$('battle-minimap');
+ if(!map)return;
+ const c=map.getContext('2d');
+ if(!c)return;
+ const W=map.width,H=map.height;
+ const xy=(x,z)=>[x/300*W,H-z/300*H];
+ c.fillStyle='#303b2c';c.fillRect(0,0,W,H);
+ c.strokeStyle='#786b4c';c.lineWidth=4;
+ c.beginPath();c.moveTo(W/2,0);c.lineTo(W/2,H);c.moveTo(0,H/2);c.lineTo(W,H/2);c.stroke();
+ // Bases and gold farms are visible without covering the live battlefield.
+ for(const base of goldRules.MAP.bases){
+  const [x,y]=xy(base.x,base.z);
+  c.fillStyle=base.team==='blue'?'#83b8db':'#d57868';
+  c.fillRect(x-4,y-4,8,8);
+ }
+ for(const farm of (econ?.farms||goldRules.MAP.farms)){
+  const [x,y]=xy(farm.x,farm.z);
+  c.fillStyle=farm.owner==='blue'?'#76b6db':farm.owner==='red'?'#dc8269':'#e7c771';
+  c.fillRect(x-2.3,y-2.3,4.6,4.6);
+ }
+ for(const army of [enemies,allies]){
+  const isBlue=army===allies;
+  c.fillStyle=isBlue?'#9bdaff':'#f18d7b';
+  for(const unit of army){
+   if(!unit?.alive)continue;
+   const [x,y]=xy(unit.x,unit.z);
+   c.beginPath();c.arc(x,y,1.6,0,Math.PI*2);c.fill();
+  }
+ }
+ const hero=findActor();
+ if(hero?.alive){
+  const [x,y]=xy(hero.x,hero.z);
+  c.strokeStyle='#fff6d0';c.lineWidth=1.6;
+  c.beginPath();c.arc(x,y,4.1,0,Math.PI*2);c.stroke();
+ }
+}
 function drawHud(){
  if(!state.ready||!battle||!controller)return;
  const hero=findActor();
@@ -664,6 +701,7 @@ function drawHud(){
  const progress=duration?100*(1-hero.reloadRemaining/duration):0;
  $('reload-fill').style.width=Math.max(0,Math.min(100,progress))+'%';
  state.fps=Math.round(engine.getFps());
+ drawMiniMap(econ);
  const short=$('quick-status');
  if(short)short.textContent='HP '+Math.round(hero.hp)+' · Золото '+funds+
   ' · 🔵 '+snap.alliesAlive+' : '+snap.enemiesAlive+' 🔴';
@@ -873,7 +911,7 @@ function frame(){
   // Follow the controlled hero with the existing touch-orbit camera.
   if(allies[0]?.alive&&camera){
    // Leave room ahead to see enemies and cover, as in the original.
-   const dest=position(allies[0],.75).add(new B.Vector3(0,0,7));
+   const dest=position(allies[0],.75).add(new B.Vector3(0,0,3));
    camera.target=B.Vector3.Lerp(camera.target,dest,Math.min(1,dt*2.8));
   }
   if(world&&economy)world.syncFarms(economy.summary());
