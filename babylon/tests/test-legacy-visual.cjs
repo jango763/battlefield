@@ -18,7 +18,7 @@ for(const id of ['touch-stick','touch-stick-knob','quick-fire','quick-gear',
 assert(game.includes("registerTouchControls();"));
 assert(game.includes("state.visualProfile=legacyVisual?.apply("));
 assert(game.includes("document.body.classList.add('battle-active')"));
-assert(game.includes("camera=new B.ArcRotateCamera('camera',Math.PI*1.50,.72,49"));
+assert(game.includes("camera=new B.ArcRotateCamera('camera',Math.PI*1.23,.73,43"));
 assert(game.includes("fieldOrders.setDestination("),'Joystick must preserve movement orders');
 assert(game.includes("controller.setFocus(target)"),'Fire button uses existing targeting');
 assert(world.includes("tx.update(false)"),'Painted terrain must be GPU-uploaded');
