@@ -179,6 +179,14 @@ for o in parts:
 weapon.rotation_mode='QUATERNION'
 weapon.animation_data_create()
 rest={b.name:b.matrix.copy() for b in rig.pose.bones}
+# FBX armature uses centimetre bone coordinates with an object-level 0.01 scale.
+# The imported gun lives in world METRES. Convert every contact target and
+# pole direction explicitly; never compare armature-local coordinates to
+# Blender-world coordinates as if they shared units.
+rigworld=rig.matrix_world.copy()
+rig_inv=rigworld.inverted()
+rig_rot_inv=rigworld.to_quaternion().inverted()
+def local_offset(world_delta):return rig_inv.to_3x3()@world_delta
 palm={}
 for side in ('Left','Right'):
  hand=rig.pose.bones[side+'Hand']
@@ -244,17 +252,17 @@ for clip in clips:
   lower=math.radians(22 if clip in ('Ready','Walk','Jog','Sprint') else 0)
   recoil=.013*max(0,math.sin((f/30)*math.pi*8))**8 if clip=='Fire' else 0
   weapon.rotation_quaternion=Quaternion((1,0,0),lower+.007*math.sin(phase))
-  shoulder=rig.pose.bones['RightArm'].head+Vector((.023,-.035,-.052))
+  shoulder=rigworld@rig.pose.bones['RightArm'].head+Vector((.023,-.035,-.052))
   stock=Vector(profile['stock'])
   weapon.location=shoulder-weapon.rotation_quaternion@stock+Vector((0,recoil+.002*math.sin(phase),0))
   update()
-  rq=frame(weapon.rotation_quaternion@Vector(profile['right_axis']),weapon.rotation_quaternion@Vector(profile['right_dorsal']))
-  lq=frame(weapon.rotation_quaternion@Vector(profile['left_axis']),weapon.rotation_quaternion@Vector(profile['left_dorsal']))
+  rq=rig_rot_inv@frame(weapon.rotation_quaternion@Vector(profile['right_axis']),weapon.rotation_quaternion@Vector(profile['right_dorsal']))
+  lq=rig_rot_inv@frame(weapon.rotation_quaternion@Vector(profile['left_axis']),weapon.rotation_quaternion@Vector(profile['left_dorsal']))
   contacts={'Right':weapon.matrix_world@Vector(profile['right']),
             'Left':weapon.matrix_world@Vector(profile['left'])}
   for side,q in (('Right',rq),('Left',lq)):
-   desired=contacts[side]-q@palm[side]
-   pole=rig.pose.bones[side+'Arm'].head+Vector((-.23 if side=='Right' else .22,.07,-.36))
+   desired=rig_inv@contacts[side]-q@palm[side]
+   pole=rig.pose.bones[side+'Arm'].head+local_offset(Vector((-.23 if side=='Right' else .22,.07,-.36)))
    solve(side,desired,pole,clip,f)
    fore=rig.pose.bones[side+'ForeArm']
    direction=rig.pose.bones[side+'Hand'].head-fore.head
@@ -268,7 +276,7 @@ for clip in clips:
       bone.rotation_quaternion=Quaternion((1,0,0),-angle)
    update()
    actual=rig.pose.bones[side+'Hand'].matrix@palm[side]
-   grip_errors[clip][side]=max(grip_errors[clip][side],(actual-contacts[side]).length)
+   grip_errors[clip][side]=max(grip_errors[clip][side],((rigworld@actual)-contacts[side]).length)
   for b in rig.pose.bones:
    b.keyframe_insert('rotation_quaternion',frame=f+1)
   weapon.keyframe_insert('location',frame=f+1)
