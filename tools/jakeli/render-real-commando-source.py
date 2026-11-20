@@ -25,7 +25,14 @@ for o in meshes:
  print('COMMANDO_EVALUATED_OBJECT',o.name,len(coords),
   [round(min(p[k] for p in coords),3) for k in range(3)],
   [round(max(p[k] for p in coords),3) for k in range(3)])
- corners.extend(coords)
+ extent=max(max(p[k] for p in coords)-min(p[k] for p in coords) for k in range(3))
+ if extent<4.0:
+  corners.extend(coords)
+ else:
+  print('COMMANDO_SOURCE_OUTLIER_EXCLUDED',o.name,'extent',extent)
+  # A bad original accessory mesh has points up to 9 m from the character.
+  # It is not valid body geometry and must not control camera framing.
+  o.hide_render=True
  ev.to_mesh_clear()
 assert corners
 minp=Vector(tuple(min(v[i] for v in corners) for i in range(3)))
