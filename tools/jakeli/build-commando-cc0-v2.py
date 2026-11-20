@@ -47,12 +47,12 @@ def material(name,rgb,metal=0,rough=.92):
  node.inputs['Metallic'].default_value=metal
  node.inputs['Roughness'].default_value=rough
  return m
-skin=material('Commando CC0 human skin',(.72,.45,.29))
-jacket=material('Commando British brown-green battledress',(.29,.31,.20))
-jacketfold=material('Commando shaded khaki coat',(.23,.27,.17))
-trouser=material('Commando British olive-brown trousers',(.35,.32,.21))
-boots=material('Commando brown-black ankle boots',(.095,.088,.074))
-webbing=material('Commando 1937 pattern khaki webbing',(.54,.49,.32))
+skin=material('Commando CC0 human skin',(.48,.285,.185))
+jacket=material('Commando British brown-green battledress',(.16,.19,.115))
+jacketfold=material('Commando shaded khaki coat',(.12,.155,.095))
+trouser=material('Commando British olive-brown trousers',(.205,.205,.14))
+boots=material('Commando brown-black ankle boots',(.05,.048,.041))
+webbing=material('Commando 1937 pattern khaki webbing',(.35,.30,.19))
 clothdark=material('Commando dark green beret felt',(.046,.16,.10))
 clothrim=material('Commando dark rolled beret edge',(.035,.095,.070))
 dullsteel=material('Commando subdued metal badge',(.55,.56,.49),.32,.65)
@@ -69,8 +69,10 @@ for m in materials:mesh.data.materials.append(m)
 region_counts={m.name:0 for m in materials}
 for poly in mesh.data.polygons:
  v=[mesh.data.vertices[i].co for i in poly.vertices]
- p=sum(v,Vector())/len(v)
- # FBX vertex body positions are in metres and neutral pose at origin.
+ p=mesh.matrix_world@(sum(v,Vector())/len(v))
+ # The native FBX's vertex positions are in centimetres: classify materials
+ # in WORLD metres, never object-local FBX centimetres. Previous all-green
+ # mesh came from accidentally assigning torso material to 72% of polygons.
  i=poly.loop_start
  u,vv=uv.data[i].uv
  ix=min(W-1,max(0,int((u%1)*W)));iy=min(H-1,max(0,int((vv%1)*H)))
@@ -113,7 +115,27 @@ def beret(name,origin,radius=.12,material=clothdark):
  data.materials.append(material)
  for face in data.polygons:face.use_smooth=True
  return obj
-beret_center=center+Vector((0,-.01,.025))
+# Find the living HEAD region on the actual skinned human mesh, NOT the
+# original FBX helmet's raw bound_box (that box is in bind coordinates and
+# put the first beret 40cm behind the character's head).
+head_group=mesh.vertex_groups.get('Head')
+assert head_group,('CC0 native source missing skin Head vertex group')
+dg=bpy.context.evaluated_depsgraph_get()
+evaluated=mesh.evaluated_get(dg)
+evaluated_mesh=evaluated.to_mesh()
+head_vertices=[
+ evaluated.matrix_world@evaluated_mesh.vertices[i].co
+ for i,v in enumerate(mesh.data.vertices)
+ if any(g.group==head_group.index and g.weight>.45 for g in v.groups)
+]
+evaluated.to_mesh_clear()
+assert len(head_vertices)>=30,('Insufficient genuine skinned head geometry',len(head_vertices))
+hxmin=min(v.x for v in head_vertices);hxmax=max(v.x for v in head_vertices)
+hymin=min(v.y for v in head_vertices);hymax=max(v.y for v in head_vertices)
+hzmax=max(v.z for v in head_vertices)
+beret_center=Vector(((hxmin+hxmax)*.5,(hymin+hymax)*.5,hzmax-.030))
+print('COMMANDO_REAL_HEAD_BERET_ANCHOR',len(head_vertices),
+  [round(x,4) for x in beret_center])
 cap=beret('BritishCommandoGreenBeret',beret_center,radius=max(.096,min(.137,helm_size.x*.54)))
 # Fitted rolled band as a toroidal seam with raised fabric, not an angular ring.
 segments=40;v=[];f=[]
