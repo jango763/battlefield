@@ -13,7 +13,21 @@ bpy.ops.import_scene.gltf(filepath=str(path))
 meshes=[o for o in bpy.context.scene.objects if o.type=='MESH']
 assert len(meshes)>=14
 bpy.context.view_layer.update()
-corners=[o.matrix_world@Vector(p) for o in meshes for p in o.bound_box]
+# Source meshes are in a large rig-bind coordinate system. Unskinned
+# helper geometry and unevaluated bound_box values are NOT character bounds.
+depsgraph=bpy.context.evaluated_depsgraph_get()
+corners=[]
+for o in meshes:
+ if not any(m.type=='ARMATURE' for m in o.modifiers):continue
+ ev=o.evaluated_get(depsgraph)
+ data=ev.to_mesh()
+ coords=[ev.matrix_world@v.co for v in data.vertices]
+ print('COMMANDO_EVALUATED_OBJECT',o.name,len(coords),
+  [round(min(p[k] for p in coords),3) for k in range(3)],
+  [round(max(p[k] for p in coords),3) for k in range(3)])
+ corners.extend(coords)
+ ev.to_mesh_clear()
+assert corners
 minp=Vector(tuple(min(v[i] for v in corners) for i in range(3)))
 maxp=Vector(tuple(max(v[i] for v in corners) for i in range(3)))
 mid=(minp+maxp)*.5;height=max((maxp-minp).length,1)
