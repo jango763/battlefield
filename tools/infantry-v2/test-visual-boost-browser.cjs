@@ -25,7 +25,7 @@ async function verify(type,name,graphics){
      !!document.querySelector('#retry:not([hidden])');
    }catch(e){return false;}
   },null,{timeout:150000});
-  const error=await page.locator('#error').textContent().catch(()=>null);
+  const error=await page.evaluate(()=>document.getElementById('error')?.textContent||'');
   if(error?.trim())throw Error('Original loader failed: '+error);
   // Wait until approved hero model is visible, avoiding splash-screen QA.
   await page.waitForFunction(()=>{
