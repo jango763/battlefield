@@ -67,12 +67,16 @@ mesh.data.materials.clear()
 materials=[skin,jacket,jacketfold,trouser,boots,webbing,black]
 for m in materials:mesh.data.materials.append(m)
 region_counts={m.name:0 for m in materials}
+# FBX has nontrivial bind matrices: raw object vertices are NOT their final
+# positions. Use the evaluated, skinned FBX T-pose mesh in world metres so
+# coat, trousers, face and boots receive the correct separate materials.
+paintdeps=bpy.context.evaluated_depsgraph_get()
+painteval=mesh.evaluated_get(paintdeps)
+paintmesh=painteval.to_mesh()
+assert len(paintmesh.vertices)==len(mesh.data.vertices)
+painted_world=[painteval.matrix_world@vert.co for vert in paintmesh.vertices]
 for poly in mesh.data.polygons:
- v=[mesh.data.vertices[i].co for i in poly.vertices]
- p=mesh.matrix_world@(sum(v,Vector())/len(v))
- # The native FBX's vertex positions are in centimetres: classify materials
- # in WORLD metres, never object-local FBX centimetres. Previous all-green
- # mesh came from accidentally assigning torso material to 72% of polygons.
+ p=sum((painted_world[i] for i in poly.vertices),Vector())/len(poly.vertices)
  i=poly.loop_start
  u,vv=uv.data[i].uv
  ix=min(W-1,max(0,int((u%1)*W)));iy=min(H-1,max(0,int((vv%1)*H)))
@@ -90,6 +94,8 @@ for poly in mesh.data.polygons:
  poly.material_index=materials.index(choice)
  region_counts[choice.name]+=1
 assert sum(region_counts.values())==len(mesh.data.polygons)
+painteval.to_mesh_clear()
+assert region_counts[jacket.name]>75 and region_counts[trouser.name]>150 and region_counts[boots.name]>60,region_counts
 # Sculpted sewable British green beret (CC0 origin), with continuous fitted
 # radius rings and soft droop, 5 profile rings, not a stack of spheres.
 def beret(name,origin,radius=.12,material=clothdark):
@@ -133,7 +139,7 @@ assert len(head_vertices)>=30,('Insufficient genuine skinned head geometry',len(
 hxmin=min(v.x for v in head_vertices);hxmax=max(v.x for v in head_vertices)
 hymin=min(v.y for v in head_vertices);hymax=max(v.y for v in head_vertices)
 hzmax=max(v.z for v in head_vertices)
-beret_center=Vector(((hxmin+hxmax)*.5,(hymin+hymax)*.5,hzmax-.030))
+beret_center=Vector(((hxmin+hxmax)*.5,(hymin+hymax)*.5,hzmax+.018))
 print('COMMANDO_REAL_HEAD_BERET_ANCHOR',len(head_vertices),
   [round(x,4) for x in beret_center])
 cap=beret('BritishCommandoGreenBeret',beret_center,radius=max(.096,min(.137,helm_size.x*.54)))
