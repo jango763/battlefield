@@ -12,6 +12,7 @@ const presentation=window.BattlefieldCombatPresentation;
 const orders=window.BattlefieldFieldOrders;
 const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
+const legacyVisual=window.BattlefieldLegacyVisualStyle;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
 const nativeBlend=window.BattlefieldNativeClipBlend;
@@ -70,6 +71,7 @@ let actors=new Map(),fx=[],scenario='squads',atBase=true,world=null;
 let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 let weaponQueue=[],weaponWorker=false;
 let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
+const touchJoystick={active:false,pointer:null,x:0,y:0,cooldown:0};
 const respawnTimers=new Map(),RESPAWN_SECONDS=28;
 function alertStatus(message){$('event').textContent=message}
 enterButton.addEventListener('click',()=>{
@@ -83,6 +85,11 @@ enterButton.addEventListener('click',()=>{
   console.error('24 soldier models',error);
  });
  briefing.hidden=true;briefing.setAttribute('aria-hidden','true');
+ // The first game's combat screen prioritised the battlefield, not a settings panel.
+ $('panel').classList.add('closed');
+ $('hud-toggle').setAttribute('aria-pressed','false');
+ $('hud-toggle').textContent='Меню';
+ document.body.classList.add('battle-active');
  atBase=false;state.atBase=false;
  alertStatus('Бой начался: британцы 🔵 против Вермахта 🔴. Касайтесь земли, чтобы управлять героем.');
  drawHud();
@@ -115,11 +122,13 @@ function createWorld(){
  const markMaterial=new B.StandardMaterial('destination-mat',scene);
  markMaterial.emissiveColor=color('#eed58b');destinationMark.material=markMaterial;
 
- camera=new B.ArcRotateCamera('camera',Math.PI*.52,1.05,33,
-  new B.Vector3(0,.7,-108),scene);
- camera.lowerRadiusLimit=15;camera.upperRadiusLimit=145;
- camera.lowerBetaLimit=.2;camera.upperBetaLimit=1.5;
- camera.wheelDeltaPercentage=.018;camera.pinchDeltaPercentage=.018;
+ // First-game readability: elevated tactical view instead of HQ facade.
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.50,.72,49,
+  new B.Vector3(0,.8,-98),scene);
+ camera.lowerRadiusLimit=22;camera.upperRadiusLimit=100;
+ camera.lowerBetaLimit=.43;camera.upperBetaLimit=1.25;
+ camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
+ state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
  camera.attachControl(canvas,true);
  scene.onPointerObservable.add(info=>{
   if(info.type!==B.PointerEventTypes.POINTERPICK||!info.pickInfo?.hit)return;
@@ -655,6 +664,11 @@ function drawHud(){
  const progress=duration?100*(1-hero.reloadRemaining/duration):0;
  $('reload-fill').style.width=Math.max(0,Math.min(100,progress))+'%';
  state.fps=Math.round(engine.getFps());
+ const short=$('quick-status');
+ if(short)short.textContent='HP '+Math.round(hero.hp)+' · Золото '+funds+
+  ' · 🔵 '+snap.alliesAlive+' : '+snap.enemiesAlive+' 🔴';
+ const pause=$('quick-pause');
+ if(pause)pause.textContent=atBase?'▶':'Ⅱ';
 }
 async function chooseGun(weapon){
  const hero=findActor();
@@ -748,6 +762,74 @@ function registerUI(){
   drawHud();
  });
 }
+// Direct first-game controls: thumb movement plus fire-priority button.
+// Actual bullets/damage remain fully inside the existing combat controller.
+function updateTouchJoystick(dt){
+ if(!touchJoystick.active||!fieldOrders||!camera)return;
+ const hero=findActor();
+ if(!hero?.alive)return;
+ touchJoystick.cooldown-=dt;
+ if(touchJoystick.cooldown>0)return;
+ touchJoystick.cooldown=.1;
+ const forward=camera.target.subtract(camera.position);
+ forward.y=0;
+ if(forward.lengthSquared()<1e-6)return;
+ forward.normalize();
+ const right=new B.Vector3(forward.z,0,-forward.x);
+ const vx=touchJoystick.x,vy=touchJoystick.y;
+ if(Math.hypot(vx,vy)<.11){fieldOrders.clearDestination();return;}
+ fieldOrders.setDestination(
+  hero.x+(right.x*vx+forward.x*vy)*11,
+  hero.z+(right.z*vx+forward.z*vy)*11);
+}
+function registerTouchControls(){
+ const pad=$('touch-stick'),knob=$('touch-stick-knob');
+ if(!pad||!knob)return;
+ function move(e){
+  const rect=pad.getBoundingClientRect();
+  const centerX=rect.left+rect.width/2,centerY=rect.top+rect.height/2;
+  const radius=Math.max(1,rect.width*.37);
+  const dx=(e.clientX-centerX)/radius,dy=(e.clientY-centerY)/radius;
+  const mag=Math.max(1,Math.hypot(dx,dy));
+  touchJoystick.x=dx/mag;touchJoystick.y=-dy/mag;
+  knob.style.transform='translate('+(touchJoystick.x*radius*.65)+'px,'+
+   (-touchJoystick.y*radius*.65)+'px)';
+  touchJoystick.cooldown=0;
+ }
+ function release(e){
+  if(e.pointerId!==touchJoystick.pointer)return;
+  touchJoystick.active=false;touchJoystick.pointer=null;
+  touchJoystick.x=touchJoystick.y=0;touchJoystick.cooldown=0;
+  knob.style.transform='translate(0,0)';
+  fieldOrders?.clearDestination();
+ }
+ pad.addEventListener('pointerdown',e=>{
+  if(!state.ready||!gameStarted||!findActor()?.alive)return;
+  e.preventDefault();
+  touchJoystick.active=true;touchJoystick.pointer=e.pointerId;
+  pad.setPointerCapture(e.pointerId);move(e);
+ });
+ pad.addEventListener('pointermove',e=>{
+  if(touchJoystick.active&&e.pointerId===touchJoystick.pointer){
+   e.preventDefault();move(e);
+  }
+ });
+ pad.addEventListener('pointerup',release);
+ pad.addEventListener('pointercancel',release);
+ $('quick-fire').addEventListener('click',()=>{
+  if(!state.ready||!gameStarted||!controller)return;
+  const hero=findActor();
+  if(!hero?.alive)return;
+  const target=enemies.filter(u=>u.alive).sort((a,b)=>
+   Math.hypot(a.x-hero.x,a.z-hero.z)-Math.hypot(b.x-hero.x,b.z-hero.z))[0];
+  if(!target)return;
+  controller.setFocus(target);
+  alertStatus('ОГОНЬ · приоритетная цель: '+target.id);
+ });
+ $('quick-gear').addEventListener('click',()=>$('hud-toggle').click());
+ $('quick-pause').addEventListener('click',()=>$('fight').click());
+ $('quick-reload').addEventListener('click',()=>$('reload-manual').click());
+}
 function updateReinforcements(dt){
  if(scenario!=='squads'||!gameStarted||!controller?.snapshot().active)return;
  for(const unit of [...allies,...enemies]){
@@ -770,6 +852,7 @@ function frame(){
  const dt=Math.max(0,Math.min(.05,engine.getDeltaTime()/1000));
  if(state.ready&&controller){
   if(!gamePausedForBriefing){
+   updateTouchJoystick(dt);
    controller.update(dt);
    updateReinforcements(dt);
    // Stop economic and unlock clocks while the actual battle is paused
@@ -789,7 +872,8 @@ function frame(){
   }
   // Follow the controlled hero with the existing touch-orbit camera.
   if(allies[0]?.alive&&camera){
-   const dest=position(allies[0],.75);
+   // Leave room ahead to see enemies and cover, as in the original.
+   const dest=position(allies[0],.75).add(new B.Vector3(0,0,9));
    camera.target=B.Vector3.Lerp(camera.target,dest,Math.min(1,dt*2.8));
   }
   if(world&&economy)world.syncFarms(economy.summary());
@@ -808,6 +892,7 @@ try{
  state.loading=false;state.ready=true;
  for(const el of document.querySelectorAll('button'))el.disabled=false;
  registerUI();
+ registerTouchControls();
  setup('squads');
  briefingProgress.textContent='Бойцы загружены. Читайте карту и нажмите «В бой».';
  enterButton.disabled=false;
