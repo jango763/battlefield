@@ -87,6 +87,9 @@ jobs:
           fi
           for attempt in 1 2 3; do
             git fetch origin "$branch"
+            # Generated GLB modified a tracked file. Its verified bytes
+            # are safe in /tmp; clean checkout before switching to remote head.
+            git reset --hard HEAD
             git checkout -B ci-commando-publish "origin/$branch"
             cp /tmp/commando-v2-verified.glb "$model"
             git add "$model"
