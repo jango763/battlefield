@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#202722">
+<title>Battlefield · Jakeli — четыре оружия</title>
+<style>
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#202722;color:#f3f4e9;font:14px system-ui,-apple-system,Segoe UI,sans-serif}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#head{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:14px;right:14px;pointer-events:none;text-shadow:0 2px 8px #000a}
+h1{margin:0;font-size:17px}#sub{font-size:11px;color:#d8dfd2;margin-top:4px}
+#controls{position:fixed;z-index:4;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);width:auto;max-width:calc(100% - 24px);background:#202b22ee;border:1px solid #68806d;border-radius:12px;box-shadow:0 7px 25px #0008;overflow:hidden}
+#controls[open]{width:min(355px,calc(100% - 24px));max-height:59dvh}
+#controls summary{list-style:none;cursor:pointer;padding:13px 15px;min-height:47px;font-weight:700;font-size:13px;touch-action:manipulation}
+#controls summary::-webkit-details-marker{display:none}
+#controls summary:before{content:"☰";margin-right:9px}#controls[open] summary:before{content:"✕"}
+#controls-body{overflow:auto;max-height:calc(59dvh - 48px);padding:0 10px 12px;overscroll-behavior:contain}
+.section{font-size:11px;color:#cedcc8;margin:10px 0 5px}
+.buttons{display:flex;flex-wrap:wrap;gap:6px}
+button{min-height:41px;border:1px solid #667964;border-radius:7px;color:#f6f5e9;background:#344735;font:600 12px system-ui,-apple-system,sans-serif;padding:8px 11px;touch-action:manipulation}
+button[aria-pressed="true"]{color:#1d311c;background:#d9e0c0;border-color:#f3f5d8}
+button:disabled{opacity:.55}
+#credit{margin-top:11px;font-size:10px;color:#bac9b6;line-height:1.5}
+#credit a{color:#d8e5c7}
+#status{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 70px);left:12px;right:12px;max-width:370px;background:#1c2921ec;border:1px solid #657564;border-radius:9px;padding:8px 12px;font-size:12px}
+#status[data-ready="true"]{display:none}
+#error{position:fixed;top:78px;left:12px;right:12px;color:#ffd4c6;font-size:12px;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="renderCanvas" aria-label="Трёхмерный британский солдат Jakeli — вращайте пальцем"></canvas>
+<div id="head"><h1>Jakeli · британский арсенал</h1><div id="sub">Исправленный скелет · оригинальные ноги Quaternius · эксперимент</div></div>
+<details id="controls">
+<summary>Оружие и анимации</summary>
+<div id="controls-body">
+<div class="section">Оружие (одна модель за раз)</div>
+<div class="buttons" id="weapons">
+<button data-weapon="uk-lee-enfield" aria-pressed="true">Lee-Enfield</button>
+<button data-weapon="uk-sten" aria-pressed="false">Sten</button>
+<button data-weapon="uk-bren" aria-pressed="false">Bren</button>
+<button data-weapon="uk-piat" aria-pressed="false">PIAT</button>
+</div>
+<div class="section">Боевая анимация</div>
+<div class="buttons">
+<button data-pose="Ready" aria-pressed="true">Наготове</button>
+<button data-pose="Aim" aria-pressed="false">Прицел</button>
+<button data-pose="Fire" aria-pressed="false">Выстрел</button>
+</div>
+<div class="section">Оригинальные движения ног Quaternius</div>
+<div class="buttons">
+<button data-pose="Walk" aria-pressed="false">Шаг</button>
+<button data-pose="Jog" aria-pressed="false">Бег</button>
+<button data-pose="Sprint" aria-pressed="false">Спринт</button>
+</div>
+<div class="section">Камера</div>
+<div class="buttons">
+<button data-view="full">Боец целиком</button>
+<button data-view="hands">Кисти слева</button>
+<button data-view="right">Кисти справа</button>
+</div>
+<div class="section">Поворачивайте модель пальцем. Другие виды оружия загружаются только после выбора.</div>
+<div id="credit">George Jakeli · British Army Soldier WW2 · CC BY 4.0 · <a href="../assets/allied-soldiers/ATTRIBUTION_JAKELI.md">Атрибуция</a>. Sten/Bren — Muster WW2, PIAT — процедурная проверочная модель Battlefield. Не выпущено в игру.</div>
+</div>
+</details>
+<div id="error" role="alert"></div>
+<div id="status" role="status">Загрузка Jakeli…</div>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./jakeli-arsenal-main.js"></script>
+</body>
+</html>
