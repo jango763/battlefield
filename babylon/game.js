@@ -17,6 +17,7 @@ const britishSoldier=window.BattlefieldBritishSoldier;
 const nativeBlend=window.BattlefieldNativeClipBlend;
 const alliedModels=window.BattlefieldAlliedModels;
 const alliedLoader=window.BattlefieldAlliedAssetLoader;
+const characters=window.BattlefieldCharacterSources;
 const briefing=$('battlefield-brief'),enterButton=$('enter-game'),briefingProgress=$('brief-progress');
 const canvas=$('view');
 // Retry and menu work even if CDN scripts or the 3D model failed to load.
@@ -26,7 +27,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!alliedModels||!alliedLoader||!nativeBlend||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -35,6 +36,8 @@ if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!fa
  enterButton.textContent='Не удалось загрузить игру';
  return;
 }
+// Refuse a silent source swap that could replace the approved appearance.
+characters.validateTrialFiles(alliedLoader.FEATURE_TRIAL_FILES);
 const META={Kar98k:'de-kar98k',MP40:'de-mp40',MG42:'de-mg42',
  Panzerschreck:'de-panzerschreck'};
 // Preserve existing gameplay weapon IDs for identical damage, ammo and motion.
@@ -50,8 +53,7 @@ const CLIP_IDS=Object.keys(META).flatMap(w=>Object.values(CLIP_POSES).map(p=>w+'
 // and three UNAPPROVED Commando slots still using the existing prototype.
 // Do not change the source catalog or the locked release manifest.
 const FEATURE_REAL_ALLIES=true;
-const featureCasting=slot=>slot===0?'americanHero':
- slot>=1&&slot<=8?'britishJakeli':alliedModels.forBlueSlot(slot).id;
+const featureCasting=slot=>characters.forSlot(slot).id;
 const NATIVE_POSES=Object.freeze({
  americanHero:Object.freeze({ready:'Idle_Quaternius',aim:'Idle_Quaternius',
   fire:'Idle_Quaternius',run:'Jog_Quaternius'}),
@@ -60,7 +62,7 @@ const NATIVE_POSES=Object.freeze({
 
 const state={ready:false, loading:true, error:null, models:0, clips:0,
  scenario:'squads',atBase:true,selected:'Kar98k',focus:null, fps:0,
- importedAlliedCount:0,modelErrors:{},alliedManifest:null};
+ importedAlliedCount:0,modelErrors:{},alliedManifest:null,actorSources:{}};
 window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
 let modelDepot=null;
@@ -287,7 +289,9 @@ async function ensureUnitsUnlocked(scenarioName){
   }
   // No invented download: if the original licensed file is missing, only
   // the explicitly labelled pre-existing prototype is available.
-  const entries=externalModel?.entries||asset.instantiateModelsToScene(
+  // Record the real GLB identity (or a clearly marked fallback) per squad slot.
+   const sourceReport=characters.audit(i,externalModel);
+   const entries=externalModel?.entries||asset.instantiateModelsToScene(
    name=>name,false,{doNotInstantiate:true});
   const view=unitVisual(i,entries,{externalModel});
   if(view.faction==='british'&&!externalModel){
@@ -312,7 +316,8 @@ async function ensureUnitsUnlocked(scenarioName){
   // Do not block the *entire game* on several 1.7 MB rifle loads or IK errors.
   view.rig={combatPose:{active:false,stage:'ready',crouch:0,recoilPulse:0}};
   view.anchor.setEnabled(false);
-  views[i]=view;state.models++;state.clips+=new Set(view.clips.values()).size;
+  views[i]=view;state.actorSources[i]=sourceReport;
+   state.models++;state.clips+=new Set(view.clips.values()).size;
   weaponQueue.push(view);
   const unit=i<12?allies[i]:enemies[i-12];
   if(state.ready&&unit){
@@ -641,7 +646,9 @@ function drawHud(){
   (paid?'\nЗапас: '+paid:'')+
   '\nСтрой: '+(fieldOrders?.snapshot().mode==='semicircle'?'боевой полукруг':'черепаха')+
   '\nВыстрелы героя: '+hero.shots+' · поражено: '+hero.kills+
-  '\nОригинальных моделей установлено: '+state.importedAlliedCount+'/12'+
+  '\nИмпортировано союзных GLB (эксперимент): '+state.importedAlliedCount+'/12'+
+   '\nНемец: утверждён · Герой: '+(state.actorSources[0]?.realModelLoaded?'загружен':'нет GLB')+
+   ' · Jakeli: '+(Object.values(state.actorSources).some(r=>r.id==='britishJakeli'&&r.realModelLoaded)?'импортирован, деформация требует приёмки':'ожидает загрузки')+
   '\nFPS: '+Math.round(engine.getFps())+
   (snap.focus?'\nПриоритетная цель: '+snap.focus:'');
  const duration=combat.WEAPONS[hero.reloadWeapon]?.reloadSeconds||0;

@@ -1,0 +1,40 @@
+name: Unified three characters QA
+on:
+  push:
+    branches:
+      - 'feature/unified-three-characters-*'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify three GLB sources and game entry
+        run: |
+          node --check babylon/character-sources.js
+          node --check babylon/game.js
+          node babylon/tests/test-character-integration.cjs
+          node babylon/tests/test-game-entry.cjs
+          node babylon/tests/test-allied-loader.cjs
+  browser-mobile:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium and WebKit for iPhone viewport checks
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/battlefield-actual-allies playwright@1.58.2
+          /tmp/battlefield-actual-allies/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Render the unified main Babylon scene
+        run: |
+          python3 -m http.server 8855 --bind 127.0.0.1 >/tmp/battlefield-integrated-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-real-allied-squad-integration.cjs
+      - name: Archive screenshots and detailed report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unified-three-characters-mobile
+          path: babylon-qa-results/actual-three-soldier-integrated/
+          if-no-files-found: ignore
