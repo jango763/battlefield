@@ -37,6 +37,12 @@ async function verify(type,name,graphics){
    const texture=gr.material.map;
    return {
     visual,
+    worldArt:window.__BATTLEFIELD_WORLD_ART__||null,
+    versionLabel:document.getElementById('graphics-build-label')?.textContent||null,
+    materialReport:scene.children.filter(group=>group.isGroup&&
+      group.children.some(mesh=>mesh.isMesh&&
+       String(mesh.material?.name||'').startsWith('WWII-textured-'))).length,
+    forestCrowns:scene.children.filter(mesh=>mesh.name==='visual-only-live-pines-crowns').length,
     groundWidth:texture?.image?.width,
     groundHeight:texture?.image?.height,
     groundRepeat:[texture.repeat.x,texture.repeat.y],
@@ -60,9 +66,20 @@ async function verify(type,name,graphics){
    assert(result.game.visual.props>=400,'Lack of vegetation and ruins');
    assert(result.game.ruins>0,'Ruin contact shadows missing');
    assert(result.game.pixelRatio<=1.65,'iPhone pixel ratio not capped');
+   assert(result.game.worldArt,'WWII texture maps not installed');
+   assert.equal(Object.keys(result.game.worldArt.textures).length,5,
+    'Missing some high-resolution material maps');
+   assert(result.game.worldArt.texturedWalls>=40,
+    'Original ruins still use untextured flat-color materials');
+   assert(result.game.worldArt.texturedRuins>=10,
+    'Textured ruins missing from main scene');
+   assert(result.game.forestCrowns>=1,'New forest details are invisible');
+   assert(result.game.versionLabel?.includes('HD'),'New game lacks version label');
   }else{
    assert.equal(result.game.visual,null,'Original bypass must not touch scene');
    assert.equal(result.game.groundWidth,256,'Comparison no longer original');
+   assert.equal(result.game.worldArt,null,'HD materials leaked into approved original mode');
+   assert(result.game.versionLabel?.includes('ОРИГИНАЛ'),'Original version label absent');
   }
   assert.equal(result.game.source,'original THREE.Scene','Engine was replaced');
   assert.equal(result.game.cameras.fov,40,'Approved camera angle changed');
