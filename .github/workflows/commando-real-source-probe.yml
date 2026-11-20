@@ -32,7 +32,8 @@ jobs:
           cache: pip
           cache-dependency-path: tools/jakeli/requirements-blender.txt
       - name: Install pinned Blender for source visual inspection
-        run: python -m pip install --only-binary=:all: -r tools/jakeli/requirements-blender.txt
+        run: |
+          python -m pip install --only-binary=:all: -r tools/jakeli/requirements-blender.txt
       - name: Render genuine whole-body source front and side
         run: python tools/jakeli/render-real-commando-source.py
       - name: Preserve original licensed source and diagnostics
