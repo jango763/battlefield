@@ -1,0 +1,42 @@
+name: First-game Three.js graphics QA
+on:
+  push:
+    branches:
+      - 'feature/threejs-visual-boost-*'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static-original-game:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the original mechanics and graphics-only injection
+        run: |
+          node --check preview/visual-boost-v1.js
+          node --check tools/infantry-v2/test-visual-boost-browser.cjs
+          node tools/infantry-v2/test-visual-boost.cjs
+          node tools/infantry-v2/test-stage2-startup.cjs
+          node tools/infantry-v2/test-stage3-german-hero.cjs
+  render-mobile:
+    needs: static-original-game
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium and WebKit
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/bf-threejs-visual playwright@1.58.2
+          /tmp/bf-threejs-visual/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Compare original and enhanced original Three.js game
+        run: |
+          python3 -m http.server 8856 --bind 127.0.0.1 >/tmp/threejs-visual-http.log 2>&1 &
+          sleep 2
+          node tools/infantry-v2/test-visual-boost-browser.cjs
+      - name: Keep iPhone viewport screenshots and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlefield-threejs-original-visual-comparison
+          path: visual-qa/threejs-original/
+          if-no-files-found: warn
