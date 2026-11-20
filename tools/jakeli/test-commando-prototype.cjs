@@ -14,7 +14,7 @@ const outPath='assets/allied-soldiers/uk-commando-'+id.replace(/^uk-/,'')+'-prot
 const j=read(outPath);
 assert.equal(j.skins?.length,1,'One independent skeleton only');
 assert.equal(j.skins[0].joints?.length,65,'Exactly 65 bone rig');
-const names=(j.meshes||[]).map(x=>x.name||'');
+const names=j.nodes.filter(x=>x.mesh!==undefined).map(x=>x.name||''); // Blender glTF exporter renames mesh datablocks Mesh_N; authored object identities survive in nodes.
 const commandoNames=names.filter(n=>/Commando/i.test(n));
 assert(commandoNames.length>40,('Few real custom Commando meshes '+commandoNames.length));
 assert(!names.some(n=>/Pants_004|SLD_1_Material|JamesSkullCap|ALL_BAG|Shirt_low|HELMET_HELMET/i.test(n)),
