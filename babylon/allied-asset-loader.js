@@ -14,7 +14,7 @@
  // This trial does NOT set installed/rightsCleared/visualApproved in manifest.
  const FEATURE_TRIAL_FILES=Object.freeze({
   americanHero:'us-hero-quaternius-donor-hands-v7.glb',
-  britishJakeli:'uk-jakeli-anatomical-v2.glb'
+  britishJakeli:'uk-jakeli-battle-lod1.glb'
  });
  const REQUIRED=Object.freeze([
   'Hips','Spine','Spine1','Spine2','Neck','Head',
