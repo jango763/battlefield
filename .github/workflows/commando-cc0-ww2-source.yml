@@ -4,6 +4,7 @@ on:
     branches: [feature/british-army-10-stages-20261118]
     paths:
       - '.github/workflows/commando-cc0-ww2-source.yml'
+      - 'tools/jakeli/render-cc0-ww2-source.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +24,16 @@ jobs:
           unzip -l babylon-qa-results/commando-ww2-source/lowpolysoldier.zip
           unzip -o -q babylon-qa-results/commando-ww2-source/lowpolysoldier.zip -d babylon-qa-results/commando-ww2-source/files
           find babylon-qa-results/commando-ww2-source/files -type f -printf '%p %s bytes\n'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tools/jakeli/requirements-blender.txt
+      - name: Install pinned Blender and FBX importer
+        run: |
+          python -m pip install --only-binary=:all: -r tools/jakeli/requirements-blender.txt
+      - name: Render full-texture real WWII soldier for quality decision
+        run: python tools/jakeli/render-cc0-ww2-source.py
       - name: Upload exact untouched CC0 source for rig audit
         if: always()
         uses: actions/upload-artifact@v4
