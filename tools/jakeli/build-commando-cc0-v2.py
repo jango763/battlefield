@@ -398,6 +398,20 @@ if os.environ.get('COMMANDO_RENDER','1')=='1':
   for tr in obj.animation_data.nla_tracks:tr.mute=(tr.name!='Ready')
  scene.frame_set(12);bpy.context.view_layer.update()
  dep=bpy.context.evaluated_depsgraph_get()
+ def bbox_eval(ob,indices=None):
+  ev=ob.evaluated_get(dep);me=ev.to_mesh()
+  coords=[ev.matrix_world@me.vertices[i].co for i in
+    (range(len(me.vertices)) if indices is None else indices)]
+  ev.to_mesh_clear()
+  return [[round(min(v[k] for v in coords),4) for k in range(3)],
+          [round(max(v[k] for v in coords),4) for k in range(3)]]
+ headi=[i for i,v in enumerate(mesh.data.vertices)
+    if any(g.group==head_group.index and g.weight>.45 for g in v.groups)]
+ headbox=bbox_eval(mesh,headi);hatbox=bbox_eval(cap)
+ print('COMMANDO_REAL_HEAD_HAT_WORLD',json.dumps({'head':headbox,
+   'beret':hatbox,'verticalSeparation':round(hatbox[0][2]-headbox[1][2],4)}),flush=True)
+
+ dep=bpy.context.evaluated_depsgraph_get()
  eva=mesh.evaluated_get(dep);dat=eva.to_mesh()
  coords=[eva.matrix_world@v.co for v in dat.vertices];eva.to_mesh_clear()
  mn=Vector(tuple(min(p[i] for p in coords) for i in range(3)))
