@@ -28,7 +28,7 @@ function create(scene,B,map){
  }
  const mat={
   earth:material('earth','#777957'),grass:material('grass','#555f43'),
-  dirt:material('dirt','#6b5945'),road:material('road','#80705a'),
+  dirt:material('dirt','#6b5945'),road:material('road','#b4aa8d'),
   track:material('track','#4c4237'),stone:material('stone','#777a76'),
   roof:material('roof','#4b463a'),wood:material('wood','#6b513a'),
   burnt:material('burnt','#242624'),rust:material('rust','#513c2d'),
@@ -105,14 +105,37 @@ function create(scene,B,map){
  if(!groundTextureReady)groundMaterial.diffuseColor=B.Color3.FromHexString('#77735e');
  groundMaterial.specularColor=new B.Color3(.02,.02,.02);
  ground.material=groundMaterial;ground.isPickable=true;ground.receiveShadows=true;
+ // Dirt road is narrow, weathered and textured: no featureless white highway.
+ // Preserve the exact road positions and collision-free gameplay routes.
+ if(typeof document!=='undefined' && B.DynamicTexture){
+  try{
+   const tx=new B.DynamicTexture('battlefield-dirt-track',
+    {width:512,height:512},scene,false);
+   const c=tx.getContext();
+   c.fillStyle='#73614a';c.fillRect(0,0,512,512);
+   let seed=1776;
+   const rand=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);
+   for(let i=0;i<9000;i++){
+    c.globalAlpha=.10+rand()*.22;
+    c.fillStyle=['#342f28','#aea083','#887756','#564633'][Math.floor(rand()*4)];
+    const x=rand()*512,y=rand()*512,r=.8+rand()*5.5;
+    c.fillRect(x,y,r*1.6,r);
+   }
+   c.globalAlpha=1;
+   tx.update(false);tx.uScale=2;tx.vScale=30;
+   tx.wrapU=B.Texture?.WRAP_ADDRESSMODE??1;
+   tx.wrapV=B.Texture?.WRAP_ADDRESSMODE??1;
+   mat.road.diffuseTexture=tx;
+  }catch(error){console.warn('Dirt-road texture fallback',error);}
+ }
  // Main central supply road, two farm access branches and vehicle tracks.
- box('north-south-road',14,.04,265,150,.025,150,mat.road);
- box('west-east-road',246,.045,12,150,.028,150,mat.road);
+ box('north-south-road',9.4,.04,265,150,.025,150,mat.road);
+ box('west-east-road',246,.045,8,150,.028,150,mat.road);
  for(const side of [-1,1]){
   box('lane-farm-west-'+side,135,.05,4,81,.055,150+side*52,mat.dirt);
   box('lane-farm-east-'+side,135,.05,4,219,.055,150+side*52,mat.dirt);
  }
- for(let z=18;z<=282;z+=7)for(const x of [146,154])
+ for(let z=18;z<=282;z+=7)for(const x of [147.2,152.8])
   box('rut-'+x+'-'+z,.26,.04,3.6,x,.064,z,mat.track);
  // Both main bases face towards the center of the map.
  for(const base of map.bases){
@@ -302,8 +325,14 @@ function create(scene,B,map){
   if(x<18||x>282||z<15||z>285)continue;
   if(Math.hypot(x-150,z-150)<24)continue;
   cylinder('tree-trunk-'+i,1.1,4.2,x,2.1,z,mat.trunk,6);
-  const tree=cylinder('tree-crown-'+i,6.5,7,x,8,z,mat.hedge,7);
-  tree.scaling.x=.95;
+  const cone=B.MeshBuilder.CreateCylinder('tree-crown-'+i,
+   {diameterTop:.8,diameterBottom:6.4,height:6.7,tessellation:7},scene);
+  cone.position.copyFrom(at(x,z,7.3,B));
+  cone.material=mat.hedge;cone.isPickable=false;nodes.push(cone);
+  const top=B.MeshBuilder.CreateCylinder('tree-top-'+i,
+   {diameterTop:0,diameterBottom:4,height:4.7,tessellation:7},scene);
+  top.position.copyFrom(at(x,z,10.5,B));
+  top.material=mat.hedge;top.isPickable=false;nodes.push(top);
  }
  for(const p of [[86,123],[210,120],[120,175],[190,181],[150,83],[152,220]]){
   for(let i=-3;i<=3;i++)box('sandbag-'+p[0]+'-'+p[1]+'-'+i,1.5,.5,.85,
