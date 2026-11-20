@@ -21,6 +21,13 @@ const ids=['uk-lee-enfield','uk-sten','uk-bren','uk-piat'];
     await page.locator('#controls summary').click();
     await page.locator('[data-weapon="'+id+'"]').click();
     await page.waitForFunction(w=>{const s=window.__JAKELI_ARSENAL_QA__;return s&&s.weapon===w&&!s.busy&&s.ready},id,{timeout:90000});
+    if(id==='uk-piat'){
+     const detailed=await page.evaluate(()=>{
+      const meshes=window.__JAKELI_ARSENAL__.scene.meshes;
+      return meshes.filter(m=>m.name.startsWith('PIAT')&&m.isEnabled()&&(m.getTotalVertices?.()||0)>0).length;
+     });
+     assert(detailed>=20,'Expected original detailed PIAT procedural model, not primitive proxy: '+detailed);
+    }
     const poses=browserName==='chromium'?['Ready','Aim','Fire','Walk','Jog','Sprint']:['Ready','Aim','Walk','Sprint'];
     for(const pose of poses){
      await page.locator('#controls summary').click();
