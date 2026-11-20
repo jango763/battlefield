@@ -261,7 +261,9 @@
     const missing=required.filter(name=>!available.has(name));
     if(missing.length){entries.dispose?.();throw Error('Native clips missing for '+id+': '+missing.join(','))}
     for(const group of entries.animationGroups)group.stop();
-    const hiddenWeapons=hideEmbeddedWeapons(entries);
+    // Jakeli's Lee-Enfield is already baked into hand targets; hiding it
+    // would produce invisible rifle fire in the common game.
+    const hiddenWeapons=id==='britishJakeli'?[]:hideEmbeddedWeapons(entries);
     return {entries,modelId:id,rig:current,retargeted:0,
      nativeClips:true,previewOnly:true,hiddenWeapons,
      sourceFile:FEATURE_TRIAL_FILES[id]};
