@@ -21,8 +21,13 @@
       console.warn('Optional graphics upgrade not loaded',e);
       return null;
     });
+    // True texture maps for architecture are independent of the game code.
+    const texturedWorld=get('ww2-structure-materials-v1.js?v=20261121-1').catch(error=>{
+      console.warn('Optional WWII surface textures not loaded',error);
+      return null;
+    });
     const work=await Promise.all([get('german-v5.js?v=20261114-stage3-hero-r3'),...Array.from({length:4},worker)]);
-    const visualPass=await graphicUpgrade;
+    const [visualPass,materialPass]=await Promise.all([graphicUpgrade,texturedWorld]);
     let html=chunks.join('');const start='// === Preview integration: German WW2 Panzergrenadier (red faction) ===',end='// === End of preview integration ===';
     const a=html.indexOf(start),b=html.indexOf(end,a);if(a<0||b<a)throw new Error('Не найдена основа тестовой версии');
     html=html.slice(0,a)+work[0]+html.slice(b+end.length);
@@ -71,7 +76,7 @@
     const graphics=new URLSearchParams(location.search).get('graphics');
     if(visualPass&&graphics!=='original'){
       html=once(html,'gr.rotation.x=-Math.PI/2;scene.add(gr);',
-       'gr.rotation.x=-Math.PI/2;scene.add(gr);\n'+visualPass);
+       'gr.rotation.x=-Math.PI/2;scene.add(gr);\n'+visualPass+'\n'+(materialPass||''));
       html=once(html,'for(let i=0;i<14;i++)ruin(rnd(-50,50),rnd(-60,60));',
        'for(let i=0;i<14;i++)ruin(rnd(-50,50),rnd(-60,60));'
        +'if(window.__BF_VISUAL_DECORATE_RUINS__)window.__BF_VISUAL_DECORATE_RUINS__();');
@@ -79,6 +84,12 @@
        "(window.__BF_VISUAL_ROAD_TEXTURE__?window.__BF_VISUAL_ROAD_TEXTURE__():"
        +"tex('#6a553c',['#5a4630','#7a6448','#3a2c1e'],160,[24,1]))");
     }
+    // Distinguish A/B versions visibly so the user never needs to guess.
+    // Label is UI only; it never changes rendering, controls or game state.
+    const label=graphics==='original'?'ОРИГИНАЛ · THREE.JS':
+      materialPass&&visualPass?'HD · ТЕКСТУРЫ ЗДАНИЙ':'ОБНОВЛЕНИЕ ГРАФИКИ';
+    html=once(html,'</body>',
+      '<div id="graphics-build-label" style="position:fixed;z-index:700;left:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);max-width:45vw;padding:5px 7px;color:#f2ecd8;background:#19241dcc;border:1px solid #b3a27b;border-radius:5px;font:700 10px system-ui;pointer-events:none">'+label+'</div></body>');
     progress.textContent='Запуск…';document.open();document.write(html);document.close();
   }catch(e){error.textContent='Не удалось загрузить игру: '+(e.name==='AbortError'?'превышено время ожидания':e.message);progress.textContent='Загрузка прервана';retry.hidden=false;}
 })();
