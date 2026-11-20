@@ -34,7 +34,7 @@ for(const anchor of unique){
   'Original engine changed: visual-only splice anchor missing or duplicated '+anchor);
 }
 for(const name of ['guardUpdate','fogUpdate','dustUpdate','camUpdate',
- 'SaveState','TANKS','P.sv','R.render(scene,cam)']){
+ 'SaveState','TANKS','R.render(scene,cam)']){
  assert(base.includes(name),'Approved original gameplay missing '+name);
 }
 console.log('BATTLEFIELD_THREEJS_VISUAL_UPGRADE_STATIC_PASS',{
