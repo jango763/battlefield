@@ -1,0 +1,35 @@
+name: Commando real licensed source inspection
+on:
+  push:
+    branches: [feature/british-army-10-stages-20261118]
+    paths:
+      - '.github/workflows/commando-real-source-probe.yml'
+      - 'tools/jakeli/probe-real-commando-source.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect-real-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned CC BY 4.0 full-body source; verify git blob hash
+        run: |
+          set -euo pipefail
+          mkdir -p babylon-qa-results/commando-real-source
+          curl --fail --location --retry 3 --silent --show-error \
+            'https://raw.githubusercontent.com/cktang88/3d-fps/130ac2a5c856401ec36e7d35afcfefe40c5801f4/public/assets/models/characters/soldier_tac.glb' \
+            --output babylon-qa-results/commando-real-source/soldier_tac.glb
+          test "$(git hash-object babylon-qa-results/commando-real-source/soldier_tac.glb)" = b403237626e308c5a27be9683407b4450b03a246
+          test "$(wc -c < babylon-qa-results/commando-real-source/soldier_tac.glb)" = 4532132
+      - name: Validate mesh material texture and rig inventory
+        run: python tools/jakeli/probe-real-commando-source.py babylon-qa-results/commando-real-source/soldier_tac.glb
+      - name: Preserve original licensed source and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commando-real-full-body-source-probe
+          path: babylon-qa-results/commando-real-source/
+          if-no-files-found: warn
+          retention-days: 10
