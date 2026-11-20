@@ -1,0 +1,66 @@
+name: Real hero and Jakeli in Babylon main battle
+on:
+  push:
+    branches:
+      - feature/british-army-10-stages-20261118
+    paths:
+      - 'babylon/game.js'
+      - 'babylon/index.html'
+      - 'babylon/allied-asset-loader.js'
+      - 'babylon/tests/test-real-allied-squad-integration.cjs'
+      - '.github/workflows/real-allied-battle-integrated.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: real-allied-battle-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  integrate-real-soldiers:
+    if: github.ref == 'refs/heads/feature/british-army-10-stages-20261118'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate import paths, native clips, and protected manifests
+        run: |
+          set -euo pipefail
+          node --check babylon/game.js
+          node --check babylon/allied-asset-loader.js
+          node --check babylon/us-hero-stage8-rig.js
+          node --check babylon/tests/test-real-allied-squad-integration.cjs
+          node - <<'NODE'
+          const fs=require('fs'),assert=require('assert');
+          const loader=fs.readFileSync('babylon/allied-asset-loader.js','utf8');
+          const game=fs.readFileSync('babylon/game.js','utf8');
+          const manifest=JSON.parse(fs.readFileSync('assets/allied-soldiers/manifest.json'));
+          for(const file of ['us-hero-quaternius-donor-hands-v7.glb',
+           'uk-jakeli-anatomical-v2.glb','uk-jakeli-anatomical-sten.glb',
+           'uk-jakeli-anatomical-bren.glb','uk-jakeli-anatomical-piat.glb'])
+           assert(fs.statSync('assets/allied-soldiers/'+file).size>4000000);
+          assert(loader.includes('featureTrial=false'));
+          assert(loader.includes('FEATURE_TRIAL_FILES'));
+          assert(game.includes('featureCasting'));
+          assert.equal(manifest.models.britishDanoob.installed,false);
+          assert.equal(manifest.models.britishFab.installed,false);
+          assert.equal(manifest.models.britishJakeli.installed,false);
+          assert.equal(manifest.models.americanHero.installed,false);
+          console.log('REAL_ALLIES_PROTECTED_IMPORTS_OK');
+          NODE
+      - name: Install Chromium and WebKit mobile engines
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/battlefield-actual-allies playwright@1.58.2
+          /tmp/battlefield-actual-allies/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Test actual three-character game integration on mobile
+        run: |
+          python3 -m http.server 8855 --bind 127.0.0.1 >/tmp/real-allies-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-real-allied-squad-integration.cjs
+      - name: Save evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlefield-real-allies-squad-proof
+          path: babylon-qa-results/actual-three-soldier-integrated/
+          if-no-files-found: warn
+          retention-days: 10
