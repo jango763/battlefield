@@ -254,7 +254,10 @@
     // Never apply incompatible German curves or hide deformation with IK.
     if(entries.skeletons.length!==1||entries.skeletons[0].bones.length!==65)
      throw Error('Feature trial requires one independent 65-bone skinned rig: '+id);
-    const available=new Set(entries.animationGroups.map(g=>g.name));
+    // Babylon appends per-instance suffixes (-0, -1...) to cloned
+    // AnimationGroups. These remain the SAME native Quaternius keys.
+    const available=new Set(entries.animationGroups.map(g=>
+     g.name.replace(/-\d+$/,'')));
     const required=id==='americanHero'
      ?['Idle_Quaternius','Walk_Quaternius','Jog_Quaternius','Sprint_Quaternius']
      :['Ready','Aim','Fire','Walk','Jog','Sprint'];
