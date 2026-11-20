@@ -1,0 +1,94 @@
+name: Jakeli anatomical four-weapon mobile QA (isolated)
+on:
+  push:
+    branches:
+      - feature/british-army-10-stages-20261118
+    paths:
+      - '.github/workflows/jakeli-arsenal-qa.yml'
+      - 'tools/jakeli/blender-rebind-german-armature.py'
+      - 'tools/jakeli/weapon_profiles.py'
+      - 'tools/jakeli/verify-anatomical.py'
+      - 'tools/jakeli/quaternius_legs.py'
+      - 'babylon/jakeli-arsenal-iphone.html'
+      - 'babylon/jakeli-arsenal-main.js'
+      - 'babylon/tests/test-jakeli-arsenal-browser.cjs'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: jakeli-anatomical-arsenal-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  isolated-arsenal:
+    if: github.ref == 'refs/heads/feature/british-army-10-stages-20261118'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tools/jakeli/requirements-blender.txt
+      - name: Install reproducible Blender 4.3 runtime
+        run: |
+          python -m pip install --only-binary=:all: -r tools/jakeli/requirements-blender.txt
+          python -c "import bpy; assert bpy.app.version == (4,3,0)"
+      - name: Bake authentic Jakeli with separate Sten Bren PIAT and Quaternius legs
+        env:
+          JAKELI_RENDER: '0'
+        run: |
+          set -euo pipefail
+          for id in uk-sten uk-bren uk-piat; do
+            echo "JAKELI_WEAPON_BUILD_START $id"
+            JAKELI_WEAPON="$id" python tools/jakeli/blender-rebind-german-armature.py
+            echo "JAKELI_WEAPON_BUILD_DONE $id"
+          done
+      - name: Strict GLB bind skin deformation and real mesh-to-weapon grip checks
+        run: |
+          set -euo pipefail
+          for id in uk-sten uk-bren uk-piat; do
+            echo "JAKELI_WEAPON_QA_START $id"
+            JAKELI_WEAPON="$id" python tools/jakeli/verify-anatomical.py
+            echo "JAKELI_WEAPON_QA_PASS $id"
+          done
+      - name: Install mobile Chromium and WebKit
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/jakeli-arsenal-qa playwright@1.58.2
+          /tmp/jakeli-arsenal-qa/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Simulate iPhone controls weapon swaps and all poses in both browsers
+        run: |
+          python -m http.server 8822 --bind 127.0.0.1 >/tmp/jakeli-arsenal-server.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-jakeli-arsenal-browser.cjs
+      - name: Save model and screenshots even when QA fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jakeli-four-weapon-anatomical-evidence
+          path: |
+            assets/allied-soldiers/uk-jakeli-anatomical-sten.glb
+            assets/allied-soldiers/uk-jakeli-anatomical-bren.glb
+            assets/allied-soldiers/uk-jakeli-anatomical-piat.glb
+            babylon-qa-results/jakeli-anatomical-sten/
+            babylon-qa-results/jakeli-anatomical-bren/
+            babylon-qa-results/jakeli-anatomical-piat/
+            babylon-qa-results/jakeli-arsenal/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Publish only experimental branch GLBs; never touch main or mark approved
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/feature/british-army-10-stages-20261118"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/allied-soldiers/uk-jakeli-anatomical-sten.glb assets/allied-soldiers/uk-jakeli-anatomical-bren.glb assets/allied-soldiers/uk-jakeli-anatomical-piat.glb
+          if git diff --cached --quiet; then
+            echo "No arsenal GLB changes"
+          else
+            git commit -m 'Publish unapproved anatomical Sten Bren and PIAT models [skip ci]'
+            git pull --rebase origin feature/british-army-10-stages-20261118
+            git push origin HEAD:refs/heads/feature/british-army-10-stages-20261118
+          fi
