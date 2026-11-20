@@ -6,8 +6,9 @@
  */
 (function(){
 'use strict';
-const report={version:'ww2-world-materials-v1',textures:{},texturedWalls:0,
- texturedRuins:0,brokenBeams:0,pineTrees:0,terrainDetail:'',errors:[]};
+const report={version:'ww2-world-materials-v2',textures:{},texturedWalls:0,
+ texturedRuins:0,texturedPoints:0,texturedBases:0,texturedBunkers:0,
+ brokenBeams:0,pineTrees:0,occlusionGroups:0,terrainDetail:'',errors:[]};
 window.__BATTLEFIELD_WORLD_ART__=report;
 let seed=19450606;
 const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
@@ -167,7 +168,22 @@ const sources={
  brick:image('burnt-brick',brickPaint),
  concrete:image('weathered-concrete',concretePaint),
  wood:image('splintered-wood',woodPaint),
- rubble:image('broken-masonry',rubblePaint)
+ rubble:image('broken-masonry',rubblePaint),
+ sandbag:image('sandbag-cloth',ctx=>{
+  ctx.fillStyle='#b2a17d';ctx.fillRect(0,0,512,512);
+  for(let y=0;y<512;y+=4){
+   ctx.fillStyle='rgba(85,74,59,.19)';ctx.fillRect(0,y,512,1.4);
+  }
+  for(let x=0;x<512;x+=5){
+   ctx.fillStyle='rgba(215,195,153,.13)';ctx.fillRect(x,0,1.2,512);
+  }
+  for(let i=0;i<4700;i++){
+   const x=rand(0,512),y=rand(0,512),r=rand(.5,3.2);
+   ctx.globalAlpha=rand(.06,.26);ctx.fillStyle=one(['#433f34','#e2caa0','#817455']);
+   ctx.fillRect(x,y,r,r);
+  }
+  ctx.globalAlpha=1;
+ })
 };
 function mat(key,{bumpScale=.035,tint=0xffffff}={}){
  const tex=sources[key];
@@ -187,6 +203,110 @@ const material={
  iron:new THREE.MeshStandardMaterial({color:0x44463f,metalness:.65,roughness:.82})
 };
 window.__BF_WORLD_MATERIALS__=material;
+// Capture the original material before assigning an image. Asset-authored
+// model uniforms and skeleton meshes are never modified by these hooks.
+function skinBuildingMesh(mesh,key,{keepColor=false}={}){
+ if(!mesh?.isMesh||!mesh.material||mesh.isSkinnedMesh)return false;
+ const original=mesh.material;
+ if(Array.isArray(original))return false;
+ // Some site materials are shared by the objective's ownership callback.
+ // Mutate the SAME material instance so flag/capture recoloring still works.
+ original.map=sources[key];
+ original.bumpMap=sources[key];
+ original.bumpScale=key==='wood'?.035:.028;
+ if(!keepColor&&original.color)original.color.setHex(0xffffff);
+ original.needsUpdate=true;
+ return true;
+}
+window.__BF_WORLD_TEXTURE_SITES__=function({points=[],bunkers=[],bases=[]}={}){
+ try{
+  for(const site of points){
+   const meshes=site?.g?.children||[];
+   let cnt=0;
+   for(const mesh of meshes){
+    const hex=mesh.material?.color?.getHex?.();
+    const kind={
+     0xc79a5a:'wall',0x8a7a5a:'wall',0x8e8e8a:'concrete',
+     0xa8793e:'wood',0x5a4a3a:'wood',0x2a2218:'wood',
+     0xc9b07a:'sandbag'
+    }[hex];
+    if(kind&&skinBuildingMesh(mesh,kind,
+      {keepColor:hex===0x8e8e8a})){cnt++;}
+   }
+   if(cnt)report.texturedPoints++;
+   // Site walls now show actual masonry maps, while its capture ring,
+   // material recoloring and gold-production code are untouched.
+  }
+  for(const base of bases){
+   let cnt=0;
+   for(const mesh of (base?.children||[])){
+    const hex=mesh.material?.color?.getHex?.();
+    const kind={0x6a5a40:'concrete',0xb59d6a:'wall',
+      0xa08a5c:'wood',0xcdb98a:'sandbag',0x8a6a3a:'wood',
+      0x7a5a2e:'wood',0x1c1812:'wood',0xa89868:'sandbag'}[hex];
+    if(kind&&skinBuildingMesh(mesh,kind)){cnt++;}
+   }
+   if(cnt)report.texturedBases++;
+  }
+  for(const bunker of bunkers){
+   let cnt=0;
+   for(const mesh of (bunker?.g?.children||[])){
+    const hex=mesh.material?.color?.getHex?.();
+    const kind={0xa8925f:'concrete',0x8a8c88:'concrete',
+      0x8f7a4e:'wood',0x77797a:'concrete',
+      0x14120e:'wood'}[hex];
+    if(kind&&skinBuildingMesh(mesh,kind)){cnt++;}
+   }
+   if(cnt)report.texturedBunkers++;
+  }
+ }catch(error){
+  report.errors.push('site art: '+String(error?.message||error));
+ }
+};
+let closeRuins=[],lastCutaway=0;
+const faded=new Map();
+const fadeCopies=new WeakMap();
+function dimMaterial(original){
+ let m=fadeCopies.get(original);
+ if(!m){
+  m=original.clone();
+  m.transparent=true;m.opacity=.24;m.depthWrite=false;
+  m.name='visual-only-see-through-building';
+  fadeCopies.set(original,m);
+ }
+ return m;
+}
+window.__BF_WORLD_ART_TICK__=function(){
+ if(!closeRuins.length||typeof P==='undefined'||!P||!cam)return;
+ const now=performance.now();
+ if(now-lastCutaway<140)return;
+ lastCutaway=now;
+ const hx=P.x,hz=P.z;
+ const cx=cam.position.x-hx,cz=cam.position.z-hz;
+ const cd=Math.max(.01,Math.hypot(cx,cz));
+ let n=0;
+ for(const group of closeRuins){
+  const dx=group.position.x-hx,dz=group.position.z-hz;
+  const d=Math.hypot(dx,dz);
+  // Standard RTS roof cutaway: fade architecture between the hero and
+  // tactical camera, restoring it as soon as the squad moves away.
+  const facing=(dx*cx+dz*cz)/(Math.max(.01,d)*cd);
+  const transparent=d<16.5&&facing>.22;
+  for(const mesh of group.children){
+   if(!mesh.isMesh)continue;
+   const prior=faded.get(mesh);
+   if(transparent&&!prior){
+    faded.set(mesh,mesh.material);
+    mesh.material=dimMaterial(mesh.material);
+   }else if(!transparent&&prior){
+    mesh.material=prior;
+    faded.delete(mesh);
+   }
+  }
+  if(transparent)n++;
+ }
+ report.occlusionGroups=n;
+};
 const previousDecorate=window.__BF_VISUAL_DECORATE_RUINS__;
 window.__BF_VISUAL_DECORATE_RUINS__=function(){
  try{
@@ -194,6 +314,7 @@ window.__BF_VISUAL_DECORATE_RUINS__=function(){
   // never to characters or GLB-authored uniforms/textures.
   const ruins=scene.children.filter(g=>g.isGroup&&g.children.length>=16&&
    Math.abs(g.position.x)<60&&Math.abs(g.position.z)<70).slice(0,14);
+  closeRuins=ruins;
   for(const g of ruins){
    let changed=0;
    for(const mesh of g.children){
