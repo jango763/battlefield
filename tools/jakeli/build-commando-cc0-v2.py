@@ -47,7 +47,7 @@ def material(name,rgb,metal=0,rough=.92):
  node.inputs['Metallic'].default_value=metal
  node.inputs['Roughness'].default_value=rough
  return m
-skin=material('Commando CC0 human skin',(.48,.285,.185))
+skin=material('Commando CC0 human skin',(.44,.275,.19))
 jacket=material('Commando British brown-green battledress',(.16,.19,.115))
 jacketfold=material('Commando shaded khaki coat',(.12,.155,.095))
 trouser=material('Commando British olive-brown trousers',(.205,.205,.14))
@@ -83,12 +83,14 @@ for poly in mesh.data.polygons:
  idx=4*(iy*W+ix)
  red,green,blue=pix[idx],pix[idx+1],pix[idx+2]
  warm=(red>.52 and green>.2 and red>green*1.19 and green>blue*.92)
- if warm or (p.z>1.45 and abs(p.x)<.15 and p.y<.03):
+ # UV atlas contains skin swatches reused over cloth; only expose flesh
+ # on real high head geometry and on outstretched hands.
+ if (p.z>1.47 and abs(p.x)<.155) or (p.z>1.0 and abs(p.x)>.34 and warm):
   choice=skin
  elif p.z<.24:choice=boots
  elif p.z<.85:choice=trouser
  elif p.z>1.30 and abs(p.x)>.38:choice=jacketfold
- elif p.z>=1.05 and p.y<-.07 and abs(p.x)<.23:choice=webbing
+ elif p.z>=1.05 and p.y<-.07 and abs(abs(p.x)-.105)<.033:choice=webbing
  elif p.z>1.10:choice=jacket
  else:choice=jacketfold
  poly.material_index=materials.index(choice)
