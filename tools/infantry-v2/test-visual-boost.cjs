@@ -6,6 +6,8 @@ const root=path.resolve(__dirname,'../..');
 const read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const wrapper=read('preview/formation-replenishment-v3.html');
 const pass=read('preview/visual-boost-v1.js');
+const worldArt=read('preview/ww2-structure-materials-v1.js');
+new Function(worldArt);
 const script=wrapper.match(/<script>([\s\S]*?)<\/script>/);
 assert(script,'Approved old Three.js loader must remain present');
 new Function(script[1]);
@@ -37,6 +39,17 @@ for(const name of ['guardUpdate','fogUpdate','dustUpdate','camUpdate',
  'SaveState','TANKS','R.render(scene,cam)']){
  assert(base.includes(name),'Approved original gameplay missing '+name);
 }
+assert(wrapper.includes("const texturedWorld=get('ww2-structure-materials-v1.js?v=20261121-1')"),
+ 'Actual surface texture source must be loaded');
+assert(wrapper.includes("'HD · ТЕКСТУРЫ ЗДАНИЙ'"),'Visual mode label missing');
+assert(wrapper.includes("'+(materialPass||'')"),'Texture pass not injected');
+for(const material of ['plaster-brick','burnt-brick','weathered-concrete',
+ 'splintered-wood','broken-masonry'])
+ assert(worldArt.includes(material),'Missing actual WWII art texture '+material);
+assert(worldArt.includes('new THREE.CanvasTexture(canvas)'));
+assert(worldArt.includes('new THREE.MeshStandardMaterial({map:tex'));
+assert(worldArt.includes('window.__BF_VISUAL_DECORATE_RUINS__=function(){'));
+assert(worldArt.includes('report.texturedWalls+=changed'));
 console.log('BATTLEFIELD_THREEJS_VISUAL_UPGRADE_STATIC_PASS',{
  sourceBytes:base.length,visualBytes:pass.length,
  loaderUntouched:wrapper.includes('for(const unit of'),nativeGuard:pass.includes('mobile')
