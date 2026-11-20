@@ -82,7 +82,7 @@ async function verify(type,name,graphics){
    assert(result.game.forestCrowns>=1,'New forest details are invisible');
    assert.equal(result.game.textureSites.objectiveMeshes,5,
     'Some capture buildings still have flat walls');
-   assert(result.game.textureSites.bunkers>=5,'Bunker texture import missing');
+   assert(result.game.worldArt.texturedBunkers>=5,'Bunker texture import missing');
    assert.equal(result.game.textureSites.bases,2,
     'Both faction HQs must be textured');
    assert.equal(result.game.worldArt.errors.length,0,
