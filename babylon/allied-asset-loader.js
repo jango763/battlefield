@@ -229,12 +229,12 @@
    // to transform nodes belonging to this specific imported actor.
    const byName=new Map();
    for(const node of entries.transformNodes||[]){
-    const key=normalize(node.name).replace(/[0-9]+$/,'');
+    const key=normalize(node.name.replace(/-\d+$/,''));
     if(key&&!byName.has(key))byName.set(key,node);
    }
    for(const sk of entries.skeletons||[])for(const bone of sk.bones){
     if(bone.getTransformNode?.())continue;
-    const joint=byName.get(normalize(bone.name).replace(/[0-9]+$/,''));
+    const joint=byName.get(normalize(bone.name.replace(/-\d+$/,'')));
     if(joint)bone.linkTransformNode(joint);
    }
    const isTrial=featureTrial&&Object.hasOwn(FEATURE_TRIAL_FILES,id);
