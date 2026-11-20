@@ -64,7 +64,8 @@ function create(scene,B,map){
  const ground=B.MeshBuilder.CreateGround('map-ground-300',{width:SIZE,height:SIZE,
   subdivisions:60},scene);
  const groundMaterial=new B.StandardMaterial('map-ground-material',scene);
- groundMaterial.diffuseColor=new B.Color3(1,1,1);
+ // Muted tint prevents bright sunlight from blowing earthy tones to white.
+ groundMaterial.diffuseColor=B.Color3.FromHexString('#bdb8a5');
  let groundTextureReady=false;
  if(typeof document!=='undefined' && B.DynamicTexture){
   try{
