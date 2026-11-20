@@ -123,8 +123,8 @@ function createWorld(){
  markMaterial.emissiveColor=color('#eed58b');destinationMark.material=markMaterial;
 
  // First-game readability: elevated tactical view instead of HQ facade.
- camera=new B.ArcRotateCamera('camera',Math.PI*1.50,.72,49,
-  new B.Vector3(0,.8,-98),scene);
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.23,.73,43,
+  new B.Vector3(0,.8,-99),scene);
  camera.lowerRadiusLimit=22;camera.upperRadiusLimit=100;
  camera.lowerBetaLimit=.43;camera.upperBetaLimit=1.25;
  camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
@@ -873,7 +873,7 @@ function frame(){
   // Follow the controlled hero with the existing touch-orbit camera.
   if(allies[0]?.alive&&camera){
    // Leave room ahead to see enemies and cover, as in the original.
-   const dest=position(allies[0],.75).add(new B.Vector3(0,0,9));
+   const dest=position(allies[0],.75).add(new B.Vector3(0,0,7));
    camera.target=B.Vector3.Lerp(camera.target,dest,Math.min(1,dt*2.8));
   }
   if(world&&economy)world.syncFarms(economy.summary());
