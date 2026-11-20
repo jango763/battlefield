@@ -15,6 +15,8 @@ async function inspect(browserType,name){
   await page.waitForFunction(()=>window.__BATTLEFIELD_GAME__?.ready||!!window.__BATTLEFIELD_GAME__?.error,
     null,{timeout:150000});
   let state=await page.evaluate(()=>({...window.__BATTLEFIELD_GAME__}));
+  result.initialState=state;
+  console.log('REAL_ALLIED_INITIAL_STATE',name,JSON.stringify(state).slice(0,6000));
   assert(!state.error,JSON.stringify({error:state.error,modelErrors:state.modelErrors}));
   assert(state.ready,'Main game never became ready');
   assert(state.importedAlliedCount>=1,'Approved real US hero missing from initial duel');
@@ -26,6 +28,7 @@ async function inspect(browserType,name){
   await page.waitForFunction(()=>window.__BATTLEFIELD_GAME__?.models>=24||
     !!window.__BATTLEFIELD_GAME__?.error,null,{timeout:200000});
   state=await page.evaluate(()=>({...window.__BATTLEFIELD_GAME__}));
+  result.fullState=state;
   assert(!state.error,JSON.stringify({error:state.error,modelErrors:state.modelErrors}));
   assert.equal(state.models,24,'24 independent soldier instances');
   assert.equal(state.importedAlliedCount,9,'US hero and eight real Jakeli British infantry');
