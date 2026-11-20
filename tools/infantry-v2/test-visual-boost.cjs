@@ -39,7 +39,7 @@ for(const name of ['guardUpdate','fogUpdate','dustUpdate','camUpdate',
  'SaveState','TANKS','R.render(scene,cam)']){
  assert(base.includes(name),'Approved original gameplay missing '+name);
 }
-assert(wrapper.includes("const texturedWorld=get('ww2-structure-materials-v1.js?v=20261121-1')"),
+assert(wrapper.includes("const texturedWorld=get('ww2-structure-materials-v1.js?v=20261121-2')"),
  'Actual surface texture source must be loaded');
 assert(wrapper.includes("'HD · ТЕКСТУРЫ ЗДАНИЙ'"),'Visual mode label missing');
 assert(wrapper.includes("'+(materialPass||'')"),'Texture pass not injected');
@@ -50,6 +50,14 @@ assert(worldArt.includes('new THREE.CanvasTexture(canvas)'));
 assert(worldArt.includes('new THREE.MeshStandardMaterial({map:tex'));
 assert(worldArt.includes('window.__BF_VISUAL_DECORATE_RUINS__=function(){'));
 assert(worldArt.includes('report.texturedWalls+=changed'));
+assert(worldArt.includes("sandbag:image('sandbag-cloth'"),'Sandbag textures missing');
+assert(worldArt.includes('window.__BF_WORLD_TEXTURE_SITES__=function'), 'Structures texture hook missing');
+assert(worldArt.includes('window.__BF_WORLD_ART_TICK__=function'), 'Occluded-structure fade missing');
+assert(wrapper.includes("window.__BF_WORLD_TEXTURE_SITES__"),'Structure texture hook not called');
+assert(wrapper.includes("window.__BF_WORLD_ART_TICK__?.()"),'Cutaway graphics hook not called');
+assert(base.includes("mkPoint('m',0,-50);mkPoint('m',0,50);"),'Objectives absent');
+assert(base.includes('camUpdate(dt);hud();ambient(now/1000);mmap();R.render(scene,cam)'),
+ 'Native camera callback cannot be decorated');
 console.log('BATTLEFIELD_THREEJS_VISUAL_UPGRADE_STATIC_PASS',{
  sourceBytes:base.length,visualBytes:pass.length,
  loaderUntouched:wrapper.includes('for(const unit of'),nativeGuard:pass.includes('mobile')
