@@ -33,8 +33,8 @@ try{
  }
  function view(n){
   cam.alpha=n==='right'?Math.PI*1.1:Math.PI*.34;
-  cam.radius=n==='full'?4.35:1.5;
-  cam.target.set(.08,n==='full'?.24:1.28,n==='full'?0:.16);
+  cam.radius=n==='full'?4.35:1.7;
+  cam.target.set(.08,n==='full'?.24:.55,n==='full'?0:.05);
   controls.open=false;
  }
  document.querySelectorAll('[data-pose]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.pose)));
