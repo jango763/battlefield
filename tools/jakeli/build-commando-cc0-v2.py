@@ -225,7 +225,8 @@ clips=['Ready','Aim','Fire','Walk','Jog','Sprint']
 movement={};grip_errors={c:{'Left':0,'Right':0} for c in clips}
 for clip in clips:
  duration=gait.clips[clip]['duration'] if clip in gait.clips else (1.2 if clip=='Fire' else 2)
- frames=max(12,round(duration*30))
+ frames=min(18,max(10,round(duration*12)))
+ print('COMMANDO_CC0_BEGIN_CLIP',clip,'frames',frames,flush=True)
  rig.animation_data.action=bpy.data.actions.new('Commando_'+clip)
  weapon.animation_data.action=bpy.data.actions.new('Commando_'+clip)
  leg_samples=[]
@@ -270,7 +271,6 @@ for clip in clips:
    grip_errors[clip][side]=max(grip_errors[clip][side],(actual-contacts[side]).length)
   for b in rig.pose.bones:
    b.keyframe_insert('rotation_quaternion',frame=f+1)
-   b.keyframe_insert('location',frame=f+1)
   weapon.keyframe_insert('location',frame=f+1)
   weapon.keyframe_insert('rotation_quaternion',frame=f+1)
  if leg_samples:
@@ -283,6 +283,7 @@ for clip in clips:
   track.name=clip;track.mute=True
   track.strips.new(clip,1,action)
   obj.animation_data.action=None
+ print('COMMANDO_CC0_FINISHED_CLIP',clip,flush=True)
 print('COMMANDO_CC0_STEN_ACTUAL_GRIP_ERRORS',json.dumps(grip_errors))
 assert max(v for sides in grip_errors.values() for v in sides.values())<.025,grip_errors
 for o in (rig,weapon):
@@ -332,7 +333,7 @@ if os.environ.get('COMMANDO_RENDER','1')=='1':
   bpy.ops.object.light_add(type='AREA',location=loc)
   light=bpy.context.object;light.data.energy=power;light.data.size=4
   light.rotation_euler=(mid-light.location).to_track_quat('-Z','Y').to_euler()
- scene.render.engine='CYCLES';scene.cycles.samples=12
+ scene.render.engine='CYCLES';scene.cycles.samples=8
  scene.render.resolution_x=900;scene.render.resolution_y=1000
  scene.render.resolution_percentage=100
  for side,angle in [('front',0),('side',1.1)]:
