@@ -37,7 +37,22 @@
   }
   return out;
  }
+ // Babylon InstantiatedEntries exposes rootNodes/skeletons/groups, NOT meshes.
+ // Discover skinned meshes from the cloned scene graph, rather than treating
+ // a perfectly valid imported model as geometry-free (first mobile CI failure).
+ function materializeEntries(entries){
+  if(!Array.isArray(entries.meshes)){
+   const nodes=[...(entries.rootNodes||[])];
+   for(const root of entries.rootNodes||[])
+    nodes.push(...(root.getDescendants?.(false)||[]));
+   const unique=[...new Set(nodes)];
+   entries.meshes=unique.filter(n=>typeof n.getTotalVertices==='function');
+   entries.transformNodes=unique.filter(n=>typeof n.getDescendants==='function');
+  }
+  return entries;
+ }
  function inspect(entries,{maxTriangles=65000}={}){
+  materializeEntries(entries);
   const skeletons=entries?.skeletons||[];
   const drawable=(entries?.meshes||[]).filter(m=>m.getTotalVertices?.()>0);
   const skinned=drawable.filter(m=>!!m.skeleton);
@@ -205,11 +220,20 @@
    if(!model)return null;
    const entries=model.instantiateModelsToScene(name=>name+'-'+tag,false,
     {doNotInstantiate:true});
+   materializeEntries(entries);
    const isTrial=featureTrial&&Object.hasOwn(FEATURE_TRIAL_FILES,id);
    const current=inspect(entries,{maxTriangles:manifest.models[id].maxTriangles});
    if(!current.ok){entries.dispose?.();const err=Error(current.issues.join('; '));
     errors.set(id,err.message);throw err;}
    if(isTrial){
+    if(typeof window!=='undefined'){
+     window.__BATTLEFIELD_TRIAL_IMPORT_QA__={
+      id,rootNodes:entries.rootNodes?.length,meshes:entries.meshes?.length,
+      skeletons:entries.skeletons?.length,groups:entries.animationGroups?.map(g=>g.name),
+      bones:entries.skeletons?.map(sk=>sk.bones.slice(0,25).map(b=>({
+       bone:b.name,node:b.getTransformNode?.()?.name||null})))
+     };
+    }
     // Retain Quaternius/anatomical animation groups native to this GLB.
     // Never apply incompatible German curves or hide deformation with IK.
     if(entries.skeletons.length!==1||entries.skeletons[0].bones.length!==65)
