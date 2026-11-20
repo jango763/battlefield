@@ -22,7 +22,7 @@
       return null;
     });
     // True texture maps for architecture are independent of the game code.
-    const texturedWorld=get('ww2-structure-materials-v1.js?v=20261121-1').catch(error=>{
+    const texturedWorld=get('ww2-structure-materials-v1.js?v=20261121-2').catch(error=>{
       console.warn('Optional WWII surface textures not loaded',error);
       return null;
     });
@@ -77,6 +77,13 @@
     if(visualPass&&graphics!=='original'){
       html=once(html,'gr.rotation.x=-Math.PI/2;scene.add(gr);',
        'gr.rotation.x=-Math.PI/2;scene.add(gr);\n'+visualPass+'\n'+(materialPass||''));
+      // Real surfaces apply to capture buildings, HQ bases and bunkers
+      // after their existing game objects are created.
+      html=once(html,"mkPoint('m',0,-50);mkPoint('m',0,50);mkPoint('m',-4,2);mkPoint('b',-16,24);mkPoint('b',16,-24);",
+       "mkPoint('m',0,-50);mkPoint('m',0,50);mkPoint('m',-4,2);mkPoint('b',-16,24);mkPoint('b',16,-24);"+
+       "if(window.__BF_WORLD_TEXTURE_SITES__)window.__BF_WORLD_TEXTURE_SITES__({points:PTS,bunkers:TW,bases:scene.children.filter(g=>g.isGroup&&Math.abs(Math.abs(g.position.x)-88)<.01&&Math.abs(g.position.z)<.01)});");
+      html=once(html,'camUpdate(dt);hud();ambient(now/1000);mmap();R.render(scene,cam)',
+       'camUpdate(dt);window.__BF_WORLD_ART_TICK__?.();hud();ambient(now/1000);mmap();R.render(scene,cam)');
       html=once(html,'for(let i=0;i<14;i++)ruin(rnd(-50,50),rnd(-60,60));',
        'for(let i=0;i<14;i++)ruin(rnd(-50,50),rnd(-60,60));'
        +'if(window.__BF_VISUAL_DECORATE_RUINS__)window.__BF_VISUAL_DECORATE_RUINS__();');
