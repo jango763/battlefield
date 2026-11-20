@@ -55,6 +55,7 @@ async function inspect(browserType,name){
    return {fogMode:scene.fogMode,fogDensity:scene.fogDensity,
     expectedFog:B.Scene.FOGMODE_EXP2,groundTextureReady:!!texture?.isReady?.(),
     groundPixel,cameraRadius:camera?.radius||null,cameraBeta:camera?.beta||null,
+    minimapVisible:getComputedStyle(document.getElementById('battle-minimap')).display!=='none',
     menuClosed:document.getElementById('panel').classList.contains('closed'),
     controlsVisible:getComputedStyle(document.getElementById('mobile-controls')).display!=='none',
     visualProfile:window.__BATTLEFIELD_GAME__.visualProfile};
@@ -64,10 +65,11 @@ async function inspect(browserType,name){
    'Atmospheric first-game fog must be enabled');
   assert(result.visualAudit.groundTextureReady,'Ground texture not uploaded to WebGL');
   assert(result.visualAudit.groundPixel?.every(v=>v<225),'Ground must not be white');
-  assert(result.visualAudit.cameraRadius>=35 && result.visualAudit.cameraRadius<75,
+  assert(result.visualAudit.cameraRadius>=25 && result.visualAudit.cameraRadius<60,
    'Camera reverted to barrack-wall close-up');
   assert(result.visualAudit.menuClosed,'Menu must be closed during battle');
   assert(result.visualAudit.controlsVisible,'First-game mobile controls missing');
+  assert(result.visualAudit.minimapVisible,'Legacy tactical mini-map not shown');
   assert.equal(result.visualAudit.visualProfile?.shadows,'soft-PCF');
   await page.screenshot({path:ROOT+'/'+name+'-24-soldiers.png'});
   const startPos=await page.evaluate(()=>{
