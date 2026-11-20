@@ -12,6 +12,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: commando-real-cc0-v2-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   verify-real-commando:
     if: github.ref == 'refs/heads/feature/british-army-10-stages-20261118'
@@ -67,13 +70,37 @@ jobs:
         run: |
           set -euo pipefail
           test "${GITHUB_REF}" = 'refs/heads/feature/british-army-10-stages-20261118'
+          branch=feature/british-army-10-stages-20261118
+          model=assets/allied-soldiers/uk-commando-cc0-sten-v2.glb
+          cp "$model" /tmp/commando-v2-verified.glb
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add assets/allied-soldiers/uk-commando-cc0-sten-v2.glb
-          if git diff --cached --quiet; then
-            echo 'Unapproved Commando v2 GLB unchanged'
-          else
-            git commit -m 'Publish unapproved genuine WW2 Commando v2 for Safari preview [skip ci]'
-            git pull --rebase origin feature/british-army-10-stages-20261118
-            git push origin HEAD:refs/heads/feature/british-army-10-stages-20261118
+          git fetch origin "$branch"
+          # Outdated runs must never overwrite the newest animation script or viewer.
+          if ! git show "origin/$branch:tools/jakeli/build-commando-cc0-v2.py" | cmp -s - tools/jakeli/build-commando-cc0-v2.py; then
+            echo 'Skipping superseded Commando build: Blender script changed'
+            exit 0
           fi
+          if ! git show "origin/$branch:babylon/commando-real-v2-main.js" | cmp -s - babylon/commando-real-v2-main.js; then
+            echo 'Skipping superseded Commando build: viewer changed'
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            git fetch origin "$branch"
+            git checkout -B ci-commando-publish "origin/$branch"
+            cp /tmp/commando-v2-verified.glb "$model"
+            git add "$model"
+            if git diff --cached --quiet; then
+              echo 'Verified GLB already published'
+              exit 0
+            fi
+            git commit -m 'Publish unapproved genuine WW2 Commando v2 for Safari preview [skip ci]'
+            if git push origin HEAD:refs/heads/feature/british-army-10-stages-20261118; then
+              echo 'Verified Commando preview published successfully'
+              exit 0
+            fi
+            echo "Concurrent update detected; refreshing binary base ($attempt/3)"
+            sleep 2
+          done
+          echo 'Could not publish due to concurrent branch updates'
+          exit 1
