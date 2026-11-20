@@ -15,7 +15,14 @@
   try{
     const chunks=new Array(17);let next=0,done=0;
     const worker=async()=>{while(next<17){const i=next++;chunks[i]=await get('parts/german-'+String(i).padStart(3,'0')+'.txt');progress.textContent='Загрузка игры: '+Math.round(++done/18*100)+'%';}};
+    // Optional visual pass loads concurrently. If unavailable, the first game
+    // still launches with its original approved graphics and mechanics.
+    const graphicUpgrade=get('visual-boost-v1.js?v=20261121-r1').catch(e=>{
+      console.warn('Optional graphics upgrade not loaded',e);
+      return null;
+    });
     const work=await Promise.all([get('german-v5.js?v=20261114-stage3-hero-r3'),...Array.from({length:4},worker)]);
+    const visualPass=await graphicUpgrade;
     let html=chunks.join('');const start='// === Preview integration: German WW2 Panzergrenadier (red faction) ===',end='// === End of preview integration ===';
     const a=html.indexOf(start),b=html.indexOf(end,a);if(a<0||b<a)throw new Error('Не найдена основа тестовой версии');
     html=html.slice(0,a)+work[0]+html.slice(b+end.length);
@@ -58,6 +65,20 @@
     html=once(html,"scene.background=new THREE.Color(0x8a8780);scene.fog=new THREE.Fog(0x938d80,70,175);","scene.background=new THREE.Color(0x85877f);scene.fog=new THREE.Fog(0x82857d,70,175);");
     html=once(html,"scene.add(new THREE.HemisphereLight(0xe6e0cc,0x5a5238,.9));const sun=new THREE.DirectionalLight(0xffd9a0,1);","scene.add(new THREE.HemisphereLight(0xe5e5dc,0x50544b,.95));const sun=new THREE.DirectionalLight(0xf6e5c7,.9);");
     html=once(html,"tex('#54402c',['#46341f','#62503a','#3a2b1c','#6b5a44','#4f5a60'],650,[20,14])","tex('#595c4e',['#4c5346','#6e6854','#41483e','#77725e','#5e625b'],650,[20,14])");
+    // Toggle comparison directly on iPhone:
+    // ?graphics=original shows untouched Three.js, ?graphics=boost adds details.
+    // Original controls, formations, GLB and combat code are unchanged.
+    const graphics=new URLSearchParams(location.search).get('graphics');
+    if(visualPass&&graphics!=='original'){
+      html=once(html,'gr.rotation.x=-Math.PI/2;scene.add(gr);',
+       'gr.rotation.x=-Math.PI/2;scene.add(gr);\n'+visualPass);
+      html=once(html,'for(let i=0;i<14;i++)ruin(rnd(-50,50),rnd(-60,60));',
+       'for(let i=0;i<14;i++)ruin(rnd(-50,50),rnd(-60,60));'
+       +'if(window.__BF_VISUAL_DECORATE_RUINS__)window.__BF_VISUAL_DECORATE_RUINS__();');
+      html=once(html,"tex('#6a553c',['#5a4630','#7a6448','#3a2c1e'],160,[24,1])",
+       "(window.__BF_VISUAL_ROAD_TEXTURE__?window.__BF_VISUAL_ROAD_TEXTURE__():"
+       +"tex('#6a553c',['#5a4630','#7a6448','#3a2c1e'],160,[24,1]))");
+    }
     progress.textContent='Запуск…';document.open();document.write(html);document.close();
   }catch(e){error.textContent='Не удалось загрузить игру: '+(e.name==='AbortError'?'превышено время ожидания':e.message);progress.textContent='Загрузка прервана';retry.hidden=false;}
 })();
