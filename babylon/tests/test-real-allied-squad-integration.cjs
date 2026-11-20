@@ -27,7 +27,10 @@ async function inspect(browserType,name){
   result.checkpoints.push({step:'duel',models:state.models,importedAllies:state.importedAlliedCount});
   await page.screenshot({path:ROOT+'/'+name+'-hero-duel.png'});
   await page.locator('#enter-game').click();
-  await page.locator('[data-scenario="squads"]').click();
+  // The legacy HUD closes on battle start. The game automatically launches
+  // ensureUnits('squads') after Enter; do not click the now-hidden menu button.
+  assert(await page.locator('#panel').evaluate(el=>el.classList.contains('closed')),
+    'Battlefield must open full-screen with menu hidden');
   await page.waitForFunction(()=>window.__BATTLEFIELD_GAME__?.models>=24||
     !!window.__BATTLEFIELD_GAME__?.error,null,{timeout:200000});
   state=await page.evaluate(()=>({...window.__BATTLEFIELD_GAME__}));
