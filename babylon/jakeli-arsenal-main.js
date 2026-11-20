@@ -36,6 +36,7 @@
  let current=null;
  function clean(item){
   if(!item)return;
+  if(item.piatVisualCleanup)item.piatVisualCleanup();
   for(const group of item.animationGroups)group.stop();
   for(const group of item.animationGroups)group.dispose();
   for(const mesh of item.meshes)if(!mesh.isDisposed())mesh.dispose();
@@ -71,6 +72,17 @@
    const expected=['Ready','Aim','Fire','Walk','Jog','Sprint'];
    if(expected.some(n=>!groups.some(g=>g.name===n)))
     throw Error('Отсутствуют анимации: '+id);
+   // The anatomical PIAT GLB is a pose/mesh QA carrier. For the actual
+   // viewer use the detailed original Battlefield procedural PIAT, not
+   // the simplified Blender geometry used to fit the hands.
+   if(id==='uk-piat'){
+    const create=window.BattlefieldJakeliWeaponRig?.createPiatVisual;
+    const holder=[...incoming.transformNodes,...incoming.meshes].find(n=>n.name==='Piat');
+    if(typeof create!=='function'||!holder)throw Error('Original PIAT model unavailable');
+    const sourcePieces=incoming.meshes.filter(m=>!m.skeleton&&(m.getTotalVertices?.()||0)>0);
+    incoming.piatVisualCleanup=create(scene,holder);
+    for(const piece of sourcePieces)piece.setEnabled(false);
+   }
    const previous=current;
    current=incoming;state.weapon=id;
    state.skeletonBones=bones;state.skinnedMeshes=skinned;
