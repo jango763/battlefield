@@ -25,7 +25,7 @@ PROFILES = {
    "left_axis": (-.25,-.968,0), "left_dorsal": (0,0,-1),
    "right_dorsal": (-1,0,0), "ready_pitch": 20, "aim_pitch": 0},
  "uk-piat": {"name": "Piat", "model": None,
-   "right": (0,.155,-.155), "left": (0,-.12,-.137),
+   "right": (0,.155,-.155), "left": (.025,-.095,-.110),
    "stock": (0,.40,-.045), "right_axis": (0,-.55,.835),
    "left_axis": (-.25,-.968,0), "left_dorsal": (0,0,-1),
    "right_dorsal": (-1,0,0), "ready_pitch": 17, "aim_pitch": 0},
