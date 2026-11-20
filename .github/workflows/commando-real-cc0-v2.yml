@@ -6,9 +6,12 @@ on:
       - '.github/workflows/commando-real-cc0-v2.yml'
       - 'tools/jakeli/build-commando-cc0-v2.py'
       - 'tools/jakeli/test-commando-cc0-v2.py'
+      - 'babylon/commando-real-v2-iphone.html'
+      - 'babylon/commando-real-v2-main.js'
+      - 'babylon/tests/test-commando-cc0-v2-browser.cjs'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   verify-real-commando:
     if: github.ref == 'refs/heads/feature/british-army-10-stages-20261118'
@@ -40,6 +43,15 @@ jobs:
         run: python tools/jakeli/build-commando-cc0-v2.py
       - name: Reject dummy body and invalid motion or skin
         run: python tools/jakeli/test-commando-cc0-v2.py
+      - name: Install mobile Chromium and WebKit
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/commando-cc0-qa playwright@1.58.2
+          /tmp/commando-cc0-qa/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Verify real Commando 3D model and six poses in mobile browsers
+        run: |
+          python -m http.server 8844 --bind 127.0.0.1 >/tmp/commando-real-v2-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-commando-cc0-v2-browser.cjs
       - name: Save visual proof and rig export for review
         if: always()
         uses: actions/upload-artifact@v4
@@ -48,5 +60,20 @@ jobs:
           path: |
             assets/allied-soldiers/uk-commando-cc0-sten-v2.glb
             babylon-qa-results/commando-cc0-v2/
+            babylon-qa-results/commando-cc0-v2-browser/
           if-no-files-found: warn
           retention-days: 14
+      - name: Publish verified nonapproved Commando v2 only in feature branch
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = 'refs/heads/feature/british-army-10-stages-20261118'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/allied-soldiers/uk-commando-cc0-sten-v2.glb
+          if git diff --cached --quiet; then
+            echo 'Unapproved Commando v2 GLB unchanged'
+          else
+            git commit -m 'Publish unapproved genuine WW2 Commando v2 for Safari preview [skip ci]'
+            git pull --rebase origin feature/british-army-10-stages-20261118
+            git push origin HEAD:refs/heads/feature/british-army-10-stages-20261118
+          fi
