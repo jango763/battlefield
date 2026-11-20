@@ -20,7 +20,7 @@ PROFILES = {
    "left_axis": (-.28,-.960,0), "left_dorsal": (0,0,-1),
    "right_dorsal": (-1,0,0), "ready_pitch": 22, "aim_pitch": 0},
  "uk-bren": {"name": "Bren", "model": "uk-bren.glb",
-   "right": (-.019,.010,-.040), "left": (.023,-.235,.055),
+   "right": (-.019,.010,-.040), "left": (.023,-.205,.055),
    "stock": (0,.31421,.04943), "right_axis": (0,-.38,.925),
    "left_axis": (-.25,-.968,0), "left_dorsal": (0,0,-1),
    "right_dorsal": (-1,0,0), "ready_pitch": 20, "aim_pitch": 0},
