@@ -28,7 +28,7 @@ function create(scene,B,map){
  }
  const mat={
   earth:material('earth','#777957'),grass:material('grass','#555f43'),
-  dirt:material('dirt','#6b5945'),road:material('road','#80705a'),
+  dirt:material('dirt','#6b5945'),road:material('road','#b4aa8d'),
   track:material('track','#4c4237'),stone:material('stone','#777a76'),
   roof:material('roof','#4b463a'),wood:material('wood','#6b513a'),
   burnt:material('burnt','#242624'),rust:material('rust','#513c2d'),
@@ -58,37 +58,84 @@ function create(scene,B,map){
   mesh.material=material('ring-'+id,color,color);
   mesh.isPickable=false;nodes.push(mesh);return mesh;
  }
- // Ground: procedural diffuse texture adds spatial detail without network assets.
+ // Legacy CoH-style terrain: warm earth, olive grass and weathered tracks.
+ // DynamicTexture takes a size object, not an HTMLCanvasElement. Always call
+ // update() after painting; otherwise mobile WebGL may display WHITE ground.
  const ground=B.MeshBuilder.CreateGround('map-ground-300',{width:SIZE,height:SIZE,
   subdivisions:60},scene);
  const groundMaterial=new B.StandardMaterial('map-ground-material',scene);
- const canvas=(typeof document!=='undefined')?document.createElement('canvas'):null;
- if(canvas&&B.DynamicTexture){
-  canvas.width=canvas.height=1024;
-  const c=canvas.getContext('2d');
-  if(c){
-   c.fillStyle='#686b50';c.fillRect(0,0,1024,1024);
-   let seed=721;const rnd=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);
-   for(let i=0;i<14500;i++){
-    const x=rnd()*1024,z=rnd()*1024,r=1+rnd()*8;
-    c.fillStyle=['#4f5d40','#857653','#91805a','#667148','#505742','#8b765a'][Math.floor(rnd()*6)];
-    c.globalAlpha=.12+rnd()*.18;c.beginPath();c.ellipse(x,z,r*2,r,0,0,Math.PI*2);c.fill();
+ // Muted tint prevents bright sunlight from blowing earthy tones to white.
+ groundMaterial.diffuseColor=B.Color3.FromHexString('#bdb8a5');
+ let groundTextureReady=false;
+ if(typeof document!=='undefined' && B.DynamicTexture){
+  try{
+   const tx=new B.DynamicTexture('battlefield-earth',
+    {width:1024,height:1024},scene,false);
+   const c=tx.getContext();
+   if(!c||typeof c.fillRect!=='function')throw Error('No 2D terrain context');
+   c.fillStyle='#77735e';c.fillRect(0,0,1024,1024);
+   let seed=721;
+   const rnd=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);
+   // Broad, overlapping variations are readable from the RTS camera.
+   for(let i=0;i<2800;i++){
+    const x=rnd()*1024,y=rnd()*1024,r=12+rnd()*65;
+    c.globalAlpha=.04+rnd()*.10;
+    c.fillStyle=['#4c5941','#a18d68','#5e684c','#b39a75','#665e4b'][Math.floor(rnd()*5)];
+    c.beginPath();c.ellipse(x,y,r*(.6+rnd()),r*(.25+rnd()*.35),
+      rnd()*Math.PI,0,Math.PI*2);c.fill();
+   }
+   // Fine earth and grass breakup; deterministic across game sessions.
+   for(let i=0;i<24000;i++){
+    const x=rnd()*1024,y=rnd()*1024,r=.5+rnd()*3.6;
+    c.fillStyle=['#414b37','#a79572','#7e855b','#574e3d','#c0ae83'][Math.floor(rnd()*5)];
+    c.globalAlpha=.15+rnd()*.31;
+    c.fillRect(x,y,r*2,r);
    }
    c.globalAlpha=1;
-   const tx=new B.DynamicTexture('battlefield-earth',canvas,scene,false);
-   tx.hasAlpha=false;groundMaterial.diffuseTexture=tx;
-  }else groundMaterial.diffuseColor=mat.earth.diffuseColor;
- }else groundMaterial.diffuseColor=mat.earth.diffuseColor;
- groundMaterial.specularColor=new B.Color3(.04,.04,.04);
- ground.material=groundMaterial;ground.isPickable=true;
+   tx.update(false); // Required: upload the painted 2D canvas to the GPU.
+   tx.uScale=2.3;tx.vScale=2.3;
+   tx.wrapU=B.Texture?.WRAP_ADDRESSMODE??1;
+   tx.wrapV=B.Texture?.WRAP_ADDRESSMODE??1;
+   groundMaterial.diffuseTexture=tx;
+   groundTextureReady=true;
+  }catch(error){
+   console.warn('Terrain texture fallback',error);
+  }
+ }
+ if(!groundTextureReady)groundMaterial.diffuseColor=B.Color3.FromHexString('#77735e');
+ groundMaterial.specularColor=new B.Color3(.02,.02,.02);
+ ground.material=groundMaterial;ground.isPickable=true;ground.receiveShadows=true;
+ // Dirt road is narrow, weathered and textured: no featureless white highway.
+ // Preserve the exact road positions and collision-free gameplay routes.
+ if(typeof document!=='undefined' && B.DynamicTexture){
+  try{
+   const tx=new B.DynamicTexture('battlefield-dirt-track',
+    {width:512,height:512},scene,false);
+   const c=tx.getContext();
+   c.fillStyle='#73614a';c.fillRect(0,0,512,512);
+   let seed=1776;
+   const rand=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);
+   for(let i=0;i<9000;i++){
+    c.globalAlpha=.10+rand()*.22;
+    c.fillStyle=['#342f28','#aea083','#887756','#564633'][Math.floor(rand()*4)];
+    const x=rand()*512,y=rand()*512,r=.8+rand()*5.5;
+    c.fillRect(x,y,r*1.6,r);
+   }
+   c.globalAlpha=1;
+   tx.update(false);tx.uScale=2;tx.vScale=30;
+   tx.wrapU=B.Texture?.WRAP_ADDRESSMODE??1;
+   tx.wrapV=B.Texture?.WRAP_ADDRESSMODE??1;
+   mat.road.diffuseTexture=tx;
+  }catch(error){console.warn('Dirt-road texture fallback',error);}
+ }
  // Main central supply road, two farm access branches and vehicle tracks.
- box('north-south-road',14,.04,265,150,.025,150,mat.road);
- box('west-east-road',246,.045,12,150,.028,150,mat.road);
+ box('north-south-road',9.4,.04,265,150,.025,150,mat.road);
+ box('west-east-road',246,.045,8,150,.028,150,mat.road);
  for(const side of [-1,1]){
   box('lane-farm-west-'+side,135,.05,4,81,.055,150+side*52,mat.dirt);
   box('lane-farm-east-'+side,135,.05,4,219,.055,150+side*52,mat.dirt);
  }
- for(let z=18;z<=282;z+=7)for(const x of [146,154])
+ for(let z=18;z<=282;z+=7)for(const x of [147.2,152.8])
   box('rut-'+x+'-'+z,.26,.04,3.6,x,.064,z,mat.track);
  // Both main bases face towards the center of the map.
  for(const base of map.bases){
@@ -211,6 +258,65 @@ function create(scene,B,map){
    return {ok:false,loaded:originalWrecksLoaded,error:String(error)};
   }
  }
+ // Ruins, shell craters and debris from the approved first-generation battlefield.
+ // Non-pickable decoration never intercepts click-to-move or enemy targeting.
+ const rubble=material('rubble','#625c4f'),crater=material('shell-crater','#423e32');
+ const craterRim=material('shell-rim','#87765c');
+ for(let i=0;i<35;i++){
+  const x=19+(i*47)%261,z=23+(i*71)%253;
+  if(Math.hypot(x-150,z-43)<25||Math.hypot(x-150,z-275)<25)continue;
+  if(map.farms.some(f=>Math.hypot(f.x-x,f.z-z)<16))continue;
+  const radius=1.2+(i%5)*.42;
+  const scorch=cylinder('shell-impact-'+i,radius*2,.018,x,.009,z,crater,12);
+  scorch.scaling.z=.76;scorch.isPickable=false;
+  const rim=B.MeshBuilder.CreateTorus('shell-rim-'+i,
+    {diameter:radius*2.1,thickness:.18,tessellation:14},scene);
+  rim.position.copyFrom(at(x,z,.023,B));rim.scaling.z=.78;
+  rim.material=craterRim;rim.isPickable=false;nodes.push(rim);
+  for(let j=0;j<2;j++){
+   const rock=box('shell-debris-'+i+'-'+j,.4+(i%3)*.17,.3,.55,
+    x+Math.cos(i+j*2.3)*radius*1.3,.15,z+Math.sin(i+j*2.3)*radius*1.3,rubble,i*.21);
+   rock.isPickable=false;
+  }
+ }
+ // Collapsed wall fragments and timber fences make the map read as a WWII
+ // battlefield rather than an empty test grid. Keep spawn routes clear.
+ for(const [x,z] of [[57,53],[84,111],[210,88],[232,184],[75,182],
+    [117,206],[181,218],[48,145],[249,139],[120,237]]){
+  for(let i=0;i<3;i++){
+   const piece=box('legacy-ruin-'+x+'-'+i,2.4,.6+i*.5,.85,
+    x+i*2.2,(.6+i*.5)/2,z+(i%2)*.55,mat.stone,(i%2)*.2);
+   piece.isPickable=false;
+  }
+  for(let i=0;i<4;i++){
+   const beam=box('broken-fence-'+x+'-'+i,.14,1.3,.14,
+    x-5+i*2.1,.65,z+5,mat.wood);
+   beam.isPickable=false;
+  }
+  for(let i=0;i<2;i++){
+   const beam=box('fence-rail-'+x+'-'+i,6.4,.12,.13,
+    x-1.9,.8+i*.35,z+5,mat.wood);
+   beam.isPickable=false;
+  }
+ }
+ // Farm trim, windows and roof ridge preserve readable building silhouettes.
+ for(const farm of map.farms){
+  box('farm-door-'+farm.id,1.65,2.5,.15,farm.x-2,1.28,farm.z+3.56,mat.wood);
+  for(const dx of [-3.2,3.2]){
+   box('farm-window-'+farm.id+'-'+dx,1.15,1.15,.17,
+    farm.x-2+dx,2.8,farm.z+3.6,mat.black);
+   box('farm-window-sill-'+farm.id+'-'+dx,1.4,.17,.32,
+    farm.x-2+dx,2.15,farm.z+3.66,mat.stone);
+  }
+  box('farm-roof-ridge-'+farm.id,10.5,.2,.22,
+   farm.x-2,6.7,farm.z,mat.wood);
+ }
+ for(const base of map.bases){
+  for(const dx of [-4.6,4.6]){
+   box('hq-window-'+base.id+'-'+dx,1.5,1.4,.2,
+    base.x+dx,3.1,base.z+4.58,mat.black);
+  }
+ }
  // Sandbags and intermittent trees — use instances for low draw-call count.
  for(let i=0;i<50;i++){
   const side=i%2?-1:1;
@@ -219,8 +325,14 @@ function create(scene,B,map){
   if(x<18||x>282||z<15||z>285)continue;
   if(Math.hypot(x-150,z-150)<24)continue;
   cylinder('tree-trunk-'+i,1.1,4.2,x,2.1,z,mat.trunk,6);
-  const tree=cylinder('tree-crown-'+i,6.5,7,x,8,z,mat.hedge,7);
-  tree.scaling.x=.95;
+  const cone=B.MeshBuilder.CreateCylinder('tree-crown-'+i,
+   {diameterTop:.8,diameterBottom:6.4,height:6.7,tessellation:7},scene);
+  cone.position.copyFrom(at(x,z,7.3,B));
+  cone.material=mat.hedge;cone.isPickable=false;nodes.push(cone);
+  const top=B.MeshBuilder.CreateCylinder('tree-top-'+i,
+   {diameterTop:0,diameterBottom:4,height:4.7,tessellation:7},scene);
+  top.position.copyFrom(at(x,z,10.5,B));
+  top.material=mat.hedge;top.isPickable=false;nodes.push(top);
  }
  for(const p of [[86,123],[210,120],[120,175],[190,181],[150,83],[152,220]]){
   for(let i=-3;i<=3;i++)box('sandbag-'+p[0]+'-'+p[1]+'-'+i,1.5,.5,.85,

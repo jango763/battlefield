@@ -55,6 +55,38 @@ button:disabled{opacity:.5;cursor:default}
 
 
 
+/* Legacy-game visual language: warm brass, restrained tactical HUD. */
+#heading{background:linear-gradient(90deg,#1b241dcf,#1b241d00);padding:7px 10px 9px 3px;border-radius:6px}
+#quick-status{margin-top:5px;font-size:12px;font-weight:700;color:#f4dfa1;text-shadow:0 1px 3px #000}
+#hud-toggle{border-color:#ac9a6d;background:#293529e9;color:#ffedc8;box-shadow:0 3px 9px #0007}
+#panel{border-color:#9b916c;background:#202b24f0}
+#panel button[aria-pressed=true]{background:#e1c484;color:#24271c}
+#mobile-controls{display:none;position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 16px);z-index:5;pointer-events:none;align-items:end;justify-content:space-between;padding:0 13px}
+#touch-stick{position:relative;width:124px;height:124px;border-radius:50%;background:#1f261c85;border:2px solid #d4c08d88;box-shadow:inset 0 0 18px #111a,0 3px 10px #0007;touch-action:none;pointer-events:auto;user-select:none;-webkit-user-select:none}
+#touch-stick:before{content:"";position:absolute;inset:20px;border-radius:50%;border:1px solid #d2c09255}
+#touch-stick-knob{position:absolute;left:calc(50% - 25px);top:calc(50% - 25px);width:50px;height:50px;border-radius:50%;border:2px solid #d9c18e;background:linear-gradient(135deg,#697357cc,#394536ee);box-shadow:0 2px 8px #0008;pointer-events:none}
+#quick-buttons{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:43px 78px;gap:8px;align-items:stretch;pointer-events:none}
+#quick-buttons button{pointer-events:auto;min-width:0;padding:3px;border:1px solid #c0ad7b;background:#2a372bdc;color:#fff0c7;box-shadow:0 3px 10px #0008;font-size:21px;font-weight:800}
+#quick-buttons #quick-gear{grid-column:1}
+#quick-buttons #quick-reload{grid-column:2}
+#quick-buttons #quick-pause{grid-column:3}
+#quick-buttons #quick-fire{grid-column:2/4;grid-row:2;background:linear-gradient(#9e5e39,#713b2a);border:2px solid #eed49a;border-radius:50%;font-size:16px;color:#fff7db;letter-spacing:.6px}
+@media(max-width:700px){
+ .battle-active #mobile-controls{display:flex}
+ .battle-active #footer{display:none}
+ .battle-active #heading{right:90px}
+ .battle-active #panel:not(.closed){max-height:46dvh;bottom:calc(env(safe-area-inset-bottom) + 147px);z-index:10}
+ .battle-active #panel #readout{max-height:130px;overflow-y:auto}
+ .battle-active #heading small{display:none}
+}
+@media(max-height:600px) and (max-width:700px){
+ #touch-stick{width:100px;height:100px}
+ #quick-buttons{grid-template-rows:34px 64px}
+ .battle-active #panel:not(.closed){bottom:110px}
+}
+#battle-minimap{display:none;position:fixed;top:calc(env(safe-area-inset-top) + 61px);right:11px;width:116px;height:116px;z-index:5;border:2px solid #a79a70;border-radius:5px;background:#334034ed;box-shadow:0 3px 15px #0009;pointer-events:none;image-rendering:auto}
+.battle-active #battle-minimap{display:block}
+@media(max-width:700px){#battle-minimap{width:104px;height:104px}}
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -68,6 +100,7 @@ button:disabled{opacity:.5;cursor:default}
 <script src="./field-orders-core.js"></script>
 <script src="./gold-economy-core.js"></script>
 <script src="./world-300.js"></script>
+<script src="./legacy-visual-style.js"></script>
 </head>
 <body>
 <div id="battlefield-brief" role="dialog" aria-label="Заставка и правила карты Перекрёсток" aria-modal="true">
@@ -110,7 +143,7 @@ button:disabled{opacity:.5;cursor:default}
 
 <canvas id="view" aria-label="Основная игра Battlefield. Коснитесь земли, чтобы приказать герою двигаться."></canvas>
 <header id="heading"><h1>Капрал на линии фронта</h1>
-<small>Battlefield · Babylon.js · управление героем и отрядом</small></header>
+<small>Battlefield · управление героем и отрядом</small><div id="quick-status" role="status">HP 100 · Золото 560 · 🔵 12 : 12 🔴</div></header>
 <button id="hud-toggle" type="button" aria-pressed="true" aria-controls="panel">Меню</button>
 <section id="panel" aria-label="Управление игрой">
 <div id="loading" role="status">Загружаю бойцов и оружие…</div>
@@ -144,6 +177,16 @@ button:disabled{opacity:.5;cursor:default}
 <p class="note">🔵 Британцы против 🔴 Вермахта. Карта 300×300 с пятью золотыми фермами, семью ДОТами и тремя подбитыми БТР. После старта дополнительные 3D-бойцы появляются постепенно. Подключён загрузчик оригинальных GLB и система переноса анимаций с проверкой скелета и хвата. Для героя и Jakeli используются сохранённые GLB: это предварительная интеграция, а не одобрение проблемной анимации Jakeli. Отдельный Командос ещё не установлен: его временный прототип не является утверждённой моделью. <a href="./allied-model-review.html" target="_blank" rel="noopener" style="color:#e5d49c">Посмотреть выбранные оригинальные модели</a> · <a href="./allied-ik-lab.html" target="_blank" rel="noopener" style="color:#e5d49c">Проверить GLB и хват оружия</a>. Оружие: Lee-Enfield, Sten, Bren и временный PIAT. Снаряжение — в режиме паузы; полноценная анимация перезарядки и обход препятствий ещё не готовы.</p>
 </section>
 <div id="footer">Коснитесь земли — приказ герою · коснитесь противника — выбрать цель · камера — двумя пальцами</div>
+<canvas id="battle-minimap" width="116" height="116" role="img" aria-label="Мини-карта: позиции британцев, Вермахта, фермы и базы"></canvas>
+<div id="mobile-controls" aria-label="Управление в стиле первой игры">
+ <div id="touch-stick" aria-label="Джойстик движения героя" role="application"><div id="touch-stick-knob"></div></div>
+ <div id="quick-buttons">
+  <button type="button" id="quick-gear" aria-label="Снаряжение" title="Снаряжение">⚙</button>
+  <button type="button" id="quick-reload" aria-label="Перезарядить" title="Перезарядить">↻</button>
+  <button type="button" id="quick-pause" aria-label="Пауза или продолжить" title="Пауза">Ⅱ</button>
+  <button type="button" id="quick-fire">ОГОНЬ</button>
+ </div>
+</div>
 <div id="failure" role="alert"><strong>Игра не загрузилась</strong><div id="failure-text">Проверьте подключение.</div><button id="retry">Повторить загрузку</button></div>
 <script src="./gold-economy-core.js"></script>
 <script src="./allied-model-catalog.js"></script>

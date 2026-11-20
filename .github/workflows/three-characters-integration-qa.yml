@@ -16,6 +16,10 @@ jobs:
           node babylon/tests/test-character-integration.cjs
           node babylon/tests/test-game-entry.cjs
           node babylon/tests/test-allied-loader.cjs
+          node --check babylon/world-300.js
+          node --check babylon/legacy-visual-style.js
+          node babylon/tests/test-world-300.cjs
+          node babylon/tests/test-legacy-visual.cjs
   browser-mobile:
     needs: verify
     runs-on: ubuntu-24.04
