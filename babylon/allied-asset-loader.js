@@ -9,6 +9,13 @@
  if(root)root.BattlefieldAlliedAssetLoader=api;
 })(typeof window!=='undefined'?window:null,function(){
  'use strict';
+ // Feature-only integration: real 65-bone GLBs already verified on
+ // dedicated iPhone stands. Original Danoob/Fab assets remain missing.
+ // This trial does NOT set installed/rightsCleared/visualApproved in manifest.
+ const FEATURE_TRIAL_FILES=Object.freeze({
+  americanHero:'us-hero-quaternius-donor-hands-v7.glb',
+  britishJakeli:'uk-jakeli-anatomical-v2.glb'
+ });
  const REQUIRED=Object.freeze([
   'Hips','Spine','Spine1','Spine2','Neck','Head',
   'LeftShoulder','LeftArm','LeftForeArm','LeftHand',
@@ -156,7 +163,7 @@
   return {ok:reason.length===0,reason,rightGripMeters:right,
    leftGripMeters:left,stockRightShoulderMeters:stock,weaponId};
  }
- function create({B,scene,catalog,sourceGroups,fetchManifest}){
+ function create({B,scene,catalog,sourceGroups,fetchManifest,featureTrial=false}){
   if(!B?.SceneLoader||!scene||!catalog?.MODELS)
    throw Error('Missing Babylon.js scene or allied casting catalog');
   let manifest=null;
@@ -180,12 +187,13 @@
    if(!manifest)throw Error('Allied model manifest not initialized');
    const row=manifest.models[id];
    if(!row)throw Error('Unknown allied model: '+id);
-   if(!row.installed)return null;
-   if(!row.rightsCleared||!row.optimized)
+   const trial=featureTrial&&Object.hasOwn(FEATURE_TRIAL_FILES,id);
+   if(!row.installed&&!trial)return null;
+   if(!trial&&(!row.rightsCleared||!row.optimized))
     throw Error('License/optimization review pending for '+id);
    if(!containers.has(id)){
     containers.set(id,B.SceneLoader.LoadAssetContainerAsync(
-     '../assets/allied-soldiers/',row.file,scene));
+     '../assets/allied-soldiers/',trial?FEATURE_TRIAL_FILES[id]:row.file,scene));
    }
    try{return await containers.get(id)}catch(e){
     containers.delete(id);
@@ -197,9 +205,27 @@
    if(!model)return null;
    const entries=model.instantiateModelsToScene(name=>name+'-'+tag,false,
     {doNotInstantiate:true});
+   const isTrial=featureTrial&&Object.hasOwn(FEATURE_TRIAL_FILES,id);
    const current=inspect(entries,{maxTriangles:manifest.models[id].maxTriangles});
    if(!current.ok){entries.dispose?.();const err=Error(current.issues.join('; '));
     errors.set(id,err.message);throw err;}
+   if(isTrial){
+    // Retain Quaternius/anatomical animation groups native to this GLB.
+    // Never apply incompatible German curves or hide deformation with IK.
+    if(entries.skeletons.length!==1||entries.skeletons[0].bones.length!==65)
+     throw Error('Feature trial requires one independent 65-bone skinned rig: '+id);
+    const available=new Set(entries.animationGroups.map(g=>g.name));
+    const required=id==='americanHero'
+     ?['Idle_Quaternius','Walk_Quaternius','Jog_Quaternius','Sprint_Quaternius']
+     :['Ready','Aim','Fire','Walk','Jog','Sprint'];
+    const missing=required.filter(name=>!available.has(name));
+    if(missing.length){entries.dispose?.();throw Error('Native clips missing for '+id+': '+missing.join(','))}
+    for(const group of entries.animationGroups)group.stop();
+    const hiddenWeapons=hideEmbeddedWeapons(entries);
+    return {entries,modelId:id,rig:current,retargeted:0,
+     nativeClips:true,previewOnly:true,hiddenWeapons,
+     sourceFile:FEATURE_TRIAL_FILES[id]};
+   }
    // The newly rigged US model ships four provisional inspection clips.
    // Do not let those sample clips fight the approved 16 gameplay clips.
    const previewGroups=[...(entries.animationGroups||[])];
@@ -223,6 +249,6 @@
    (report,id)=>gripAssessment(report,id,manifest?.gripQA||{
     rightMaxMeters:.06,leftMaxMeters:.06,stockMaxMeters:.15})});
  }
- return Object.freeze({REQUIRED,CLIPS,normalize,inspect,hideEmbeddedWeapons,
+ return Object.freeze({FEATURE_TRIAL_FILES,REQUIRED,CLIPS,normalize,inspect,hideEmbeddedWeapons,
   validateManifest,sourceClips,retarget,gripAssessment,create});
 });
