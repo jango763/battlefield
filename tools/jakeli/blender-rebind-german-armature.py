@@ -7,10 +7,14 @@ import bpy, json, math, re, hashlib, os
 from pathlib import Path
 from mathutils import Vector, Matrix, Quaternion
 from quaternius_legs import QuaterniusLowerBody
+from weapon_profiles import load_profile
 ROOT=Path(__file__).resolve().parents[2]
 SRC=ROOT/'assets/allied-soldiers/uk-jakeli-mobile-static.glb'
-OUT=ROOT/'assets/allied-soldiers/uk-jakeli-anatomical-v2.glb'
-QA=ROOT/'babylon-qa-results/jakeli-anatomical';QA.mkdir(parents=True,exist_ok=True)
+WEAPON_ID=os.environ.get('JAKELI_WEAPON','uk-lee-enfield')
+MODEL_SUFFIX='' if WEAPON_ID=='uk-lee-enfield' else '-'+WEAPON_ID.removeprefix('uk-')
+OUT=ROOT/'assets/allied-soldiers'/('uk-jakeli-anatomical-v2.glb' if not MODEL_SUFFIX else 'uk-jakeli-anatomical'+MODEL_SUFFIX+'.glb')
+QA=ROOT/'babylon-qa-results'/('jakeli-anatomical' if not MODEL_SUFFIX else 'jakeli-anatomical'+MODEL_SUFFIX)
+QA.mkdir(parents=True,exist_ok=True)
 assert hashlib.sha256(SRC.read_bytes()).hexdigest()=='e86dc27fdb763092ad80391ea79c3f83f20c7b81195d2132dc1b68cf3634d7a0'
 def canon(n):return re.sub(r'_\d+$','',n.replace('mixamorig:',''))
 def load(path):
@@ -158,9 +162,10 @@ for o in meshes:
  bind_error=max(bind_error,max((v.co-original[o.name]['positions'][i]).length for i,v in enumerate(ev.vertices)))
  o.evaluated_get(dg).to_mesh_clear()
 assert bind_error<1e-4,bind_error
-# The rifle and both contact targets form one rigid assembly, authored once in Blender.
-weapon=load(ROOT/'assets/ww2-weapons/uk-lee-enfield.glb')
-gun=bpy.data.objects.new('LeeEnfield',None);bpy.context.scene.collection.objects.link(gun)
+# Each variant uses the identical re-bound Jakeli mesh and Quaternius legs.
+# Only weapon appearance, rigid mount, and baked arm contact targets differ.
+profile,weapon=load_profile(ROOT,WEAPON_ID,load)
+gun=bpy.data.objects.new(profile['name'],None);bpy.context.scene.collection.objects.link(gun)
 for o in weapon:
  if o.parent not in weapon:
   w=o.matrix_world.copy();o.parent=gun;o.matrix_world=w
@@ -204,7 +209,7 @@ for clip,duration in [('Ready',2),('Aim',2),('Fire',1.2)]+[(c,gait.clips[c]['dur
    gait.apply(clip, f/frames)
   update()
   # Gun stock sits in right shoulder pocket; support is on the actual fore-end.
-  lower=math.radians(24 if clip in ['Ready','Walk','Jog','Sprint'] else 0)
+  lower=math.radians(profile['ready_pitch'] if clip in ['Ready','Walk','Jog','Sprint'] else profile['aim_pitch'])
   recoil=.012*max(0,math.sin(t*math.pi*8))**8 if clip=='Fire' else 0
   # The glTF NLA exporter drops animation channels that are constant within
   # a clip, even if their values differ across clips. This left Aim using
@@ -212,11 +217,11 @@ for clip,duration in [('Ready',2),('Aim',2),('Fire',1.2)]+[(c,gait.clips[c]['dur
   # A subtle, baked breathing arc preserves both animated gun channels.
   gun.rotation_quaternion=Quaternion((1,0,0),lower+.008*math.sin(phase))
   shoulder=bones['RightArm'].head+Vector((.025,-.035,-.055))
-  stock=Vector((0,.2636,-.051387844));gun.location=shoulder-gun.rotation_quaternion@stock+Vector((0,recoil+.003*math.sin(phase),0));update()
-  rightQ=frame(gun.rotation_quaternion@Vector((0,-.945,.326)),gun.rotation_quaternion@Vector((-1,0,0)))
-  leftQ=frame(gun.rotation_quaternion@Vector((-.32,-.947,0)),gun.rotation_quaternion@Vector((0,0,-1)))
+  stock=Vector(profile['stock']);gun.location=shoulder-gun.rotation_quaternion@stock+Vector((0,recoil+.003*math.sin(phase),0));update()
+  rightQ=frame(gun.rotation_quaternion@Vector(profile['right_axis']),gun.rotation_quaternion@Vector(profile['right_dorsal']))
+  leftQ=frame(gun.rotation_quaternion@Vector(profile['left_axis']),gun.rotation_quaternion@Vector(profile['left_dorsal']))
   # Contact markers are at the physical stock wrist and underside of the forestock.
-  contacts={'Right':gun.matrix_world@Vector((-.018,.017,-.009)),'Left':gun.matrix_world@Vector((0,-.20,.020))}
+  contacts={'Right':gun.matrix_world@Vector(profile['right']),'Left':gun.matrix_world@Vector(profile['left'])}
   for s,q in [('Right',rightQ),('Left',leftQ)]:
    goal=contacts[s]-q@palm_local[s]
    pole=bones[s+'Arm'].head+Vector((-.25 if s=='Right' else .20,.08,-.45))
@@ -253,7 +258,7 @@ bpy.ops.wm.save_as_mainfile(filepath=str(QA/'jakeli-anatomical.blend'))
 bpy.ops.export_scene.gltf(filepath=str(OUT),export_format='GLB',use_selection=True,export_animations=True,
  export_animation_mode='NLA_TRACKS',export_skins=True,export_materials='EXPORT',export_yup=True,
  export_force_sampling=True,export_anim_slide_to_zero=True,export_rest_position_armature=True)
-report={'sourceSHA256':hashlib.sha256(SRC.read_bytes()).hexdigest(),'blender':bpy.app.version_string,
+report={'sourceSHA256':hashlib.sha256(SRC.read_bytes()).hexdigest(),'blender':bpy.app.version_string,'weaponId':WEAPON_ID,'weaponNode':profile['name'],'outputModel':OUT.name,
  'bindMaxVertexErrorMeters':bind_error,'maxBakedPalmContactErrorMeters':grip_max,'elbowBendRangeDegrees':[min(elbows),max(elbows)],
  'sourceVertices':sum(v['vertices'] for v in original.values()),'meshes':len(meshes),'bonesBeforeGltfRoot':len(bones),
  'preserved':'All original source positions (one uniform transform), topology, UVs and materials; embedded Springfield excluded',
