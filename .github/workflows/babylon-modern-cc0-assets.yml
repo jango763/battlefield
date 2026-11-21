@@ -1,0 +1,41 @@
+name: Install Babylon modern CC0 material bank
+on:
+  push:
+    branches:
+      - feature/babylon-modern-art-v1-20261121
+    paths:
+      - 'babylon/tools/fetch-modern-materials.py'
+      - '.github/workflows/babylon-modern-cc0-assets.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: battlefield-modern-cc0-assets
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PNG JPEG image tools
+        run: python3 -m pip install --break-system-packages Pillow==11.3.0
+      - name: Fetch PBR maps directly from verified Poly Haven CC0 API
+        run: python3 babylon/tools/fetch-modern-materials.py
+      - name: Commit material files to experimental branch, never main
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add babylon/art/
+          if ! git diff --cached --quiet; then
+            git commit -m 'Add Poly Haven scanned CC0 1K PBR terrain and WWII wall materials'
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
+      - name: Save materials as artifact for audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlefield-babylon-modern-cc0-pbr-bank
+          path: babylon/art/
+          if-no-files-found: warn
+          retention-days: 14
