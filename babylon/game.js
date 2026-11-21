@@ -957,7 +957,10 @@ function updateReinforcements(dt){
  state.reinforcements=replenisher.snapshot();
 }
 function frame(){
- const dt=Math.max(0,Math.min(.05,engine.getDeltaTime()/1000));
+ // Under mobile software rendering, clamping to 50ms made real-time
+ // walking, army spawning and gold clocks slow down dramatically at <20 FPS.
+ // 120ms is still safely below every core's maximum simulation step (200ms).
+ const dt=Math.max(0,Math.min(.12,engine.getDeltaTime()/1000));
  if(state.ready&&controller){
   if(!gamePausedForBriefing){
    updateTouchJoystick(dt);
