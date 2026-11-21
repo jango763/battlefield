@@ -32,7 +32,7 @@ assert(art.includes("world.ground.material=mud"));
 assert(art.includes("tex.uScale=1.6;tex.vScale=45"),'Road photographs must not stretch lengthwise');
 assert(art.includes("mesh.name.startsWith('rut-')"),'Remove toy-like raised tracks');
 assert(art.includes("circle.isVisible=false"),'Hide giant screen-covering base circles');
-assert(game.includes("camera=new B.ArcRotateCamera('camera',Math.PI*1.5,1.08,24"),
+assert(game.includes("camera=new B.ArcRotateCamera('camera',Math.PI*1.5,1.18,14"),
  'Camera must show more forward world depth');
 assert(art.includes("mesh.skeleton"),'Never rewrite soldier rig materials');
 console.log('BATTLEFIELD_MODERN_ART_STATIC_PASS',{
