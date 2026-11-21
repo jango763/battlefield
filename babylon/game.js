@@ -15,6 +15,7 @@ const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
 const legacyVisual=window.BattlefieldLegacyVisualStyle;
 const modernArt=window.BattlefieldModernArt;
+const villageModels=window.BattlefieldModernVillageModels;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
 const nativeBlend=window.BattlefieldNativeClipBlend;
@@ -135,7 +136,15 @@ function createWorld(){
  // Real photographed materials and geometry; Babylon skinned soldiers, game AI,
  // colliders, controls and camera remain entirely unchanged.
  if(new URLSearchParams(location.search).get('art')!=='classic'){
-  try{state.modernArt=modernArt.apply({scene,B,world,camera,sun,map:goldRules.MAP});}
+  try{
+   state.modernArt=modernArt.apply({scene,B,world,camera,sun,map:goldRules.MAP});
+   if(villageModels?.install){
+    state.villageModels={started:true,loaded:0,pending:3};
+    void villageModels.install({scene,B,art:state.modernArt}).then(
+     result=>{state.villageModels=result},
+     error=>{state.villageModels={error:String(error)}});
+   }
+  }
   catch(error){console.warn('Modern art fallback to native map',error);
    state.modernArt={error:String(error)};}
  }else state.modernArt={profile:'original-babylon',ready:false};
