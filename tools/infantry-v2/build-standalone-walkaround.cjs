@@ -51,6 +51,27 @@ catch(e){console.error('Cannot run the unmodified first-game loader',e);process.
  assert(written.includes('class ArmyAI'),'Lost native autonomous army');
  assert(written.includes('spT[t]=1.4'),'Lost 1.4s infantry waves');
  assert(written.includes('window.__BF_WALKAROUND__'),'Lost close hero camera');
+ // The original game references TWO externally hosted Three.js runtime files.
+ // This is another iPhone failure point, even after consolidating 17 chunks.
+ // Inline their exact pinned r128 MIT-licensed code in the standalone edition.
+ const modules=process.env.BF_THREE_R128_NODE_MODULES||
+  '/tmp/battlefield-three128/node_modules/three';
+ const vendors=[
+  ['https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+    path.join(modules,'build/three.min.js')],
+  ['https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',
+    path.join(modules,'examples/js/loaders/GLTFLoader.js')]
+ ];
+ for(const [url,filename] of vendors){
+  const old='<script src="'+url+'"></script>';
+  assert(written.includes(old),'Missing required external Three.js script '+url);
+  const content=fs.readFileSync(filename,'utf8').replace(/<\\/script/gi,'<\\\\/script');
+  assert(content.length>10000,'Missing original Three.js library '+filename);
+  written=written.replace(old,
+   '<script>/* THREE.JS MIT LICENSE — bundled locally to support offline iPhone launch. */\\n'+
+   content+'\\n</script>');
+ }
+ assert(!written.includes('<script src="https://'), 'External startup library still required');
  assert(written.includes('WWII-textured'),'Actual site materials missing');
  assert(written.includes('БРОДИЛКА · АРМИЯ ПЕРВОЙ ИГРЫ'));
  assert(!written.includes('Загрузка игры: 0%'),'Download splash leaked into bundle');
