@@ -22,12 +22,18 @@ async function run(engine,name,mode){
     return art?.ready && (art.scannedMaterialMaps>=16||art.errors.length>0);
    },null,{timeout:35000});
   }
+  if(mode==='modern'){
+   await page.waitForFunction(()=>{
+    const models=window.__BATTLEFIELD_GAME__?.villageModels;
+    return models?.finished || models?.error;
+   },null,{timeout:90000});
+  }
   const start=await page.evaluate(()=>{
    const state=window.__BATTLEFIELD_GAME__,B=window.BABYLON;
    const scene=B.EngineStore.LastCreatedScene;
    const art=state.modernArt;
    return {ready:state.ready,error:state.error,
-    art,models:state.models,pbr:scene.materials.filter(m=>m.getClassName()==='PBRMaterial').length,
+    art,modelArt:state.villageModels,models:state.models,pbr:scene.materials.filter(m=>m.getClassName()==='PBRMaterial').length,
     hdMaterials:scene.materials.filter(m=>m.name?.startsWith('hd2026-')).length,
     grounds:scene.meshes.filter(m=>m.name==='map-ground-300'&&!!m.material?.albedoTexture).length,
     hdNodes:scene.meshes.filter(m=>m.name?.startsWith('hd2026-')).length,
@@ -43,6 +49,10 @@ async function run(engine,name,mode){
    assert(start.art?.ready,'Modern art not applied');
    assert.equal(start.art?.errors.length,0,'Local scan errors: '+start.art?.errors.join(' | '));
    assert(start.art?.scannedMaterialMaps>=16,'No photo-scan PBR images loaded');
+   assert(start.modelArt?.loaded>=2,
+    'Locally hosted genuine village GLB did not load: '+JSON.stringify(start.modelArt));
+   assert(!start.modelArt?.errors?.length,
+    'Real village GLB decoder was unavailable: '+JSON.stringify(start.modelArt.errors));
    assert(start.art?.meshSurfaces>=35,'Still shows untextured block world');
    assert(start.art?.architecturalDetails>=140,'Real architectural detail missing');
    assert(start.art?.damagedRuins>=6,'Damaged village ruins missing');
@@ -53,6 +63,7 @@ async function run(engine,name,mode){
    assert(start.text?.includes('PBR'),'Incorrect build label');
   }else{
    assert.equal(start.hdMaterials,0,'Modern PBR material leaked into original comparison');
+   assert(!start.modelArt,'Modern real 3D village GLBs leaked into original mode');
    assert(start.text?.includes('ORIGINAL'));
   }
   await page.locator('#enter-game').click();
