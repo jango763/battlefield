@@ -59,7 +59,7 @@ function apply({scene,B,world,camera,sun,map}){
  const brick=pbr('weathered-brick','brick',{scale:2,tint:'#c4aa9b',rough:1});
  const stone=pbr('pitted-stone','stone',{scale:2,tint:'#c4bfaf',rough:1});
  const roof=pbr('old-roof-tiles','brick',{scale:4,tint:'#817166',rough:1});
- const timber=pbr('warped-timber','stone',{scale:2,tint:'#65584b',rough:1});
+ const timber=pbr('warped-timber','wood',{scale:2,tint:'#9b8b76',rough:1});
  const dirt=pbr('soil-patches','mud',{scale:2,tint:'#9c927f',rough:1});
  // Ground was previously a single hand-painted 1024x1024 canvas that faded
  // into flat brown. Photographically scanned multi-surface PBR adds fine relief.
