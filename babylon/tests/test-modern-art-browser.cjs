@@ -76,6 +76,21 @@ async function run(engine,name,mode){
   assert(hero.models>=2&&hero.models<24,'Babylon GLB supply regressions');
   assert(hero.active?.blueAlive>=1&&hero.active?.redAlive>=1);
   await page.screenshot({path:ROOT+'/'+name+'-'+mode+'.png'});
+  if(mode==='modern'){
+   // Art inspection frame: temporarily point ONLY the test camera at the
+   // actual CC0 timber house; the game's camera and movement are unchanged.
+   await page.evaluate(()=>{
+    const B=window.BABYLON;
+    const scene=B.EngineStore.LastCreatedScene,camera=scene.activeCamera;
+    const point=new B.Vector3(16,3.2,-86); // house at map (166,64)
+    camera.alpha=Math.PI*1.43;
+    camera.beta=1.16;
+    camera.radius=17;
+    scene.onBeforeRenderObservable.add(()=>camera.setTarget(point));
+   });
+   await page.waitForTimeout(1200);
+   await page.screenshot({path:ROOT+'/'+name+'-authored-house.glb.png'});
+  }
   result.pass=true;
  }catch(e){
   result.error=String(e?.stack||e);
