@@ -9,7 +9,7 @@ const B=window.BABYLON;
 const combat=window.BattlefieldBalance;
 const tactics=window.BattlefieldSquadController;
 const presentation=window.BattlefieldCombatPresentation;
-const orders=window.BattlefieldFieldOrders;
+const orders=window.BattlefieldFirstGameArmy;
 const replenishment=window.BattlefieldReplenishment;
 const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
@@ -75,6 +75,7 @@ let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null
 let weaponQueue=[],weaponWorker=false;
 let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
 const touchJoystick={active:false,pointer:null,x:0,y:0,cooldown:0};
+const movementKeys={w:false,a:false,s:false,d:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false};
 // Reinforcement clocks are owned by replenishment-core.js.
 function alertStatus(message){$('event').textContent=message}
 enterButton.addEventListener('click',()=>{
@@ -122,14 +123,19 @@ function createWorld(){
  const markMaterial=new B.StandardMaterial('destination-mat',scene);
  markMaterial.emissiveColor=color('#eed58b');destinationMark.material=markMaterial;
 
- // First-game readability: elevated tactical view instead of HQ facade.
- camera=new B.ArcRotateCamera('camera',Math.PI*1.23,.83,33,
-  new B.Vector3(0,.8,-104),scene);
- camera.lowerRadiusLimit=18;camera.upperRadiusLimit=85;
- camera.lowerBetaLimit=.43;camera.upperBetaLimit=1.25;
+ // Mirror the FIRST Three.js game's camera: elevated follow, stable heading.
+ // Babylon map's northern direction is +Z, so stand behind the blue hero.
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.88,24,
+  new B.Vector3(0,1,-107),scene);
+ camera.lowerRadiusLimit=23;camera.upperRadiusLimit=25;
+ camera.lowerBetaLimit=.87;camera.upperBetaLimit=.89;
  camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
  state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
- camera.attachControl(canvas,true);
+ // The first game never let a one-finger drag spin the battlefield.
+ // Keep direct touch joystick + tap-to-move; camera is follow-locked.
+ camera.detachControl();
+ state.controls='first-game-free-walking';
+ state.armyBehavior='autonomous-capture-and-magnet';
  scene.onPointerObservable.add(info=>{
   if(info.type!==B.PointerEventTypes.POINTERPICK||!info.pickInfo?.hit)return;
   let mesh=info.pickInfo.pickedMesh;
@@ -453,6 +459,7 @@ function assignView(view,unit){
   return;
  }
  view.weapon='Kar98k';
+ view.lastUnitX=unit.x;view.lastUnitZ=unit.z;
  view.anchor.setEnabled(true);
  view.anchor.position.copyFrom(position(unit));
  view.anchor.rotation.y=unit.team==='враг'?-Math.PI/2:Math.PI/2;
@@ -513,10 +520,12 @@ function setup(scenarioName){
   u.spawn={x:u.x,z:u.z};
  }
  for(const u of enemies){u.economyTeam='red';u.spawn={x:u.x,z:u.z};}
- fieldOrders=orders.create({hero:allies[0],allies,enemies,onArrive:()=>{
-  if(destinationMark)destinationMark.isVisible=false;
- }});
- controller=tactics.create({battle,allies,enemies,driveAllies:dt=>fieldOrders.update(dt),endWhenEliminated:scenario!=='squads',
+ fieldOrders=orders.create({hero:allies[0],allies,enemies,
+  farms:economy.farms,
+  centralOpen:()=>economy.summary().central.open,
+  onArrive:()=>{if(destinationMark)destinationMark.isVisible=false;}
+ });
+ controller=tactics.create({battle,allies,enemies,driveAllies:dt=>fieldOrders.updateAllies(dt),driveEnemies:dt=>fieldOrders.updateEnemies(dt),endWhenEliminated:scenario!=='squads',
   onShot:drawShot,
   onFinish:result=>alertStatus(result.winner==='allies'?
    'Победа! Отряд удержал позицию. Нажмите «Новый бой» для продолжения.':
@@ -612,14 +621,17 @@ function syncVisual(view){
  view.hpFill.position.x=-.38*(1-nextHP);
  view.anchor.position.copyFrom(position(unit));
  const target=controller?.getTarget(unit);
- if(target){
-  const deltaX=target.x-unit.x,deltaZ=target.z-unit.z;
-  view.anchor.rotation.y=Math.atan2(deltaX,deltaZ);
-  if(unit===findActor()&&controller?.isMoving(unit)&&fieldOrders){
-   const heading=fieldOrders.snapshot().heading;
-   view.anchor.rotation.y=Math.atan2(heading.x,heading.z);
-  }
+ const dx=unit.x-(view.lastUnitX??unit.x);
+ const dz=unit.z-(view.lastUnitZ??unit.z);
+ const moving=controller?.isMoving(unit);
+ // Face the direction of actual movement. Previously every autonomous unit
+ // ran sideways while staring at an enemy hundreds of metres away.
+ if(moving && Math.hypot(dx,dz)>.005){
+  view.anchor.rotation.y=Math.atan2(dx,dz);
+ }else if(target && Math.hypot(target.x-unit.x,target.z-unit.z)<42){
+  view.anchor.rotation.y=Math.atan2(target.x-unit.x,target.z-unit.z);
  }
+ view.lastUnitX=unit.x;view.lastUnitZ=unit.z;
  if(unit.weapon!==view.weapon){
   view.weapon=unit.weapon;
   view.lastPose=null; // Force matching animation after fallback.
@@ -679,6 +691,10 @@ function drawHud(){
  if(!state.ready||!battle||!controller)return;
  const hero=findActor();
  const snap=controller.snapshot();
+ state.firstGameArmy=fieldOrders?.snapshot()||null;
+ state.heroPosition={x:hero.x,z:hero.z};
+ state.cameraPosition=camera?{radius:camera.radius,alpha:camera.alpha,
+  beta:camera.beta,targetX:camera.target.x,targetZ:camera.target.z}:null;
  const inventory=hero.weapon==='Kar98k'?null:hero.inventory[hero.weapon];
  const funds=battle.getFunds();
  const econ=economy?.summary();
@@ -707,6 +723,9 @@ function drawHud(){
   '\nЦентр: '+timerLabel+
   (paid?'\nЗапас: '+paid:'')+
   '\nСтрой: '+(fieldOrders?.snapshot().mode==='semicircle'?'боевой полукруг':'черепаха')+
+  '\nАрмия: охрана героя '+(state.firstGameArmy?.aliveGuards||0)+
+   ' · самостоятельные 🔵 '+(state.firstGameArmy?.autonomousBlue||0)+
+   ' / 🔴 '+(state.firstGameArmy?.autonomousRed||0)+
   '\nВыстрелы героя: '+hero.shots+' · поражено: '+hero.kills+
   (state.reinforcements?'\nПополнение каждые 1,4 с · лимит '+REINFORCEMENT_LIMIT+' на сторону'+
     '\nЗа бой прибыло: 🔵 '+state.reinforcements.totalBlueReinforced+
@@ -819,27 +838,29 @@ function registerUI(){
   drawHud();
  });
 }
-// Direct first-game controls: thumb movement plus fire-priority button.
-// Actual bullets/damage remain fully inside the existing combat controller.
+// First game's direct WASD/joystick walking. No repeating waypoint commands.
+// Screen-up means NORTH (+Z) on the Babylon 300x300 battlefield.
 function updateTouchJoystick(dt){
- if(!touchJoystick.active||!fieldOrders||!camera)return;
- const hero=findActor();
- if(!hero?.alive)return;
- touchJoystick.cooldown-=dt;
- if(touchJoystick.cooldown>0)return;
- touchJoystick.cooldown=.1;
- const forward=camera.target.subtract(camera.position);
- forward.y=0;
- if(forward.lengthSquared()<1e-6)return;
- forward.normalize();
- const right=new B.Vector3(forward.z,0,-forward.x);
- const vx=touchJoystick.x,vy=touchJoystick.y;
- if(Math.hypot(vx,vy)<.11){fieldOrders.clearDestination();return;}
- fieldOrders.setDestination(
-  hero.x+(right.x*vx+forward.x*vy)*11,
-  hero.z+(right.z*vx+forward.z*vy)*11);
+ if(!fieldOrders)return;
+ if(touchJoystick.active){
+  fieldOrders.setMovement(touchJoystick.x,touchJoystick.y);
+  return;
+ }
+ const x=Number(movementKeys.d||movementKeys.ArrowRight)-
+  Number(movementKeys.a||movementKeys.ArrowLeft);
+ const z=Number(movementKeys.w||movementKeys.ArrowUp)-
+  Number(movementKeys.s||movementKeys.ArrowDown);
+ fieldOrders.setMovement(x,z);
 }
 function registerTouchControls(){
+ // Match the first game's W/A/S/D and arrow-key walking on desktop.
+ // Key events only change a movement vector; the combat loop owns physics.
+ for(const type of ['keydown','keyup'])window.addEventListener(type,e=>{
+  if(!(e.key in movementKeys))return;
+  if(e.target?.matches?.('input,textarea,select,[contenteditable=true]'))return;
+  movementKeys[e.key]=type==='keydown';
+  if(e.key.startsWith('Arrow'))e.preventDefault();
+ });
  const pad=$('touch-stick'),knob=$('touch-stick-knob');
  if(!pad||!knob)return;
  function move(e){
@@ -858,7 +879,7 @@ function registerTouchControls(){
   touchJoystick.active=false;touchJoystick.pointer=null;
   touchJoystick.x=touchJoystick.y=0;touchJoystick.cooldown=0;
   knob.style.transform='translate(0,0)';
-  fieldOrders?.clearDestination();
+  fieldOrders?.clearMovement();
  }
  pad.addEventListener('pointerdown',e=>{
   if(!state.ready||!gameStarted||!findActor()?.alive)return;
@@ -936,7 +957,10 @@ function updateReinforcements(dt){
  state.reinforcements=replenisher.snapshot();
 }
 function frame(){
- const dt=Math.max(0,Math.min(.05,engine.getDeltaTime()/1000));
+ // Under mobile software rendering, clamping to 50ms made real-time
+ // walking, army spawning and gold clocks slow down dramatically at <20 FPS.
+ // 120ms is still safely below every core's maximum simulation step (200ms).
+ const dt=Math.max(0,Math.min(.12,engine.getDeltaTime()/1000));
  if(state.ready&&controller){
   if(!gamePausedForBriefing){
    updateTouchJoystick(dt);
@@ -957,10 +981,10 @@ function frame(){
    syncVisual(view);
    nativeBlend.update(view,dt);
   }
-  // Follow the controlled hero with the existing touch-orbit camera.
+  // Fixed original Three.js follow profile, without rotating on the joystick.
   if(allies[0]?.alive&&camera){
    // Leave room ahead to see enemies and cover, as in the original.
-   const dest=position(allies[0],.75).add(new B.Vector3(0,0,3));
+   const dest=position(allies[0],.75).add(new B.Vector3(0,0,0));
    camera.target=B.Vector3.Lerp(camera.target,dest,Math.min(1,dt*2.8));
   }
   if(world&&economy)world.syncFarms(economy.summary());

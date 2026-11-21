@@ -98,6 +98,7 @@ button:disabled{opacity:.5;cursor:default}
 <script src="./combat-presentation-core.js"></script>
 <script src="./squad-combat-core.js"></script>
 <script src="./field-orders-core.js"></script>
+<script src="./first-game-army-core.js"></script>
 <script src="./replenishment-core.js"></script>
 <script src="./gold-economy-core.js"></script>
 <script src="./world-300.js"></script>
@@ -134,7 +135,7 @@ button:disabled{opacity:.5;cursor:default}
     <tr><td>Уничтожение бойца</td><td>+15</td></tr>
     <tr><td>Уничтожение бронированного</td><td>+30</td></tr>
    </tbody></table>
-   <p>Непрерывная битва: войска постепенно прибывают с обеих баз, погибшие заменяются подкреплениями. На поле одновременно не более 8 бойцов каждой стороны (16 всего), чтобы сохранить скорость на iPhone. Объединённая экспериментальная сцена: американский герой, оригинальный Jakeli и утверждённый немецкий боец подключаются из сохранённых GLB без замены облика. У Jakeli ещё не пройдена проверка деформации скелета и хвата оружия — до этого финальный выпуск заблокирован. Три слота Командос ожидают согласованного исходника. Источники Danoob и Fab не подменяются другими моделями. <a href="./allied-model-review.html" target="_blank" rel="noopener" style="color:#e5d49c">Открыть выбранные модели авторов</a>. Герой занимает отдельное зарезервированное место среди восьми британских бойцов. После гибели солдата его место вновь займёт подкрепление, прибывающее с базы. Бой не ограничен 24 появлениями.</p>
+   <p>Непрерывная битва: войска постепенно прибывают с обеих баз, погибшие заменяются подкреплениями. На поле одновременно не более 8 бойцов каждой стороны (16 всего), чтобы сохранить скорость на iPhone. Шесть ближайших бойцов могут присоединиться к герою; остальные действуют самостоятельно и захватывают объекты. Объединённая экспериментальная сцена: американский герой, оригинальный Jakeli и утверждённый немецкий боец подключаются из сохранённых GLB без замены облика. У Jakeli ещё не пройдена проверка деформации скелета и хвата оружия — до этого финальный выпуск заблокирован. Три слота Командос ожидают согласованного исходника. Источники Danoob и Fab не подменяются другими моделями. <a href="./allied-model-review.html" target="_blank" rel="noopener" style="color:#e5d49c">Открыть выбранные модели авторов</a>. Герой занимает отдельное зарезервированное место среди восьми британских бойцов. После гибели солдата его место вновь займёт подкрепление, прибывающее с базы. Бой не ограничен 24 появлениями.</p>
    <div id="brief-progress" role="status" aria-live="polite">Загружаем Battlefield…</div>
    <button id="enter-game" type="button" disabled>Загрузка бойцов…</button>
    <p class="brief-tip">Старт боя — только по нажатию. Можно спокойно дочитать схему, даже если игра уже загрузилась.</p>
@@ -144,7 +145,7 @@ button:disabled{opacity:.5;cursor:default}
 
 <canvas id="view" aria-label="Основная игра Battlefield. Коснитесь земли, чтобы приказать герою двигаться."></canvas>
 <header id="heading"><h1>Капрал на линии фронта</h1>
-<small>Battlefield · управление героем и отрядом</small><div id="quick-status" role="status">HP 100 · Золото 560 · 🔵 1 : 1 🔴</div></header>
+<small>Battlefield · свободная бродилка · самостоятельная армия</small><div id="quick-status" role="status">HP 100 · Золото 560 · 🔵 1 : 1 🔴</div></header>
 <button id="hud-toggle" type="button" aria-pressed="true" aria-controls="panel">Меню</button>
 <section id="panel" aria-label="Управление игрой">
 <div id="loading" role="status">Загружаю бойцов и оружие…</div>
@@ -173,11 +174,11 @@ button:disabled{opacity:.5;cursor:default}
 </div>
 <div id="reload"><div id="reload-fill"></div></div>
 <div id="readout" role="status">Подготовка сцены…</div>
-<div id="event" role="status">Коснитесь земли для движения, противника — для атаки.</div>
+<div id="event" role="status">Джойстик или WASD — ходьба · армия самостоятельно захватывает фермы.</div>
 <p class="note"><a href="https://sketchfab.com/3d-models/cartoon-dieselpunk-armored-cars-polygonal-style-cd1e044d046841aa846cce9edee0fa3e" target="_blank" rel="noopener noreferrer" style="color:#e5d49c">Подбитая техника: Tykryk, CC BY 4.0</a></p>
 <p class="note">🔵 Британцы против 🔴 Вермахта. Карта 300×300 с пятью золотыми фермами, семью ДОТами и тремя подбитыми БТР. После старта дополнительные 3D-бойцы появляются постепенно. Подключён загрузчик оригинальных GLB и система переноса анимаций с проверкой скелета и хвата. Для героя и Jakeli используются сохранённые GLB: это предварительная интеграция, а не одобрение проблемной анимации Jakeli. Отдельный Командос ещё не установлен: его временный прототип не является утверждённой моделью. <a href="./allied-model-review.html" target="_blank" rel="noopener" style="color:#e5d49c">Посмотреть выбранные оригинальные модели</a> · <a href="./allied-ik-lab.html" target="_blank" rel="noopener" style="color:#e5d49c">Проверить GLB и хват оружия</a>. Оружие: Lee-Enfield, Sten, Bren и временный PIAT. Снаряжение — в режиме паузы; полноценная анимация перезарядки и обход препятствий ещё не готовы.</p>
 </section>
-<div id="footer">Коснитесь земли — приказ герою · коснитесь противника — выбрать цель · камера — двумя пальцами</div>
+<div id="footer">WASD или джойстик — свободное движение · коснитесь цели — приоритет огня · армия захватывает фермы самостоятельно</div>
 <canvas id="battle-minimap" width="116" height="116" role="img" aria-label="Мини-карта: позиции британцев, Вермахта, фермы и базы"></canvas>
 <div id="mobile-controls" aria-label="Управление в стиле первой игры">
  <div id="touch-stick" aria-label="Джойстик движения героя" role="application"><div id="touch-stick-knob"></div></div>
