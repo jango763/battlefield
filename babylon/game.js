@@ -687,6 +687,10 @@ function drawHud(){
  if(!state.ready||!battle||!controller)return;
  const hero=findActor();
  const snap=controller.snapshot();
+ state.firstGameArmy=fieldOrders?.snapshot()||null;
+ state.heroPosition={x:hero.x,z:hero.z};
+ state.cameraPosition=camera?{radius:camera.radius,alpha:camera.alpha,
+  beta:camera.beta,targetX:camera.target.x,targetZ:camera.target.z}:null;
  const inventory=hero.weapon==='Kar98k'?null:hero.inventory[hero.weapon];
  const funds=battle.getFunds();
  const econ=economy?.summary();
@@ -715,6 +719,9 @@ function drawHud(){
   '\nЦентр: '+timerLabel+
   (paid?'\nЗапас: '+paid:'')+
   '\nСтрой: '+(fieldOrders?.snapshot().mode==='semicircle'?'боевой полукруг':'черепаха')+
+  '\nАрмия: охрана героя '+(state.firstGameArmy?.aliveGuards||0)+
+   ' · самостоятельные 🔵 '+(state.firstGameArmy?.autonomousBlue||0)+
+   ' / 🔴 '+(state.firstGameArmy?.autonomousRed||0)+
   '\nВыстрелы героя: '+hero.shots+' · поражено: '+hero.kills+
   (state.reinforcements?'\nПополнение каждые 1,4 с · лимит '+REINFORCEMENT_LIMIT+' на сторону'+
     '\nЗа бой прибыло: 🔵 '+state.reinforcements.totalBlueReinforced+
