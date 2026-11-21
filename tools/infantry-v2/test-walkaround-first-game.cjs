@@ -10,7 +10,7 @@ const ending=fs.readFileSync(path.join(root,'preview/parts/german-016.txt'),'utf
 const script=wrapper.match(/<script>([\s\S]*?)<\/script>/);
 assert(script,'First-game loader not found');
 new Function(script[1]);
-assert(alias.includes('play=walk&graphics=boost'),'Walkaround alias does not target first engine');
+assert(alias.includes('walkaround-bundled.html'),'Walkaround alias does not target the one-file first engine');
 assert(wrapper.includes("const playMode=new URLSearchParams(location.search).get('play')||'classic'"));
 assert(wrapper.includes("playMode==='walk'"),'Close follow must be opt-in, keep first camera available');
 assert(wrapper.includes('20.5,camP.z+16.5'),'Hero follow not close enough');
