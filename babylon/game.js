@@ -698,7 +698,7 @@ function drawHud(){
  const paid=Object.keys(hero.inventory).map(w=>w+':'+battle.totalAmmo(hero,w)).join(' · ');
  $('readout').textContent=
   'Бой: '+(snap.active?'ИДЁТ':snap.done?'ЗАВЕРШЁН':'ОЖИДАНИЕ')+
-  ' · британцы '+snap.alliesAlive+'/'+allies.length+' · Вермахт '+snap.enemiesAlive+'/'+enemies.length+
+  ' · британцы '+snap.alliesAlive+'/'+(state.reinforcements?.maxAlivePerSide||allies.length)+' · Вермахт '+snap.enemiesAlive+'/'+(state.reinforcements?.maxAlivePerSide||enemies.length)+
   '\nГерой 🇺🇸 ('+(hero.characterModelImported?'модель загружена':'3D-файл ещё не получен')+'): '+Math.round(hero.hp)+'/100 HP · оружие: '+britishLabel(hero.weapon)+
   (inventory?' · '+inventory.loaded+'+'+inventory.reserve+' патр.':' · ∞ патронов')+
   (hero.reloadRemaining>0?'\nПерезарядка: '+hero.reloadRemaining.toFixed(1)+' c':'')+
@@ -708,6 +708,9 @@ function drawHud(){
   (paid?'\nЗапас: '+paid:'')+
   '\nСтрой: '+(fieldOrders?.snapshot().mode==='semicircle'?'боевой полукруг':'черепаха')+
   '\nВыстрелы героя: '+hero.shots+' · поражено: '+hero.kills+
+  (state.reinforcements?'\nПополнение каждые 1,4 с · лимит '+REINFORCEMENT_LIMIT+' на сторону'+
+    '\nЗа бой прибыло: 🔵 '+state.reinforcements.totalBlueReinforced+
+    ' · 🔴 '+state.reinforcements.totalRedReinforced:'')+
   '\nИмпортировано союзных GLB (эксперимент): '+state.importedAlliedCount+'/12'+
    '\nНемец: утверждён · Герой: '+(state.actorSources[0]?.realModelLoaded?'загружен':'нет GLB')+
    ' · Jakeli: '+(Object.values(state.actorSources).some(r=>r.id==='britishJakeli'&&r.realModelLoaded)?'импортирован, деформация требует приёмки':'ожидает загрузки')+
@@ -720,7 +723,7 @@ function drawHud(){
  drawMiniMap(econ);
  const short=$('quick-status');
  if(short)short.textContent='HP '+Math.round(hero.hp)+' · Золото '+funds+
-  ' · 🔵 '+snap.alliesAlive+' : '+snap.enemiesAlive+' 🔴';
+  ' · 🔵 '+snap.alliesAlive+' : '+snap.enemiesAlive+' 🔴'+(state.reinforcements?' · ⟳':'');
  const pause=$('quick-pause');
  if(pause)pause.textContent=atBase?'▶':'Ⅱ';
 }
