@@ -61,6 +61,30 @@
     // and engineer, while normal faction selection / HUD stay unchanged.
     html=once(html,'const PTS=[];',
       "const PTS=[];if(new URLSearchParams(location.search).get('inspect')==='wehrmacht'){const lab=document.createElement('div');lab.textContent='ВЕРМАХТ · 12 БОЙЦОВ · ОБЩАЯ СИСТЕМА';lab.style.cssText='position:fixed;left:8px;top:calc(env(safe-area-inset-top,0px) + 116px);z-index:990;padding:6px 9px;color:#fff;background:#26372fee;border:1px solid #aaa;border-radius:6px;font:700 12px Arial;pointer-events:none';document.body.appendChild(lab);}");
+    // Preferred iPhone play mode: actual FIRST Three.js battle rules, not a
+    // newly approximated Babylon 12x12 squad. Only the optical camera distance
+    // changes. Joystick, infantry AI, free movement, guards, commanders,
+    // engineers, economy, respawn/spawning and approved models are untouched.
+    const playMode=new URLSearchParams(location.search).get('play')||'classic';
+    if(playMode==='walk'){
+      html=once(html,
+        'const vh=2*Math.tan(cam.fov*Math.PI/360)*43,vw=vh*cam.aspect',
+        'const vh=2*Math.tan(cam.fov*Math.PI/360)*25,vw=vh*cam.aspect');
+      html=once(html,
+        'cam.position.set(camP.x+(shake>0?rnd(-.3,.3):0),34,camP.z+26+(shake>0?rnd(-.3,.3):0));cam.lookAt(camP.x,0,camP.z);',
+        'cam.position.set(camP.x+(shake>0?rnd(-.3,.3):0),20.5,camP.z+16.5+(shake>0?rnd(-.3,.3):0));cam.lookAt(camP.x,1.5,camP.z+1.2);');
+      // This is only a QA contract. It does not own or modify army logic.
+      html=once(html,'const camP={x:0,z:12},lk={x:0,z:0},lkT={x:0,z:0};',
+        "const camP={x:0,z:12},lk={x:0,z:0},lkT={x:0,z:0};"+
+        "window.__BF_WALKAROUND__={engine:'Three.js',camera:'follow-close',"+
+        "army:'original-autonomous',heroMovement:'original-joystick',"+
+        "getState:()=>({hero:[P.x,P.z],units:U.length,"+
+        "blueAlive:U.filter(u=>u.t==='blue'&&u.hp>0).length,"+
+        "redAlive:U.filter(u=>u.t==='red'&&u.hp>0).length,"+
+        "guards:U.filter(u=>u.guard&&u.hp>0).length,"+
+        "camera:[cam.position.x,cam.position.y,cam.position.z]," +
+        "spawnTimers:[spT.blue,spT.red],commanderTimers:[cmT.blue,cmT.red]})};");
+    }
     // Visible build check for the close-up only; standard RTS HUD unchanged.
     html=once(html,'const PTS=[];',
       "const PTS=[];if(new URLSearchParams(location.search).get('inspect')==='german'){const lab=document.createElement('div');lab.textContent='НЕМЕЦ · ПИЛОТКА V19';lab.style.cssText='position:fixed;right:9px;top:calc(env(safe-area-inset-top,0px) + 120px);z-index:990;padding:5px 8px;color:#fff;background:#253b32dc;border:1px solid #c1c3ad;border-radius:5px;font:700 12px Arial;pointer-events:none';document.body.appendChild(lab);}");
@@ -93,10 +117,11 @@
     }
     // Distinguish A/B versions visibly so the user never needs to guess.
     // Label is UI only; it never changes rendering, controls or game state.
-    const label=graphics==='original'?'ОРИГИНАЛ · THREE.JS':
+    const label=playMode==='walk'?'БРОДИЛКА · АРМИЯ ПЕРВОЙ ИГРЫ':
+      graphics==='original'?'ОРИГИНАЛ · THREE.JS':
       materialPass&&visualPass?'HD · ТЕКСТУРЫ ЗДАНИЙ':'ОБНОВЛЕНИЕ ГРАФИКИ';
     html=once(html,'</body>',
-      '<div id="graphics-build-label" style="position:fixed;z-index:700;left:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);max-width:45vw;padding:5px 7px;color:#f2ecd8;background:#19241dcc;border:1px solid #b3a27b;border-radius:5px;font:700 10px system-ui;pointer-events:none">'+label+'</div></body>');
+      '<div id="graphics-build-label" style="position:fixed;z-index:700;left:8px;top:calc(env(safe-area-inset-top,0px) + 78px);max-width:70vw;padding:5px 7px;color:#f2ecd8;background:#19241dcc;border:1px solid #b3a27b;border-radius:5px;font:700 10px system-ui;pointer-events:none">'+label+'</div></body>');
     progress.textContent='Запуск…';document.open();document.write(html);document.close();
   }catch(e){error.textContent='Не удалось загрузить игру: '+(e.name==='AbortError'?'превышено время ожидания':e.message);progress.textContent='Загрузка прервана';retry.hidden=false;}
 })();
