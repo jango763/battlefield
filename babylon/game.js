@@ -884,23 +884,53 @@ function registerTouchControls(){
  $('quick-pause').addEventListener('click',()=>$('fight').click());
  $('quick-reload').addEventListener('click',()=>$('reload-manual').click());
 }
-function updateReinforcements(dt){
- if(scenario!=='squads'||!gameStarted||!controller?.snapshot().active)return;
- for(const unit of [...allies,...enemies]){
-  if(unit.alive){respawnTimers.delete(unit);continue;}
-  if(!respawnTimers.has(unit))respawnTimers.set(unit,RESPAWN_SECONDS);
-  const left=respawnTimers.get(unit)-dt;
-  if(left>0){respawnTimers.set(unit,left);continue;}
-  respawnTimers.delete(unit);
+async function deployReinforcement({unit,side,hero},epoch){
+ const slot=unit.reinforcementSlot;
+ try{
+  // Stream ONLY this requested approved model; never create all 24 at launch.
+  await ensureUnits([slot]);
+  if(epoch!==reinforcementEpoch||scenario!=='squads'||!replenisher?.snapshot().active)
+   return; // A Reset or mode switch invalidated an in-flight asset request.
+  if(!controller?.snapshot().active){
+   replenisher.finish(unit,false);
+   return;
+  }
+  const view=views[slot];
+  if(!view)throw Error('Model was not created for reserve slot '+slot);
   unit.alive=true;unit.hp=unit.maxHp;
+  // Always start from the correct army base, never at the location of death.
   unit.x=unit.spawn.x;unit.z=unit.spawn.z;
-  unit.cooldown=0;unit.reloadRemaining=0;unit.reloadWeapon=null;unit.suppressed=0;
-  unit.weapon='Kar98k';unit.gold=0;
+  unit.cooldown=0;unit.reloadRemaining=0;unit.reloadWeapon=null;
+  unit.suppressed=0;unit.weapon='Kar98k';
   if(unit.isHero)fieldOrders?.clearDestination();
-  const view=actors.get(unit);
-  if(view){view.anchor.setEnabled(true);view.marker.setEnabled(true);
-   view.hpBack.setEnabled(true);view.hpFill.setEnabled(true);view.lastPose=null;}
+  unit.characterModelImported=!!view.importedAlliedModel;
+  assignView(view,unit);
+  actors.set(unit,view);
+  replenisher.finish(unit,true);
+  state.reinforcements=replenisher.snapshot();
+  // Existing weapon assets/IK remain attached to the original rig.
+  // Subsequent equip requests use the existing weapon queue.
+  if(unit.isHero)alertStatus('Герой вернулся на базу. Подкрепления продолжают прибывать.');
+  else if(state.reinforcements.totalBlueReinforced+
+   state.reinforcements.totalRedReinforced<=6)
+   alertStatus(side==='blue'?'Подкрепление союзников вышло с базы.':
+    'Подкрепление Вермахта вышло с базы.');
+  void processWeaponQueue();
+ }catch(error){
+  if(epoch!==reinforcementEpoch)return;
+  replenisher?.finish(unit,false);
+  const key='reinforcement-'+slot;
+  state.modelErrors[key]=String(error?.message||error);
+  console.warn('Не удалось загрузить подкрепление',side,slot,error);
  }
+}
+function updateReinforcements(dt){
+ if(scenario!=='squads'||!gameStarted||!controller?.snapshot().active||!replenisher)
+  return;
+ const requests=replenisher.update(dt);
+ const epoch=reinforcementEpoch;
+ for(const request of requests)void deployReinforcement(request,epoch);
+ state.reinforcements=replenisher.snapshot();
 }
 function frame(){
  const dt=Math.max(0,Math.min(.05,engine.getDeltaTime()/1000));
