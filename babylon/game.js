@@ -842,6 +842,14 @@ function updateTouchJoystick(dt){
  fieldOrders.setMovement(x,z);
 }
 function registerTouchControls(){
+ // Match the first game's W/A/S/D and arrow-key walking on desktop.
+ // Key events only change a movement vector; the combat loop owns physics.
+ for(const type of ['keydown','keyup'])window.addEventListener(type,e=>{
+  if(!(e.key in movementKeys))return;
+  if(e.target?.matches?.('input,textarea,select,[contenteditable=true]'))return;
+  movementKeys[e.key]=type==='keydown';
+  if(e.key.startsWith('Arrow'))e.preventDefault();
+ });
  const pad=$('touch-stick'),knob=$('touch-stick-knob');
  if(!pad||!knob)return;
  function move(e){
