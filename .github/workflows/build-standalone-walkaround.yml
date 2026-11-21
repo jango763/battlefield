@@ -1,0 +1,54 @@
+name: Build standalone first Battlefield walkaround
+on:
+  push:
+    branches:
+      - feature/threejs-walkaround-first-army-20261121
+    paths:
+      - 'preview/formation-replenishment-v3.html'
+      - 'preview/parts/german-*.txt'
+      - 'preview/german-v5.js'
+      - 'preview/visual-boost-v1.js'
+      - 'preview/ww2-structure-materials-v1.js'
+      - 'tools/infantry-v2/build-standalone-walkaround.cjs'
+      - '.github/workflows/build-standalone-walkaround.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: build-first-battlefield-iphone-standalone
+  cancel-in-progress: true
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Install pinned Three.js r128 locally for offline bundle
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/battlefield-three128 three@0.128.0
+          test -s /tmp/battlefield-three128/node_modules/three/build/three.min.js
+          test -s /tmp/battlefield-three128/node_modules/three/examples/js/loaders/GLTFLoader.js
+      - name: Assemble original Three.js into one mobile HTML page
+        run: |
+          node --check tools/infantry-v2/build-standalone-walkaround.cjs
+          node tools/infantry-v2/build-standalone-walkaround.cjs
+          test $(wc -c < preview/walkaround-bundled.html) -gt 3000000
+      - name: Publish single HTML file on experimental feature branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add preview/walkaround-bundled.html
+          if ! git diff --cached --quiet; then
+            git commit -m 'Build one-file first-game iPhone walkaround (no network code chunks)'
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
+      - name: Keep standalone HTML as backup artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlefield-first-walkaround-single-html
+          path: preview/walkaround-bundled.html
+          if-no-files-found: warn
+          retention-days: 14
