@@ -55,8 +55,9 @@ assert.equal(plan.snapshot().blueAlive,8,'British capped active budget missing')
 assert.equal(plan.snapshot().redAlive,8,'Wehrmacht capped active budget missing');
 const a=blue.find((u,i)=>i>0&&u.alive),b=red.find((u,i)=>i>0&&u.alive);
 a.alive=false;b.alive=false;
-advance(.3);
 assert.equal(plan.snapshot().blueAlive,7,'Fatality not reflected in ally roster');
+advance(.3);
+assert(plan.snapshot().blueAlive<=8,'Replenishment exceeded per-side cap');
 advance(6);
 assert.equal(plan.snapshot().blueAlive,8,'Dead British soldier not replenished');
 assert.equal(plan.snapshot().redAlive,8,'Dead German soldier not replenished');
