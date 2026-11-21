@@ -16,6 +16,7 @@ MATERIALS = {
     "plaster": "plastered_wall_05",
     "brick": "brick_wall_001",
     "stone": "stone_wall",
+    "wood": "weathered_planks",
 }
 UA = "BattlefieldIndie/0.1 (+github.com/jango763/battlefield; CC0 asset attribution audit)"
 def fetch(url, limit=12_000_000):
