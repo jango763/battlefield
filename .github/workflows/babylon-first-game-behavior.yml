@@ -1,0 +1,61 @@
+name: Babylon first-game behavior parity QA
+on:
+  push:
+    branches:
+      - feature/babylon-first-game-behavior-20261121
+    paths:
+      - 'babylon/game.js'
+      - 'babylon/index.html'
+      - 'babylon/first-game-army-core.js'
+      - 'babylon/squad-combat-core.js'
+      - 'babylon/tests/test-first-game-behavior.cjs'
+      - 'babylon/tests/test-first-game-behavior-browser.cjs'
+      - '.github/workflows/babylon-first-game-behavior.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: first-game-behavior-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  first-game-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify free walking, autonomous armies and approved existing combat rules
+        run: |
+          set -e
+          node --check babylon/game.js
+          node --check babylon/first-game-army-core.js
+          node --check babylon/squad-combat-core.js
+          node --check babylon/tests/test-first-game-behavior.cjs
+          node --check babylon/tests/test-first-game-behavior-browser.cjs
+          node babylon/tests/test-first-game-behavior.cjs
+          node babylon/tests/test-continuous-reinforcements.cjs
+          node babylon/tests/test-squad-combat.cjs
+          node babylon/tests/test-field-orders.cjs
+          node babylon/tests/test-central-unlock.cjs
+          node babylon/tests/test-gold-economy.cjs
+  iphone-browsers:
+    needs: first-game-rules
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mobile Chromium and WebKit
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/battlefield-first-game-parity playwright@1.58.2
+          /tmp/battlefield-first-game-parity/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Validate original game feel and genuine GLB soldiers on phone viewport
+        run: |
+          python3 -m http.server 8859 --bind 127.0.0.1 >/tmp/battlefield-first-game-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-first-game-behavior-browser.cjs
+      - name: Save proof screenshots and state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlefield-original-army-babylon-iphone-qa
+          path: babylon-qa-results/first-game-parity/
+          if-no-files-found: warn
+          retention-days: 10
