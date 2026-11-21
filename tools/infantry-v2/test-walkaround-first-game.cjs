@@ -19,9 +19,9 @@ assert(wrapper.includes('БРОДИЛКА · АРМИЯ ПЕРВОЙ ИГРЫ'),
 assert(original.includes('new THREE.PerspectiveCamera(40'),'First game camera changed');
 assert(original.includes("function guardUpdate(){"),'Magnetic guard logic missing');
 assert(original.includes("class ArmyAI"),'Autonomous first-game army missing');
-assert(original.includes("spT[t]=1.4;if(U.filter(u=>u.t===t).length<22)mk(t)"),
+assert(ending.includes("spT[t]=1.4;if(U.filter(u=>u.t===t).length<22)mk(t)"),
  'Army must replenish at 1.4s with same 22 per-side population threshold');
-assert(original.includes("cmT[t]=30;mk(t,true)"),'Commanders must still recruit');
+assert(ending.includes("cmT[t]=30;mk(t,true)"),'Commanders must still recruit');
 assert(original.includes("if(cur<6)"),'Hero escort/magnet must still fill up to 6');
 assert(original.includes("function mk(t,cmd,eng)"),'Engineer and officer roles missing');
 assert(ending.includes('requestAnimationFrame(loop)'),'First game render loop missing');
