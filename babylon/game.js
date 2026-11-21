@@ -125,10 +125,10 @@ function createWorld(){
 
  // Mirror the FIRST Three.js game's camera: elevated follow, stable heading.
  // Babylon map's northern direction is +Z, so stand behind the blue hero.
- camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.66,43,
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.88,24,
   new B.Vector3(0,1,-107),scene);
- camera.lowerRadiusLimit=40;camera.upperRadiusLimit=47;
- camera.lowerBetaLimit=.65;camera.upperBetaLimit=.68;
+ camera.lowerRadiusLimit=23;camera.upperRadiusLimit=25;
+ camera.lowerBetaLimit=.87;camera.upperBetaLimit=.89;
  camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
  state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
  // The first game never let a one-finger drag spin the battlefield.
@@ -459,6 +459,7 @@ function assignView(view,unit){
   return;
  }
  view.weapon='Kar98k';
+ view.lastUnitX=unit.x;view.lastUnitZ=unit.z;
  view.anchor.setEnabled(true);
  view.anchor.position.copyFrom(position(unit));
  view.anchor.rotation.y=unit.team==='враг'?-Math.PI/2:Math.PI/2;
@@ -620,14 +621,17 @@ function syncVisual(view){
  view.hpFill.position.x=-.38*(1-nextHP);
  view.anchor.position.copyFrom(position(unit));
  const target=controller?.getTarget(unit);
- if(target){
-  const deltaX=target.x-unit.x,deltaZ=target.z-unit.z;
-  view.anchor.rotation.y=Math.atan2(deltaX,deltaZ);
-  if(unit===findActor()&&controller?.isMoving(unit)&&fieldOrders){
-   const heading=fieldOrders.snapshot().heading;
-   view.anchor.rotation.y=Math.atan2(heading.x,heading.z);
-  }
+ const dx=unit.x-(view.lastUnitX??unit.x);
+ const dz=unit.z-(view.lastUnitZ??unit.z);
+ const moving=controller?.isMoving(unit);
+ // Face the direction of actual movement. Previously every autonomous unit
+ // ran sideways while staring at an enemy hundreds of metres away.
+ if(moving && Math.hypot(dx,dz)>.005){
+  view.anchor.rotation.y=Math.atan2(dx,dz);
+ }else if(target && Math.hypot(target.x-unit.x,target.z-unit.z)<42){
+  view.anchor.rotation.y=Math.atan2(target.x-unit.x,target.z-unit.z);
  }
+ view.lastUnitX=unit.x;view.lastUnitZ=unit.z;
  if(unit.weapon!==view.weapon){
   view.weapon=unit.weapon;
   view.lastPose=null; // Force matching animation after fallback.
