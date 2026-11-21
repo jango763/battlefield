@@ -288,7 +288,7 @@ function apply({scene,B,world,camera,sun,map}){
  report.ready=true;
  scene.metadata=scene.metadata||{};
  scene.metadata.battlefieldModernArt=report;
- return Object.freeze(report);
+ return report; // Asynchronous local JPG loads increment report.scannedMaterialMaps.
 }
 return Object.freeze({apply,PROFILE});
 });
