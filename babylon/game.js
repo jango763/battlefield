@@ -10,6 +10,7 @@ const combat=window.BattlefieldBalance;
 const tactics=window.BattlefieldSquadController;
 const presentation=window.BattlefieldCombatPresentation;
 const orders=window.BattlefieldFieldOrders;
+const replenishment=window.BattlefieldReplenishment;
 const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
 const legacyVisual=window.BattlefieldLegacyVisualStyle;
@@ -28,7 +29,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -68,22 +69,21 @@ window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
 let modelDepot=null;
 let actors=new Map(),fx=[],scenario='squads',atBase=true,world=null;
+let replenisher=null,reinforcementEpoch=0;
+const REINFORCEMENT_LIMIT=8;
 let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 let weaponQueue=[],weaponWorker=false;
 let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
 const touchJoystick={active:false,pointer:null,x:0,y:0,cooldown:0};
-const respawnTimers=new Map(),RESPAWN_SECONDS=28;
+// Reinforcement clocks are owned by replenishment-core.js.
 function alertStatus(message){$('event').textContent=message}
 enterButton.addEventListener('click',()=>{
  if(!state.ready||gameStarted)return;
  const r=controller.start();
  if(!r.ok){alertStatus('Бой не удалось начать: '+r.reason);return;}
  gameStarted=true;gamePausedForBriefing=false;
- // Bring in the full 12-on-12 models progressively, while the match is running.
- void ensureUnits('squads').then(()=>processWeaponQueue()).catch(error=>{
-  $('loading').textContent='Некоторые бойцы не загрузились: '+(error?.message||error);
-  console.error('24 soldier models',error);
- });
+ // Character models now load individually when a reinforcement leaves its base.
+ // No eager 24-skeleton load on iPhone.
  briefing.hidden=true;briefing.setAttribute('aria-hidden','true');
  // The first game's combat screen prioritised the battlefield, not a settings panel.
  $('panel').classList.add('closed');
@@ -253,14 +253,14 @@ const SCENE_SLOTS={
 // instantiating overlapping skeletons or double-counting soldier models.
 let ensureUnitsInFlight=null;
 async function ensureUnits(scenarioName){
- while(ensureUnitsInFlight)await ensureUnitsInFlight;
+ while(ensureUnitsInFlight){try{await ensureUnitsInFlight;}catch(_){/* retry next slot */}}
  const task=ensureUnitsUnlocked(scenarioName);
  ensureUnitsInFlight=task;
  try{return await task;}
  finally{if(ensureUnitsInFlight===task)ensureUnitsInFlight=null;}
 }
 async function ensureUnitsUnlocked(scenarioName){
- const slots=SCENE_SLOTS[scenarioName];
+ const slots=Array.isArray(scenarioName)?scenarioName:SCENE_SLOTS[scenarioName];
  if(!slots)throw Error('Неизвестный режим отряда: '+scenarioName);
  if(!asset){
   $('loading').textContent='Загружаю анимированного немецкого стрелка…';
@@ -329,7 +329,7 @@ async function ensureUnitsUnlocked(scenarioName){
    state.models++;state.clips+=new Set(view.clips.values()).size;
   weaponQueue.push(view);
   const unit=i<12?allies[i]:enemies[i-12];
-  if(state.ready&&unit){
+  if(state.ready&&unit?.alive){
    unit.characterModelImported=!!externalModel;
    assignView(view,unit);actors.set(unit,view);
   }
@@ -415,7 +415,7 @@ async function chooseScenario(name){
  starting=true;
  for(const button of document.querySelectorAll('button'))button.disabled=true;
  try{
-  await ensureUnits(name);
+  await ensureUnits(name==='squads'?'duel':name);
   setup(name);
   void processWeaponQueue();
   const launch=gameStarted?controller.start():{ok:false};
@@ -467,7 +467,8 @@ function setup(scenarioName){
  if(!state.ready)return;
  if(!SCENARIOS[scenarioName])throw Error('Unknown scenario');
  controller?.stop();
- respawnTimers.clear();
+ replenisher?.stop();replenisher=null;
+ reinforcementEpoch++;
  scenario=scenarioName;atBase=true;
  if(destinationMark)destinationMark.isVisible=false;
  state.scenario=scenario;state.atBase=true;state.focus=null;
