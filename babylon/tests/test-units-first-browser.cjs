@@ -45,7 +45,9 @@ async function check(engine,name){
    assert.equal(snapshot.otherVisible.length,0,'Previous models overlap '+id);
    assert.equal(snapshot.approval,id==='german',
     'Experimental UK/US model incorrectly marked final');
-   await page.waitForTimeout(450);
+   // WebKit shader compilation may not render the very first 65/68-bone
+   // skinned frame immediately after a loaded-state callback.
+   await page.waitForTimeout(id==='german'?1650:650);
    await page.screenshot({path:DIR+'/'+name+'-'+id+'-idle.png'});
    await page.locator('[data-motion="walk"]').click();
    await page.waitForTimeout(380);
