@@ -1,0 +1,48 @@
+name: Public iPhone one-file access check
+on:
+  push:
+    branches:
+      - feature/threejs-walkaround-first-army-20261121
+    paths:
+      - 'preview/walkaround.html'
+      - '.github/workflows/verify-public-walkaround.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  remote-cdn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify current commit contains full one-file build
+        run: |
+          test -s preview/walkaround-bundled.html
+          test $(wc -c < preview/walkaround-bundled.html) -gt 8000000
+          ! grep -q 'src="https://cdnjs.cloudflare.com' preview/walkaround-bundled.html
+          ! grep -q 'src="https://cdn.jsdelivr.net' preview/walkaround-bundled.html
+          grep -q 'window.__BF_WALKAROUND__' preview/walkaround-bundled.html
+      - name: Check public rawcdn and raw.githack endpoints
+        shell: bash
+        run: |
+          set +e
+          for domain in rawcdn.githack.com raw.githack.com; do
+            url="https://$domain/jango763/battlefield/$GITHUB_SHA/preview/walkaround-bundled.html"
+            echo "CHECK_DOMAIN=$domain"
+            curl --location --silent --show-error --max-time 100 \
+              --write-out "HTTP:%{http_code} TYPE:%{content_type} BYTES:%{size_download}\n" \
+              --output /tmp/remote-game.html "$url"
+            code=$?
+            if [ "$code" -eq 0 ]; then
+              echo "FILE_BYTES=$(wc -c </tmp/remote-game.html)"
+              head -c 85 /tmp/remote-game.html
+              echo
+              if grep -q 'window.__BF_WALKAROUND__' /tmp/remote-game.html; then
+                echo "PUBLIC_GAME_CONTENT_VERIFIED=$domain"
+              else
+                echo "NO_GAME_CONTENT_AT_DOMAIN=$domain"
+              fi
+            else
+              echo "CDN_ERROR=$domain:$code"
+            fi
+          done
