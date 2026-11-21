@@ -126,10 +126,10 @@ function createWorld(){
 
  // Mirror the FIRST Three.js game's camera: elevated follow, stable heading.
  // Babylon map's northern direction is +Z, so stand behind the blue hero.
- camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.88,24,
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.5,1.08,24,
   new B.Vector3(0,1,-107),scene);
  camera.lowerRadiusLimit=23;camera.upperRadiusLimit=25;
- camera.lowerBetaLimit=.87;camera.upperBetaLimit=.89;
+ camera.lowerBetaLimit=1.07;camera.upperBetaLimit=1.09;
  camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
  state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
  // Real photographed materials and geometry; Babylon skinned soldiers, game AI,
