@@ -54,7 +54,16 @@ function apply({scene,B,world,camera,sun,map}){
   return m;
  }
  const mud=pbr('scanned-mud','mud',{scale:32,tint:'#bbc1b1',rough:1});
- const mudRoad=pbr('tracked-earth','mud',{scale:3,tint:'#b5a486',rough:1});
+ // Road boxes are 265 x 9 metres. Texture UVs need DISTANCE-PROPORTIONAL
+ // repeat counts or photoscanned soil stretches into ugly vertical streaks.
+ const mudRoad=pbr('tracked-earth','mud',{scale:1,tint:'#b5a486',rough:1});
+ const crossRoad=pbr('tracked-earth-east-west','mud',{scale:1,tint:'#b5a486',rough:1});
+ for(const tex of [mudRoad.albedoTexture,mudRoad.bumpTexture]){
+  tex.uScale=1.6;tex.vScale=45;
+ }
+ for(const tex of [crossRoad.albedoTexture,crossRoad.bumpTexture]){
+  tex.uScale=40;tex.vScale=1.3;
+ }
  const plaster=pbr('battered-plaster','plaster',{scale:2,tint:'#d4c8b5'});
  const brick=pbr('weathered-brick','brick',{scale:2,tint:'#c4aa9b',rough:1});
  const stone=pbr('pitted-stone','stone',{scale:2,tint:'#c4bfaf',rough:1});
@@ -76,7 +85,7 @@ function apply({scene,B,world,camera,sun,map}){
   'farm-door-':timber,'farm-window-sill-':stone,'farm-roof-ridge-':timber,
   'base-door-':timber,'farm-barn-roof-':roof,
   'base-hq-roof-':roof,'barrack-roof-':roof,'farm-roof-':roof,
-  'north-south-road':mudRoad,'west-east-road':mudRoad,
+  'north-south-road':mudRoad,'west-east-road':crossRoad,
   'lane-farm-':dirt,'btr-top-':timber
  };
  // Mesh semantics drive art, not blanket traversal. Faction capture rings,
@@ -86,11 +95,19 @@ function apply({scene,B,world,camera,sun,map}){
   // Babylon.Mesh has no Three.js-style "isMesh" property: all genuine map
   // geometry was erroneously skipped in the first art test.
   if(!mesh?.material||mesh.skeleton)continue;
+  // Hundreds of raised rectangular road ruts looked like 1990s scenery.
+  if(mesh.name.startsWith('rut-')){mesh.isVisible=false;continue;}
   const match=entries.find(([prefix])=>mesh.name.startsWith(prefix));
   if(!match)continue;
   // Clan/faction indicators remain unmodified by the texture pass.
   mesh.material=match[1];
   mesh.receiveShadows=true;report.meshSurfaces++;
+ }
+ // Strong white 28-metre circles across the hero's screen were base rings,
+ // not ground art. Faction bases are already marked on the minimap.
+ for(const base of map.bases){
+  const circle=scene.getMeshByName('map-ring-'+base.id);
+  if(circle)circle.isVisible=false;
  }
  const batches=new Map();
  function addShape(mesh,matName){
@@ -197,7 +214,7 @@ function apply({scene,B,world,camera,sun,map}){
  // A ruined rural wall near the playable route gets real wall openings and
  // thickness; never block the hero/AI path or add undocumented collisions.
  for(const [index,rx,rz] of [[0,126,72],[1,174,86],[2,98,188],
-  [3,202,199],[4,110,244],[5,198,52]]){
+  [3,202,199],[4,110,244],[5,165,62]]){
   const h=between(3.2,4.9),wallLength=between(7,11);
   // Segmented walls with missing central sections, not intact boxes.
   for(const side of [-1,1]){
