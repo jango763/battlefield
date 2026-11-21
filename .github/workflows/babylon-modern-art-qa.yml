@@ -5,9 +5,11 @@ on:
       - feature/babylon-modern-art-v1-20261121
     paths:
       - 'babylon/modern-art-v1.js'
+      - 'babylon/modern-village-models.js'
       - 'babylon/game.js'
       - 'babylon/index.html'
       - 'babylon/art/**'
+      - 'babylon/art/models/**'
       - 'babylon/tests/test-modern-art.cjs'
       - 'babylon/tests/test-modern-art-browser.cjs'
       - '.github/workflows/babylon-modern-art-qa.yml'
@@ -25,6 +27,7 @@ jobs:
       - name: Validate PBR image rights and asset bytes, geometry, legacy gameplay
         run: |
           node --check babylon/modern-art-v1.js
+          node --check babylon/modern-village-models.js
           node --check babylon/game.js
           node --check babylon/tests/test-modern-art-browser.cjs
           node babylon/tests/test-modern-art.cjs
