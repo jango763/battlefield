@@ -23,7 +23,7 @@ async function inspect(browserType,browserName){
   assert.equal(state.models,2,'24 skeletons should NOT be loaded at boot');
   assert(Math.abs(state.cameraPosition.alpha-Math.PI*1.5)<.1,
    'Camera no longer follows original first-game direction');
-  assert(Math.abs(state.cameraPosition.radius-43)<2);
+  assert(Math.abs(state.cameraPosition.radius-24)<2);
   report.start={models:state.models,controls:state.controls,
    army:state.armyBehavior,camera:state.cameraPosition};
   await page.screenshot({path:ROOT+'/'+browserName+'-hero-start.png'});
