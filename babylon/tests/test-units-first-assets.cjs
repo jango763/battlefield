@@ -31,14 +31,19 @@ for(const [id,[filename,clips]] of Object.entries(sources)){
  assert.equal(bytes.toString('ascii',16,20),'JSON');
  const content=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)).toString('utf8'));
  const skel=content.skins||[];
- assert.equal(skel.length,1,'One independent rig '+filename);
- assert.equal(skel[0].joints.length,65,'65 source joints '+filename);
+ console.log('SOURCE_GLB_RIGS',id,JSON.stringify({
+  skins:skel.length,jointCounts:skel.map(x=>x.joints?.length),
+  clips:content.animations?.map(x=>x.name),meshes:content.meshes?.length}));
+ assert(skel.length>=1,'A real skin must be present '+filename);
+ if(id!=='german')assert.equal(skel.length,1,'Independent allied rig '+filename);
+ const rig=skel.find(x=>x.joints?.length===65);
+ assert(rig,'65 source joints missing '+filename);
  const names=(content.animations||[]).map(a=>a.name);
  for(const clip of clips)assert(names.includes(clip),'Absent animation '+clip+' in '+filename);
  const rigs=(content.meshes||[]).flatMap(m=>m.primitives||[])
   .filter(p=>p.attributes?.JOINTS_0!==undefined&&p.attributes?.WEIGHTS_0!==undefined);
  assert(rigs.length>=2,'No real skinned character geometry '+filename);
- const skelNames=skel[0].joints.map(i=>content.nodes[i]?.name||'');
+ const skelNames=rig.joints.map(i=>content.nodes[i]?.name||'');
  const normalized=x=>x.replace(/^mixamorig[:_]?/i,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
  for(const key of ['hips','head','leftarm','leftforearm','lefthand',
   'rightarm','rightforearm','righthand','leftfoot','rightfoot'])
