@@ -83,7 +83,9 @@ function apply({scene,B,world,camera,sun,map}){
  // uniforms, skinned soldier rigs and road collisions retain their identity.
  const entries=Object.entries(classify).sort((a,b)=>b[0].length-a[0].length);
  for(const mesh of nodes){
-  if(!mesh.isMesh||mesh.isSkinnedMesh)continue;
+  // Babylon.Mesh has no Three.js-style "isMesh" property: all genuine map
+  // geometry was erroneously skipped in the first art test.
+  if(!mesh?.material||mesh.skeleton)continue;
   const match=entries.find(([prefix])=>mesh.name.startsWith(prefix));
   if(!match)continue;
   // Clan/faction indicators remain unmodified by the texture pass.
