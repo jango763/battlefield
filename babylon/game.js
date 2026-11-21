@@ -491,10 +491,20 @@ function setup(scenarioName){
  const enemiesXY=Array.from({length:theirs},(_,i)=>({
   x:150+(i%4-1.5)*6,z:267-Math.floor(i/4)*4
  }));
- for(let i=0;i<ours;i++)allies.push(battle.addUnit({
-  id:i===0?'hero':'британец-'+(i+1),team:'свои',...alliesXY[i]}));
- for(let i=0;i<theirs;i++)enemies.push(battle.addUnit({
-  id:'вермахт-'+(i+1),team:'враг',...enemiesXY[i]}));
+ for(let i=0;i<ours;i++){
+  const unit=battle.addUnit({id:i===0?'hero':'британец-'+(i+1),
+   team:'свои',...alliesXY[i]});
+  if(scenario==='squads'&&i>0)unit.alive=false;
+  unit.reinforcementSlot=i;
+  allies.push(unit);
+ }
+ for(let i=0;i<theirs;i++){
+  const unit=battle.addUnit({id:'вермахт-'+(i+1),
+   team:'враг',...enemiesXY[i]});
+  if(scenario==='squads'&&i>0)unit.alive=false;
+  unit.reinforcementSlot=i+12;
+  enemies.push(unit);
+ }
  for(const [i,u] of allies.entries()){
   u.economyTeam='blue';u.isHero=i===0;
   // Selected casting, not a claim that original asset has been imported.
@@ -512,17 +522,22 @@ function setup(scenarioName){
    'Победа! Отряд удержал позицию. Нажмите «Новый бой» для продолжения.':
    'Отряд разгромлен. Нажмите «Новый бой», чтобы повторить атаку.')
  });
+ if(scenario==='squads'){
+  replenisher=replenishment.create({allies,enemies,hero:allies[0],
+   maxAlivePerSide:REINFORCEMENT_LIMIT});
+  state.reinforcements=replenisher.snapshot();
+ }else state.reinforcements=null;
  actors=new Map();
  for(let i=0;i<12;i++){
   if(views[i]){
-   assignView(views[i],allies[i]||null);
+   assignView(views[i],allies[i]?.alive?allies[i]:null);
    if(allies[i])allies[i].characterModelImported=views[i].importedAlliedModel;
   }
-  if(views[i]&&allies[i])actors.set(allies[i],views[i]);
+  if(views[i]&&allies[i]?.alive)actors.set(allies[i],views[i]);
  }
  for(let i=0;i<12;i++){
-  if(views[i+12])assignView(views[i+12],enemies[i]||null);
-  if(views[i+12]&&enemies[i])actors.set(enemies[i],views[i+12]);
+  if(views[i+12])assignView(views[i+12],enemies[i]?.alive?enemies[i]:null);
+  if(views[i+12]&&enemies[i]?.alive)actors.set(enemies[i],views[i+12]);
  }
  for(const button of document.querySelectorAll('[data-scenario]'))
   button.setAttribute('aria-pressed',String(button.dataset.scenario===scenario));
