@@ -25,6 +25,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
+      - name: Install pinned Three.js r128 locally for offline bundle
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/battlefield-three128 three@0.128.0
+          test -s /tmp/battlefield-three128/node_modules/three/build/three.min.js
+          test -s /tmp/battlefield-three128/node_modules/three/examples/js/loaders/GLTFLoader.js
       - name: Assemble original Three.js into one mobile HTML page
         run: |
           node --check tools/infantry-v2/build-standalone-walkaround.cjs
