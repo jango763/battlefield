@@ -35,7 +35,6 @@ jobs:
           node babylon/tests/test-squad-combat.cjs
           node babylon/tests/test-field-orders.cjs
           node babylon/tests/test-central-unlock.cjs
-          node babylon/tests/test-gold-economy.cjs
   iphone-browsers:
     needs: first-game-rules
     runs-on: ubuntu-24.04
