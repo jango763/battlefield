@@ -10,10 +10,10 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const specs=Object.freeze({
  german:Object.freeze({
   label:'Вермахт · утверждённый немецкий стрелок',source:'animstudio-preview/models/all-combat-run.glb',
-  approval:'УТВЕРЖДЁН',color:'#a9b7a3',
+  approval:'ИСХОДНАЯ МОДЕЛЬ УТВЕРЖДЕНА',color:'#a9b7a3',
   clips:{idle:'Kar98k_Hold',walk:'Kar98k_Run',run:'Kar98k_Run',aim:'Kar98k_Aim',fire:'Kar98k_Fire'},
   speeds:{walk:.67,run:1.1,fire:1},
-  warning:'Базовая немецкая модель — не менять скелет или внешность.'
+  warning:'Это исходный анимированный GLB. Комплект немецкой формы, головного убора и оружия из Three.js ещё нужно перенести в Babylon.js.'
  }),
  american:Object.freeze({
   label:'Американский герой · оригинальная модель',source:'../assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb',
