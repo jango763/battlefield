@@ -14,6 +14,7 @@ const replenishment=window.BattlefieldReplenishment;
 const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
 const legacyVisual=window.BattlefieldLegacyVisualStyle;
+const modernArt=window.BattlefieldModernArt;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
 const nativeBlend=window.BattlefieldNativeClipBlend;
@@ -29,7 +30,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -131,6 +132,13 @@ function createWorld(){
  camera.lowerBetaLimit=.87;camera.upperBetaLimit=.89;
  camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
  state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
+ // Real photographed materials and geometry; Babylon skinned soldiers, game AI,
+ // colliders, controls and camera remain entirely unchanged.
+ if(new URLSearchParams(location.search).get('art')!=='classic'){
+  try{state.modernArt=modernArt.apply({scene,B,world,camera,sun,map:goldRules.MAP});}
+  catch(error){console.warn('Modern art fallback to native map',error);
+   state.modernArt={error:String(error)};}
+ }else state.modernArt={profile:'original-babylon',ready:false};
  // The first game never let a one-finger drag spin the battlefield.
  // Keep direct touch joystick + tap-to-move; camera is follow-locked.
  camera.detachControl();
