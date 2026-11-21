@@ -29,7 +29,7 @@ for(const [name,data] of Object.entries(manifest.materials)){
 assert.equal(Object.keys(manifest.materials).length,5);
 assert(art.includes("pbr('warped-timber','wood'"));
 assert(art.includes("world.ground.material=mud"));
-assert(art.includes("mesh.isSkinnedMesh"),'Never rewrite soldier rig materials');
+assert(art.includes("mesh.skeleton"),'Never rewrite soldier rig materials');
 console.log('BATTLEFIELD_MODERN_ART_STATIC_PASS',{
  scannedMaterialSets:5,textureMaps:10,realPBR:true,
  architecture:'damaged village ruins and pitched roofs',
