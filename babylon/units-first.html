@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#171f1b">
+<title>Battlefield · наши три бойца · 3D</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#141b17;color:#eef3e9;font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+#view{width:100%;height:100%;display:block;touch-action:none}
+header{position:fixed;z-index:3;top:calc(env(safe-area-inset-top,0px) + 7px);left:12px;right:12px;pointer-events:none;text-shadow:0 1px 6px #000}
+h1{font-size:17px;margin:0 0 3px}header small{font-size:11px;color:#c1cfc1}
+#control{position:fixed;z-index:3;bottom:calc(env(safe-area-inset-bottom,0px) + 9px);left:8px;right:8px;background:#1b291fe8;border:1px solid #78917d;border-radius:12px;max-width:620px;margin:auto;padding:10px;box-shadow:0 8px 25px #000b}
+.row{display:flex;gap:7px;align-items:stretch;margin:5px 0}
+button{background:#34513d;color:#eef3e8;border:1px solid #7e9985;border-radius:8px;min-height:44px;padding:8px 6px;flex:1;font:650 12px system-ui;touch-action:manipulation}
+button[aria-pressed=true]{background:#d4dfb4;color:#20321f}
+button:disabled{opacity:.36}
+#status{font-size:11px;line-height:1.4;color:#dfebd8;white-space:pre-line;margin:5px 0 7px;min-height:30px}
+#warning{font-size:10px;color:#f2ce9c;margin-top:7px}
+#error{position:fixed;z-index:6;top:calc(env(safe-area-inset-top,0px) + 78px);left:10px;right:10px;color:#ffd1be;background:#462a21e8;padding:9px;border-radius:7px;display:none}
+a{color:#dfe9a8}
+@media(max-width:390px){button{font-size:11px;padding:7px 3px}#control{padding:8px}}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="./units-first.js"></script>
+</head><body>
+<canvas id="view" aria-label="Реальные 3D-модели немецкого стрелка, американца и британца Jakeli. Вращайте пальцем."></canvas>
+<header><h1>Battlefield · наши бойцы</h1><small>Оригинальные GLB · одинаковый масштаб · оригинальные анимации</small></header>
+<div id="error" role="alert"></div>
+<section id="control">
+ <div class="row" role="group" aria-label="Переключить бойца">
+  <button data-unit="german" aria-pressed="true">Вермахт</button>
+  <button data-unit="american" aria-pressed="false">Американец</button>
+  <button data-unit="jakeli" aria-pressed="false">Британец Jakeli</button>
+ </div>
+ <div id="status" role="status" aria-live="polite">Загружаю утверждённого немецкого стрелка…</div>
+ <div class="row" role="group" aria-label="Проверить анимацию">
+  <button data-motion="idle" aria-pressed="true">Стойка</button>
+  <button data-motion="walk">Ходьба</button>
+  <button data-motion="run">Бег</button>
+  <button data-motion="aim">Прицел</button>
+  <button data-motion="fire">Выстрел</button>
+ </div>
+ <div id="warning">Немец — утверждён. Американец и Jakeli — экспериментальные: качество рук, деформаций и хват оружия ещё не принято. В боевую армию изменения не внесены.</div>
+</section>
+</body></html>
