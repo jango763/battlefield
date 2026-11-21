@@ -139,6 +139,8 @@ function createWorld(){
   catch(error){console.warn('Modern art fallback to native map',error);
    state.modernArt={error:String(error)};}
  }else state.modernArt={profile:'original-babylon',ready:false};
+ const artTag=$('graphics-tag');
+ if(artTag)artTag.textContent=state.modernArt?.ready?'HD 2026 · PBR · CC0':'ORIGINAL · BABYLON';
  // The first game never let a one-finger drag spin the battlefield.
  // Keep direct touch joystick + tap-to-move; camera is follow-locked.
  camera.detachControl();
