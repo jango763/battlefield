@@ -49,6 +49,9 @@
   function reserve(side){
    if(!active||!roster[side])return null;
    const candidates=eligible[side];
+   // Never queue more than one heavy GLB import for each team. The next
+   // soldier leaves barracks on the next timer tick after delivery.
+   if([...pending].some(u=>roster[side].includes(u)))return null;
    if(roster[side].filter(u=>u.alive).length+
       [...pending].filter(u=>roster[side].includes(u)).length>=maxAlivePerSide)
     return null;
