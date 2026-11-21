@@ -36,8 +36,12 @@ for(const [id,[filename,clips]] of Object.entries(sources)){
   clips:content.animations?.map(x=>x.name),meshes:content.meshes?.length}));
  assert(skel.length>=1,'A real skin must be present '+filename);
  if(id!=='german')assert.equal(skel.length,1,'Independent allied rig '+filename);
- const rig=skel.find(x=>x.joints?.length===65);
- assert(rig,'65 source joints missing '+filename);
+ // The approved German GLB has five skinned uniform/weapon meshes and
+ // 68 GLTF joints (65 anatomical + 3 attachments), not one 65-joint skin.
+ const expectedJoints=id==='german'?68:65;
+ if(id==='german')assert.equal(skel.length,5,'Approved soldier mesh skins changed');
+ const rig=skel.find(x=>x.joints?.length===expectedJoints);
+ assert(rig,expectedJoints+' source joints missing '+filename);
  const names=(content.animations||[]).map(a=>a.name);
  for(const clip of clips)assert(names.includes(clip),'Absent animation '+clip+' in '+filename);
  const rigs=(content.meshes||[]).flatMap(m=>m.primitives||[])
@@ -52,7 +56,7 @@ for(const [id,[filename,clips]] of Object.entries(sources)){
  const tris=(content.meshes||[]).flatMap(m=>m.primitives||[])
   .reduce((sum,p)=>sum+Math.ceil(content.accessors[p.indices]?.count/3||0),0);
  results[id]={bytes:bytes.length,meshes:content.meshes?.length,
-  skins:skel.length,bones:65,realSkinnedPrimitives:rigs.length,
+  skins:skel.length,bones:expectedJoints,realSkinnedPrimitives:rigs.length,
   triangles:tris,clips:names.length,extensionsRequired:content.extensionsRequired||[],
   visualApproved:id==='german'};
 }
