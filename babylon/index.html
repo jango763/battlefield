@@ -98,6 +98,7 @@ button:disabled{opacity:.5;cursor:default}
 <script src="./combat-presentation-core.js"></script>
 <script src="./squad-combat-core.js"></script>
 <script src="./field-orders-core.js"></script>
+<script src="./replenishment-core.js"></script>
 <script src="./gold-economy-core.js"></script>
 <script src="./world-300.js"></script>
 <script src="./legacy-visual-style.js"></script>
@@ -133,7 +134,7 @@ button:disabled{opacity:.5;cursor:default}
     <tr><td>Уничтожение бойца</td><td>+15</td></tr>
     <tr><td>Уничтожение бронированного</td><td>+30</td></tr>
    </tbody></table>
-   <p>Объединённая экспериментальная сцена: американский герой, оригинальный Jakeli и утверждённый немецкий боец подключаются из сохранённых GLB без замены облика. У Jakeli ещё не пройдена проверка деформации скелета и хвата оружия — до этого финальный выпуск заблокирован. Три слота Командос ожидают согласованного исходника. Источники Danoob и Fab не подменяются другими моделями. <a href="./allied-model-review.html" target="_blank" rel="noopener" style="color:#e5d49c">Открыть выбранные модели авторов</a>. Герой занимает одно место из 12. При смене стороны в новой команде убирается один бот, а в прежней появляется новый: баланс всегда <b>12 на 12</b>.</p>
+   <p>Непрерывная битва: войска постепенно прибывают с обеих баз, погибшие заменяются подкреплениями. На поле одновременно не более 8 бойцов каждой стороны (16 всего), чтобы сохранить скорость на iPhone. Объединённая экспериментальная сцена: американский герой, оригинальный Jakeli и утверждённый немецкий боец подключаются из сохранённых GLB без замены облика. У Jakeli ещё не пройдена проверка деформации скелета и хвата оружия — до этого финальный выпуск заблокирован. Три слота Командос ожидают согласованного исходника. Источники Danoob и Fab не подменяются другими моделями. <a href="./allied-model-review.html" target="_blank" rel="noopener" style="color:#e5d49c">Открыть выбранные модели авторов</a>. Герой занимает одно место из 12. При смене стороны в новой команде убирается один бот, а в прежней появляется новый: баланс всегда <b>12 на 12</b>.</p>
    <div id="brief-progress" role="status" aria-live="polite">Загружаем Battlefield…</div>
    <button id="enter-game" type="button" disabled>Загрузка бойцов…</button>
    <p class="brief-tip">Старт боя — только по нажатию. Можно спокойно дочитать схему, даже если игра уже загрузилась.</p>
@@ -156,7 +157,7 @@ button:disabled{opacity:.5;cursor:default}
 <h2>Подкрепление</h2>
 <div class="row">
 <button data-scenario="duel" aria-pressed="false" disabled>Дуэль (тест)</button>
-<button data-scenario="squads" aria-pressed="true" disabled>Битва 12×12</button>
+<button data-scenario="squads" aria-pressed="true" disabled>Бесконечные подкрепления</button>
 </div>
 <h2>Оружие героя</h2>
 <div class="row">
