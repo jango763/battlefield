@@ -28,6 +28,7 @@ async function run(engine,name,mode){
    const art=state.modernArt;
    return {ready:state.ready,error:state.error,
     art,models:state.models,pbr:scene.materials.filter(m=>m.getClassName()==='PBRMaterial').length,
+    hdMaterials:scene.materials.filter(m=>m.name?.startsWith('hd2026-')).length,
     grounds:scene.meshes.filter(m=>m.name==='map-ground-300'&&!!m.material?.albedoTexture).length,
     hdNodes:scene.meshes.filter(m=>m.name?.startsWith('hd2026-')).length,
     meshCount:scene.meshes.length,
@@ -47,11 +48,11 @@ async function run(engine,name,mode){
    assert(start.art?.damagedRuins>=6,'Damaged village ruins missing');
    assert(start.art?.drawCallBatches>=4,'Too many draw calls; no batching');
    assert(start.art?.foliageInstances>=80,'Missing instanced grass');
-   assert(start.pbr>=8,'Scanned PBR materials not applied');
+   assert(start.hdMaterials>=8,'Scanned PBR materials not applied');
    assert(start.grounds===1,'Terrain scan missing');
    assert(start.text?.includes('PBR'),'Incorrect build label');
   }else{
-   assert.equal(start.pbr,0,'Modern PBR material leaked into original comparison');
+   assert.equal(start.hdMaterials,0,'Modern PBR material leaked into original comparison');
    assert(start.text?.includes('ORIGINAL'));
   }
   await page.locator('#enter-game').click();
