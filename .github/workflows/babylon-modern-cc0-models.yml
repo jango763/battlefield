@@ -1,0 +1,41 @@
+name: Install CC0 WWII village GLB models
+on:
+  push:
+    branches:
+      - feature/babylon-modern-art-v1-20261121
+    paths:
+      - 'babylon/tools/fetch-cc0-architecture.py'
+      - '.github/workflows/babylon-modern-cc0-models.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: battlefield-modern-village-models
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch vetted CC0 glTF historical buildings
+        run: python3 babylon/tools/fetch-cc0-architecture.py
+      - name: Commit GLBs to the experimental branch, never main
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add babylon/art/models/
+          if ! git diff --cached --quiet; then
+            git commit -m 'Add CC0 historical timber house, hay barn and village church GLBs'
+            git fetch origin "$GITHUB_REF_NAME"
+            git rebase "origin/$GITHUB_REF_NAME"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
+      - name: Preserve binary models and codec manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlefield-cc0-historical-glb-bank
+          path: babylon/art/models/
+          if-no-files-found: warn
+          retention-days: 14

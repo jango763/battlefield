@@ -14,6 +14,8 @@ const replenishment=window.BattlefieldReplenishment;
 const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
 const legacyVisual=window.BattlefieldLegacyVisualStyle;
+const modernArt=window.BattlefieldModernArt;
+const villageModels=window.BattlefieldModernVillageModels;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
 const nativeBlend=window.BattlefieldNativeClipBlend;
@@ -29,7 +31,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -125,12 +127,29 @@ function createWorld(){
 
  // Mirror the FIRST Three.js game's camera: elevated follow, stable heading.
  // Babylon map's northern direction is +Z, so stand behind the blue hero.
- camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.88,24,
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.5,1.18,14,
   new B.Vector3(0,1,-107),scene);
- camera.lowerRadiusLimit=23;camera.upperRadiusLimit=25;
- camera.lowerBetaLimit=.87;camera.upperBetaLimit=.89;
+ camera.lowerRadiusLimit=13.5;camera.upperRadiusLimit=14.5;
+ camera.lowerBetaLimit=1.17;camera.upperBetaLimit=1.19;
  camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
  state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
+ // Real photographed materials and geometry; Babylon skinned soldiers, game AI,
+ // colliders, controls and camera remain entirely unchanged.
+ if(new URLSearchParams(location.search).get('art')!=='classic'){
+  try{
+   state.modernArt=modernArt.apply({scene,B,world,camera,sun,map:goldRules.MAP});
+   if(villageModels?.install){
+    state.villageModels={started:true,loaded:0,pending:3};
+    void villageModels.install({scene,B,art:state.modernArt}).then(
+     result=>{state.villageModels=result},
+     error=>{state.villageModels={error:String(error)}});
+   }
+  }
+  catch(error){console.warn('Modern art fallback to native map',error);
+   state.modernArt={error:String(error)};}
+ }else state.modernArt={profile:'original-babylon',ready:false};
+ const artTag=$('graphics-tag');
+ if(artTag)artTag.textContent=state.modernArt?.ready?'HD 2026 · PBR · CC0':'ORIGINAL · BABYLON';
  // The first game never let a one-finger drag spin the battlefield.
  // Keep direct touch joystick + tap-to-move; camera is follow-locked.
  camera.detachControl();
@@ -984,7 +1003,7 @@ function frame(){
   // Fixed original Three.js follow profile, without rotating on the joystick.
   if(allies[0]?.alive&&camera){
    // Leave room ahead to see enemies and cover, as in the original.
-   const dest=position(allies[0],.75).add(new B.Vector3(0,0,0));
+   const dest=position(allies[0],1.55).add(new B.Vector3(0,0,3.0));
    camera.target=B.Vector3.Lerp(camera.target,dest,Math.min(1,dt*2.8));
   }
   if(world&&economy)world.syncFarms(economy.summary());

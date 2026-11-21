@@ -1,0 +1,48 @@
+{
+  "origin": "https://tevy.dev/models",
+  "license": "CC0 1.0",
+  "models": {
+    "normandy-timber-house": {
+      "source": "https://tevy.dev/models/timber-frame-house/v1/lod0.glb",
+      "assetPage": "https://tevy.dev/models/timber-frame-house",
+      "file": "normandy-timber-house.glb",
+      "bytes": 2064400,
+      "extensionsUsed": [
+        "EXT_meshopt_compression",
+        "KHR_materials_emissive_strength",
+        "KHR_mesh_quantization",
+        "KHR_texture_basisu"
+      ],
+      "meshes": 24,
+      "materials": 14
+    },
+    "normandy-hay-barn": {
+      "source": "https://tevy.dev/models/hay-barn/v2/lod0.glb",
+      "assetPage": "https://tevy.dev/models/hay-barn",
+      "file": "normandy-hay-barn.glb",
+      "bytes": 1129316,
+      "extensionsUsed": [
+        "EXT_meshopt_compression",
+        "KHR_materials_specular",
+        "KHR_mesh_quantization",
+        "KHR_texture_basisu"
+      ],
+      "meshes": 1,
+      "materials": 1
+    },
+    "village-church": {
+      "source": "https://tevy.dev/models/village-church/v2/lod0.glb",
+      "assetPage": "https://tevy.dev/models/village-church",
+      "file": "village-church.glb",
+      "bytes": 621068,
+      "extensionsUsed": [
+        "EXT_meshopt_compression",
+        "KHR_materials_specular",
+        "KHR_mesh_quantization",
+        "KHR_texture_basisu"
+      ],
+      "meshes": 1,
+      "materials": 1
+    }
+  }
+}
