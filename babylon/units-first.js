@@ -122,7 +122,12 @@ try{
   const {min,max,height,meshes}=area(container);
   const skinned=meshes.filter(m=>!!m.skeleton);
   const bones=skel[0]?.bones?.length||0;
-  if(skel.length!==1||bones!==65||skinned.length<2)
+  // Approved German GLB: 5 mesh skins x 68 glTF joints (including
+  // three equipment helpers). Allied trial rigs: 1 x 65 joints.
+  const valid=id==='german'
+   ?skel.length===5&&skel.every(r=>r.bones.length===68)
+   :skel.length===1&&bones===65;
+  if(!valid||skinned.length<2)
    throw Error('Подлинный GLB отклонён: '+id+'; скелеты '+skel.length+
     ', кости '+bones+', skinned меши '+skinned.length);
   const clips=container.animationGroups||[];
@@ -146,7 +151,7 @@ try{
   cache.set(id,data);
   state.realModels[id]=true;
   state.characters[id]={source:spec.source,skinned:skinned.length,
-   skeletons:1,bones,triangles,clips:clips.map(g=>g.name),activeClip:null,
+   skeletons:skel.length,bones,triangles,clips:clips.map(g=>g.name),activeClip:null,
    approved:state.approved[id],hasFallback:false};
   state.loadedCount=cache.size;
   return data;
