@@ -66,6 +66,22 @@
           "bytes": 425743
         }
       }
+    },
+    "wood": {
+      "asset_id": "weathered_planks",
+      "asset_page": "https://polyhaven.com/a/weathered_planks",
+      "maps": {
+        "diffuse": {
+          "path": "wood-base.jpg",
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/weathered_planks/weathered_planks_diff_1k.jpg",
+          "bytes": 141228
+        },
+        "normal": {
+          "path": "wood-normal.jpg",
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/weathered_planks/weathered_planks_nor_gl_1k.jpg",
+          "bytes": 134336
+        }
+      }
     }
   }
 }
