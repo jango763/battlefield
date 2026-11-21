@@ -49,7 +49,10 @@ for(const [id,[filename,clips]] of Object.entries(sources)){
  assert(rigs.length>=2,'No real skinned character geometry '+filename);
  const skelNames=rig.joints.map(i=>content.nodes[i]?.name||'');
  const normalized=x=>x.replace(/^mixamorig[:_]?/i,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
- for(const key of ['hips','head','leftarm','leftforearm','lefthand',
+ console.log('SOURCE_GLB_BONE_LABELS',id,JSON.stringify(skelNames.slice(0,28)));
+ // The original approved Wehrmacht uses its own authoring convention. Do
+ // not rename its bones or impose the incompatible Allied Mixamo labels.
+ if(id!=='german')for(const key of ['hips','head','leftarm','leftforearm','lefthand',
   'rightarm','rightforearm','righthand','leftfoot','rightfoot'])
   assert(skelNames.some(n=>normalized(n)===key),
    filename+' missing actual joint '+key);
