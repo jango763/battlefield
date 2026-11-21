@@ -37,7 +37,8 @@ async function check(engine,name){
    },id);
    report.actors[id]=snapshot;
    assert(!snapshot.error,'Original character did not load: '+snapshot.error);
-   assert.equal(snapshot.bones,65);
+   assert.equal(snapshot.bones,id==='german'?68:65);
+   assert(snapshot.source.endsWith(id==='german'?'all-combat-run.glb':id==='american'?'us-hero-quaternius-donor-hands-v7.glb':'uk-jakeli-battle-lod1.glb'));
    assert(snapshot.skin>=2,'Static non-skinned character in '+id);
    assert(snapshot.triangles>9000,'Low-quality primitive substituted '+id);
    assert(snapshot.real&&!snapshot.fallback&&snapshot.rootEnabled);
