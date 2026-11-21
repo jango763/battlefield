@@ -10,7 +10,7 @@
 'use strict';
 const SPEED=18; // game-distance units per second, temporary range tuning.
 const ENGAGE=Object.freeze({Kar98k:42,MP40:23,MG42:39,Panzerschreck:52});
-function create({battle,allies,enemies,onShot=()=>{},onFinish=()=>{},driveAllies=null,endWhenEliminated=true}){
+function create({battle,allies,enemies,onShot=()=>{},onFinish=()=>{},driveAllies=null,driveEnemies=null,endWhenEliminated=true}){
  if(!battle||!Array.isArray(allies)||!Array.isArray(enemies))throw Error('Invalid teams');
  if(!allies.length||!enemies.length)throw Error('At least one soldier per team required');
  const members=[...allies,...enemies];
@@ -63,8 +63,17 @@ function create({battle,allies,enemies,onShot=()=>{},onFinish=()=>{},driveAllies
        moving.set(unit,true);
      }
    }
+   if(driveEnemies){
+     const directed=driveEnemies(dt);
+     if(!(directed instanceof Set))throw Error('driveEnemies must return moved-unit Set');
+     for(const unit of directed){
+       if(!enemies.includes(unit))throw Error('Cannot drive non-enemy unit');
+       moving.set(unit,true);
+     }
+   }
    for(const unit of members){
      if(driveAllies && allies.includes(unit))continue;
+     if(driveEnemies && enemies.includes(unit))continue;
      if(!unit.alive)continue;
      const target=getTarget(unit);
      if(!target)continue;
