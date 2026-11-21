@@ -65,11 +65,13 @@ catch(e){console.error('Cannot run the unmodified first-game loader',e);process.
  for(const [url,filename] of vendors){
   const old='<script src="'+url+'"></script>';
   assert(written.includes(old),'Missing required external Three.js script '+url);
-  const content=fs.readFileSync(filename,'utf8').replace(/<\\/script/gi,'<\\\\/script');
+  const content=fs.readFileSync(filename,'utf8')
+   .split('</script').join('<'+String.fromCharCode(92)+'/script');
   assert(content.length>10000,'Missing original Three.js library '+filename);
+  const nl=String.fromCharCode(10);
   written=written.replace(old,
-   '<script>/* THREE.JS MIT LICENSE — bundled locally to support offline iPhone launch. */\\n'+
-   content+'\\n</script>');
+   '<script>/* THREE.JS MIT LICENSE — bundled locally for iPhone. */'+nl+
+   content+nl+'</script>');
  }
  assert(!written.includes('<script src="https://'), 'External startup library still required');
  assert(written.includes('WWII-textured'),'Actual site materials missing');
