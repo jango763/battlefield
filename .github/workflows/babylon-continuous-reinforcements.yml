@@ -1,0 +1,56 @@
+name: Babylon continuous reinforcements mobile QA
+on:
+  push:
+    branches:
+      - feature/babylon-continuous-reinforcements-20261121
+    paths:
+      - 'babylon/game.js'
+      - 'babylon/index.html'
+      - 'babylon/replenishment-core.js'
+      - 'babylon/tests/test-continuous-reinforcements.cjs'
+      - 'babylon/tests/test-continuous-reinforcements-browser.cjs'
+      - '.github/workflows/babylon-continuous-reinforcements.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: babylon-continuous-reinforcements-BRANCH
+  cancel-in-progress: true
+jobs:
+  pure-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replenishment invariants and existing combat rules
+        run: |
+          node --check babylon/game.js
+          node --check babylon/replenishment-core.js
+          node --check babylon/tests/test-continuous-reinforcements.cjs
+          node --check babylon/tests/test-continuous-reinforcements-browser.cjs
+          node babylon/tests/test-continuous-reinforcements.cjs
+          node babylon/tests/test-squad-combat.cjs
+          node babylon/tests/test-field-orders.cjs
+          node babylon/tests/test-central-unlock.cjs
+  mobile-browser:
+    needs: pure-rules
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mobile engines
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/battlefield-reinforcements playwright@1.58.2
+          /tmp/battlefield-reinforcements/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Prove reinforcement of approved character models
+        run: |
+          python3 -m http.server 8857 --bind 127.0.0.1 >/tmp/battlefield-reinforce-server.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-continuous-reinforcements-browser.cjs
+      - name: Save screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlefield-continuous-iphone-comparison
+          path: babylon-qa-results/continuous-reinforcements/
+          if-no-files-found: warn
+          retention-days: 10
