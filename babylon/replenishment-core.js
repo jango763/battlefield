@@ -52,9 +52,12 @@
    // Never queue more than one heavy GLB import for each team. The next
    // soldier leaves barracks on the next timer tick after delivery.
    if([...pending].some(u=>roster[side].includes(u)))return null;
-   if(roster[side].filter(u=>u.alive).length+
-      [...pending].filter(u=>roster[side].includes(u)).length>=maxAlivePerSide)
-    return null;
+   // Reserve one British slot for the player even while the hero is dead.
+   // Otherwise eight replacements + a revived hero would exceed the cap.
+   const activeBots=eligible[side].filter(u=>u.alive).length;
+   const waitingBots=[...pending].filter(u=>eligible[side].includes(u)).length;
+   const escortLimit=side==='blue'?maxAlivePerSide-1:maxAlivePerSide;
+   if(activeBots+waitingBots>=escortLimit)return null;
    for(let k=0;k<candidates.length;k++){
     const idx=(cursors[side]+k)%candidates.length;
     const u=candidates[idx];
