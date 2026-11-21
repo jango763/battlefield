@@ -1,0 +1,37 @@
+name: Verify public modern Battlefield mobile download
+on:
+  push:
+    branches:
+      - feature/babylon-modern-art-v1-20261121
+    paths:
+      - '.github/workflows/babylon-modern-public-urls.yml'
+      - 'babylon/index.html'
+      - 'babylon/modern-village-models.js'
+      - 'babylon/art/models/**'
+      - 'babylon/art/*.jpg'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cdn-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify real browser build and CC0 art files are accessible without GitHub login
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://raw.githack.com/jango763/battlefield/$GITHUB_SHA/babylon"
+          for asset in index.html art/mud-base.jpg art/brick-normal.jpg art/models/normandy-timber-house.glb art/models/normandy-hay-barn.glb art/models/village-church.glb; do
+            echo "PUBLIC_CHECK $asset"
+            curl --fail --location --silent --show-error --max-time 95 \
+              "$base/$asset" --output /tmp/battlefield-public-response
+            size=$(wc -c </tmp/battlefield-public-response)
+            echo "PUBLIC_OK $asset $size"
+            test "$size" -gt 10000
+            case "$asset" in
+              *.glb) test "$(head -c4 /tmp/battlefield-public-response)" = "glTF" ;;
+              *.html) grep -q 'modern-art-v1.js' /tmp/battlefield-public-response ;;
+            esac
+          done
