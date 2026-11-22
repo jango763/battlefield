@@ -15,8 +15,9 @@
   'rightarm','rightforearm','righthand','leftupleg','leftleg','leftfoot',
   'rightupleg','rightleg','rightfoot']);
  const WEAPONS=Object.freeze(['Kar98k','MP40','MG42','Panzerschreck']);
- const canonical=name=>String(name||'').replace(/-\d+$/,'')
-  .replace(/^mixamorig[:_]?/i,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
+ const canonical=name=>String(name||'').replace(/[-_]\d+$/,'')
+  .replace(/^.*?(?=mixamorig)/i,'').replace(/^mixamorig[:_]?/i,'')
+  .replace(/[^a-z0-9]/gi,'').toLowerCase();
  const sourceName=group=>group?.name?.replace(/-\d+$/,'')||'';
  function findGroup(groups,name){
   return (groups||[]).find(g=>sourceName(g)===name||g.name===name)||null;
@@ -126,8 +127,9 @@
     continue;
    }
    view.unifiedMotionGroups.set(signature,made.group);
-   for(const gun of WEAPONS)
-    view.clips.set(gun+'_'+(mode==='run'?'Run':'Hold'),made.group);
+   // Reuse a cross-rig clip only for the common rifle. Automatic weapons
+   // and the launcher have distinct authored arm poses that must not break.
+   view.clips.set('Kar98k_'+(mode==='run'?'Run':'Hold'),made.group);
    view.unifiedMotionReports[mode]={status:'retargeted',joints:made.joints};
    transferred++;
   }
