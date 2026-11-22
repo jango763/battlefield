@@ -1,9 +1,7 @@
-/* Battlefield 2026-11-22 — unit-only shared animation donor bridge.
- * Germany supplies RUN; British Jakeli supplies READY. The American rig
- * remains a separate skinned character with its own weapon/hand IK.
- * Babylon AnimatorAvatar performs rest-pose-aware retargeting where possible.
- * Incompatible rigs keep native clips: never overwrite a GLB or bind pose.
- */
+/* Battlefield — independent donor rigs: German RUN drives LEGS only.
+ * Rifle-ready/aim and both arms remain native to their skinned character.
+ * Cross-rig full-body READY is unsafe: it caused mannequin arms and lost grip.
+ * Source GLBs and bind matrices remain untouched. */
 (function(root,factory){
  const api=factory();
  if(typeof module==='object'&&module.exports)module.exports=api;
@@ -15,6 +13,9 @@
   'rightarm','rightforearm','righthand','leftupleg','leftleg','leftfoot',
   'rightupleg','rightleg','rightfoot']);
  const WEAPONS=Object.freeze(['Kar98k','MP40','MG42','Panzerschreck']);
+ const LOCOMOTION=Object.freeze(['hips','leftupleg','leftleg','leftfoot',
+  'lefttoebase','rightupleg','rightleg','rightfoot','righttoebase']);
+ const locomotionNames=new Set(LOCOMOTION);
  const canonical=name=>String(name||'').replace(/[-_]\d+$/,'')
   .replace(/^.*?(?=mixamorig)/i,'').replace(/^mixamorig[:_]?/i,'')
   .replace(/[^a-z0-9]/gi,'').toLowerCase();
@@ -100,44 +101,63 @@
    return {ok:false,reason:String(e?.message||e)};
   }
  }
- // A unit retains a native clip map and can revert independently.
- // The bridge never mutates mesh geometry, skeleton hierarchy or gameplay.
- function install(view,{B,germanRun,britishReady}={}){
+ // Retargeting the donor's ARMS is not a valid two-handed weapon solution.
+ // Play only its authored hip/leg motion. Native torso, fingers and hand-IK
+ // always remain in control; never overwrite the target character's skin.
+ function legsOnly(group){
+  if(!group?.targetedAnimations)return {ok:false,reason:'No animated targets'};
+  let removed=0;
+  for(let i=group.targetedAnimations.length-1;i>=0;i--){
+   const name=canonical(group.targetedAnimations[i]?.target?.name);
+   if(!locomotionNames.has(name)){
+    group.targetedAnimations.splice(i,1);removed++;
+   }
+  }
+  const names=new Set(group.targetedAnimations.map(t=>canonical(t.target?.name)));
+  if(!['hips','leftupleg','leftleg','rightupleg','rightleg'].every(n=>names.has(n)))
+   return {ok:false,reason:'Incomplete animated leg chain',removed};
+  return {ok:true,kept:group.targetedAnimations.length,removed};
+ }
+ // Each actor owns a different rig. Do not replace READY with an unrelated
+ // soldier's upper-body pose: the weapon/hand controller owns that stance.
+ function install(view,{B,germanRun}={}){
   if(!view?.root||!view?.imported?.skeletons||!view?.clips)
-   return {ok:false,reason:'Нет самостоятельного персонажа'};
+   return {ok:false,reason:'No independent skinned actor'};
   view.nativeMotionClips||=new Map(view.clips);
   view.unifiedMotionGroups||=new Map();
   view.unifiedMotionReports||={};
-  let transferred=0;
   const family=view.importedAlliedName||'approvedGerman';
-  for(const [mode,donor,keepNative] of [
-   ['run',germanRun,family==='approvedGerman'],
-   ['ready',britishReady,family==='britishJakeli']
-  ]){
-   if(keepNative){
-    view.unifiedMotionReports[mode]={status:'native',reason:'Утверждённый донор'};continue;
-   }
-   if(!donor){view.unifiedMotionReports[mode]={status:'pending',reason:'Донор ещё не загружен'};continue;}
-   const signature=mode+':'+sourceName(donor);
-   if(view.unifiedMotionGroups.has(signature))continue;
-   const made=retarget({B,sourceGroup:donor,targetRoot:view.root,
-    skeletons:view.imported.skeletons,tag:String(view.index)+'-'+mode});
-   if(!made.ok){
-    view.unifiedMotionReports[mode]={status:'fallback',reason:made.reason};
-    continue;
-   }
-   view.unifiedMotionGroups.set(signature,made.group);
-   // Reuse a cross-rig clip only for the common rifle. Automatic weapons
-   // and the launcher have distinct authored arm poses that must not break.
-   view.clips.set('Kar98k_'+(mode==='run'?'Run':'Hold'),made.group);
-   view.unifiedMotionReports[mode]={status:'retargeted',joints:made.joints};
-   transferred++;
+  view.unifiedMotionReports.ready={status:'native-weapon-stance',
+   reason:'Character-specific arms and grip; no cross-rig READY'};
+  if(family==='approvedGerman'){
+   view.unifiedMotionReports.run={status:'native-donor'};
+   return {ok:true,transferred:0,family,reports:view.unifiedMotionReports};
   }
-  return {ok:true,transferred,family,
-   reports:view.unifiedMotionReports,
-   left:armReach(view.imported.skeletons,'left'),
-   right:armReach(view.imported.skeletons,'right')};
+  if(!germanRun){
+   view.unifiedMotionReports.run={status:'pending'};
+   return {ok:true,transferred:0,family,reports:view.unifiedMotionReports};
+  }
+  const signature='legs:'+sourceName(germanRun);
+  if(view.unifiedMotionGroups.has(signature))
+   return {ok:true,transferred:0,family,reports:view.unifiedMotionReports};
+  const made=retarget({B,sourceGroup:germanRun,targetRoot:view.root,
+    skeletons:view.imported.skeletons,tag:String(view.index)+'-legs-run'});
+  if(!made.ok){
+   view.unifiedMotionReports.run={status:'native-fallback',reason:made.reason};
+   return {ok:true,transferred:0,family,reports:view.unifiedMotionReports};
+  }
+  const masking=legsOnly(made.group);
+  if(!masking.ok){
+   made.group.dispose?.();
+   view.unifiedMotionReports.run={status:'native-fallback',reason:masking.reason};
+   return {ok:true,transferred:0,family,reports:view.unifiedMotionReports};
+  }
+  view.unifiedMotionGroups.set(signature,made.group);
+  view.clips.set('Kar98k_Run',made.group);
+  view.unifiedMotionReports.run={status:'legs-only',joints:masking.kept,
+   protectedChannels:masking.removed};
+  return {ok:true,transferred:1,family,reports:view.unifiedMotionReports};
  }
  return Object.freeze({REQUIRED,WEAPONS,canonical,sourceName,findGroup,
-  targetRig,armReach,clampGrip,retarget,install});
+  targetRig,armReach,clampGrip,retarget,legsOnly,install});
 });
