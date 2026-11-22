@@ -475,12 +475,18 @@
       Right:measureHandBasis('Right',right),
       Left:measureHandBasis('Left',left)
     };
+    // The approved source hands are not aligned to the generic +Y
+    // Mixamo guess. Preserve the old pose for idle/aim; for the dedicated
+    // German running carry use measured real finger/knuckle landmarks.
+    const useKnuckleBasis=()=>anatomicalDebug||
+      (state.weaponMotionRunCarryTest&&state.weaponMotionRun&&
+       weaponId==='de-kar98k');
     function desiredHandFrame(side,axis,palm,gunQ) {
       const target=makeHandOrientation(axis,palm,gunQ);
-      const basis=anatomicalDebug?anatomicalBases[side]:null;
+      const basis=useKnuckleBasis()?anatomicalBases[side]:null;
       return basis?target.multiply(basis.quat.conjugate()).normalize():target;
     }
-    const localHandForward=side=>anatomicalDebug&&anatomicalBases[side]
+    const localHandForward=side=>useKnuckleBasis()&&anatomicalBases[side]
       ?anatomicalBases[side].localForward:B.Axis.Y;
 
     function flexFingers(side) {
