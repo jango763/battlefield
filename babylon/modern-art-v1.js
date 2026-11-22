@@ -129,10 +129,13 @@ function apply({scene,B,world,camera,sun,map}){
  terrainTexture.anisotropicFilteringLevel=4;
  terrainTexture.update(false);
  terrainTexture.updateSamplingMode(B.Texture.TRILINEAR_SAMPLINGMODE);
- const smoothEarth=new B.PBRMaterial('hd2026-matte-terrain',scene);
- smoothEarth.albedoTexture=terrainTexture;
- smoothEarth.albedoColor=B.Color3.FromHexString('#bac4a6');
- smoothEarth.metallic=0;smoothEarth.roughness=1;smoothEarth.specularIntensity=0;
+ // Painted countryside uses a matte diffuse shader instead of washed-out
+ // high-exposure PBR ground. Historic buildings retain full scanned PBR.
+ const smoothEarth=new B.StandardMaterial('hd2026-matte-terrain',scene);
+ smoothEarth.diffuseTexture=terrainTexture;
+ smoothEarth.diffuseColor=B.Color3.FromHexString('#899b76');
+ smoothEarth.specularColor=B.Color3.Black();
+ smoothEarth.ambientColor=B.Color3.FromHexString('#414f34');
  const oldGround=world.ground.material;
  world.ground.material=smoothEarth;
  world.ground.receiveShadows=true;
@@ -191,11 +194,11 @@ function apply({scene,B,world,camera,sun,map}){
   mesh.material=mat;mesh.isPickable=false;mesh.receiveShadows=true;
   return mesh;
  }
- makeOrganicRoad('north-south',true,17.5,282.5,5.64,mudRoad,.055);
- makeOrganicRoad('east-west',false,27,273,5.28,crossRoad,.062);
+ makeOrganicRoad('north-south',true,17.5,282.5,4.2,mudRoad,.055);
+ makeOrganicRoad('east-west',false,27,273,4.6,crossRoad,.062);
  if(northRoad)northRoad.isVisible=false;
  if(eastRoad)eastRoad.isVisible=false;
- report.roadVisualWidth=5.64;
+ report.roadVisualWidth=4.2;
  const classify={
   'base-square-':stone,'base-hq-':plaster,'barrack-':plaster,
   'farm-yard-':dirt,'farm-house-':plaster,'farm-barn-':timber,
@@ -458,7 +461,7 @@ function apply({scene,B,world,camera,sun,map}){
  }
  const config=scene.imageProcessingConfiguration;
  if(config){config.toneMappingEnabled=true;config.exposure=.96;config.contrast=1.105;}
- report.colorGrade='muted-olive-earth-v3';
+ report.colorGrade='muted-olive-earth-v4';
  report.mipmappedScans=true;report.opaqueHedgerows=true;
  report.ready=true;
  scene.metadata=scene.metadata||{};
