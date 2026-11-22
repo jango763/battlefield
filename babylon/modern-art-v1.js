@@ -56,8 +56,8 @@ function apply({scene,B,world,camera,sun,map}){
  const mud=pbr('scanned-mud','mud',{scale:32,tint:'#bbc1b1',rough:1});
  // Road boxes are 265 x 9 metres. Texture UVs need DISTANCE-PROPORTIONAL
  // repeat counts or photoscanned soil stretches into ugly vertical streaks.
- const mudRoad=pbr('tracked-earth','mud',{scale:1,tint:'#b5a486',rough:1});
- const crossRoad=pbr('tracked-earth-east-west','mud',{scale:1,tint:'#b5a486',rough:1});
+ const mudRoad=pbr('tracked-earth','mud',{scale:1,tint:'#dbc9aa',rough:1});
+ const crossRoad=pbr('tracked-earth-east-west','mud',{scale:1,tint:'#dbc9aa',rough:1});
  for(const tex of [mudRoad.albedoTexture,mudRoad.bumpTexture]){
   tex.uScale=1.6;tex.vScale=45;
  }
@@ -302,13 +302,13 @@ function apply({scene,B,world,camera,sun,map}){
  }catch(error){report.errors.push('foliage '+String(error));}
  // Restrained warm light — no extreme color filters, high-cost bloom or SSAO
  // at mobile resolution. Original sun casts PCF shadows where already supported.
- sun.intensity=1.2;
+ sun.intensity=1.32;
  if(scene.fogMode!==B.Scene.FOGMODE_NONE){
   scene.fogDensity=.0026;
   scene.fogColor=B.Color3.FromHexString('#9a9b8e');
  }
  const config=scene.imageProcessingConfiguration;
- if(config){config.toneMappingEnabled=true;config.exposure=1.06;config.contrast=1.11;}
+ if(config){config.toneMappingEnabled=true;config.exposure=1.18;config.contrast=1.035;}
  report.ready=true;
  scene.metadata=scene.metadata||{};
  scene.metadata.battlefieldModernArt=report;
