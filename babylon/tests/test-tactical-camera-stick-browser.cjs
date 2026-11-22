@@ -42,9 +42,11 @@ const {chromium}=require('/tmp/bf-tactical-camera/node_modules/playwright');
   assert.equal(before.ready,true);assert(before.models>=2);
   assert.equal(before.camera,'tactical');
   assert(before.detail?.ready,'Organic non-pickable map overlay must render');
-  assert(before.detail?.patches>=120&&before.detail.drawCalls===4,
+  assert(before.detail?.patches>=120&&before.detail.drawCalls===5,
    'Terrain plus two shared-mesh roadside detail batches must be generated');
   assert.equal(before.detail.roadSurface,'two-track-gravel-and-grass');
+  assert.equal(before.detail.roadVergesVisible,true,
+   'Natural grass verges must be distinguishable from the road from above');
   assert(before.detail.hedges>=25&&before.detail.stones>=12,
    'The empty hero corridor needs visible rural foliage and rubble');
   assert(before.stickLoaded);
@@ -81,6 +83,27 @@ const {chromium}=require('/tmp/bf-tactical-camera/node_modules/playwright');
   const stopped=await getState();
   assert(Math.abs(stopped.position.z-released.position.z)<.55,
    'Hero may not keep moving after finger release');
+  // Actual iPhone uses touch, not a mouse. Exercise PointerEvent touch
+  // capture through Chromium's native touchscreen injection pipeline.
+  const client=await page.context().newCDPSession(page);
+  const beforeTouch=await getState();
+  await client.send('Input.dispatchTouchEvent',{type:'touchStart',
+   touchPoints:[{x,y,id:42}]});
+  await client.send('Input.dispatchTouchEvent',{type:'touchMove',
+   touchPoints:[{x,y:y-70,id:42}]});
+  await page.waitForTimeout(750);
+  const touchMoving=await getState();
+  assert.equal(touchMoving.stick.active,true,'Native touch pointer must lock');
+  assert(touchMoving.stick.z>.6,'Touch forward must match mouse and keyboard direction');
+  assert(touchMoving.position.z>beforeTouch.position.z+.4,
+   'Real touch gesture must actually move the German/British hero');
+  await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await page.waitForTimeout(180);
+  const touchReleased=await getState();
+  assert.equal(touchReleased.stick.active,false,'TouchEnd must release the joystick');
+  console.log('BATTLEFIELD_REAL_TOUCH_DRAG',JSON.stringify({
+   initial:beforeTouch.position,moving:touchMoving.position,
+   released:touchReleased.position}));
   await page.locator('#hud-toggle').click();
   await page.locator('#camera-toggle').click();
   const classic=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.cameraProfile);
