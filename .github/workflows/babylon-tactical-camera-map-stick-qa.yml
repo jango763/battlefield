@@ -11,6 +11,7 @@ on:
       - 'babylon/mobile-thumbstick.js'
       - 'babylon/tactical-map-detail.js'
       - 'babylon/tests/test-tactical-controls.cjs'
+      - 'babylon/tests/test-first-game-behavior.cjs'
       - 'babylon/tests/test-tactical-camera-stick-browser.cjs'
       - '.github/workflows/babylon-tactical-camera-map-stick-qa.yml'
   workflow_dispatch:
