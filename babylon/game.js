@@ -179,8 +179,13 @@ function createWorld(){
  if(new URLSearchParams(location.search).get('art')!=='classic'){
   try{
    state.modernArt=modernArt.apply({scene,B,world,camera,sun,map:goldRules.MAP});
-   state.mapDetail=mapDetail.apply({scene,B,map:goldRules.MAP,
-    lowPower:graphicsMode==='low'});
+   try{
+    state.mapDetail=mapDetail.apply({scene,B,map:goldRules.MAP,
+     lowPower:graphicsMode==='low'});
+   }catch(error){
+    state.mapDetail={ready:false,error:String(error)};
+    console.warn('Organic terrain fallback to licensed ground PBR',error);
+   }
    if(villageModels?.install){
     state.villageModels={started:true,loaded:0,pending:3};
     void villageModels.install({scene,B,art:state.modernArt}).then(
@@ -961,6 +966,13 @@ function resupplyHero(){
  drawHud();
 }
 function registerUI(){
+ const camButton=$('camera-toggle');
+ if(camButton)camButton.addEventListener('click',()=>{
+  const next=cameraProfile.id==='tactical'?'classic':'tactical';
+  cameraProfile=tacticalCamera.configure(camera,{profile:next});
+  state.cameraProfile=cameraProfile.id;
+  camButton.textContent='Камера: '+(next==='tactical'?'тактическая':'близкая');
+ });
  document.querySelectorAll('[data-scenario]').forEach(button=>
   button.addEventListener('click',()=>chooseScenario(button.dataset.scenario)));
  document.querySelectorAll('[data-weapon]').forEach(button=>
