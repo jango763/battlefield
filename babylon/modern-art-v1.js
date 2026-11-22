@@ -89,6 +89,9 @@ function apply({scene,B,world,camera,sun,map}){
    between(0,Math.PI),0,Math.PI*2);
   brush.fill();
  }
+ // Reset the canvas alpha before painting feathered washes; otherwise the
+ // final random brush alpha multiplies every gradient into invisibility.
+ brush.globalAlpha=1;
  // Paint large, gently feathered fields, shell scars and road shoulders in
  // the ground albedo. Unlike micro-noise decals these survive minification.
  function earthWash(x,z,r,hex,opacity){
