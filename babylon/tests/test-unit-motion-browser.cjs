@@ -40,13 +40,15 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
     const s=window.__BF_UNIT_REVIEW__;
     return {id,error:s?.error,failures:s?.skinFailures,loadedCount:s?.loadedCount,
      active:s?.characters[id]?.activeClip,models:s?.realModels,
-     rigReady:s?.characters[id]?.rigReady,assembled:s?.characters[id]?.assembled};
+     rigReady:s?.characters[id]?.rigReady,assembled:s?.characters[id]?.assembled,
+     hiddenSourceGun:s?.characters[id]?.hiddenSourceGun};
    },id);
    console.log('BATTLEFIELD_UNIT_LOAD_STEP',JSON.stringify(loaded));
    assert(!loaded.error,'Original model '+id+' failed: '+loaded.error);
    assert(loaded.active,'Original '+id+' was not selected and animated');
    assert(loaded.rigReady,'Soldier '+id+' must have complete hands / gun rig, never a mannequin');
    if(id==='american')assert(/hand IK/.test(loaded.assembled),'American must have original Lee-Enfield rig');
+   if(id==='american')assert.equal(loaded.hiddenSourceGun,5,'American original gun must not overlap equipped Lee-Enfield');
    if(id==='german')assert(/weapon rig/.test(loaded.assembled),'German must be equipped, not a naked animation source');
    await page.waitForTimeout(400);
    // Visible output is captured for human inspection; base64 JPEG in the CI
