@@ -193,6 +193,27 @@ try{
    -min.y*scale,-(min.z+max.z)*.5*scale);
   container.addAllToScene();
   for(const clip of clips)clip.stop();
+  // The source American Soldier WW2 includes five primitive M1 gun parts:
+  // one Chrome receiver + four TanPlastic components (Object_0..Object_4).
+  // In this range the equipped Lee-Enfield is owned by the real hand IK.
+  // Hide, NEVER dispose, the original gun to avoid a second rifle across
+  // the face. Do not touch the 36 skinned costume/hand meshes or materials.
+  let hiddenSourceGun=0;
+  if(id==='american'){
+   const oldGun=container.meshes.filter(m=>/^Object_[0-4]$/.test(m.name));
+   const materials=oldGun.map(m=>m.material?.name||'');
+   if(oldGun.length===5&&materials.filter(n=>n==='Chrome').length===1&&
+      materials.filter(n=>n==='TanPlastic').length===4){
+    for(const mesh of oldGun){mesh.setEnabled(false);hiddenSourceGun++;}
+   }else throw Error('Нельзя безопасно убрать исходное оружие: состав мешей изменился');
+   // Reuse the tested Stage 8 source-hand skin material calibration.
+   const donorSkin=container.materials.find(mat=>
+    mat.name.includes('Battlefield_US_Donor_Hands_Skin'));
+   if(donorSkin?.albedoColor){
+    donorSkin.albedoColor=new B.Color3(.39,.275,.235);
+    donorSkin.metallic=0;donorSkin.roughness=.95;
+   }
+  }
   // Reuse the ALREADY WORKING soldier-specific rigs instead of showing bare
   // animation skeletons or a weaponless American mannequin.
   let rig=null,rigState=null;
@@ -216,7 +237,7 @@ try{
   const triangles=meshes.reduce((sum,m)=>
    sum+Math.round((m.getTotalIndices?.()||m.getTotalVertices())/3),0);
   const data={id,spec,container,pivot,clips,skinned:skinned.length,bones,triangles,
-   rig,rigState,rigReady:id==='jakeli'||!!rig,
+   rig,rigState,rigReady:id==='jakeli'||!!rig,hiddenSourceGun,
    textures:container.textures?.length||0};
   cache.set(id,data);
   rebuildSharedMotion();
@@ -227,7 +248,7 @@ try{
    assembled:id==='german'?'original soldier + German weapon rig + Kar98k':
     id==='american'?'original US skin + Quaternius + Lee-Enfield hand IK':
      'original British skin + native ready/weapon',
-   rigReady:data.rigReady};
+   rigReady:data.rigReady,hiddenSourceGun:data.hiddenSourceGun};
   state.loadedCount=cache.size;
   return data;
  }
