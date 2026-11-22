@@ -1,0 +1,123 @@
+   ':'+String(left%60).padStart(2,'0'):
+   'ЗАКРЫТА — ждём гибель первого бота';
+ $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
+ $('supply').disabled=!atBase||!hero.alive;
+ $('reload-manual').disabled=!hero.alive||hero.weapon==='Kar98k'||
+  hero.reloadRemaining>0||!hero.inventory[hero.weapon]?.reserve||
+  hero.inventory[hero.weapon]?.loaded>=combat.WEAPONS[hero.weapon].magazineSize;
+ for(const button of document.querySelectorAll('[data-weapon]'))
+  button.setAttribute('aria-pressed',String(hero.weapon===button.dataset.weapon));
+ const paid=Object.keys(hero.inventory).map(w=>w+':'+battle.totalAmmo(hero,w)).join(' · ');
+ $('readout').textContent=
+  'Бой: '+(snap.active?'ИДЁТ':snap.done?'ЗАВЕРШЁН':'ОЖИДАНИЕ')+
+  ' · британцы '+snap.alliesAlive+'/'+(state.reinforcements?.maxAlivePerSide||allies.length)+' · Вермахт '+snap.enemiesAlive+'/'+(state.reinforcements?.maxAlivePerSide||enemies.length)+
+  '\nГерой 🇺🇸 ('+(hero.characterModelImported?'модель загружена':'3D-файл ещё не получен')+'): '+Math.round(hero.hp)+'/100 HP · оружие: '+britishLabel(hero.weapon)+
+  (inventory?' · '+inventory.loaded+'+'+inventory.reserve+' патр.':' · ∞ патронов')+
+  (hero.reloadRemaining>0?'\nПерезарядка: '+hero.reloadRemaining.toFixed(1)+' c':'')+
+  '\nБританцы 🔵: '+funds+' · Вермахт 🔴: '+(econ?.treasury.red??'—')+
+  '\nФермы: '+(econ?.owners.blue.length||0)+' синих · '+(econ?.owners.red.length||0)+' красных'+
+  '\nЦентр: '+timerLabel+
+  (paid?'\nЗапас: '+paid:'')+
+  '\nСтрой: '+(fieldOrders?.snapshot().mode==='semicircle'?'боевой полукруг':'черепаха')+
+  '\nАрмия: охрана героя '+(state.firstGameArmy?.aliveGuards||0)+
+   ' · самостоятельные 🔵 '+(state.firstGameArmy?.autonomousBlue||0)+
+   ' / 🔴 '+(state.firstGameArmy?.autonomousRed||0)+
+  '\nВыстрелы героя: '+hero.shots+' · поражено: '+hero.kills+
+  '\nЗадача: '+mission.current+
+   (mission.finished?' ✓':' · '+Math.min(mission.progress,mission.target)+
+    '/'+mission.target)+' · награды: '+mission.completed+'/'+mission.total+
+  (state.reinforcements?'\nПополнение каждые 1,4 с · лимит '+REINFORCEMENT_LIMIT+' на сторону'+
+    '\nЗа бой прибыло: 🔵 '+state.reinforcements.totalBlueReinforced+
+    ' · 🔴 '+state.reinforcements.totalRedReinforced:'')+
+  '\nИмпортировано союзных GLB (эксперимент): '+state.importedAlliedCount+'/12'+
+   '\nНемец: утверждён · Герой: '+(state.actorSources[0]?.realModelLoaded?'загружен':'нет GLB')+
+   ' · Jakeli: '+(Object.values(state.actorSources).some(r=>r.id==='britishJakeli'&&r.realModelLoaded)?'импортирован, деформация требует приёмки':'ожидает загрузки')+
+  '\nFPS: '+Math.round(engine.getFps())+
+  (snap.focus?'\nПриоритетная цель: '+snap.focus:'');
+ const duration=combat.WEAPONS[hero.reloadWeapon]?.reloadSeconds||0;
+ const progress=duration?100*(1-hero.reloadRemaining/duration):0;
+ $('reload-fill').style.width=Math.max(0,Math.min(100,progress))+'%';
+ state.fps=Math.round(engine.getFps());
+ drawMiniMap(econ);
+ const short=$('quick-status');
+ if(short)short.textContent='HP '+Math.round(hero.hp)+' · Золото '+funds+
+  ' · 🔵 '+snap.alliesAlive+' : '+snap.enemiesAlive+' 🔴'+(state.reinforcements?' · ⟳':'');
+ const pause=$('quick-pause');
+ if(pause)pause.textContent=atBase?'▶':'Ⅱ';
+}
+async function chooseGun(weapon){
+ const hero=findActor();
+ if(!state.ready||!hero||!combat.WEAPONS[weapon]||!hero.alive)return;
+ let result;
+ if(weapon==='Kar98k'||hero.inventory[weapon])result=battle.switchWeapon(hero,weapon);
+ else result=battle.buyWeapon(hero,weapon,{atBase});
+ if(!result.ok){
+  alertStatus(result.reason==='return-to-base'?'Оружие покупается на базе.':
+   result.reason==='insufficient-funds'?'Недостаточно денег.':
+   'Не удалось выбрать оружие: '+result.reason);
+  return;
+ }
+ if(economy&&result.cost>0){
+  if(!economy.pay('blue',result.cost))
+   throw Error('Несоответствие игровой казны стоимости оружия');
+  lastEconomyBlue=economy.treasury.blue;
+ }
+ state.selected=weapon;
+ const visual=actors.get(hero);
+ if(visual){
+  visual.weapon=weapon;
+  if(visual.rig?.equipWeapon){
+   await visual.rig.equipWeapon(weaponAsset(visual,weapon)).catch(e=>{
+    visual.weaponError=String(e);alertStatus('Ошибка модели оружия: '+e);
+   });
+  }
+  const snapshot=presentation.describe(hero);
+  setClip(visual,snapshot.pose);
+ }
+ alertStatus('Боец вооружён: '+britishLabel(weapon)+' · БК '+(battle.totalAmmo(hero,weapon)||'∞'));
+ drawHud();
+}
+function resupplyHero(){
+ const hero=findActor();
+ const last=state.selected!=='Kar98k'?state.selected:
+  Object.keys(hero.inventory)[0];
+ if(!last){alertStatus('Бесплатной Kar98k боеприпасы не требуются.');return;}
+ const result=battle.resupply(hero,last,{atBase});
+ if(!result.ok){alertStatus('БК не пополнен: '+result.reason);return;}
+ if(economy&&result.cost>0){
+  if(!economy.pay('blue',result.cost))
+   throw Error('Несоответствие игровой казны расходам на БК');
+  lastEconomyBlue=economy.treasury.blue;
+ }
+ alertStatus('Пополнение '+britishLabel(last)+': +'+result.added+' за '+result.cost+' монет.');
+ drawHud();
+}
+function registerUI(){
+ document.querySelectorAll('[data-scenario]').forEach(button=>
+  button.addEventListener('click',()=>chooseScenario(button.dataset.scenario)));
+ document.querySelectorAll('[data-weapon]').forEach(button=>
+  button.addEventListener('click',()=>chooseGun(button.dataset.weapon)));
+ $('fight').addEventListener('click',()=>{
+  const hero=findActor();
+  if(!hero?.alive){alertStatus('Герой погиб. Нажмите «Сброс».');return;}
+  if(atBase){
+   const result=controller.start();
+   if(!result.ok){alertStatus('Бой не начат: '+result.reason);return;}
+   atBase=false;state.atBase=false;alertStatus('Продолжаем бой. Коснитесь земли для движения героя.');
+  }else{
+   controller.stop();atBase=true;state.atBase=true;
+   alertStatus('Пауза: доступна смена оружия и пополнение БК.');
+  }
+  drawHud();
+ });
+ $('reset').addEventListener('click',()=>{
+  setup(scenario);
+  const start=controller.start();
+  if(start.ok){atBase=false;state.atBase=false;}
+  alertStatus('Новый бой. Выбирайте направление движения касанием земли.');
+  drawHud();
+ });
+ $('supply').addEventListener('click',resupplyHero);
+ $('order-move').addEventListener('click',()=>{
+  inputMode='move';
+  $('order-move').setAttribute('aria-pressed','true');
