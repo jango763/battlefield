@@ -5,7 +5,7 @@
 function install({B,scene,world,layout,design}){
  const meshes=[],materials=new Map(),batches=new Map();
  function mat(name,hex){if(materials.has(name))return materials.get(name);const m=new B.StandardMaterial('field-'+name,scene);m.diffuseColor=B.Color3.FromHexString(hex);m.specularColor=B.Color3.Black();materials.set(name,m);return m;}
- const earth=mat('earth','#76634b'),timber=mat('timber','#594c39'),sand=mat('sand','#9d9070');
+ const earth=mat('earth','#69533f'),timber=mat('timber','#544936'),sand=mat('sand','#a39370');
  function box(name,x,y,z,w,h,d,m,rot=0){const o=B.MeshBuilder.CreateBox(name,{width:w,height:h,depth:d},scene);o.position.set(x-150,y,z-150);o.rotation.y=rot;o.material=m;o.isPickable=false;o.receiveShadows=true;meshes.push(o);return o;}
  world.heightAt=(x,z)=>design.heightAt(layout,x,z);
  for(const o of layout.obstacles)world.addObstacle(o);
@@ -27,7 +27,7 @@ function install({B,scene,world,layout,design}){
   // Broad duckboards are stable at RTS distance; no coplanar micro-lines.
   box(t.id+'-duckboard',t.x,-.80,t.z,t.b-t.a-6,.08,1.7,timber);
  }
- const concrete=mat('concrete','#77776c'),metal=mat('steel','#454b44');
+ const concrete=mat('concrete','#74766b'),metal=mat('steel','#3f4640');
  for(const f of layout.fortifications){
   const {x,z,id}=f;
   if(f.type==='sandbags'){

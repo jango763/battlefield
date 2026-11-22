@@ -35,16 +35,17 @@ function apply({scene,B,world,camera,sun,map}){
   m.metallic=0;m.roughness=rough;
   m.backFaceCulling=true;
   m.specularIntensity=.22;
-  const base=new B.Texture('./art/'+scan+'-base.jpg',scene,true,false,
+  const base=new B.Texture('./art/'+scan+'-base.jpg',scene,false,false,
    B.Texture.TRILINEAR_SAMPLINGMODE,
    ()=>{report.scannedMaterialMaps++},
    (_msg,exception)=>report.errors.push('missing '+scan+' diffuse '+String(exception||_msg)));
-  const normal=new B.Texture('./art/'+scan+'-normal.jpg',scene,true,false,
+  const normal=new B.Texture('./art/'+scan+'-normal.jpg',scene,false,false,
    B.Texture.TRILINEAR_SAMPLINGMODE,
    ()=>{report.scannedMaterialMaps++},
    (_msg,exception)=>report.errors.push('missing '+scan+' normal '+String(exception||_msg)));
   for(const t of [base,normal]){
    t.wrapU=t.wrapV=B.Texture.WRAP_ADDRESSMODE;
+   t.anisotropicFilteringLevel=4;
    t.uScale=t.vScale=scale;
    textures.push(t);
   }
@@ -77,7 +78,7 @@ function apply({scene,B,world,camera,sun,map}){
  canvasGround.width=canvasGround.height=512;
  const brush=canvasGround.getContext('2d');
  if(!brush)throw Error('No terrain painting context');
- brush.fillStyle='#667354';brush.fillRect(0,0,512,512);
+ brush.fillStyle='#64734f';brush.fillRect(0,0,512,512);
  for(let i=0;i<230;i++){
   const x=between(0,512),y=between(0,512);
   const radius=between(14,50);
@@ -88,6 +89,35 @@ function apply({scene,B,world,camera,sun,map}){
    between(0,Math.PI),0,Math.PI*2);
   brush.fill();
  }
+ // Paint large, gently feathered fields, shell scars and road shoulders in
+ // the ground albedo. Unlike micro-noise decals these survive minification.
+ function earthWash(x,z,r,hex,opacity){
+  const px=x*512/300,pz=z*512/300,rr=r*512/300;
+  const gradient=brush.createRadialGradient(px,pz,rr*.10,px,pz,rr);
+  gradient.addColorStop(0,hex.replace('ALPHA',String(opacity)));
+  gradient.addColorStop(.54,hex.replace('ALPHA',String(opacity*.48)));
+  gradient.addColorStop(1,hex.replace('ALPHA','0'));
+  brush.fillStyle=gradient;brush.fillRect(px-rr,pz-rr,rr*2,rr*2);
+ }
+ for(let i=0;i<165;i++){
+  const x=between(3,297),z=between(3,297);
+  if(Math.abs(x-150)<7||Math.abs(z-150)<7)continue;
+  earthWash(x,z,between(7,22),
+   choose(['rgba(43,65,35,ALPHA)','rgba(115,91,56,ALPHA)','rgba(95,102,62,ALPHA)']),
+   between(.06,.16));
+ }
+ // Continuous dusty road margins avoid a blank straight brown runway.
+ for(let z=20;z<281;z+=7)for(const side of [-1,1]){
+  earthWash(150+side*between(4,7),z+between(-3,3),between(3.4,7.5),
+   'rgba(121,98,63,ALPHA)',between(.12,.24));
+ }
+ for(const t of [{z:82},{z:218}]){
+  for(let x=35;x<=265;x+=10)
+   earthWash(x,t.z+between(-2,2),between(4.5,8.5),
+    'rgba(91,69,45,ALPHA)',between(.16,.29));
+ }
+ for(const w of map.wrecks||[])
+  earthWash(w.x,w.z,between(5,8),'rgba(43,39,31,ALPHA)',.32);
  brush.globalAlpha=1;
  const terrainTexture=new B.DynamicTexture('hd2026-soft-painted-earth',
   {width:512,height:512},scene,true);
@@ -98,7 +128,7 @@ function apply({scene,B,world,camera,sun,map}){
  terrainTexture.updateSamplingMode(B.Texture.TRILINEAR_SAMPLINGMODE);
  const smoothEarth=new B.PBRMaterial('hd2026-matte-terrain',scene);
  smoothEarth.albedoTexture=terrainTexture;
- smoothEarth.albedoColor=B.Color3.FromHexString('#f1ebd9');
+ smoothEarth.albedoColor=B.Color3.FromHexString('#e3ddc2');
  smoothEarth.metallic=0;smoothEarth.roughness=1;smoothEarth.specularIntensity=0;
  const oldGround=world.ground.material;
  world.ground.material=smoothEarth;
@@ -372,15 +402,47 @@ function apply({scene,B,world,camera,sun,map}){
    mesh.thinInstanceRefreshBoundingInfo();
   }
  }catch(error){report.errors.push('foliage '+String(error));}
+ // Angular, opaque hedgerow clumps add silhouettes without alpha overdraw.
+ // Thin instances are single-draw-call decoration: never collision proxies.
+ try{
+  const shrubMat=new B.StandardMaterial('hd2026-shrub-mat',scene);
+  shrubMat.diffuseColor=B.Color3.FromHexString('#43583c');
+  shrubMat.specularColor=B.Color3.Black();
+  const shrubs=B.MeshBuilder.CreateSphere('hd2026-hedgerow',
+   {diameter:1,segments:5},scene);
+  shrubs.material=shrubMat;shrubs.isPickable=false;shrubs.receiveShadows=false;
+  const buf=[];
+  const lowPower=new URLSearchParams(
+   typeof location!=='undefined'?location.search:'').get('quality')==='low';
+  const budget=lowPower?72:132;
+  for(let i=0;i<budget;i++){
+   const x=between(10,290),z=between(10,290);
+   if(Math.abs(x-150)<11||Math.abs(z-150)<11)continue;
+   if(map.farms.some(f=>Math.hypot(f.x-x,f.z-z)<14))continue;
+   if(map.bases.some(b=>Math.hypot(b.x-x,b.z-z)<26))continue;
+   const w=between(.65,1.55);
+   const m=B.Matrix.Compose(new B.Vector3(w*1.8,w*.72,w*1.15),
+    B.Quaternion.FromEulerAngles(0,between(0,Math.PI*2),0),
+    pos(x,w*.38,z));
+   buf.push(...m.asArray());
+   report.shrubInstances=(report.shrubInstances||0)+1;
+  }
+  if(buf.length){
+   shrubs.thinInstanceSetBuffer('matrix',new Float32Array(buf),16,true);
+   shrubs.thinInstanceRefreshBoundingInfo();
+  }
+ }catch(error){report.errors.push('hedgerows '+String(error));}
  // Restrained warm light — no extreme color filters, high-cost bloom or SSAO
  // at mobile resolution. Original sun casts PCF shadows where already supported.
- sun.intensity=1.10;
+ sun.intensity=1.04;
  if(scene.fogMode!==B.Scene.FOGMODE_NONE){
-  scene.fogDensity=.0026;
-  scene.fogColor=B.Color3.FromHexString('#9a9b8e');
+  scene.fogDensity=.0020;
+  scene.fogColor=B.Color3.FromHexString('#939a86');
  }
  const config=scene.imageProcessingConfiguration;
- if(config){config.toneMappingEnabled=true;config.exposure=1.05;config.contrast=1.025;}
+ if(config){config.toneMappingEnabled=true;config.exposure=.96;config.contrast=1.105;}
+ report.colorGrade='muted-olive-earth-v2';
+ report.mipmappedScans=true;report.opaqueHedgerows=true;
  report.ready=true;
  scene.metadata=scene.metadata||{};
  scene.metadata.battlefieldModernArt=report;
