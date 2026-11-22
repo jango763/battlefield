@@ -595,7 +595,7 @@
         // Keep the rifle nearly horizontal while running. The former
         // +0.33 rad pitch visibly pointed the muzzle at the ground and
         // made the wrists look detached despite passing distance-only IK.
-        run: rifle ? [.045, -.05, -.025] : [.22, -.05, -.025],
+        run: rifle ? [.045, .34, -.025] : [.22, -.05, -.025],
         fire: [.012, 0, 0]
       })[pose];
       // During mobile shooting, legs KEEP the Run clip. Only the upper-body
