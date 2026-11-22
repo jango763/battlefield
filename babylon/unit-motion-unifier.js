@@ -15,9 +15,9 @@
   'rightarm','rightforearm','righthand','leftupleg','leftleg','leftfoot',
   'rightupleg','rightleg','rightfoot']);
  const WEAPONS=Object.freeze(['Kar98k','MP40','MG42','Panzerschreck']);
- const canonical=name=>String(name||'').replace(/-\\d+$/,'')
+ const canonical=name=>String(name||'').replace(/-\d+$/,'')
   .replace(/^mixamorig[:_]?/i,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
- const sourceName=group=>group?.name?.replace(/-\\d+$/,'')||'';
+ const sourceName=group=>group?.name?.replace(/-\d+$/,'')||'';
  function findGroup(groups,name){
   return (groups||[]).find(g=>sourceName(g)===name||g.name===name)||null;
  }
