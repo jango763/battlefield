@@ -573,6 +573,34 @@ function assignView(view,unit){
  view.rig.combatPose={active:false,stage:'ready',crouch:0,recoilPulse:0};
  // Approved rig starts with Kar98k loaded; avoid duplicate requests.
 }
+// Lightweight session objectives are earned through real combat/capture,
+ // not daily login gates, advertising, paywalls, or duplicated army gold.
+const SESSION_OBJECTIVES=Object.freeze([
+ {kind:'kills',target:1,title:'Первое устранение'},
+ {kind:'farms',target:1,title:'Первая ферма'},
+ {kind:'kills',target:3,title:'Три устранения'},
+ {kind:'farms',target:3,title:'Удержать три фермы'}
+]);
+let missionIndex=0;
+function advanceObjectives(hero,econ){
+ let advanced=false;
+ while(missionIndex<SESSION_OBJECTIVES.length){
+  const task=SESSION_OBJECTIVES[missionIndex];
+  const progress=task.kind==='kills'?hero.kills:(econ?.owners?.blue?.length||0);
+  if(progress<task.target)break;
+  missionIndex++;advanced=true;
+ }
+ const task=SESSION_OBJECTIVES[missionIndex];
+ const progress=task?(task.kind==='kills'?hero.kills:
+  econ?.owners?.blue?.length||0):SESSION_OBJECTIVES.length;
+ state.mission={completed:missionIndex,total:SESSION_OBJECTIVES.length,
+  current:task?.title||'Все цели выполнены',progress,
+  target:task?.target||SESSION_OBJECTIVES.length,finished:!task};
+ if(advanced&&gameStarted)alertStatus(task?
+  'Задача выполнена! Следующая: '+task.title:
+  'Все боевые задачи выполнены! Продолжайте защищать фермы.');
+ return state.mission;
+}
 function setup(scenarioName){
  if(!state.ready)return;
  if(!SCENARIOS[scenarioName])throw Error('Unknown scenario');
@@ -580,6 +608,8 @@ function setup(scenarioName){
  replenisher?.stop();replenisher=null;
  reinforcementEpoch++;
  scenario=scenarioName;atBase=true;
+ missionIndex=0;state.mission={completed:0,total:SESSION_OBJECTIVES.length,
+  current:SESSION_OBJECTIVES[0].title,progress:0,target:1,finished:false};
  if(destinationMark)destinationMark.isVisible=false;
  state.scenario=scenario;state.atBase=true;state.focus=null;
  const [ours,theirs]=SCENARIOS[scenario];
