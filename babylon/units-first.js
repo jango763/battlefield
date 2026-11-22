@@ -220,7 +220,8 @@ try{
    if(!rigState.weaponRigReady)throw Error('Не удалось собрать руки и Kar98k');
    // A/B gate only: test the user's previously saved 32-parameter Kar98k
    // grip without mutating the original GLB or overwriting production IK.
-   if(new URLSearchParams(location.search).get('testedHandPreset')==='1'){
+   const requestedPreset=new URLSearchParams(location.search).get('testedHandPreset');
+   if(requestedPreset==='1'||requestedPreset==='rightOnly'){
     const response=await fetch('animstudio-preview/presets/kar98k-user-v2.json');
     if(!response.ok)throw Error('Сохранённый мастер-хват Kar98k не найден');
     const saved=await response.json();
@@ -229,8 +230,11 @@ try{
       throw Error('Неожиданное содержимое сохранённой позы Kar98k');
     if(typeof rigState.setMasterPose!=='function')
       throw Error('Студия мастер-хвата отключена');
-    rigState.setMasterPose(saved.profile);
-    state.handPresetTest='kar98k-user-v2';
+    const profile=requestedPreset==='rightOnly'
+      ?Object.fromEntries(Object.entries(saved.profile).filter(([key])=>key.startsWith('right')))
+      :saved.profile;
+    rigState.setMasterPose(profile);
+    state.handPresetTest='kar98k-user-v2-'+requestedPreset;
    }
   }
   if(id==='american'){
