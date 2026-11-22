@@ -226,6 +226,17 @@ function createWorld(){
  engine.runRenderLoop(frame);
  window.addEventListener('resize',()=>engine.resize());
 }
+// Squad markers and health bars share faction GPU materials without
+// sharing health state, hit boxes, or independent skinned character rigs.
+const soldierMaterialCache=new Map();
+function factionMat(kind,side,hex,{alpha=1,disableLighting=false}={}){
+ const key=kind+'-'+side;
+ if(soldierMaterialCache.has(key))return soldierMaterialCache.get(key);
+ const m=new B.StandardMaterial('soldier-shared-'+key,scene);
+ m.emissiveColor=color(hex);m.alpha=alpha;m.disableLighting=disableLighting;
+ soldierMaterialCache.set(key,m);
+ return m;
+}
 function unitVisual(index,entries,{externalModel=null}={}){
  const anchor=new B.TransformNode('soldier-anchor-'+index,scene);
  const root=new B.TransformNode('approved-animated-rig-'+index,scene);
@@ -275,21 +286,20 @@ function unitVisual(index,entries,{externalModel=null}={}){
  }
  const marker=B.MeshBuilder.CreateDisc('squad-ring-'+index,{radius:.47,tessellation:24},scene);
  marker.parent=anchor;marker.rotation.x=Math.PI/2;marker.position.y=.025;
- const ringMat=new B.StandardMaterial('squad-ring-mat-'+index,scene);
- ringMat.emissiveColor=color(index<12?'#77bcea':'#e98668');ringMat.alpha=.75;
+ const ringMat=factionMat('ring',index<12?'blue':'red',
+  index<12?'#77bcea':'#e98668',{alpha:.75});
  marker.material=ringMat;marker.isPickable=false;
  const hpBack=B.MeshBuilder.CreatePlane('health-bg-'+index,{width:.8,height:.085},scene);
  hpBack.parent=anchor;hpBack.billboardMode=B.Mesh.BILLBOARDMODE_ALL;
  hpBack.position.y=2.08;
- const hpBgMat=new B.StandardMaterial('health-bg-mat-'+index,scene);
- hpBgMat.emissiveColor=color('#27332a');hpBgMat.disableLighting=true;
+ const hpBgMat=factionMat('hp-background','both','#27332a',
+  {disableLighting:true});
  hpBack.material=hpBgMat;hpBack.isPickable=false;
  const hpFill=B.MeshBuilder.CreatePlane('health-fill-'+index,{width:.76,height:.061},scene);
  hpFill.parent=anchor;hpFill.billboardMode=B.Mesh.BILLBOARDMODE_ALL;
  hpFill.position.y=2.081;hpFill.position.z=-.01;
- const hpMat=new B.StandardMaterial('hp-mat-'+index,scene);
- hpMat.emissiveColor=color(index<12?'#8bdaa0':'#e78f6b');
- hpMat.disableLighting=true;hpFill.material=hpMat;hpFill.isPickable=false;
+ const hpMat=factionMat('hp-fill',index<12?'blue':'red',
+  index<12?'#8bdaa0':'#e78f6b',{disableLighting:true});hpFill.material=hpMat;hpFill.isPickable=false;
  for(const mesh of drawable)mesh.metadata={...(mesh.metadata||{}),squadSlot:index};
  return {index,faction:factions.sideForSlot(index),
   chosenAlliedModel:index<12?(FEATURE_REAL_ALLIES?featureCasting(index):alliedModels.forBlueSlot(index).id):null,
