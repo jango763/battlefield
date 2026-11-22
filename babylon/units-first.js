@@ -193,20 +193,10 @@ try{
    -min.y*scale,-(min.z+max.z)*.5*scale);
   container.addAllToScene();
   for(const clip of clips)clip.stop();
-  // The source American Soldier WW2 includes five primitive M1 gun parts:
-  // one Chrome receiver + four TanPlastic components (GLB mesh 0..4).
-  // Babylon renumbers source glTF nodes to Object_7/10/13/16/19.
-  // In this range the equipped Lee-Enfield is owned by the real hand IK.
-  // Hide, NEVER dispose, the original gun to avoid a second rifle across
-  // the face. Do not touch the 36 skinned costume/hand meshes or materials.
+  // Preserve ALL source geometry. The reported "second rifle" came from
+  // another soldier's independently loaded weapon, not the US source mesh.
   let hiddenSourceGun=0;
   if(id==='american'){
-   const oldGun=container.meshes.filter(m=>/^(?:Object_7|Object_10|Object_13|Object_16|Object_19)$/.test(m.name));
-   const materials=oldGun.map(m=>m.material?.name||'');
-   if(oldGun.length===5&&materials.filter(n=>n.includes('Chrome')).length===1&&
-      materials.filter(n=>n.includes('TanPlastic')).length===4){
-    for(const mesh of oldGun){mesh.setEnabled(false);hiddenSourceGun++;}
-   }else throw Error('American original rifle mesh layout changed: cannot safely remove duplicate');
    // Reuse the tested Stage 8 source-hand skin material calibration.
    const donorSkin=container.materials.find(mat=>
     mat.name.includes('Battlefield_US_Donor_Hands_Skin'));
@@ -217,6 +207,7 @@ try{
   }
   // Reuse the ALREADY WORKING soldier-specific rigs instead of showing bare
   // animation skeletons or a weaponless American mannequin.
+  const sceneMeshesBeforeRig=new Set(scene.meshes);
   let rig=null,rigState=null;
   if(id==='german'){
    if(typeof window.BattlefieldWeaponRig?.create!=='function')
@@ -235,10 +226,15 @@ try{
     scene,imported:container,stage:pivot,weaponRoot:'../assets/ww2-weapons/'});
    if(!rig?.report?.ready)throw Error('Не удалось собрать американца с винтовкой');
   }
+  // Weapon meshes are created by their separate controllers under scene
+  // roots, NOT under the original character pivot. Preserve ownership so
+  // switching a character cannot leave a floating gun from a previous unit.
+  const weaponMeshes=scene.meshes.filter(m=>
+   !sceneMeshesBeforeRig.has(m)&&m.getTotalVertices?.()>0);
   const triangles=meshes.reduce((sum,m)=>
    sum+Math.round((m.getTotalIndices?.()||m.getTotalVertices())/3),0);
   const data={id,spec,container,pivot,clips,skinned:skinned.length,bones,triangles,
-   rig,rigState,rigReady:id==='jakeli'||!!rig,hiddenSourceGun,
+   rig,rigState,rigReady:id==='jakeli'||!!rig,hiddenSourceGun,weaponMeshes,
    textures:container.textures?.length||0};
   cache.set(id,data);
   rebuildSharedMotion();
@@ -249,7 +245,8 @@ try{
    assembled:id==='german'?'original soldier + German weapon rig + Kar98k':
     id==='american'?'original US skin + Quaternius + Lee-Enfield hand IK':
      'original British skin + native ready/weapon',
-   rigReady:data.rigReady,hiddenSourceGun:data.hiddenSourceGun};
+   rigReady:data.rigReady,hiddenSourceGun:data.hiddenSourceGun,
+   weaponMeshCount:data.weaponMeshes.length};
   state.loadedCount=cache.size;
   return data;
  }
@@ -267,7 +264,13 @@ try{
     active.pivot.setEnabled(false);
    }
    active=model;
-   for(const [key,other] of cache)other.pivot.setEnabled(key===id);
+   for(const [key,other] of cache){
+    const selected=key===id;
+    other.pivot.setEnabled(selected);
+    // A disabled character must never leave its independently mounted gun
+    // on screen. IK still owns positions; the preview owns only visibility.
+    for(const weapon of other.weaponMeshes||[])weapon.setEnabled(selected);
+   }
    state.selected=id;
    state.motion='idle';
    play('idle');state.ready=true;
