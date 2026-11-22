@@ -15,7 +15,7 @@ const specs=Object.freeze({
   approval:'ИСХОДНАЯ МОДЕЛЬ УТВЕРЖДЕНА',color:'#a9b7a3',
   clips:{idle:'Kar98k_Hold',walk:'Kar98k_Run',run:'Kar98k_Run',aim:'Kar98k_Aim',fire:'Kar98k_Fire'},
   speeds:{walk:.67,run:1.1,fire:1},
-  warning:'Бег ног — исходный немецкий GLB. Руки во время бега остаются в штатной стойке с Kar98k, без переноса анимации кистей. Проверка боевого хвата продолжается.'
+  warning:'Бег ног — исходный немецкий GLB. В беговой стойке Kar98k держится перед грудью, правая и левая кисти используют отдельную настройку хвата. Качество движения требует оценки на iPhone.'
  }),
  american:Object.freeze({
   label:'Американский герой · оригинальная модель',source:'../assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb',
@@ -135,15 +135,18 @@ try{
   // The real two-handed rigs work AFTER the native animation and before rendering.
   // No foreign soldier's arm/shoulder tracks are allowed to fight their IK.
   if(model.id==='german'&&model.rigState){
+   // Accepted soldier-range running carry is ON by default.
+   // ?runCarry=0 retains the previous A/B path for regression comparison.
    model.rigState.weaponMotionRunCarryTest=
-    new URLSearchParams(location.search).get('runCarry')==='1';
-   // The real German trigger fingers bend toward the wood along reverse
-   // local X in close-up. Limit this opt-in to the RIGHT hand while running.
+    new URLSearchParams(location.search).get('runCarry')!=='0';
+   // Both hands use their measured reverse-X finger hinges only in running
+   // carry; ready/aim/other weapons keep their existing authoring.
    model.rigState.weaponMotionGripDebug=
     mode==='run'&&model.rigState.weaponMotionRunCarryTest?'reverseAxisX':null;
    model.rigState.weaponMotionRun=mode==='run';
    model.rigState.weaponMotionRightWristMax=
-    Number(new URLSearchParams(location.search).get('rightWristCap')||55);
+    Number(new URLSearchParams(location.search).get('rightWristCap')||
+      (mode==='run'&&model.rigState.weaponMotionRunCarryTest?120:55));
   }
   if(model.id==='german')
    model.rigState?.setWeaponPose?.(mode==='run'&&model.rigState?.weaponMotionRunCarryTest?'run':
