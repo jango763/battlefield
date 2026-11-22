@@ -488,6 +488,9 @@
       // Curl around joint-local Z and tuck the THUMB around a separate X axis.
       // No hand meshes or skeletal joints are duplicated.
       const rightHand = side === 'Right';
+      // Research-only runtime A/B of the real knuckle hinge axis. The rest
+      // pose, GLB and production finger curl are NEVER overwritten.
+      const gripMode=state.weaponMotionGripDebug||gripDebug;
       for (const digit of ['Thumb','Index','Middle','Ring','Pinky']) {
         const segments = fingerRoots[side][digit];
         const amount = digit === 'Thumb' ? [-.36,-.38,-.20]
@@ -503,13 +506,13 @@
           const sideKey=rightHand?'right':'left';
           const multiplier=gripStudio
             ?master[sideKey+digit+'Curl']
-            :gripDebug==='neutral'?0:gripDebug==='classic'?1:1.55;
+            :gripMode==='neutral'?0:gripMode==='classic'?1:1.55;
           const spread=gripStudio?master[sideKey+digit+'Spread']*Math.PI/180:0;
-          const sign=gripDebug==='reverse'?-1:1;
-          const curlAxis=gripDebug==='axisX'?B.Axis.X:B.Axis.Z;
+          const sign=(gripMode==='reverse'||gripMode==='reverseAxisX')?-1:1;
+          const curlAxis=(gripMode==='axisX'||gripMode==='reverseAxisX')?B.Axis.X:B.Axis.Z;
           const bend=B.Quaternion.RotationAxis(curlAxis,amount[i]*multiplier*sign);
           const fan=i===0 ?B.Quaternion.RotationAxis(B.Axis.X,spread) :B.Quaternion.Identity();
-          const tuck=digit==='Thumb'&&gripDebug!=='neutral'
+          const tuck=digit==='Thumb'&&gripMode!=='neutral'
             ?B.Quaternion.RotationAxis(B.Axis.X,(rightHand?-.30:.30)*(i===0?1:.50))
             :B.Quaternion.Identity();
           node.rotationQuaternion=rest.get(node).multiply(tuck).multiply(fan).multiply(bend).normalize();
