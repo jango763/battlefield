@@ -10,6 +10,7 @@ on:
       - 'babylon/units-first.js'
       - 'babylon/units-first.html'
       - 'babylon/tests/test-unit-motion-unifier.cjs'
+      - 'babylon/tests/test-units-first-assets.cjs'
       - '.github/workflows/unit-motion-unifier-qa.yml'
   workflow_dispatch:
 permissions:
