@@ -7,6 +7,7 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
   args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader']});
  const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ page.on('console',msg=>{if(msg.text().includes('BATTLEFIELD_US_GUN_MESH_CANDIDATES'))console.log(msg.text())});
  try{
   await page.goto('http://127.0.0.1:8858/babylon/units-first.html',
    {waitUntil:'domcontentloaded',timeout:60000});
