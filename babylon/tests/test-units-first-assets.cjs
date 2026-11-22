@@ -76,6 +76,11 @@ for(const [id,[filename,clips]] of Object.entries(sources)){
    default:return null;
   }
  }
+ if(id==='american')console.log('BATTLEFIELD_US_MESH_MANIFEST',JSON.stringify(
+  (content.meshes||[]).map((m,i)=>({id:i,name:m.name,
+   primitives:m.primitives?.length,
+   material:m.primitives?.map(p=>content.materials?.[p.material]?.name||''),
+   vertices:m.primitives?.map(p=>content.accessors?.[p.attributes?.POSITION]?.count||0)}))));
  const handWeightVertices={lefthand:0,righthand:0,leftforearm:0,rightforearm:0};
  for(const node of content.nodes||[]){
   if(node.mesh===undefined||node.skin===undefined)continue;
