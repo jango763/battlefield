@@ -45,8 +45,8 @@ const {chromium}=require('/tmp/bf-tactical-camera/node_modules/playwright');
   assert(before.detail?.patches>=120&&before.detail.drawCalls===5,
    'Terrain plus two shared-mesh roadside detail batches must be generated');
   assert.equal(before.detail.roadSurface,'two-track-gravel-and-grass');
-  assert.equal(before.detail.roadMaterial,'PBR-opaque-dry-earth',
-   'Road must be physically lit with a clean, brighter soil texture');
+  assert.equal(before.detail.roadMaterial,'PBR-blended-dry-earth',
+   'Road must blend photographed CC0 soil with procedurally drawn gravel, not render as a concrete highway');
   assert.equal(before.detail.roadVergesVisible,true,
    'Natural grass verges must be distinguishable from the road from above');
   assert(before.detail.hedges>=25&&before.detail.stones>=12,
