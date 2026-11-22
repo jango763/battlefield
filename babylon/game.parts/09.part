@@ -1,3 +1,4 @@
+  $('order-attack').setAttribute('aria-pressed','true');
   alertStatus('Атака: коснитесь противника для выбора цели.');
  });
  $('reload-manual').addEventListener('click',()=>{

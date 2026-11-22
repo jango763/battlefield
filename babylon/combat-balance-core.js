@@ -258,7 +258,7 @@
     // soldier's inventory or personal weapon to make a mounted gun fire.
     function applyDamage(attacker,target,amount,weapon='support'){
       unitOf(attacker);unitOf(target);
-      if(!attacker.alive||!target.alive||attacker.team===target.team||!Number.isFinite(amount)||amount<=0)return null;
+      if(!target.alive||attacker.team===target.team||!Number.isFinite(amount)||amount<=0)return null;
       const damage=Math.min(target.hp,Math.round(amount));target.hp-=damage;attacker.hits++;
       if(target.hp<=0){target.alive=false;attacker.kills++;emit('kill',{attacker:attacker.id,victim:target.id,weapon});}
       return {id:target.id,damage,hp:target.hp};

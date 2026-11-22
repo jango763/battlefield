@@ -55,18 +55,31 @@ function install({B,scene,world,layout,design}){
  for(const def of layout.emplacements){
   const {x,z,id}=def,pivot=new B.TransformNode(id+'-turret',scene);pivot.position.set(x-150,0,z-150);
   function part(label,dx,y,dz,w,h,d,m){const p=box(id+'-'+label,x+dx,y,z+dz,w,h,d,m);p.setParent(pivot);return p;}
-  part('receiver',0,1.25,0,.23,.25,.75,metal);
-  part('barrel',0,1.3,.95,.095,.095,1.35,metal);
-  part('muzzle',0,1.3,1.65,.16,.16,.18,metal);
-  part('stock',0,1.2,-.6,.18,.22,.5,timber);
-  part('ammo-box',-.38,1.05,-.05,.38,.37,.45,metal);
-  part('sight',0,1.47,.55,.08,.18,.07,metal);
-  for(const side of [-1,1]){const leg=part('tripod-'+side,side*.4,.55,.22,.09,1.15,.09,metal);leg.rotation.z=side*.45;}
-  const rear=part('rear-leg',0,.55,-.5,.09,1.15,.09,metal);rear.rotation.x=-.5;
+  if(def.kind==='cannon'){
+   part('breech',0,1.15,-.25,.55,.48,.9,metal);
+   part('barrel',0,1.25,1.1,.19,.19,2.5,metal);
+   part('muzzle',0,1.25,2.42,.26,.26,.24,metal);
+   part('shield',0,1.15,.15,2.35,1.7,.15,metal);
+   part('axle',0,.62,-.25,2.7,.17,.2,metal);
+   for(const side of [-1,1]){
+    const wheel=B.MeshBuilder.CreateTorus(id+'-wheel-'+side,{diameter:1.15,thickness:.2,tessellation:16},scene);
+    wheel.position.set(x-150+side*1.2,.62,z-150-.25);wheel.rotation.z=Math.PI/2;wheel.material=metal;wheel.isPickable=false;wheel.setParent(pivot);
+    const trail=part('trail-'+side,side*.55,.28,-1.3,.16,.23,2,metal);trail.rotation.y=side*.3;
+   }
+  }else{
+   part('receiver',0,1.25,0,.23,.25,.75,metal);
+   part('barrel',0,1.3,.95,.095,.095,1.35,metal);
+   part('muzzle',0,1.3,1.65,.16,.16,.18,metal);
+   part('stock',0,1.2,-.6,.18,.22,.5,timber);
+   part('ammo-box',-.38,1.05,-.05,.38,.37,.45,metal);
+   part('sight',0,1.47,.55,.08,.18,.07,metal);
+   for(const side of [-1,1]){const leg=part('tripod-'+side,side*.4,.55,.22,.09,1.15,.09,metal);leg.rotation.z=side*.45;}
+   const rear=part('rear-leg',0,.55,-.5,.09,1.15,.09,metal);rear.rotation.x=-.5;
+  }
   pivot.rotation.y=def.heading;mounts.set(id,pivot);
   // Visible sector boundary, broad enough to remain stable in mobile view.
   const points=[new B.Vector3(x-150,.09,z-150)];
-  for(let i=0;i<=20;i++){const a=def.heading-Math.PI/3+i*Math.PI/30;points.push(new B.Vector3(x-150+Math.sin(a)*8,.09,z-150+Math.cos(a)*8));}
+  for(let i=0;i<=20;i++){const arc=def.kind==='cannon'?Math.PI*2/9:Math.PI/3,a=def.heading-arc+i*arc/10;points.push(new B.Vector3(x-150+Math.sin(a)*8,.09,z-150+Math.cos(a)*8));}
   points.push(points[0]);const sector=B.MeshBuilder.CreateLines(id+'-sector',{points},scene);sector.color=B.Color3.FromHexString(def.team==='blue'?'#557f8b':'#9d6355');sector.isPickable=false;
  }
  const api={layout,meshes,materials,box,mat,earth,timber,sand,world,scene,B,mounts,

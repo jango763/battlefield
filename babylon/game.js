@@ -746,6 +746,12 @@ function drawShot({unit,target,result,mount}){
    }
   }
  }
+ if(mount?.kind==='cannon'&&result.phase==='launch'){
+  const start=position({x:mount.x+Math.sin(mount.yaw)*2.5,z:mount.z+Math.cos(mount.yaw)*2.5},1.25),end=position(result.impact,.25);
+  const shell=B.MeshBuilder.CreateSphere('field-shell',{diameter:.23,segments:6},scene);
+  const mat=new B.StandardMaterial('field-shell-glow',scene);mat.emissiveColor=color('#e2ac63');shell.material=mat;shell.isPickable=false;
+  addEffect(shell,result.duration,mat);fx[fx.length-1].flight={start,end,duration:result.duration};return;
+ }
  const source=actors.get(unit),targetView=actors.get(target);
  if(!source||!targetView)return;
  const muzzle=source.rig?.getMuzzleWorld?.()?.position||
@@ -755,11 +761,11 @@ function drawShot({unit,target,result,mount}){
  const impact=result.impact?position(result.impact,.7):
   targetView.anchor.position.add(new B.Vector3(0,1.15,0));
  if(!result.hit&&!result.impact)impact.z+=(Math.random()-.5)*1.4;
- drawTracer(start,impact,result.weapon==='Panzerschreck'?color('#ff9945'):
+ if(result.phase!=='impact')drawTracer(start,impact,result.weapon==='Panzerschreck'?color('#ff9945'):
   color(unit.team==='свои'?'#ffe5a0':'#ff866f'),
   result.weapon==='Panzerschreck'?.24:.095);
  if(result.weapon==='Panzerschreck'){
-  const diameter=combat.WEAPONS.Panzerschreck.blastRadius*UNIT_SCALE*2;
+  const diameter=(result.blastRadius||combat.WEAPONS.Panzerschreck.blastRadius)*UNIT_SCALE*2;
   const sphere=B.MeshBuilder.CreateSphere('blast',{diameter,segments:10},scene);
   sphere.position.copyFrom(impact);
   const mat=new B.StandardMaterial('blast glow',scene);
@@ -1205,6 +1211,7 @@ function frame(){
  }
  for(let i=fx.length-1;i>=0;i--){
   const f=fx[i];f.ttl-=dt;
+  if(f.flight){const t=Math.max(0,Math.min(1,1-f.ttl/f.flight.duration));f.mesh.position.copyFrom(B.Vector3.Lerp(f.flight.start,f.flight.end,t));f.mesh.position.y+=Math.sin(Math.PI*t)*2;}
   if(f.ttl<=0){
    if(f.pooled){f.pooled.active=false;f.mesh.setEnabled(false);}
    else{f.mesh.dispose();f.material?.dispose();}

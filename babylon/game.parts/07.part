@@ -1,6 +1,9 @@
+ if(!result.hit&&!result.impact)impact.z+=(Math.random()-.5)*1.4;
+ if(result.phase!=='impact')drawTracer(start,impact,result.weapon==='Panzerschreck'?color('#ff9945'):
+  color(unit.team==='свои'?'#ffe5a0':'#ff866f'),
   result.weapon==='Panzerschreck'?.24:.095);
  if(result.weapon==='Panzerschreck'){
-  const diameter=combat.WEAPONS.Panzerschreck.blastRadius*UNIT_SCALE*2;
+  const diameter=(result.blastRadius||combat.WEAPONS.Panzerschreck.blastRadius)*UNIT_SCALE*2;
   const sphere=B.MeshBuilder.CreateSphere('blast',{diameter,segments:10},scene);
   sphere.position.copyFrom(impact);
   const mat=new B.StandardMaterial('blast glow',scene);
@@ -122,5 +125,3 @@ function drawHud(){
   central?.started?'Откроется через '+String(Math.floor(left/60)).padStart(2,'0')+
    ':'+String(left%60).padStart(2,'0'):
    'ЗАКРЫТА — ждём гибель первого бота';
- $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
- $('supply').disabled=!atBase||!hero.alive;

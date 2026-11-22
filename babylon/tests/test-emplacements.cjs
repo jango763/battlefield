@@ -9,3 +9,11 @@ crew[1].alive=false;s.crewUpdate();const before=shots;for(let i=0;i<200;i++)s.up
 const replacement=battle.addUnit({id:'replacement',team:'blue',x:31.6,z:29.6});crew.push(replacement);s.crewUpdate();Object.assign(replacement,s.assignment(replacement).seat);for(let i=0;i<200;i++)s.update(.05);assert(shots>before,'Replacement restores service');
 target.z=5;const reverse=shots;for(let i=0;i<100;i++)s.update(.05);assert.equal(shots,reverse,'Cannot fire outside sector');
 console.log('CREW_SECTOR_RELOAD_SUPPRESSION_PASS',shots);
+const b2=C.createBattle(),crews=[b2.addUnit({id:'c1',team:'a'}),b2.addUnit({id:'c2',team:'a'})],t2=b2.addUnit({id:'t2',team:'b',x:50,z:80,hp:1000}),t3=b2.addUnit({id:'splash',team:'b',x:52,z:80,hp:1000});
+const gun=E.create({definitions:[{id:'cannon',kind:'cannon',team:'blue',x:50,z:40,heading:0}],allies:crews,enemies:[t2,t3],battle:b2,navigation:N.create({size:120}),random:()=>0});
+gun.crewUpdate();for(const u of crews)Object.assign(u,gun.assignment(u).seat);
+gun.update(.1);assert.equal(t2.hp,1000,'Shell takes time to reach target');assert.equal(gun.mounts[0].shots,1);assert.equal(gun.mounts[0].reload,7);
+for(let i=0;i<20;i++)gun.update(.1);assert(t2.hp<1000&&t3.hp<1000,'Artillery splash affects nearby enemies');assert.equal(gun.mounts[0].shots,1,'Reload gates shots');
+assert(!gun.inSector(gun.mounts[0],{x:50,z:45}),'Minimum range enforced');
+const blocker=N.create({size:120,obstacles:[{x:50,z:60,hw:20,hd:1}]});assert(!blocker.lineOfSight(gun.mounts[0],t2));
+console.log('ARTILLERY_FLIGHT_SPLASH_RELOAD_PASS');

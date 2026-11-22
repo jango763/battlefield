@@ -44,9 +44,11 @@ function create(){
  for(const [i,[x,z]] of [[86,123],[210,120],[120,175],[190,181],[150,83],[152,220]].entries())
   for(const facing of [-1,1])covers.push({id:'legacy-sandbag-'+i+'-'+facing,x,z:z-facing*1.25,hw:4.7,hd:.7,protection:.55,facing,type:'sandbags'});
  const emplacements=[{id:'mg-blue',kind:'mg',team:'blue',x:132,z:104,heading:0},
-  {id:'mg-red',kind:'mg',team:'red',x:168,z:196,heading:Math.PI}];
+  {id:'mg-red',kind:'mg',team:'red',x:168,z:196,heading:Math.PI},
+  {id:'gun-blue',kind:'cannon',team:'blue',x:177,z:114,heading:0},
+  {id:'gun-red',kind:'cannon',team:'red',x:123,z:186,heading:Math.PI}];
  for(const m of emplacements){
-  obstacles.push({id:m.id,type:'emplacement',x:m.x,z:m.z,hw:.6,hd:.55,blocksSight:false});
+  obstacles.push({id:m.id,type:'emplacement',x:m.x,z:m.z,hw:m.kind==='cannon'?1.15:.6,hd:.55,blocksSight:false});
   const facing=m.team==='blue'?1:-1;
   fortifications.push({id:m.id+'-bags',type:'sandbags',x:m.x,z:m.z+facing*1.8});
   obstacles.push({id:m.id+'-bags',type:'sandbags',x:m.x,z:m.z+facing*1.8,hw:5.4,hd:.55,blocksSight:false});

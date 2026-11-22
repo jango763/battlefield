@@ -124,3 +124,4 @@ async function processWeaponQueue(){
     }
    }catch(error){
     state.engineering.weaponFailures=(state.engineering.weaponFailures||0)+1;
+    // The animated approved soldier stays visible and game logic works.
