@@ -1,3 +1,9 @@
+ $('hud-toggle').setAttribute('aria-pressed','false');
+ $('hud-toggle').textContent='Меню';
+ document.body.classList.add('battle-active');
+ atBase=false;state.atBase=false;
+ alertStatus('Бой начался: британцы 🔵 против Вермахта 🔴. Касайтесь земли, чтобы управлять героем.');
+ drawHud();
 });
 function position(unit,y=0){
  return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y,BASE_Z+unit.z*UNIT_SCALE);
@@ -38,19 +44,27 @@ function createWorld(){
  const markMaterial=new B.StandardMaterial('destination-mat',scene);
  markMaterial.emissiveColor=color('#eed58b');destinationMark.material=markMaterial;
 
- // Mirror the FIRST Three.js game's camera: elevated follow, stable heading.
- // Babylon map's northern direction is +Z, so stand behind the blue hero.
- camera=new B.ArcRotateCamera('camera',Math.PI*1.5,1.18,14,
-  new B.Vector3(0,1,-107),scene);
- camera.lowerRadiusLimit=13.5;camera.upperRadiusLimit=14.5;
- camera.lowerBetaLimit=1.17;camera.upperBetaLimit=1.19;
- camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
+ // The first game's elevated patrol viewpoint, now a readable tactical
+ // perspective. ?camera=classic safely restores the previous close profile.
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.83,23.5,
+  new B.Vector3(0,1,-105),scene);
+ cameraProfile=tacticalCamera.configure(camera,{profile:
+  new URLSearchParams(location.search).get('camera')});
+ state.cameraProfile=cameraProfile.id;
+ camera.wheelPrecision=1e9;camera.pinchDeltaPercentage=0;
  state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
  // Real photographed materials and geometry; Babylon skinned soldiers, game AI,
  // colliders, controls and camera remain entirely unchanged.
  if(new URLSearchParams(location.search).get('art')!=='classic'){
   try{
    state.modernArt=modernArt.apply({scene,B,world,camera,sun,map:goldRules.MAP});
+   try{
+    state.mapDetail=mapDetail.apply({scene,B,map:goldRules.MAP,
+     lowPower:graphicsMode==='low'});
+   }catch(error){
+    state.mapDetail={ready:false,error:String(error)};
+    console.warn('Organic terrain fallback to licensed ground PBR',error);
+   }
    if(villageModels?.install){
     state.villageModels={started:true,loaded:0,pending:3};
     void villageModels.install({scene,B,art:state.modernArt}).then(
@@ -82,7 +96,7 @@ function createWorld(){
    }
    return;
   }
-  if(info.pickInfo.pickedMesh===terrain && fieldOrders && state.ready){
+  if(info.pickInfo.pickedMesh===terrain && fieldOrders && state.ready&&!touchJoystick.active){
    const point=info.pickInfo.pickedPoint;
    if(!point)return;
    if(inputMode==='attack'){
@@ -106,18 +120,3 @@ function createWorld(){
  window.addEventListener('resize',()=>engine.resize());
 }
 // Squad markers and health bars share faction GPU materials without
-// sharing health state, hit boxes, or independent skinned character rigs.
-const soldierMaterialCache=new Map();
-function factionMat(kind,side,hex,{alpha=1,disableLighting=false}={}){
- const key=kind+'-'+side;
- if(soldierMaterialCache.has(key))return soldierMaterialCache.get(key);
- const m=new B.StandardMaterial('soldier-shared-'+key,scene);
- m.emissiveColor=color(hex);m.alpha=alpha;m.disableLighting=disableLighting;
- soldierMaterialCache.set(key,m);
- return m;
-}
-function unitVisual(index,entries,{externalModel=null}={}){
- const anchor=new B.TransformNode('soldier-anchor-'+index,scene);
- const root=new B.TransformNode('approved-animated-rig-'+index,scene);
- root.parent=anchor;
- const descendants=[...entries.rootNodes];
