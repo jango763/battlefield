@@ -1010,7 +1010,8 @@ function updateTouchJoystick(dt){
   Number(movementKeys.a||movementKeys.ArrowLeft);
  const z=Number(movementKeys.w||movementKeys.ArrowUp)-
   Number(movementKeys.s||movementKeys.ArrowDown);
- fieldOrders.setMovement(x,z);
+ const magnitude=Math.hypot(x,z);
+ fieldOrders.setMovement(magnitude>1?x/magnitude:x,magnitude>1?z/magnitude:z);
 }
 function registerTouchControls(){
  // Match the first game's W/A/S/D and arrow-key walking on desktop.
@@ -1054,12 +1055,26 @@ function registerTouchControls(){
  });
  pad.addEventListener('pointerup',release);
  pad.addEventListener('pointercancel',release);
+ pad.addEventListener('lostpointercapture',release);
+ window.addEventListener('blur',()=>{
+  // No stuck walking after iPhone tab suspension or incoming calls.
+  for(const key of Object.keys(movementKeys))movementKeys[key]=false;
+  touchJoystick.active=false;touchJoystick.pointer=null;
+  touchJoystick.x=touchJoystick.y=0;
+  knob.style.transform='translate(0,0)';
+  fieldOrders?.clearMovement();
+ });
  $('quick-fire').addEventListener('click',()=>{
   if(!state.ready||!gameStarted||!controller)return;
   const hero=findActor();
   if(!hero?.alive)return;
-  const target=enemies.filter(u=>u.alive).sort((a,b)=>
-   Math.hypot(a.x-hero.x,a.z-hero.z)-Math.hypot(b.x-hero.x,b.z-hero.z))[0];
+  // O(n) nearest living enemy without sorting or allocating arrays.
+  let target=null,best=Infinity;
+  for(const enemy of enemies){
+   if(!enemy?.alive)continue;
+   const d=(enemy.x-hero.x)**2+(enemy.z-hero.z)**2;
+   if(d<best){best=d;target=enemy;}
+  }
   if(!target)return;
   controller.setFocus(target);
   alertStatus('ОГОНЬ · приоритетная цель: '+target.id);
