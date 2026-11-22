@@ -81,7 +81,7 @@ function apply({scene,B,world,camera,sun,map}){
  for(let i=0;i<230;i++){
   const x=between(0,512),y=between(0,512);
   const radius=between(14,50);
-  brush.globalAlpha=between(.035,.105);
+  brush.globalAlpha=between(.065,.15);
   brush.fillStyle=choose(['#8b8768','#4b654a','#8d8265','#596746','#a08a68']);
   brush.beginPath();
   brush.ellipse(x,y,radius*between(.7,1.6),radius*between(.45,1.15),
@@ -105,13 +105,57 @@ function apply({scene,B,world,camera,sun,map}){
  world.ground.receiveShadows=true;
  report.meshSurfaces++;report.terrainStyle='low-frequency-mipmapped-matte';
  if(oldGround&&oldGround!==smoothEarth)oldGround.dispose(true,true);
- // Large road textures repeated up to 45 times shimmered badly in motion.
- // Matte colours retain the layout without flickering microdetail.
- for(const [road,shade] of [[mudRoad,'#8c8269'],[crossRoad,'#8c8269']]){
-  road.albedoTexture=null;road.bumpTexture=null;
-  road.albedoColor=B.Color3.FromHexString(shade);
-  road.specularIntensity=0;
+ // Narrow the two roads VISUALLY: hero physics and the 300x300 map remain
+ // unchanged, but the start area no longer looks like a featureless runway.
+ const northRoad=scene.getMeshByName('north-south-road');
+ const eastRoad=scene.getMeshByName('west-east-road');
+ if(northRoad){northRoad.scaling.x=.60;northRoad.isPickable=false;}
+ if(eastRoad){eastRoad.scaling.z=.66;eastRoad.isPickable=false;}
+ const roadCanvas=document.createElement('canvas');
+ roadCanvas.width=roadCanvas.height=256;
+ const rc=roadCanvas.getContext('2d');
+ if(!rc)throw Error('No road painting context');
+ rc.fillStyle='#716b54';rc.fillRect(0,0,256,256);
+ for(let i=0;i<130;i++){
+  rc.globalAlpha=between(.045,.14);
+  rc.fillStyle=choose(['#99896b','#59644b','#5c5545','#9a8868']);
+  rc.beginPath();
+  rc.ellipse(between(0,256),between(0,256),between(9,35),
+   between(12,49),between(0,Math.PI),0,Math.PI*2);
+  rc.fill();
  }
+ rc.globalAlpha=1;
+ const roadTexture=new B.DynamicTexture('hd2026-soft-road',
+  {width:256,height:256},scene,true);
+ roadTexture.getContext().drawImage(roadCanvas,0,0);
+ roadTexture.wrapU=roadTexture.wrapV=B.Texture.CLAMP_ADDRESSMODE;
+ roadTexture.anisotropicFilteringLevel=4;
+ roadTexture.update(false);
+ roadTexture.updateSamplingMode(B.Texture.TRILINEAR_SAMPLINGMODE);
+ for(const road of [mudRoad,crossRoad]){
+  road.albedoTexture=roadTexture;
+  road.bumpTexture=null;
+  road.albedoColor=B.Color3.FromHexString('#ece5d3');
+  road.roughness=1;road.specularIntensity=0;
+ }
+ // Sparse broad verge islands soften the geometric edge with no alpha test.
+ const vergeMaterial=new B.StandardMaterial('hd2026-road-verge-material',scene);
+ vergeMaterial.diffuseColor=B.Color3.FromHexString('#596b4d');
+ vergeMaterial.specularColor=B.Color3.Black();
+ const verge=B.MeshBuilder.CreateSphere('hd2026-road-verge',
+  {diameter:1,segments:8},scene);
+ verge.material=vergeMaterial;verge.isPickable=false;
+ const vergeMatrices=[];
+ for(let i=0;i<108;i++){
+  const x=150+(rand()<.5?-1:1)*between(2.6,3.3);
+  const z=between(14,286);
+  const s=B.Matrix.Compose(new B.Vector3(between(.55,1.3),.085,between(1.3,3.3)),
+   B.Quaternion.Identity(),pos(x,.065,z));
+  vergeMatrices.push(...s.asArray());
+ }
+ verge.thinInstanceSetBuffer('matrix',new Float32Array(vergeMatrices),16,true);
+ verge.thinInstanceRefreshBoundingInfo();
+ report.roadVisualWidth=9.4*.60;
  const classify={
   'base-square-':stone,'base-hq-':plaster,'barrack-':plaster,
   'farm-yard-':dirt,'farm-house-':plaster,'farm-barn-':timber,

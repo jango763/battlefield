@@ -28,6 +28,9 @@ async function test(browserType,name){
     terrain:s.modernArt?.terrainStyle,groundMaterial:ground?.material?.name,
     hasGroundMap:!!ground?.material?.albedoTexture,
     grass:!!scene?.getMeshByName('hd2026-meadow-tuft'),
+    roadWidth:s.modernArt?.roadVisualWidth,
+    controlButtonLeft:document.getElementById('quick-buttons')?.getBoundingClientRect().left,
+    windowWidth:window.innerWidth,
     camera:s.cameraProfile,graphics:s.graphics};
   });
   assert(loaded.ready&&!loaded.error,'Game could not load: '+loaded.error);
@@ -35,9 +38,17 @@ async function test(browserType,name){
   assert.equal(loaded.groundMaterial,'hd2026-matte-terrain');
   assert(loaded.hasGroundMap,'New terrain texture missing');
   assert(loaded.grass,'Opaque foliage missing');
+  assert(Math.abs(loaded.roadWidth-5.64)<.01,'Road still too wide');
+  // After the battle-active CSS is applied the buttons must occupy RIGHT side.
   assert.equal(loaded.camera.mode,'elevated-tactical-follow');
   await page.locator('#enter-game').click();
   await page.waitForTimeout(700);
+  const buttonBounds=await page.evaluate(()=>{
+   const r=document.getElementById('quick-buttons').getBoundingClientRect();
+   return {left:r.left,right:r.right,viewport:innerWidth};
+  });
+  assert(buttonBounds.left>buttonBounds.viewport*.52,
+   'Fire/reload buttons overlap left joystick: '+JSON.stringify(buttonBounds));
   const initial=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.heroPosition);
   await page.screenshot({path:out+'/'+name+'-soft-terrain.png'});
   // User gestures are real pointer input, not synthesized app callbacks.
