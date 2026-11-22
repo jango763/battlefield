@@ -24,10 +24,12 @@ a{color:#dfe9a8}
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
 <script src="./native-clip-blend.js"></script>
 <script src="./unit-motion-unifier.js"></script>
+<script src="./weapon-rig.js"></script>
+<script src="./us-hero-ara-lee-enfield-stage4.js"></script>
 <script defer src="./units-first.js"></script>
 </head><body>
 <canvas id="view" aria-label="Реальные 3D-модели немецкого стрелка, американца и британца Jakeli. Вращайте пальцем."></canvas>
-<header><h1>Battlefield · наши бойцы</h1><small>Оригинальные GLB · одинаковый масштаб · оригинальные анимации</small></header>
+<header><h1>Battlefield · наши бойцы</h1><small>Оригинальные GLB · родные руки и оружие · проверка движения</small></header>
 <div id="error" role="alert"></div>
 <section id="control">
  <div class="row" role="group" aria-label="Переключить бойца">
@@ -35,7 +37,7 @@ a{color:#dfe9a8}
   <button data-unit="american" aria-pressed="false">Американец</button>
   <button data-unit="jakeli" aria-pressed="false">Британец Jakeli</button>
  </div>
- <div class="row"><button id="motion-standard" aria-pressed="true">Общий стандарт: ВКЛ</button></div>
+ <div class="row"><button id="motion-standard" aria-pressed="true">Ноги: бег немца ВКЛ</button></div>
  <div id="status" role="status" aria-live="polite">Загружаю утверждённого немецкого стрелка…</div>
  <div class="row" role="group" aria-label="Проверить анимацию">
   <button data-motion="idle" aria-pressed="true">Стойка</button>
@@ -44,6 +46,6 @@ a{color:#dfe9a8}
   <button data-motion="aim">Прицел</button>
   <button data-motion="fire">Выстрел</button>
  </div>
- <div id="warning">Общий стандарт: немецкий бег и британская стойка переносятся на совместимые скелеты; при несовместимости — родные клипы. Можно выключить и сравнить. Хват оружия и деформация Jakeli ещё требуют визуальной приёмки. Утверждена только исходная немецкая модель.</div>
+ <div id="warning">Немец: исходное тело и штатный Kar98k/IK. Американец: исходное тело, Quaternius и рабочий контроллер двух рук Lee-Enfield. Британец: оригинальный Jakeli с его Ready. Немецкий бег переносится только на ноги, без повреждения рук. Деформация Jakeli и качество хвата требуют визуальной приёмки.</div>
 </section>
 </body></html>
