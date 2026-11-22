@@ -72,8 +72,12 @@ window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
 let modelDepot=null;
 const motionDonors={germanRun:null,britishReady:null};
+// Cross-rig locomotion failed visual acceptance in the isolated soldier range.
+// Keep native authored clips in gameplay unless deliberately reviewing that
+// experimental branch with a URL flag. Never silently ship stiff donor legs.
+const DONOR_RUN_RESEARCH=new URLSearchParams(location.search).get('experimentalDonorRun')==='1';
 function promoteUnitMotion(view){
- if(!unitMotion||!view)return;
+ if(!unitMotion||!view||!DONOR_RUN_RESEARCH)return;
  const previous=view.clip,pose=view.lastPose;
  try{
   const result=unitMotion.install(view,{B,...motionDonors});
