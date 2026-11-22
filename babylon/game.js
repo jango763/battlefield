@@ -73,7 +73,7 @@ state.engineering={version:'10-stage-20261122',parts:10,privacy:'local-only',
  glbFallbacks:0,assetRetries:0,frameStats:{},source:'original-ww2-babylon'};
 window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
-let modelDepot=null;
+let modelDepot=null,modelDepotRetryAfter=0;
 const motionDonors={germanRun:null,britishReady:null};
 // Cross-rig locomotion failed visual acceptance in the isolated soldier range.
 // Keep native authored clips in gameplay unless deliberately reviewing that
@@ -339,7 +339,7 @@ async function ensureUnitsUnlocked(scenarioName){
   if(asset.animationGroups.length<16)
    throw Error('В GLB отсутствуют 16 согласованных боевых анимаций');
  }
- if(!modelDepot){
+ if(!modelDepot&&Date.now()>=modelDepotRetryAfter){
   modelDepot=alliedLoader.create({B,scene,catalog:alliedModels,
    sourceGroups:asset.animationGroups,featureTrial:FEATURE_REAL_ALLIES});
   try{
@@ -349,6 +349,8 @@ async function ensureUnitsUnlocked(scenarioName){
    // Missing manifest does not make 12v12 unplayable; no false model import.
    console.warn('Allied GLB manifest unavailable; source models not installed',error);
    modelDepot=null;
+   modelDepotRetryAfter=Date.now()+30000;
+   state.engineering.assetRetries++;
   }
  }
  for(const i of slots){
@@ -363,6 +365,7 @@ async function ensureUnitsUnlocked(scenarioName){
     externalModel=await modelDepot.instantiate(selected,i);
    }catch(error){
     state.modelErrors[selected]=String(error?.message||error);
+    state.engineering.glbFallbacks++;
     console.error('Allied licensed model rejected',selected,error);
    }
   }
