@@ -15,4 +15,12 @@ const combat=require('../combat-balance-core'),{create}=require('../squad-combat
 const battle=combat.createBattle({random:()=>0}),a=battle.addUnit({id:'a',team:'a',x:10,z:10}),b=battle.addUnit({id:'b',team:'b',x:20,z:10});
 const ctl=create({battle,allies:[a],enemies:[b],driveAllies:()=>new Set(),driveEnemies:()=>new Set(),lineOfSight:()=>false});ctl.start();ctl.update(.1);assert.equal(a.shots,0);assert.equal(b.shots,0);
 assert(combat.hitChance('Kar98k',30,{cover:.8})<combat.hitChance('Kar98k',30));
-console.log('TRENCHES_COVER_AND_LINE_OF_SIGHT_PASS');
+for(const f of layout.fortifications){
+ assert(layout.obstacles.some(o=>o.id===f.id||o.id.startsWith(f.id+'-')),'Every fortification has collision');
+ if(f.type==='bunker'){
+  assert(nav.free({x:f.x,z:f.z}),'Bunker interior walkable');
+  assert(nav.clear({x:f.x,z:f.z-f.facing*5},{x:f.x,z:f.z}),'Rear entrance open');
+  assert(nav.lineOfSight({x:f.x,z:f.z},{x:f.x,z:f.z+f.facing*10}),'Gun slit has line of fire');
+ }
+}
+console.log('TRENCHES_FORTIFICATIONS_COVER_AND_LINE_OF_SIGHT_PASS');

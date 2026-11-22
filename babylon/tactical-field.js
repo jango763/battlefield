@@ -27,6 +27,30 @@ function install({B,scene,world,layout,design}){
   // Broad duckboards are stable at RTS distance; no coplanar micro-lines.
   box(t.id+'-duckboard',t.x,-.80,t.z,t.b-t.a-6,.08,1.7,timber);
  }
+ const concrete=mat('concrete','#77776c'),metal=mat('steel','#454b44');
+ for(const f of layout.fortifications){
+  const {x,z,id}=f;
+  if(f.type==='sandbags'){
+   for(let layer=0;layer<2;layer++)for(let i=0;i<8;i++)
+    box(id+'-'+layer+'-'+i,x-4.7+i*1.34+(layer?.2:0),.25+layer*.4,z,1.37,.43,.95,sand,Math.sin(i*8)*.04);
+  }else if(f.type==='bunker'){
+   for(const side of [-1,1]){
+    box(id+'-side-'+side,x+side*3,1.35,z,.8,2.7,6,concrete);
+    for(const end of [-1,1])box(id+'-front-'+side+'-'+end,x+side*2,1.35,z+end*2.7,2,2.7,.7,concrete);
+   }
+   // Real front aperture and rear entry; overhead lintel never blocks feet.
+   box(id+'-slit-lintel',x,2.25,z+f.facing*2.7,2,1,.7,concrete);
+   box(id+'-roof',x,2.95,z,7,.55,6.8,concrete);
+   box(id+'-threshold',x,.08,z-f.facing*3,1.8,.16,1.5,concrete);
+  }else if(f.type==='hedgehog'){
+   for(const [i,angle] of [-.8,.8].entries()){const beam=box(id+'-'+i,x,1,z,.25,2.9,.28,metal);beam.rotation.z=angle;}
+   const cross=box(id+'-cross',x,1,z,.25,2.9,.28,metal);cross.rotation.x=Math.PI/2;
+  }else if(f.type==='wire'){
+   for(let i=0;i<5;i++)box(id+'-post-'+i,x-6+i*3,.65,z,.16,1.3,.16,timber);
+   for(const y of [.4,.85])box(id+'-wire-'+y,x,y,z,12,.075,.075,metal);
+   for(let i=0;i<12;i++){const bar=box(id+'-barb-'+i,x-5.5+i,.85,z,.2,.15,.15,metal);bar.rotation.z=.7;}
+  }
+ }
  const api={layout,meshes,materials,box,mat,earth,timber,sand,world,scene,B};
  world.field=api;return api;
 }
