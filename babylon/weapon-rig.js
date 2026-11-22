@@ -285,7 +285,8 @@
   }
   async function create({ scene, imported, root, state, animationDriven = false, bindUI = true,
     weaponRoot = '../assets/ww2-weapons/', acceptExportSockets = false,
-    initialWeaponId = 'de-kar98k', allowRetargetedSkeleton = false }) {
+    initialWeaponId = 'de-kar98k', allowRetargetedSkeleton = false,
+    previewNativeArmLayer = false }) {
     const skeleton = imported.skeletons[0];
     const linked = (skeleton?.bones || []).map(b => b.getTransformNode?.()).filter(Boolean);
     const nodes = [...imported.transformNodes, ...imported.meshes, ...linked];
@@ -526,7 +527,7 @@
     let rocketDispose = null, generation = 0;
     state.weaponRig = {
       rig: 'Mixamo linked glTF nodes + 2-hand IK + elbow poles + grip fingers', pose, weapon: null,
-      animationDriven,
+      animationDriven,previewNativeArmLayer,
       rightGripMeters: null, leftGripMeters: null,
       preliminaryGeometryOnly: true, experimentalFourthAsset: true,
       fingerJoints: fingers.length, anatomicalElbowPoles: true
@@ -560,7 +561,15 @@
       if (!animationDriven && !needsPose && (pose === 'ready' || pose === 'aim')) return;
       if (!animationDriven && !needsPose && now - lastSolveTime < 65) return;
       needsPose = false; lastSolveTime = now;
-      for (const [node, q] of rest) node.rotationQuaternion = q.clone();
+      // A/B: respect the author's native upper-body animation during run.
+      // The previous unconditional bind-pose reset erased authored arm swing
+      // every frame, leaving stiff mannequin-like shoulders in motion.
+      // Finger bones still reset before applying the separate grip curl.
+      for (const [node, q] of rest){
+        if(previewNativeArmLayer&&animationDriven&&pose==='run'&&!fingers.includes(node))
+          continue;
+        node.rotationQuaternion=q.clone();
+      }
       applyCombatStance();
       refresh(chest); refresh(right.shoulder); refresh(left.shoulder);
       const t = performance.now() * .001;
