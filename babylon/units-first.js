@@ -220,7 +220,7 @@ try{
   }finally{$$('[data-unit]').forEach(b=>b.disabled=false);updateButtons();}
  }
  $$('[data-unit]').forEach(b=>b.addEventListener('click',()=>void select(b.dataset.unit)));
- $('[data-motion]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.motion)));
+ document.querySelectorAll('[data-motion]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.motion))); // animated unit controls
  $('#motion-standard').addEventListener('click',()=>{
   state.sharedMotion=!state.sharedMotion;
   $('#motion-standard').setAttribute('aria-pressed',String(state.sharedMotion));
