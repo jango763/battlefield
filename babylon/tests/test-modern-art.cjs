@@ -47,7 +47,8 @@ for(const obj of Object.values(villages.models)){
 
 assert(art.includes("pbr('warped-timber','wood'"));
 assert(art.includes("world.ground.material=smoothEarth"),'Ground must avoid photo-grain shimmer');
-assert(art.includes("road.albedoTexture=null;road.bumpTexture=null"),'Roads must avoid high-frequency moire');
+assert(art.includes("road.albedoTexture=roadTexture"),'Roads must use coarse painted material');
+assert(art.includes("northRoad.scaling.x=.60"),'Roads should be visually narrow');
 assert(art.includes("mesh.name.startsWith('rut-')"),'Remove toy-like raised tracks');
 assert(art.includes("circle.isVisible=false"),'Hide giant screen-covering base circles');
 assert(game.includes("camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.96,23"),
