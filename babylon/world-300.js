@@ -129,8 +129,8 @@ function create(scene,B,map){
   }catch(error){console.warn('Dirt-road texture fallback',error);}
  }
  // Main central supply road, two farm access branches and vehicle tracks.
- box('north-south-road',9.4,.04,265,150,.025,150,mat.road);
- box('west-east-road',246,.045,8,150,.028,150,mat.road);
+ box('north-south-road',7.8,.04,265,150,.025,150,mat.road);
+ box('west-east-road',246,.045,7.2,150,.028,150,mat.road);
  for(const side of [-1,1]){
   box('lane-farm-west-'+side,135,.05,4,81,.055,150+side*52,mat.dirt);
   box('lane-farm-east-'+side,135,.05,4,219,.055,150+side*52,mat.dirt);
