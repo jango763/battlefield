@@ -111,7 +111,8 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
       rightIKMeters:r.rightIKMeters,leftIKMeters:r.leftIKMeters,
       rightFingerDirectionErrorDegrees:r.rightFingerDirectionErrorDegrees,
       leftFingerDirectionErrorDegrees:r.leftFingerDirectionErrorDegrees,
-      forwardDot:r.forwardDot,error:r.error||null};
+      forwardDot:r.forwardDot,barrelElevationDeg:r.barrelElevationDeg,
+      error:r.error||null};
     },fighter);
     console.log('BATTLEFIELD_GAIT_FRAME',JSON.stringify({...report,label}));
     shot=await page.screenshot({type:'jpeg',quality:47,
