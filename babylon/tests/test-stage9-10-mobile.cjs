@@ -88,26 +88,10 @@ fs.mkdirSync(dir,{recursive:true});
     lightCount:scene.lights.length,clear:scene.clearColor.asArray(),
     activeCamera:scene.activeCamera?.position.asArray()};
   });
-  await page.evaluate(()=>{
-   const scene=window.BABYLON.EngineStore.LastCreatedScene;
-   const mat=scene.getMeshByName('map-ground-300').material;
-   mat.disableLighting=true;
-   mat.emissiveColor=new BABYLON.Color3(1,1,1);
-   mat.emissiveTexture=mat.diffuseTexture;
-   mat.diffuseColor=new BABYLON.Color3(1,1,1);
-   mat.markAsDirty(BABYLON.Material.AllDirtyFlag);
-  });
-  await page.waitForTimeout(220);
-  await page.screenshot({path:dir+'/'+name+'-diagnostic-unlit-texture.png'});
-  await page.evaluate(()=>{
-   const scene=window.BABYLON.EngineStore.LastCreatedScene;
-   const mat=scene.getMeshByName('map-ground-300').material;
-   mat.diffuseTexture=null;mat.emissiveTexture=null;
-   mat.emissiveColor=new BABYLON.Color3(.1,.9,.15);
-   mat.markAsDirty(BABYLON.Material.AllDirtyFlag);
-  });
-  await page.waitForTimeout(220);
-  await page.screenshot({path:dir+'/'+name+'-diagnostic-solid-green.png'});
+  assert(result.terrainDiagnostics.ground.normals[1]>.9,
+   'Ground normals point DOWN: '+JSON.stringify(result.terrainDiagnostics.ground.normals));
+  assert(result.terrainDiagnostics.material.textureReady,
+   'Painted terrain texture unavailable to GPU');
   await page.mouse.move(160,693);await page.mouse.down();
   await page.mouse.move(94,693,{steps:7});
   await page.waitForTimeout(850);await page.mouse.up();

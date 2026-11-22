@@ -18,6 +18,7 @@ assert.match(field,/B\.Mesh\.MergeMeshes\(group,true,true\)/);
 assert.match(field,/if\(part\.parent\)/,'Must keep rotating weapon rigs out of static batches');
 assert.match(field,/joined\.freezeWorldMatrix\(\)/);
 assert.match(field,/optimization\.drawCallsSaved/);
+assert.match(field,/indices\.push\(a,b,c,b,d,c\)/, 'Terrain winding must be upward');
 assert.match(game,/changeGraphicsMode\(mode\)/);
 assert.match(game,/state\.optimization=world\.field\.optimization/);
 assert.match(game,/renderQuality\.mode==='auto'/);

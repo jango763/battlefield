@@ -16,7 +16,9 @@ function install({B,scene,world,layout,design}){
  for(const t of layout.trenches){for(const x of [t.a,t.a+3,t.b-3,t.b])xs.add(x);for(const dz of [-2,-1.3,-1.15,0,1.15,1.3,2])zs.add(t.z+dz);}
  const X=[...xs].sort((a,b)=>a-b),Z=[...zs].sort((a,b)=>a-b),positions=[],uvs=[],indices=[],normals=[];
  for(const z of Z)for(const x of X){positions.push(x-150,world.heightAt(x,z),z-150);uvs.push(x/300,z/300);}
- for(let j=0;j<Z.length-1;j++)for(let i=0;i<X.length-1;i++){const a=j*X.length+i,b=a+1,c=a+X.length,d=c+1;indices.push(a,c,b,b,c,d);}
+ for(let j=0;j<Z.length-1;j++)for(let i=0;i<X.length-1;i++){const a=j*X.length+i,b=a+1,c=a+X.length,d=c+1;
+  // Upward-facing normals are mandatory in this right-handed scene.
+  indices.push(a,b,c,b,d,c);}
  const vd=new B.VertexData();B.VertexData.ComputeNormals(positions,indices,normals);Object.assign(vd,{positions,indices,normals,uvs});vd.applyToMesh(world.ground,true);
  for(const t of layout.trenches){
   for(const side of [-1,1]){
