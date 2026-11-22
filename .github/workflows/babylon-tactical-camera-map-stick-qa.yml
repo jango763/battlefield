@@ -1,4 +1,4 @@
-name: Battlefield CoH3-style countryside: daylight, verges, native-touch QA
+name: "Battlefield CoH3-style countryside: daylight, verges, native-touch QA"
 on:
   push:
     branches:
