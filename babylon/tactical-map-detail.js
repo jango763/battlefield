@@ -133,26 +133,26 @@
   const c=roadCanvas.getContext('2d');
   if(c){
    c.clearRect(0,0,512,1024);
-   c.fillStyle='rgba(173,160,135,.20)';c.fillRect(0,0,512,1024);
+   c.fillStyle='rgba(208,192,160,.35)';c.fillRect(0,0,512,1024);
    for(const centre of [155,357]){
     c.beginPath();c.moveTo(centre,0);
     for(let y=0;y<=1024;y+=32)c.lineTo(centre+Math.sin(y*.019+centre)*11,y);
-    c.strokeStyle='rgba(53,50,43,.42)';c.lineWidth=41;c.stroke();
+    c.strokeStyle='rgba(75,69,58,.24)';c.lineWidth=32;c.stroke();
     c.beginPath();c.moveTo(centre-25,0);
     for(let y=0;y<=1024;y+=36)c.lineTo(centre-25+Math.sin(y*.021+centre)*10,y);
     c.strokeStyle='rgba(191,179,151,.27)';c.lineWidth=17;c.stroke();
    }
    c.beginPath();c.moveTo(252,0);
    for(let y=0;y<=1024;y+=18)c.lineTo(252+Math.sin(y*.027)*17,y);
-   c.strokeStyle='rgba(77,110,59,.48)';c.lineWidth=32;c.stroke();
+   c.strokeStyle='rgba(103,135,76,.58)';c.lineWidth=38;c.stroke();
    for(let i=0;i<1900;i++){
     const x=random()*512,y=random()*1024;
     const centre=Math.abs(x-256);
     if(i%3===0&&centre<50){
-     c.fillStyle='rgba(92,119,67,.47)';
+     c.fillStyle='rgba(100,136,72,.60)';
      c.fillRect(x,y,1+random()*4,2+random()*12);
     }else{
-     c.fillStyle=i%2?'rgba(207,196,162,.27)':'rgba(74,69,57,.26)';
+     c.fillStyle=i%2?'rgba(227,209,174,.38)':'rgba(104,96,79,.20)';
      c.fillRect(x,y,1+random()*5,1+random()*4);
     }
    }
@@ -171,10 +171,50 @@
   roadDetail.isPickable=false;roadDetail.checkCollisions=false;
   roadDetail.metadata={visualOnly:true,noCollision:true};
   roadDetail.freezeWorldMatrix();
+  // Vegetated road shoulders, with deliberately transparent centre:
+  // the two dirt wheel paths and fully working ground picks stay visible.
+  // One locally drawn atlas, one extra draw call, zero collision changes.
+  const vergeCanvas=document.createElement('canvas');
+  vergeCanvas.width=512;vergeCanvas.height=1024;
+  const vc=vergeCanvas.getContext('2d');
+  if(vc){
+   const fade=vc.createLinearGradient(0,0,512,0);
+   for(const [p,tint] of [
+    [0,'rgba(97,126,71,.73)'],[.14,'rgba(112,139,76,.62)'],
+    [.28,'rgba(116,144,89,.39)'],[.36,'rgba(112,133,79,0)'],
+    [.64,'rgba(112,133,79,0)'],[.72,'rgba(116,144,89,.39)'],
+    [.86,'rgba(112,139,76,.62)'],[1,'rgba(97,126,71,.73)']
+   ])fade.addColorStop(p,tint);
+   vc.fillStyle=fade;vc.fillRect(0,0,512,1024);
+   for(let i=0;i<2400;i++){
+    const x=random()*512;
+    if(x>185&&x<327)continue;
+    const y=random()*1024;
+    vc.fillStyle=i%3===0?'rgba(176,169,109,.32)':
+     i%3===1?'rgba(64,103,59,.44)':'rgba(137,164,91,.34)';
+    vc.fillRect(x,y,1+random()*5,2+random()*16);
+   }
+  }
+  const vergeTex=new B.DynamicTexture('tactical-grassy-road-verges',
+   {width:512,height:1024},scene,false);
+  vergeTex.getContext().drawImage(vergeCanvas,0,0);
+  vergeTex.hasAlpha=true;vergeTex.update(false);
+  const vergeMat=new B.StandardMaterial('tactical-verges-lit',scene);
+  vergeMat.diffuseTexture=vergeTex;
+  vergeMat.useAlphaFromDiffuseTexture=true;
+  vergeMat.backFaceCulling=false;vergeMat.disableLighting=true;
+  vergeMat.transparencyMode=B.Material.MATERIAL_ALPHABLEND;
+  const vergeMesh=B.MeshBuilder.CreateGround('tactical-verges-ground',
+   {width:19,height:265,subdivisions:1},scene);
+  vergeMesh.position.y=.061;
+  vergeMesh.material=vergeMat;vergeMesh.isPickable=false;
+  vergeMesh.checkCollisions=false;
+  vergeMesh.freezeWorldMatrix();
+  vergeMesh.metadata={visualOnly:true,noCollision:true};
   const result={ready:true,style:'tactical-rural-ww2',
    licensedReference:'CC0 Poly Haven ground, original procedurally drawn overlay',
    canvasSize:size,patches,roadVerges,hedges,stones,
-   drawCalls:4,roadSurface:'two-track-gravel-and-grass',collisionChanges:0,
+   drawCalls:5,roadSurface:'two-track-gravel-and-grass',roadVergesVisible:true,collisionChanges:0,
    inputInterception:false};
   scene.metadata=scene.metadata||{};
   scene.metadata.battlefieldOrganicMap=result;
