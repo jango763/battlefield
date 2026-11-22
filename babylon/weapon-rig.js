@@ -186,7 +186,7 @@
     refresh(arm.hand);
     return +(theta*180/Math.PI).toFixed(1);
   }
-  function setHandRotation(hand, worldQ, bindLocal) {
+  function setHandRotation(hand, worldQ, bindLocal, maxDegrees = 55) {
     refresh(hand.parent);
     const qParent = hand.parent ? worldRotation(hand.parent) : B.Quaternion.Identity();
     const desired = qParent.conjugate().multiply(worldQ).normalize();
@@ -196,7 +196,7 @@
     const dot = Math.abs(bindLocal.x*desired.x+bindLocal.y*desired.y+
       bindLocal.z*desired.z+bindLocal.w*desired.w);
     const theta = 2*Math.acos(B.Scalar.Clamp(dot,0,1));
-    const maxWrist = 55*Math.PI/180;
+    const maxWrist = maxDegrees*Math.PI/180;
     const blend = theta>maxWrist ? maxWrist/theta : 1;
     hand.rotationQuaternion = B.Quaternion.Slerp(bindLocal,desired,blend).normalize();
     refresh(hand);
@@ -828,7 +828,13 @@
       report.leftElbowDegrees = elbowBend(left);
       report.rightForearmTwistDegrees=twistForearmToPalm(right,rightQ);
       report.leftForearmTwistDegrees=twistForearmToPalm(left,leftQ);
-      report.rightWristDegrees=setHandRotation(right.hand,rightQ,rest.get(right.hand));
+      // Experimental only: test whether the old 55° wrist guard is the reason
+      // the actual right fingers miss the trigger axis by ~64° in German run.
+      // This does NOT change the production default or GLB bind pose.
+      const rightCap=state.weaponMotionRun
+        ?B.Scalar.Clamp(Number(state.weaponMotionRightWristMax)||55,55,140):55;
+      report.rightWristLimitDeg=rightCap;
+      report.rightWristDegrees=setHandRotation(right.hand,rightQ,rest.get(right.hand),rightCap);
       report.leftWristDegrees=setHandRotation(left.hand,leftQ,rest.get(left.hand));
       flexFingers('Right'); flexFingers('Left');
       // Report REAL post-constraint palm directions, not an unattained ideal
