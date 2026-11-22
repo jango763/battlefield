@@ -82,7 +82,34 @@ function install({B,scene,world,layout,design}){
   for(let i=0;i<=20;i++){const arc=def.kind==='cannon'?Math.PI*2/9:Math.PI/3,a=def.heading-arc+i*arc/10;points.push(new B.Vector3(x-150+Math.sin(a)*8,.09,z-150+Math.cos(a)*8));}
   points.push(points[0]);const sector=B.MeshBuilder.CreateLines(id+'-sector',{points},scene);sector.color=B.Color3.FromHexString(def.team==='blue'?'#557f8b':'#9d6355');sector.isPickable=false;
  }
- const api={layout,meshes,materials,box,mat,earth,timber,sand,world,scene,B,mounts,
+ // Gameplay collisions are separate data. Batch only unmoving boxes of the
+ // SAME material; never merge rotating gun pivots, skinned actors or pickables.
+ const optimization={staticMeshes:0,mergedBatches:0,drawCallsSaved:0,
+  dynamicMountMeshes:0,mergeErrors:[]};
+ const staticByMaterial=new Map();
+ for(const part of meshes){
+  if(part.parent){optimization.dynamicMountMeshes++;continue;}
+  optimization.staticMeshes++;
+  const key=part.material;
+  if(!staticByMaterial.has(key))staticByMaterial.set(key,[]);
+  staticByMaterial.get(key).push(part);
+ }
+ for(const [mat,parts] of staticByMaterial){
+  for(let i=0;i<parts.length;i+=64){
+   const group=parts.slice(i,i+64);
+   if(group.length<2)continue;
+   try{
+    const joined=B.Mesh.MergeMeshes(group,true,true);
+    if(!joined)throw Error('No geometry returned');
+    joined.name='field-batched-'+mat.name+'-'+i;
+    joined.material=mat;joined.isPickable=false;joined.receiveShadows=true;
+    joined.freezeWorldMatrix();
+    optimization.mergedBatches++;
+    optimization.drawCallsSaved+=group.length-1;
+   }catch(error){optimization.mergeErrors.push(String(error?.message||error));}
+  }
+ }
+ const api={layout,meshes,materials,box,mat,earth,timber,sand,world,scene,B,mounts,optimization,
   update:support=>{for(const m of support.mounts){const p=mounts.get(m.id);if(p)p.rotation.y=m.yaw;}}};
  world.field=api;return api;
 }

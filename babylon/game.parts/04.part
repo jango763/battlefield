@@ -1,3 +1,18 @@
+  if(views[i])continue;
+  $('loading').textContent='Загружаю бойцов: '+state.models+'/'+slots.length+
+   ' · создание №'+(i+1);
+  // Preserve exact Mixamo joint names in clone-local hierarchies for IK.
+  let externalModel=null;
+  if(i<12&&modelDepot){
+   const selected=FEATURE_REAL_ALLIES?featureCasting(i):alliedModels.forBlueSlot(i).id;
+   try{
+    externalModel=await modelDepot.instantiate(selected,i);
+   }catch(error){
+    state.modelErrors[selected]=String(error?.message||error);
+    state.engineering.glbFallbacks++;
+    console.error('Allied licensed model rejected',selected,error);
+   }
+  }
   // Retarget Jakeli READY only after its original native rig is available.
   if(externalModel?.modelId==='britishJakeli'&&!motionDonors.britishReady){
    motionDonors.britishReady=unitMotion?.findGroup(externalModel.entries.animationGroups,'Ready')||null;
@@ -114,15 +129,3 @@ async function processWeaponQueue(){
      // not replace the final close-up visual acceptance on iPhone.
      const assessment=modelDepot.gripAssessment(rig.weaponRig,
       weaponAsset(view,wanted));
-     view.gripStatus=assessment;
-     if(!assessment.ok)console.warn('Allied hand sockets pending QA',
-      view.importedAlliedName,assessment.reason);
-    }
-   }catch(error){
-    state.engineering.weaponFailures=(state.engineering.weaponFailures||0)+1;
-    // The animated approved soldier stays visible and game logic works.
-    view.weaponError=String(error?.message||error);
-    console.error('Weapon model for soldier '+(view.index+1),error);
-    if(view.index===0)
-     alertStatus('Боец загружен, но оружейный IK недоступен: '+view.weaponError);
-   }

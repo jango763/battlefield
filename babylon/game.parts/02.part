@@ -1,5 +1,3 @@
-const graphicsPreference=new URLSearchParams(location.search).get('quality');
-const graphicsMode=['low','high','auto'].includes(graphicsPreference)?graphicsPreference:'auto';
 const deviceScale=Math.max(1,window.devicePixelRatio||1);
 const renderQuality={
  mode:graphicsMode,low:Math.max(1,deviceScale/2.0),
@@ -7,11 +5,33 @@ const renderQuality={
  scale:Math.max(1,deviceScale/(graphicsMode==='low'?1.15:
   graphicsMode==='high'?2.1:1.7))
 };
+const qualityLabels={auto:'Авто',low:'Низкое',high:'Высокое'};
+function changeGraphicsMode(mode){
+ if(!qualityLabels[mode])return;
+ renderQuality.mode=mode;
+ renderQuality.scale=Math.max(1,deviceScale/(mode==='low'?1.15:
+  mode==='high'?2.1:1.7));
+ renderQuality.fpsElapsed=0;
+ if(engine)engine.setHardwareScalingLevel(renderQuality.scale);
+ if(state.graphics){
+  state.graphics.mode=mode;
+  state.graphics.adaptive=mode==='auto';
+  state.graphics.hardwareScale=+renderQuality.scale.toFixed(2);
+  state.graphics.changes++;
+ }
+ const button=$('quality-cycle');
+ if(button)button.textContent='Качество: '+qualityLabels[mode];
+}
+$('quality-cycle')?.addEventListener('click',()=>{
+ const modes=['auto','low','high'];
+ changeGraphicsMode(modes[(modes.indexOf(renderQuality.mode)+1)%modes.length]);
+});
 function createWorld(){
  engine=new B.Engine(canvas,true,{powerPreference:'high-performance'});
  engine.setHardwareScalingLevel(renderQuality.scale);
  state.graphics={mode:graphicsMode,hardwareScale:renderQuality.scale,
   adaptive:graphicsMode==='auto',changes:0};
+ $('quality-cycle').textContent='Качество: '+qualityLabels[graphicsMode];
  scene=new B.Scene(engine);
  scene.useRightHandedSystem=true;
  scene.skipPointerMovePicking=true;
@@ -64,6 +84,7 @@ function createWorld(){
  world.defenses=window.BattlefieldDefenseLayout.create();
  world.field=window.BattlefieldTacticalField.install({B,scene,world,layout:world.defenses,design:window.BattlefieldDefenseLayout});
  state.defenses={trenches:world.defenses.trenches.length,lines:2};
+ state.optimization=world.field.optimization;
  world.navigation=window.BattlefieldNavigation.create({obstacles:world.obstacles});
  state.navigation=world.navigation.stats;
  state.vehicleBounds=world.vehicleBounds;
@@ -108,21 +129,3 @@ function createWorld(){
    }
   }
  });
- engine.runRenderLoop(frame);
- window.addEventListener('resize',()=>engine.resize());
-}
-// Squad markers and health bars share faction GPU materials without
-// sharing health state, hit boxes, or independent skinned character rigs.
-const soldierMaterialCache=new Map();
-function factionMat(kind,side,hex,{alpha=1,disableLighting=false}={}){
- const key=kind+'-'+side;
- if(soldierMaterialCache.has(key))return soldierMaterialCache.get(key);
- const m=new B.StandardMaterial('soldier-shared-'+key,scene);
- m.emissiveColor=color(hex);m.alpha=alpha;m.disableLighting=disableLighting;
- soldierMaterialCache.set(key,m);
- return m;
-}
-function unitVisual(index,entries,{externalModel=null}={}){
- const anchor=new B.TransformNode('soldier-anchor-'+index,scene);
- const root=new B.TransformNode('approved-animated-rig-'+index,scene);
- root.parent=anchor;

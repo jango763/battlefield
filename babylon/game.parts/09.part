@@ -1,3 +1,4 @@
+ });
  $('reload-manual').addEventListener('click',()=>{
   const r=battle.startReload(findActor());
   alertStatus(r.ok?'Перезарядка началась: '+r.seconds+' с.':
@@ -126,3 +127,4 @@ async function deployReinforcement({unit,side,hero},epoch){
   unit.suppressed=0;unit.weapon='Kar98k';
   if(unit.isHero)fieldOrders?.clearDestination();
   unit.characterModelImported=!!view.importedAlliedModel;
+  assignView(view,unit);

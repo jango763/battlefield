@@ -1,3 +1,21 @@
+ engine.runRenderLoop(frame);
+ window.addEventListener('resize',()=>engine.resize());
+}
+// Squad markers and health bars share faction GPU materials without
+// sharing health state, hit boxes, or independent skinned character rigs.
+const soldierMaterialCache=new Map();
+function factionMat(kind,side,hex,{alpha=1,disableLighting=false}={}){
+ const key=kind+'-'+side;
+ if(soldierMaterialCache.has(key))return soldierMaterialCache.get(key);
+ const m=new B.StandardMaterial('soldier-shared-'+key,scene);
+ m.emissiveColor=color(hex);m.alpha=alpha;m.disableLighting=disableLighting;
+ soldierMaterialCache.set(key,m);
+ return m;
+}
+function unitVisual(index,entries,{externalModel=null}={}){
+ const anchor=new B.TransformNode('soldier-anchor-'+index,scene);
+ const root=new B.TransformNode('approved-animated-rig-'+index,scene);
+ root.parent=anchor;
  const descendants=[...entries.rootNodes];
  for(const n of entries.rootNodes)descendants.push(...n.getDescendants(false));
  const unique=[...new Set(descendants)];
@@ -111,18 +129,3 @@ async function ensureUnitsUnlocked(scenarioName){
   }
  }
  for(const i of slots){
-  if(views[i])continue;
-  $('loading').textContent='Загружаю бойцов: '+state.models+'/'+slots.length+
-   ' · создание №'+(i+1);
-  // Preserve exact Mixamo joint names in clone-local hierarchies for IK.
-  let externalModel=null;
-  if(i<12&&modelDepot){
-   const selected=FEATURE_REAL_ALLIES?featureCasting(i):alliedModels.forBlueSlot(i).id;
-   try{
-    externalModel=await modelDepot.instantiate(selected,i);
-   }catch(error){
-    state.modelErrors[selected]=String(error?.message||error);
-    state.engineering.glbFallbacks++;
-    console.error('Allied licensed model rejected',selected,error);
-   }
-  }

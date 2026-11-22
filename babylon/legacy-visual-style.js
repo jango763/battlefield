@@ -43,7 +43,9 @@ function apply({scene,B,camera,sun,world,ambient}){
  let shadows='unavailable',casters=0;
  if(B.ShadowGenerator){
   try{
-   const shadow=new B.ShadowGenerator(PROFILE.shadowMapSize,sun);
+   const mobile=typeof window!=='undefined'&&Math.min(window.innerWidth,window.innerHeight)<700;
+   const shadowSize=mobile?512:PROFILE.shadowMapSize;
+   const shadow=new B.ShadowGenerator(shadowSize,sun);
    shadow.usePercentageCloserFiltering=true;
    shadow.filteringQuality=B.ShadowGenerator.QUALITY_LOW;
    shadow.bias=.0009;

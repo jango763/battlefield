@@ -136,11 +136,33 @@ const renderQuality={
  scale:Math.max(1,deviceScale/(graphicsMode==='low'?1.15:
   graphicsMode==='high'?2.1:1.7))
 };
+const qualityLabels={auto:'Авто',low:'Низкое',high:'Высокое'};
+function changeGraphicsMode(mode){
+ if(!qualityLabels[mode])return;
+ renderQuality.mode=mode;
+ renderQuality.scale=Math.max(1,deviceScale/(mode==='low'?1.15:
+  mode==='high'?2.1:1.7));
+ renderQuality.fpsElapsed=0;
+ if(engine)engine.setHardwareScalingLevel(renderQuality.scale);
+ if(state.graphics){
+  state.graphics.mode=mode;
+  state.graphics.adaptive=mode==='auto';
+  state.graphics.hardwareScale=+renderQuality.scale.toFixed(2);
+  state.graphics.changes++;
+ }
+ const button=$('quality-cycle');
+ if(button)button.textContent='Качество: '+qualityLabels[mode];
+}
+$('quality-cycle')?.addEventListener('click',()=>{
+ const modes=['auto','low','high'];
+ changeGraphicsMode(modes[(modes.indexOf(renderQuality.mode)+1)%modes.length]);
+});
 function createWorld(){
  engine=new B.Engine(canvas,true,{powerPreference:'high-performance'});
  engine.setHardwareScalingLevel(renderQuality.scale);
  state.graphics={mode:graphicsMode,hardwareScale:renderQuality.scale,
   adaptive:graphicsMode==='auto',changes:0};
+ $('quality-cycle').textContent='Качество: '+qualityLabels[graphicsMode];
  scene=new B.Scene(engine);
  scene.useRightHandedSystem=true;
  scene.skipPointerMovePicking=true;
@@ -193,6 +215,7 @@ function createWorld(){
  world.defenses=window.BattlefieldDefenseLayout.create();
  world.field=window.BattlefieldTacticalField.install({B,scene,world,layout:world.defenses,design:window.BattlefieldDefenseLayout});
  state.defenses={trenches:world.defenses.trenches.length,lines:2};
+ state.optimization=world.field.optimization;
  world.navigation=window.BattlefieldNavigation.create({obstacles:world.obstacles});
  state.navigation=world.navigation.stats;
  state.vehicleBounds=world.vehicleBounds;
@@ -1247,7 +1270,10 @@ function frame(){
    state.engineering.frameStats={fps:+fps.toFixed(1),scale:+next.toFixed(2),
     visibleActors:views.filter(v=>v?.unit?.alive).length,
     activeTracers:fx.filter(f=>f.pooled).length,
-    sharedSoldierMaterials:soldierMaterialCache.size};
+    sharedSoldierMaterials:soldierMaterialCache.size,
+    staticDrawCallsSaved:world?.field?.optimization?.drawCallsSaved||0,
+    dynamicWeaponMounts:world?.field?.optimization?.dynamicMountMeshes||0,
+    activeMeshes:scene.getActiveMeshes().length};
   }
  }
  scene.render();

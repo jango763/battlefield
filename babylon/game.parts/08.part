@@ -1,3 +1,6 @@
+ $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
+ $('supply').disabled=!atBase||!hero.alive;
+ $('reload-manual').disabled=!hero.alive||hero.weapon==='Kar98k'||
   hero.reloadRemaining>0||!hero.inventory[hero.weapon]?.reserve||
   hero.inventory[hero.weapon]?.loaded>=combat.WEAPONS[hero.weapon].magazineSize;
  for(const button of document.querySelectorAll('[data-weapon]'))
@@ -125,4 +128,3 @@ function registerUI(){
   $('order-move').setAttribute('aria-pressed','false');
   $('order-attack').setAttribute('aria-pressed','true');
   alertStatus('Атака: коснитесь противника для выбора цели.');
- });
