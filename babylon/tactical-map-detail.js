@@ -133,14 +133,14 @@
   const c=roadCanvas.getContext('2d');
   if(c){
    c.clearRect(0,0,512,1024);
-   c.fillStyle='rgba(208,192,160,.35)';c.fillRect(0,0,512,1024);
+   c.fillStyle='#b5a584';c.fillRect(0,0,512,1024);
    for(const centre of [155,357]){
     c.beginPath();c.moveTo(centre,0);
     for(let y=0;y<=1024;y+=32)c.lineTo(centre+Math.sin(y*.019+centre)*11,y);
-    c.strokeStyle='rgba(75,69,58,.24)';c.lineWidth=32;c.stroke();
+    c.strokeStyle='rgba(66,61,51,.19)';c.lineWidth=34;c.stroke();
     c.beginPath();c.moveTo(centre-25,0);
     for(let y=0;y<=1024;y+=36)c.lineTo(centre-25+Math.sin(y*.021+centre)*10,y);
-    c.strokeStyle='rgba(191,179,151,.27)';c.lineWidth=17;c.stroke();
+    c.strokeStyle='rgba(226,210,172,.30)';c.lineWidth=18;c.stroke();
    }
    c.beginPath();c.moveTo(252,0);
    for(let y=0;y<=1024;y+=18)c.lineTo(252+Math.sin(y*.027)*17,y);
@@ -161,10 +161,16 @@
    {width:512,height:1024},scene,false);
   roadTexture.getContext().drawImage(roadCanvas,0,0);
   roadTexture.hasAlpha=true;roadTexture.update(false);
-  const roadMat=new B.StandardMaterial('tactical-road-wear',scene);
-  roadMat.diffuseTexture=roadTexture;roadMat.useAlphaFromDiffuseTexture=true;
-  roadMat.backFaceCulling=false;roadMat.disableLighting=true;
-  roadMat.transparencyMode=B.Material.MATERIAL_ALPHABLEND;
+  // The old dark scanned soil made the entire camera frame read as mud.
+  // A physically lit ALBEDO atlas is deliberately opaque, while we reuse
+  // the licensed CC0 mud normal map for close surface relief and roughness.
+  const roadMat=new B.PBRMaterial('tactical-road-wear-pbr',scene);
+  roadMat.albedoTexture=roadTexture;
+  roadMat.albedoColor=B.Color3.White();
+  roadMat.metallic=0;roadMat.roughness=.96;
+  const sourceRoad=scene.getMaterialByName('hd2026-tracked-earth');
+  if(sourceRoad?.bumpTexture)roadMat.bumpTexture=sourceRoad.bumpTexture;
+  roadMat.backFaceCulling=false;
   const roadDetail=B.MeshBuilder.CreateGround('tactical-two-track-surface',
    {width:6.7,height:265,subdivisions:1},scene);
   roadDetail.position.y=.054;roadDetail.material=roadMat;
@@ -213,7 +219,7 @@
   vergeMesh.metadata={visualOnly:true,noCollision:true};
   const result={ready:true,style:'tactical-rural-ww2',
    licensedReference:'CC0 Poly Haven ground, original procedurally drawn overlay',
-   canvasSize:size,patches,roadVerges,hedges,stones,
+   canvasSize:size,patches,roadVerges,hedges,stones,roadMaterial:'PBR-opaque-dry-earth',
    drawCalls:5,roadSurface:'two-track-gravel-and-grass',roadVergesVisible:true,collisionChanges:0,
    inputInterception:false};
   scene.metadata=scene.metadata||{};
