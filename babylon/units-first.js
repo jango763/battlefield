@@ -305,7 +305,7 @@ try{
   if(active)play(state.motion);
  });
  window.__BF_UNIT_REVIEW_ACT__={select,play,
-  getLoaded:()=>[...cache.keys()],getScene:()=>scene};
+  getLoaded:()=>[...cache.keys()],getScene:()=>scene,getModel:id=>cache.get(id)};
  engine.runRenderLoop(()=>{
   if(active)nativeBlend?.update(active,Math.max(0,Math.min(.1,engine.getDeltaTime()/1000)));
   scene.render();
