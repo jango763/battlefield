@@ -105,12 +105,10 @@ function apply({scene,B,world,camera,sun,map}){
  world.ground.receiveShadows=true;
  report.meshSurfaces++;report.terrainStyle='low-frequency-mipmapped-matte';
  if(oldGround&&oldGround!==smoothEarth)oldGround.dispose(true,true);
- // Narrow the two roads VISUALLY: hero physics and the 300x300 map remain
- // unchanged, but the start area no longer looks like a featureless runway.
+ // Preserve all route coordinates and collisions; replace only the harsh
+ // rectangular road surfaces with broad, smoothly irregular ribbons.
  const northRoad=scene.getMeshByName('north-south-road');
  const eastRoad=scene.getMeshByName('west-east-road');
- if(northRoad){northRoad.scaling.x=.60;northRoad.isPickable=false;}
- if(eastRoad){eastRoad.scaling.z=.66;eastRoad.isPickable=false;}
  const roadCanvas=document.createElement('canvas');
  roadCanvas.width=roadCanvas.height=256;
  const rc=roadCanvas.getContext('2d');
@@ -138,24 +136,33 @@ function apply({scene,B,world,camera,sun,map}){
   road.albedoColor=B.Color3.FromHexString('#ece5d3');
   road.roughness=1;road.specularIntensity=0;
  }
- // Sparse broad verge islands soften the geometric edge with no alpha test.
- const vergeMaterial=new B.StandardMaterial('hd2026-road-verge-material',scene);
- vergeMaterial.diffuseColor=B.Color3.FromHexString('#596b4d');
- vergeMaterial.specularColor=B.Color3.Black();
- const verge=B.MeshBuilder.CreateSphere('hd2026-road-verge',
-  {diameter:1,segments:8},scene);
- verge.material=vergeMaterial;verge.isPickable=false;
- const vergeMatrices=[];
- for(let i=0;i<108;i++){
-  const x=150+(rand()<.5?-1:1)*between(2.6,3.3);
-  const z=between(14,286);
-  const s=B.Matrix.Compose(new B.Vector3(between(.55,1.3),.085,between(1.3,3.3)),
-   B.Quaternion.Identity(),pos(x,.065,z));
-  vergeMatrices.push(...s.asArray());
+ // Avoid disconnected green ellipses: actual road boundaries undulate
+ // at metre scale. This is geometry (not alpha/noise) and stays stable in Safari.
+ function makeOrganicRoad(name,alongZ,begin,end,width,mat,height){
+  const sideA=[],sideB=[],sections=100;
+  const phase=alongZ?0:1.4;
+  for(let i=0;i<=sections;i++){
+   const t=i/sections,along=begin+(end-begin)*t;
+   const wobble=.23*Math.sin(t*20+phase)+.12*Math.sin(t*51+phase);
+   const half=width*.5*(1+.055*Math.sin(t*16+phase)+.035*Math.sin(t*39));
+   if(alongZ){
+    sideA.push(pos(150-half+wobble,height,along));
+    sideB.push(pos(150+half+wobble,height,along));
+   }else{
+    sideA.push(pos(along,height,150-half+wobble));
+    sideB.push(pos(along,height,150+half+wobble));
+   }
+  }
+  const mesh=B.MeshBuilder.CreateRibbon('hd2026-organic-road-'+name,
+   {pathArray:[sideA,sideB],sideOrientation:B.Mesh.DOUBLESIDE},scene);
+  mesh.material=mat;mesh.isPickable=false;mesh.receiveShadows=true;
+  return mesh;
  }
- verge.thinInstanceSetBuffer('matrix',new Float32Array(vergeMatrices),16,true);
- verge.thinInstanceRefreshBoundingInfo();
- report.roadVisualWidth=9.4*.60;
+ makeOrganicRoad('north-south',true,17.5,282.5,5.64,mudRoad,.055);
+ makeOrganicRoad('east-west',false,27,273,5.28,crossRoad,.062);
+ if(northRoad)northRoad.isVisible=false;
+ if(eastRoad)eastRoad.isVisible=false;
+ report.roadVisualWidth=5.64;
  const classify={
   'base-square-':stone,'base-hq-':plaster,'barrack-':plaster,
   'farm-yard-':dirt,'farm-house-':plaster,'farm-barn-':timber,

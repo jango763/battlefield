@@ -14,7 +14,7 @@ assert.match(game,/fieldOrders\.setMovement\(magnitude>1\?-x\/magnitude:-x/);
 assert.match(game,/zone\.addEventListener\('pointercancel',release\)/);
 assert.match(game,/document\.addEventListener\('visibilitychange'/);
 assert.match(art,/terrainStyle='low-frequency-mipmapped-matte'/);
-assert.match(art,/northRoad\.scaling\.x=\.60/);
+assert.match(art,/CreateRibbon\('hd2026-organic-road-'/);
 assert.match(art,/new B\.DynamicTexture\('hd2026-soft-road'/);
 assert.match(html,/#quick-buttons\{margin-left:auto/);
 assert.match(art,/new B\.DynamicTexture\('hd2026-soft-painted-earth'/);

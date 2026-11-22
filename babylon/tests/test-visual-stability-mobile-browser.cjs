@@ -29,6 +29,9 @@ async function test(browserType,name){
     hasGroundMap:!!ground?.material?.albedoTexture,
     grass:!!scene?.getMeshByName('hd2026-meadow-tuft'),
     roadWidth:s.modernArt?.roadVisualWidth,
+    organicRoad:!!scene?.getMeshByName('hd2026-organic-road-north-south'),
+    oldRoadHidden:scene?.getMeshByName('north-south-road')?.isVisible===false,
+    dotVergesAbsent:!scene?.getMeshByName('hd2026-road-verge'),
     controlButtonLeft:document.getElementById('quick-buttons')?.getBoundingClientRect().left,
     windowWidth:window.innerWidth,
     camera:s.cameraProfile,graphics:s.graphics};
@@ -39,6 +42,8 @@ async function test(browserType,name){
   assert(loaded.hasGroundMap,'New terrain texture missing');
   assert(loaded.grass,'Opaque foliage missing');
   assert(Math.abs(loaded.roadWidth-5.64)<.01,'Road still too wide');
+  assert(loaded.organicRoad&&loaded.oldRoadHidden&&loaded.dotVergesAbsent,
+   'Irregular road surface did not replace rectangular road and dot verges');
   // After the battle-active CSS is applied the buttons must occupy RIGHT side.
   assert.equal(loaded.camera.mode,'elevated-tactical-follow');
   await page.locator('#enter-game').click();
