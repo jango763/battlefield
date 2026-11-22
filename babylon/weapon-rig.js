@@ -629,7 +629,7 @@
         // +0.33 rad pitch visibly pointed the muzzle at the ground and
         // made the wrists look detached despite passing distance-only IK.
         run: rifle
-          ? (state.weaponMotionRunCarryTest ? [-.16,.20,-.025] : [.045,.34,-.025])
+          ? (state.weaponMotionRunCarryTest ? [.19,.20,-.025] : [.045,.34,-.025])
           : [.22,-.05,-.025],
         fire: [.012, 0, 0]
       })[pose];
