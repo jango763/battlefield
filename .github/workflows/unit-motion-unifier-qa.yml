@@ -5,6 +5,9 @@ on:
       - feature/unit-motion-unification-20261122
     paths:
       - 'babylon/unit-motion-unifier.js'
+      - 'babylon/weapon-rig.js'
+      - 'babylon/us-hero-ara-lee-enfield-stage4.js'
+      - 'babylon/native-clip-blend.js'
       - 'babylon/game.js'
       - 'babylon/index.html'
       - 'babylon/units-first.js'
