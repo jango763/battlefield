@@ -216,6 +216,7 @@ try{
    rig=await window.BattlefieldWeaponRig.create({scene,imported:container,
     root:pivot,state:rigState,animationDriven:true,bindUI:false,
     acceptExportSockets:true,initialWeaponId:'de-kar98k',
+    previewNativeArmLayer:new URLSearchParams(location.search).get('previewNativeArmLayer')==='1',
     weaponRoot:'../assets/ww2-weapons/'});
    if(!rigState.weaponRigReady)throw Error('Не удалось собрать руки и Kar98k');
    // A/B gate only: test the user's previously saved 32-parameter Kar98k
