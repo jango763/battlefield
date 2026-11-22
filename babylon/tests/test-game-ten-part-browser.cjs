@@ -7,7 +7,7 @@ const {chromium}=require('/tmp/bf-ten-stage/node_modules/playwright');
    '--enable-unsafe-swiftshader','--enable-webgl','--no-sandbox']});
  try{
   const page=await browser.newPage({viewport:{width:390,height:844},
-   deviceScaleFactor:1,isMobile:true,hasTouch:true});
+   deviceScaleFactor:3,isMobile:true,hasTouch:true});
   const errors=[];
   page.on('pageerror',e=>errors.push(String(e)));
   await page.goto('http://127.0.0.1:8876/babylon/index.html?quality=low',
@@ -26,6 +26,8 @@ const {chromium}=require('/tmp/bf-ten-stage/node_modules/playwright');
   assert.equal(metrics.ready,true,'Real Babylon game should load on phone');
   assert(metrics.models>=2,'Hero and opponent GLBs must be present');
   assert.equal(metrics.graphics.mode,'low');
+  assert(metrics.graphics.hardwareScale>2.4&&metrics.graphics.hardwareScale<2.9,
+   'Retina iPhone 3x must use low tier scaled hardware pixels');
   assert.equal(metrics.minimap.width,232,'Retina minimap');
   assert.equal(metrics.mission?.completed,0,'Session objectives reset');
   assert.equal(metrics.engineering?.parts,10,'Ten real game code partitions');
