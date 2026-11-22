@@ -15,6 +15,9 @@ const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
 const legacyVisual=window.BattlefieldLegacyVisualStyle;
 const modernArt=window.BattlefieldModernArt;
+const tacticalCamera=window.BattlefieldTacticalCamera;
+const mobileThumbstick=window.BattlefieldMobileThumbstick;
+const mapDetail=window.BattlefieldTacticalMapDetail;
 const villageModels=window.BattlefieldModernVillageModels;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
@@ -32,7 +35,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!tacticalCamera||!mobileThumbstick||!mapDetail||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -102,6 +105,7 @@ let statusAt=0,lastFarmSyncAt=0,starting=false,fieldOrders=null,terrain=null,des
 let weaponQueue=[],weaponWorker=false;
 let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
 const touchJoystick={active:false,pointer:null,x:0,y:0,cooldown:0};
+let joystickDriver=null,cameraProfile=null;
 const movementKeys={w:false,a:false,s:false,d:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false};
 // Reinforcement clocks are owned by replenishment-core.js.
 function alertStatus(message){$('event').textContent=message}
@@ -161,19 +165,22 @@ function createWorld(){
  const markMaterial=new B.StandardMaterial('destination-mat',scene);
  markMaterial.emissiveColor=color('#eed58b');destinationMark.material=markMaterial;
 
- // Mirror the FIRST Three.js game's camera: elevated follow, stable heading.
- // Babylon map's northern direction is +Z, so stand behind the blue hero.
- camera=new B.ArcRotateCamera('camera',Math.PI*1.5,1.18,14,
-  new B.Vector3(0,1,-107),scene);
- camera.lowerRadiusLimit=13.5;camera.upperRadiusLimit=14.5;
- camera.lowerBetaLimit=1.17;camera.upperBetaLimit=1.19;
- camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
+ // The first game's elevated patrol viewpoint, now a readable tactical
+ // perspective. ?camera=classic safely restores the previous close profile.
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.83,23.5,
+  new B.Vector3(0,1,-105),scene);
+ cameraProfile=tacticalCamera.configure(camera,{profile:
+  new URLSearchParams(location.search).get('camera')});
+ state.cameraProfile=cameraProfile.id;
+ camera.wheelPrecision=1e9;camera.pinchDeltaPercentage=0;
  state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
  // Real photographed materials and geometry; Babylon skinned soldiers, game AI,
  // colliders, controls and camera remain entirely unchanged.
  if(new URLSearchParams(location.search).get('art')!=='classic'){
   try{
    state.modernArt=modernArt.apply({scene,B,world,camera,sun,map:goldRules.MAP});
+   state.mapDetail=mapDetail.apply({scene,B,map:goldRules.MAP,
+    lowPower:graphicsMode==='low'});
    if(villageModels?.install){
     state.villageModels={started:true,loaded:0,pending:3};
     void villageModels.install({scene,B,art:state.modernArt}).then(
@@ -205,7 +212,7 @@ function createWorld(){
    }
    return;
   }
-  if(info.pickInfo.pickedMesh===terrain && fieldOrders && state.ready){
+  if(info.pickInfo.pickedMesh===terrain && fieldOrders && state.ready&&!touchJoystick.active){
    const point=info.pickInfo.pickedPoint;
    if(!point)return;
    if(inputMode==='attack'){
@@ -1024,44 +1031,17 @@ function registerTouchControls(){
  });
  const pad=$('touch-stick'),knob=$('touch-stick-knob');
  if(!pad||!knob)return;
- function move(e){
-  const rect=pad.getBoundingClientRect();
-  const centerX=rect.left+rect.width/2,centerY=rect.top+rect.height/2;
-  const radius=Math.max(1,rect.width*.37);
-  const dx=(e.clientX-centerX)/radius,dy=(e.clientY-centerY)/radius;
-  const mag=Math.max(1,Math.hypot(dx,dy));
-  touchJoystick.x=dx/mag;touchJoystick.y=-dy/mag;
-  knob.style.transform='translate('+(touchJoystick.x*radius*.65)+'px,'+
-   (-touchJoystick.y*radius*.65)+'px)';
-  touchJoystick.cooldown=0;
- }
- function release(e){
-  if(e.pointerId!==touchJoystick.pointer)return;
-  touchJoystick.active=false;touchJoystick.pointer=null;
-  touchJoystick.x=touchJoystick.y=0;touchJoystick.cooldown=0;
-  knob.style.transform='translate(0,0)';
-  fieldOrders?.clearMovement();
- }
- pad.addEventListener('pointerdown',e=>{
-  if(!state.ready||!gameStarted||!findActor()?.alive)return;
-  e.preventDefault();
-  touchJoystick.active=true;touchJoystick.pointer=e.pointerId;
-  pad.setPointerCapture(e.pointerId);move(e);
- });
- pad.addEventListener('pointermove',e=>{
-  if(touchJoystick.active&&e.pointerId===touchJoystick.pointer){
-   e.preventDefault();move(e);
-  }
- });
- pad.addEventListener('pointerup',release);
- pad.addEventListener('pointercancel',release);
- pad.addEventListener('lostpointercapture',release);
+ joystickDriver=mobileThumbstick.create({pad,knob,win:window,
+  canStart:()=>state.ready&&gameStarted&&!!findActor()?.alive,
+  onMove:(x,z,active)=>{
+   touchJoystick.x=x;touchJoystick.y=z;touchJoystick.active=active;
+   touchJoystick.pointer=joystickDriver?.state.pointer??null;
+   if(active)fieldOrders?.setMovement(x,z);
+   else fieldOrders?.clearMovement();
+  }});
+ state.thumbstick=joystickDriver.state;
  window.addEventListener('blur',()=>{
-  // No stuck walking after iPhone tab suspension or incoming calls.
   for(const key of Object.keys(movementKeys))movementKeys[key]=false;
-  touchJoystick.active=false;touchJoystick.pointer=null;
-  touchJoystick.x=touchJoystick.y=0;
-  knob.style.transform='translate(0,0)';
   fieldOrders?.clearMovement();
  });
  $('quick-fire').addEventListener('click',()=>{
@@ -1156,12 +1136,9 @@ function frame(){
    syncVisual(view);
    nativeBlend.update(view,dt);
   }
-  // Fixed original Three.js follow profile, without rotating on the joystick.
-  if(allies[0]?.alive&&camera){
-   // Leave room ahead to see enemies and cover, as in the original.
-   const dest=position(allies[0],1.55).add(new B.Vector3(0,0,3.0));
-   camera.target=B.Vector3.Lerp(camera.target,dest,Math.min(1,dt*2.8));
-  }
+  // Never rotate the camera or consume thumbstick touches while following.
+  if(allies[0]?.alive&&camera)tacticalCamera.follow(camera,allies[0],
+   {B,profile:cameraProfile.id,dt});
   const now=performance.now();
   // The five capture-ring meshes change slowly. Rebuilding the complete
   // economy summary and ring materials every rendered frame wastes CPU.
