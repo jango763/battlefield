@@ -125,7 +125,7 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
     await page.waitForTimeout(380);
     shot=await page.screenshot({type:'jpeg',quality:47,
       path:'/tmp/bf-motion-'+fighter+'-native-run-full.jpeg'});
-    console.log('BATTLEFIELD_MOTION_'+fighter.toUpperCase()+'_NATIVE_RUN_FULL_JPEG_BASE64 '+shot.toString('base64'));
+    console.log('BATTLEFIELD_MOTION_'+fighter.toUpperCase()+'_DONOR_RUN_FULL_JPEG_BASE64 '+shot.toString('base64'));
     // Return donor state for next soldier comparison; the user toggle stays functional.
     await page.locator('#toggle-controls').click();
     await page.locator('#motion-standard').click();
@@ -143,7 +143,7 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
   await page.waitForTimeout(500);
   await page.screenshot({path:'/tmp/bf-unit-motion-american-run.png'});
   await page.locator('#motion-standard').click();
-  assert.equal(await page.locator('#motion-standard').getAttribute('aria-pressed'),'false');
+  assert.equal(await page.locator('#motion-standard').getAttribute('aria-pressed'),'true');
   await page.screenshot({path:'/tmp/bf-unit-motion-american-native.png'});
   await page.locator('#toggle-controls').click();
   assert.equal(await page.locator('#toggle-controls').getAttribute('aria-expanded'),'false');
