@@ -34,7 +34,7 @@ const specs=Object.freeze({
  })
 });
 const state=window.__BF_UNIT_REVIEW__={
- ready:false,selected:'german',motion:'idle',error:null,sharedMotion:true,motionReports:{},createdGroups:0,
+ ready:false,selected:'german',motion:'idle',error:null,sharedMotion:true,panelOpen:false,motionReports:{},createdGroups:0,
  realModels:{},approved:{german:true,american:false,jakeli:false},
  trialOnly:true,characters:{},loadedCount:0,skinFailures:[]
 };
@@ -259,6 +259,16 @@ try{
  }
  $$('[data-unit]').forEach(b=>b.addEventListener('click',()=>void select(b.dataset.unit)));
  document.querySelectorAll('[data-motion]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.motion))); // animated unit controls
+ const toggleControls=$('#toggle-controls'),controlsBody=$('#controls-body'),panel=$('#control');
+ function setPanel(open){
+  state.panelOpen=!!open;
+  panel.classList.toggle('open',state.panelOpen);
+  controlsBody.hidden=!state.panelOpen;
+  toggleControls.setAttribute('aria-expanded',String(state.panelOpen));
+  toggleControls.textContent=state.panelOpen?'Скрыть управление':'Показать управление';
+ }
+ toggleControls.addEventListener('click',()=>setPanel(!state.panelOpen));
+ setPanel(false); // Opening the range never hides the legs behind a giant menu.
  $('#motion-standard').addEventListener('click',()=>{
   state.sharedMotion=!state.sharedMotion;
   $('#motion-standard').setAttribute('aria-pressed',String(state.sharedMotion));
