@@ -355,6 +355,15 @@ async function ensureUnitsUnlocked(scenarioName){
    const entries=externalModel?.entries||asset.instantiateModelsToScene(
    name=>name,false,{doNotInstantiate:true});
   const view=unitVisual(i,entries,{externalModel});
+  // This is the SAME original German rig as the approved soldier-only lab.
+  // Transfer its tested leg-only native Run into the actual Babylon squad.
+  // Never overwrite American/UK authored animation tracks or weapon grips.
+  if(!externalModel&&unitMotion?.installNativeGermanLegRun){
+   const local=unitMotion.installNativeGermanLegRun(view,{B,scene});
+   state.unitMotionReports[i]={nativeGermanRun:local.ok?
+    'seven-leg-tracks':String(local.reason)};
+   if(!local.ok)console.warn('Original German run fallback',i,local.reason);
+  }
   promoteUnitMotion(view);
   if(view.faction==='british'&&!externalModel){
    // These are ORIGINAL procedural placeholders, not new skins. Commando
@@ -435,6 +444,8 @@ async function processWeaponQueue(){
      weaponRoot:'../assets/ww2-weapons/'
     });
     if(!rig.weaponRigReady)throw Error('Двухручный IK не подготовлен');
+    configureGermanRifleCarry(view,view.lastPose||'ready');
+    rig.setWeaponPose?.(view.lastPose||'ready');
     const wanted=view.unit?.weapon||view.weapon;
     if(rig.weaponRig?.weapon!==weaponAsset(view,wanted)&&rig.equipWeapon)
      await rig.equipWeapon(weaponAsset(view,wanted));
@@ -488,7 +499,21 @@ async function chooseScenario(name){
 function stopAnimations(view){
  nativeBlend.stop(view);
 }
+function configureGermanRifleCarry(view,pose){
+ const rig=view?.rig;
+ if(!rig)return;
+ const originalRifle=!!view.nativeGermanLegsRun&&
+  !view.importedAlliedModel&&rig.weaponRig?.weapon==='de-kar98k';
+ // Only the approved German Kar98k receives the validated ~horizontal
+ // run carry and the anatomically measured 2-hand finger curl.
+ // MP40, MG42, launchers and allied rigs retain their existing controllers.
+ rig.weaponMotionRunCarryTest=originalRifle;
+ rig.weaponMotionRun=originalRifle&&pose==='run';
+ rig.weaponMotionRightWristMax=originalRifle&&pose==='run'?120:55;
+ rig.weaponMotionGripDebug=originalRifle&&pose==='run'?'reverseAxisX':null;
+}
 function setClip(view,pose){
+ configureGermanRifleCarry(view,pose);
  const id=view.weapon+'_'+CLIP_POSES[pose];
  const target=view.clips.get(id);
  if(!target){

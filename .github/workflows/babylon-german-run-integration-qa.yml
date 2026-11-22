@@ -1,0 +1,29 @@
+name: Battlefield Kar98k squad integration — unit only
+on:
+  push:
+    branches:
+      - feature/babylon-german-run-gameplay-integration-20261122
+    paths:
+      - 'babylon/game.js'
+      - 'babylon/unit-motion-unifier.js'
+      - 'babylon/weapon-rig.js'
+      - 'babylon/tests/test-unit-motion-unifier.cjs'
+      - '.github/workflows/babylon-german-run-integration-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  german-rifle-squad:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static JS syntax and independent German squad-animation contract
+        run: |
+          node --check babylon/game.js
+          node --check babylon/unit-motion-unifier.js
+          node --check babylon/weapon-rig.js
+          node --check babylon/units-first.js
+          node babylon/tests/test-unit-motion-unifier.cjs
+      - name: Verify original WWII actor GLB skin and animation channels
+        run: node babylon/tests/test-units-first-assets.cjs

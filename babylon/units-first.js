@@ -219,11 +219,15 @@ try{
    const authored=unitMotion?.findGroup(clips,'Kar98k_Run');
    if(!authored||typeof B.AnimationGroup!=='function')
     throw Error('Не найден исходный немецкий бег для нижнего слоя');
-   const lower=new B.AnimationGroup('native-German-legs-with-Kar98k-ready',scene);
-   for(const track of authored.targetedAnimations||[])
-    lower.addTargetedAnimation(track.animation,track.target);
-   const masked=unitMotion.legsOnly(lower);
-   if(!masked.ok){lower.dispose();throw Error('Нельзя выделить бег ног: '+masked.reason);}
+   // Exercise the EXACT helper that now builds real Babylon squad actors.
+   // This mobile lab is the renderer-based acceptance gate for production
+   // native-leg animation isolation, not a separate toy implementation.
+   const actorForReview={index:'preview',imported:{skeletons:container.skeletons},
+    clips:new Map([['Kar98k_Run',authored]])};
+   const built=unitMotion.installNativeGermanLegRun(actorForReview,{
+    B,scene,groupName:'native-German-legs-with-Kar98k-ready'});
+   if(!built.ok)throw Error('Нельзя выделить бег ног: '+built.reason);
+   const lower=built.group;
    // Second-stage natural gait experiment: use the REAL German source's
    // authored Spine rotation curve, not a sine-wave "robot" animation.
    // Reduce its delta relative to the native first frame and apply it to
