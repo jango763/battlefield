@@ -123,3 +123,4 @@ async function processWeaponQueue(){
      view.gripStatus=assessment;
      if(!assessment.ok)console.warn('Allied hand sockets pending QA',
       view.importedAlliedName,assessment.reason);
+    }

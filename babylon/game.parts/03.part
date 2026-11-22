@@ -1,3 +1,4 @@
+function unitVisual(index,entries,{externalModel=null}={}){
  const anchor=new B.TransformNode('soldier-anchor-'+index,scene);
  const root=new B.TransformNode('approved-animated-rig-'+index,scene);
  root.parent=anchor;

@@ -123,7 +123,7 @@ enterButton.addEventListener('click',()=>{
  drawHud();
 });
 function position(unit,y=0){
- return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y,BASE_Z+unit.z*UNIT_SCALE);
+ return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y+(world?.heightAt?.(unit.x,unit.z)||0),BASE_Z+unit.z*UNIT_SCALE);
 }
 function color(hex){return B.Color3.FromHexString(hex)}
 const graphicsPreference=new URLSearchParams(location.search).get('quality');
@@ -189,6 +189,9 @@ function createWorld(){
   catch(error){console.warn('Modern art fallback to native map',error);
    state.modernArt={error:String(error)};}
  }else state.modernArt={profile:'original-babylon',ready:false};
+ world.defenses=window.BattlefieldDefenseLayout.create();
+ world.field=window.BattlefieldTacticalField.install({B,scene,world,layout:world.defenses,design:window.BattlefieldDefenseLayout});
+ state.defenses={trenches:world.defenses.trenches.length,lines:2};
  world.navigation=window.BattlefieldNavigation.create({obstacles:world.obstacles});
  state.navigation=world.navigation.stats;
  state.vehicleBounds=world.vehicleBounds;
@@ -670,6 +673,8 @@ function setup(scenarioName){
   onArrive:()=>{if(destinationMark)destinationMark.isVisible=false;}
  });
  controller=tactics.create({battle,allies,enemies,driveAllies:dt=>fieldOrders.updateAllies(dt),driveEnemies:dt=>fieldOrders.updateEnemies(dt),endWhenEliminated:scenario!=='squads',
+  lineOfSight:(a,b)=>world.navigation.lineOfSight(a,b),
+  coverFor:(u,a)=>window.BattlefieldDefenseLayout.coverAt(world.defenses,u,a),
   onShot:drawShot,
   onFinish:result=>alertStatus(result.winner==='allies'?
    'Победа! Отряд удержал позицию. Нажмите «Новый бой» для продолжения.':

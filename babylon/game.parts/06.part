@@ -1,5 +1,3 @@
- economy=goldRules.create({onEvent:event=>{
-  if(event.type==='central-countdown-start')
    alertStatus('Первый бот погиб! До открытия центральной фермы — 05:00.');
   if(event.type==='central-open')
    alertStatus('ЦЕНТРАЛЬНАЯ ФЕРМА ОТКРЫТА! Захватите её ради большого золота.');
@@ -45,6 +43,8 @@
   onArrive:()=>{if(destinationMark)destinationMark.isVisible=false;}
  });
  controller=tactics.create({battle,allies,enemies,driveAllies:dt=>fieldOrders.updateAllies(dt),driveEnemies:dt=>fieldOrders.updateEnemies(dt),endWhenEliminated:scenario!=='squads',
+  lineOfSight:(a,b)=>world.navigation.lineOfSight(a,b),
+  coverFor:(u,a)=>window.BattlefieldDefenseLayout.coverAt(world.defenses,u,a),
   onShot:drawShot,
   onFinish:result=>alertStatus(result.winner==='allies'?
    'Победа! Отряд удержал позицию. Нажмите «Новый бой» для продолжения.':

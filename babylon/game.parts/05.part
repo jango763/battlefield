@@ -1,4 +1,3 @@
-    }
    }catch(error){
     state.engineering.weaponFailures=(state.engineering.weaponFailures||0)+1;
     // The animated approved soldier stays visible and game logic works.
@@ -123,3 +122,5 @@ function setup(scenarioName){
  if(destinationMark)destinationMark.isVisible=false;
  state.scenario=scenario;state.atBase=true;state.focus=null;
  const [ours,theirs]=SCENARIOS[scenario];
+ economy=goldRules.create({onEvent:event=>{
+  if(event.type==='central-countdown-start')

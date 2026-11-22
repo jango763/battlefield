@@ -10,7 +10,7 @@
 'use strict';
 const SPEED=18; // game-distance units per second, temporary range tuning.
 const ENGAGE=Object.freeze({Kar98k:42,MP40:23,MG42:39,Panzerschreck:52});
-function create({battle,allies,enemies,onShot=()=>{},onFinish=()=>{},driveAllies=null,driveEnemies=null,endWhenEliminated=true}){
+function create({battle,allies,enemies,onShot=()=>{},onFinish=()=>{},driveAllies=null,driveEnemies=null,endWhenEliminated=true,lineOfSight=()=>true,coverFor=()=>0}){
  if(!battle||!Array.isArray(allies)||!Array.isArray(enemies))throw Error('Invalid teams');
  if(!allies.length||!enemies.length)throw Error('At least one soldier per team required');
  const members=[...allies,...enemies];
@@ -23,7 +23,7 @@ function create({battle,allies,enemies,onShot=()=>{},onFinish=()=>{},driveAllies
  function nearest(unit,targets){
    let selected=null,dist=Infinity;
    for(const enemy of targets){
-     if(!enemy.alive)continue;
+     if(!enemy.alive||!lineOfSight(unit,enemy))continue;
      const d=Math.hypot(unit.x-enemy.x,unit.z-enemy.z);
      if(d<dist){selected=enemy;dist=d;}
    }
@@ -36,7 +36,7 @@ function create({battle,allies,enemies,onShot=()=>{},onFinish=()=>{},driveAllies
    return {ok:true};
  }
  function getTarget(unit){
-   if(allies.includes(unit)&&focus?.alive)return focus;
+   if(allies.includes(unit)&&focus?.alive&&lineOfSight(unit,focus))return focus;
    return nearest(unit,opposite(unit));
  }
  function start() {
@@ -93,7 +93,7 @@ function create({battle,allies,enemies,onShot=()=>{},onFinish=()=>{},driveAllies
      if(!unit.alive)continue;
      const target=getTarget(unit);
      if(!target)continue;
-     const response=battle.fire(unit,target,{moving:moving.get(unit)});
+     const response=battle.fire(unit,target,{moving:moving.get(unit),cover:coverFor(target,unit)});
      if(!response.ok)continue;
      ages.set(unit,0);
      onShot({unit,target,result:response,moving:moving.get(unit),elapsed});
