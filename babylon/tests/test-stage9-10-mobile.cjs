@@ -40,7 +40,12 @@ fs.mkdirSync(dir,{recursive:true});
   });
   const s=result.initial;
   assert(s.ready&&!s.error,'Game startup failed: '+s.error);
-  assert.equal(s.art.colorGrade,'muted-olive-earth-v3');
+  assert.equal(s.art.colorGrade,'muted-olive-earth-v4');
+  assert.equal(s.art.roadVisualWidth,4.2,'Road must be narrowed');
+  assert.equal(await page.evaluate(()=>{
+   const m=window.BABYLON.EngineStore.LastCreatedScene.getMeshByName('map-ground-300');
+   return m?.material?.name==='hd2026-matte-terrain'&&!!m.material.diffuseTexture;
+  }),true,'Matte diffuse ground did not load');
   assert(s.art.mipmappedScans&&s.art.opaqueHedgerows);
   assert(s.art.scannedMaterialMaps>=12);
   assert(s.shrubInstances>=30,'Nontransparent low-poly ground foliage absent');

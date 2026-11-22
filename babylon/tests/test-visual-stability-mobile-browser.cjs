@@ -26,7 +26,7 @@ async function test(browserType,name){
    const ground=scene?.getMeshByName('map-ground-300');
    return {ready:s.ready,error:s.error,
     terrain:s.modernArt?.terrainStyle,groundMaterial:ground?.material?.name,
-    hasGroundMap:!!ground?.material?.albedoTexture,
+    hasGroundMap:!!(ground?.material?.albedoTexture||ground?.material?.diffuseTexture),
     grass:!!scene?.getMeshByName('hd2026-meadow-tuft'),
     roadWidth:s.modernArt?.roadVisualWidth,
     organicRoad:!!scene?.getMeshByName('hd2026-organic-road-north-south'),
