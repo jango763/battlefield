@@ -1,3 +1,5 @@
+  assignView(view,unit);
+  actors.set(unit,view);
   replenisher.finish(unit,true);
   state.reinforcements=replenisher.snapshot();
   // Existing weapon assets/IK remain attached to the original rig.
@@ -49,12 +51,9 @@ function frame(){
    syncVisual(view);
    nativeBlend.update(view,dt);
   }
-  // Fixed original Three.js follow profile, without rotating on the joystick.
-  if(allies[0]?.alive&&camera){
-   // Leave room ahead to see enemies and cover, as in the original.
-   const dest=position(allies[0],1.55).add(new B.Vector3(0,0,3.0));
-   camera.target=B.Vector3.Lerp(camera.target,dest,Math.min(1,dt*2.8));
-  }
+  // Never rotate the camera or consume thumbstick touches while following.
+  if(allies[0]?.alive&&camera)tacticalCamera.follow(camera,allies[0],
+   {B,profile:cameraProfile.id,dt});
   const now=performance.now();
   // The five capture-ring meshes change slowly. Rebuilding the complete
   // economy summary and ring materials every rendered frame wastes CPU.

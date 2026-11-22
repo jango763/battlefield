@@ -15,6 +15,9 @@ const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
 const legacyVisual=window.BattlefieldLegacyVisualStyle;
 const modernArt=window.BattlefieldModernArt;
+const tacticalCamera=window.BattlefieldTacticalCamera;
+const mobileThumbstick=window.BattlefieldMobileThumbstick;
+const mapDetail=window.BattlefieldTacticalMapDetail;
 const villageModels=window.BattlefieldModernVillageModels;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
@@ -32,7 +35,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!tacticalCamera||!mobileThumbstick||!mapDetail||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -102,6 +105,7 @@ let statusAt=0,lastFarmSyncAt=0,starting=false,fieldOrders=null,terrain=null,des
 let weaponQueue=[],weaponWorker=false;
 let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
 const touchJoystick={active:false,pointer:null,x:0,y:0,cooldown:0};
+let joystickDriver=null,cameraProfile=null;
 const movementKeys={w:false,a:false,s:false,d:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false};
 // Reinforcement clocks are owned by replenishment-core.js.
 function alertStatus(message){$('event').textContent=message}
@@ -115,9 +119,3 @@ enterButton.addEventListener('click',()=>{
  briefing.hidden=true;briefing.setAttribute('aria-hidden','true');
  // The first game's combat screen prioritised the battlefield, not a settings panel.
  $('panel').classList.add('closed');
- $('hud-toggle').setAttribute('aria-pressed','false');
- $('hud-toggle').textContent='Меню';
- document.body.classList.add('battle-active');
- atBase=false;state.atBase=false;
- alertStatus('Бой начался: британцы 🔵 против Вермахта 🔴. Касайтесь земли, чтобы управлять героем.');
- drawHud();

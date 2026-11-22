@@ -1,3 +1,19 @@
+   modelDepotRetryAfter=Date.now()+30000;
+   state.engineering.assetRetries++;
+  }
+ }
+ for(const i of slots){
+  if(views[i])continue;
+  $('loading').textContent='Загружаю бойцов: '+state.models+'/'+slots.length+
+   ' · создание №'+(i+1);
+  // Preserve exact Mixamo joint names in clone-local hierarchies for IK.
+  let externalModel=null;
+  if(i<12&&modelDepot){
+   const selected=FEATURE_REAL_ALLIES?featureCasting(i):alliedModels.forBlueSlot(i).id;
+   try{
+    externalModel=await modelDepot.instantiate(selected,i);
+   }catch(error){
+    state.modelErrors[selected]=String(error?.message||error);
     state.engineering.glbFallbacks++;
     console.error('Allied licensed model rejected',selected,error);
    }
@@ -104,20 +120,3 @@ async function processWeaponQueue(){
      animationDriven:true,bindUI:false,acceptExportSockets:true,
      allowRetargetedSkeleton:view.importedAlliedModel,
      initialWeaponId:weaponAsset(view,view.unit?.weapon||view.weapon),
-     weaponRoot:'../assets/ww2-weapons/'
-    });
-    if(!rig.weaponRigReady)throw Error('Двухручный IK не подготовлен');
-    configureGermanRifleCarry(view,view.lastPose||'ready');
-    rig.setWeaponPose?.(view.lastPose||'ready');
-    const wanted=view.unit?.weapon||view.weapon;
-    if(rig.weaponRig?.weapon!==weaponAsset(view,wanted)&&rig.equipWeapon)
-     await rig.equipWeapon(weaponAsset(view,wanted));
-    view.weaponError=null;
-    if(view.importedAlliedModel){
-     // Sample after the IK render observer has run. A numerical PASS does
-     // not replace the final close-up visual acceptance on iPhone.
-     const assessment=modelDepot.gripAssessment(rig.weaponRig,
-      weaponAsset(view,wanted));
-     view.gripStatus=assessment;
-     if(!assessment.ok)console.warn('Allied hand sockets pending QA',
-      view.importedAlliedName,assessment.reason);
