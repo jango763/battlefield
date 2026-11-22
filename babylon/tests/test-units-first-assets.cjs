@@ -47,6 +47,18 @@ for(const [id,[filename,clips]] of Object.entries(sources)){
  const rigs=(content.meshes||[]).flatMap(m=>m.primitives||[])
   .filter(p=>p.attributes?.JOINTS_0!==undefined&&p.attributes?.WEIGHTS_0!==undefined);
  assert(rigs.length>=2,'No real skinned character geometry '+filename);
+ if(id==='german'){
+  const nativeRun=(content.animations||[]).find(a=>a.name==='Kar98k_Run');
+  const tracks=(nativeRun?.channels||[]).map(ch=>({
+   node:content.nodes[ch.target?.node]?.name||'',
+   path:ch.target?.path||''
+  }));
+  console.log('BATTLEFIELD_GERMAN_NATIVE_RUN_ARM_WEAPON_SOCKET',
+   JSON.stringify({weapon:tracks.filter(x=>/weapon/i.test(x.node)),
+    rightHand:tracks.filter(x=>/righthand|rightforearm/i.test(x.node)),
+    leftHand:tracks.filter(x=>/lefthand|leftforearm/i.test(x.node)),
+    tracks:tracks.length}));
+ }
  const skelNames=rig.joints.map(i=>content.nodes[i]?.name||'');
  const normalized=x=>x.replace(/^mixamorig[:_]?/i,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
  console.log('SOURCE_GLB_BONE_LABELS',id,JSON.stringify(skelNames.slice(0,28)));
