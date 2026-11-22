@@ -1,9 +1,3 @@
- if(!result.hit&&!result.impact)impact.z+=(Math.random()-.5)*1.4;
- if(result.phase!=='impact')drawTracer(start,impact,result.weapon==='Panzerschreck'?color('#ff9945'):
-  color(unit.team==='свои'?'#ffe5a0':'#ff866f'),
-  result.weapon==='Panzerschreck'?.24:.095);
- if(result.weapon==='Panzerschreck'){
-  const diameter=(result.blastRadius||combat.WEAPONS.Panzerschreck.blastRadius)*UNIT_SCALE*2;
   const sphere=B.MeshBuilder.CreateSphere('blast',{diameter,segments:10},scene);
   sphere.position.copyFrom(impact);
   const mat=new B.StandardMaterial('blast glow',scene);
@@ -79,6 +73,8 @@ function drawMiniMap(econ){
  c.fillStyle='#303b2c';c.fillRect(0,0,W,H);
  c.strokeStyle='#786b4c';c.lineWidth=4;
  c.beginPath();c.moveTo(W/2,0);c.lineTo(W/2,H);c.moveTo(0,H/2);c.lineTo(W,H/2);c.stroke();
+ for(const t of world.defenses.trenches){const [x1,y]=xy(t.a,t.z),[x2]=xy(t.b,t.z);c.strokeStyle=t.team==='blue'?'#7398a3':'#ad8173';c.lineWidth=1.5;c.beginPath();c.moveTo(x1,y);c.lineTo(x2,y);c.stroke();}
+ for(const m of support?.snapshot()||[]){const [x,y]=xy(m.x,m.z);c.strokeStyle=m.team==='blue'?'#a0d3e5':'#e5a08c';c.lineWidth=1;c.strokeRect(x-1.7,y-1.7,3.4,3.4);}
  // Bases and gold farms are visible without covering the live battlefield.
  for(const base of goldRules.MAP.bases){
   const [x,y]=xy(base.x,base.z);
@@ -112,6 +108,8 @@ function drawHud(){
  const snap=controller.snapshot();
  state.firstGameArmy=fieldOrders?.snapshot()||null;
  state.emplacements=support?.snapshot()||[];
+ state.tactical=tacticalAI?.snapshot();
+ state.heroCover=window.BattlefieldDefenseLayout.coverAt(world.defenses,hero,controller.getTarget(hero));
  state.heroPosition={x:hero.x,z:hero.z};
  state.cameraPosition=camera?{radius:camera.radius,alpha:camera.alpha,
   beta:camera.beta,targetX:camera.target.x,targetZ:camera.target.z}:null;
@@ -125,3 +123,6 @@ function drawHud(){
   central?.started?'Откроется через '+String(Math.floor(left/60)).padStart(2,'0')+
    ':'+String(left%60).padStart(2,'0'):
    'ЗАКРЫТА — ждём гибель первого бота';
+ $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
+ $('supply').disabled=!atBase||!hero.alive;
+ $('reload-manual').disabled=!hero.alive||hero.weapon==='Kar98k'||

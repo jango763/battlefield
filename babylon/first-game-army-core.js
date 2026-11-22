@@ -11,10 +11,10 @@
 })(typeof window!=='undefined'?window:null,function(){
  'use strict';
  const SIZE=300, HERO_SPEED=9, INFANTRY_SPEED=10, MAGNET_SPEED=16;
- const MAX_GUARDS=6, ENEMY_ALERT=30, FOLLOW_RECRUIT=14, FOLLOW_DROP=32;
+ const MAX_GUARDS=6, ENEMY_ALERT=55, FOLLOW_RECRUIT=14, FOLLOW_DROP=32;
  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
  const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
- function create({hero,allies,enemies,farms,centralOpen=()=>false,onArrive=()=>{},navigation=null,support=null}={}){
+ function create({hero,allies,enemies,farms,centralOpen=()=>false,onArrive=()=>{},navigation=null,support=null,tactical=null}={}){
   if(!hero||!Array.isArray(allies)||allies[0]!==hero||
      !Array.isArray(enemies)||!Array.isArray(farms)||!farms.length)
    throw Error('Invalid first Battlefield hero/army inputs');
@@ -46,6 +46,7 @@
   }
   function clearDestination(){destination=null}
   function advance(u,point,speed,dt,stop=.3){
+   speed*=u.suppressed>0?.6:1;
    if(navigation)return navigation.follow(u,point,speed,dt,stop);
    const dx=point.x-u.x,dz=point.z-u.z,d=Math.hypot(dx,dz);
    if(d<=stop)return false;
@@ -58,7 +59,7 @@
   function soldierThreat(u,other,range=ENEMY_ALERT){
    let near=null,d=range;
    for(const v of other){
-    if(!v.alive)continue;
+    if(!v.alive||(navigation&&!navigation.lineOfSight(u,v)))continue;
     const rd=dist(u,v);
     if(rd<d){near=v;d=rd}
    }
@@ -124,6 +125,7 @@
   }
   function objective(u,side){
    const candidates=availableFarms(side);
+   if(side==='blue'&&tactical?.snapshot().stance==='attack'&&candidates.length)return candidates.slice().sort((a,b)=>dist(u,a)-dist(u,b))[0];
    if(!candidates.length){
     const defended=farms.filter(f=>f.owner===side);
     return defended.length?defended[Math.abs(hash(u.id))%defended.length]:null;
@@ -146,6 +148,12 @@
    const job=support?.assignment(u);
    if(job){if(advance(u,job.seat,INFANTRY_SPEED,dt,.25))moved.add(u);return;}
    const enemy=soldierThreat(u,opposite(side));
+   if(tactical){
+    const farm=objective(u,side);if(farm)goalCache.set(u,farm.id);
+    const plan=tactical.decide(u,{side,enemy,farm,dt});
+    if(plan.goal&&advance(u,plan.goal,INFANTRY_SPEED*plan.speed,dt,plan.stop))moved.add(u);
+    return;
+   }
    if(enemy){
     const d=dist(u,enemy);
     // Stop and engage while within effective rifle range, preserving

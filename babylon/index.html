@@ -157,6 +157,8 @@ button:disabled{opacity:.5;cursor:default}
 <button id="order-attack" aria-pressed="false" disabled>Атака</button>
 <button id="fight" disabled>▶ Играть</button>
 </div>
+<h2>Самостоятельная армия</h2>
+<div class="row"><button data-stance="auto" aria-pressed="true">Авто</button><button data-stance="hold" aria-pressed="false">Оборона</button><button data-stance="attack" aria-pressed="false">Атака</button></div>
 <h2>Огневая поддержка</h2>
 <p class="note">Расчёт — 2 бойца. Потеря расчёта останавливает огонь; свободные бойцы заменяют погибших.</p>
 <table aria-label="Характеристики стационарного оружия"><tr><th>Оружие</th><th>Дальность</th><th>Сектор</th><th>Перезарядка</th></tr><tr><td>Пулемёт</td><td>72 м</td><td>120°</td><td>6 с / 60 патр.</td></tr><tr><td>Полевая пушка</td><td>18–105 м</td><td>80°</td><td>7 с / снаряд</td></tr></table>
@@ -208,6 +210,7 @@ button:disabled{opacity:.5;cursor:default}
 <script src="./defense-layout.js"></script>
 <script src="./tactical-field.js"></script>
 <script src="./emplacements-core.js"></script>
+<script src="./tactical-ai.js"></script>
 <script src="./game.js"></script>
 </body>
 </html>

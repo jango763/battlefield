@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),D=require('../defense-layout'),N=require('../navigation-core'),T=require('../tactical-ai');
+const layout=D.create(),nav=N.create({obstacles:layout.obstacles}),ai=T.create({layout,navigation:nav,design:D});
+const a={id:'a',x:65,z:104,alive:true,weapon:'Kar98k',suppressed:0},b={...a,id:'b',x:66},enemy={id:'e',x:70,z:130};
+const p1=ai.decide(a,{side:'blue',enemy,dt:.1}),p2=ai.decide(b,{side:'blue',enemy,dt:.1});
+assert(p1.goal&&p2.goal);assert.notEqual(p1.goal.id,p2.goal.id,'Cover slots exclusively occupied');
+a.suppressed=2;assert(ai.decide(a,{side:'blue',enemy,dt:.1}).speed<=.5);
+ai.setStance('hold',{x:60,z:80});const hold=ai.decide(b,{side:'blue',dt:.1});assert.equal(hold.state,'hold');assert(Math.hypot(hold.goal.x-60,hold.goal.z-80)<15);
+ai.setStance('attack');const attack=ai.decide(b,{side:'blue',farm:{x:70,z:95,owner:'red'},dt:.1});assert.equal(attack.state,'attack');
+ai.setStance('auto');const defend=ai.decide(b,{side:'blue',farm:{x:70,z:95,owner:'blue'},dt:.1});assert.equal(defend.state,'defend');
+console.log('COVER_RESERVATIONS_SUPPRESSION_ORDERS_PASS');

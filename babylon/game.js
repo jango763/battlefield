@@ -100,7 +100,7 @@ let replenisher=null,reinforcementEpoch=0;
 const REINFORCEMENT_LIMIT=8;
 let statusAt=0,lastFarmSyncAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 let weaponQueue=[],weaponWorker=false;
-let support=null;
+let support=null,tacticalAI=null;
 let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
 const touchJoystick={active:false,pointer:null,x:0,y:0,cooldown:0};
 const movementKeys={w:false,a:false,s:false,d:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false};
@@ -668,11 +668,12 @@ function setup(scenarioName){
  }
  for(const u of enemies){u.economyTeam='red';u.spawn={x:u.x,z:u.z};}
  for(const u of [...allies,...enemies]){const safe=world.navigation.nearestFree(u);if(safe){u.x=safe.x;u.z=safe.z;u.spawn={...safe};}}
+ tacticalAI=window.BattlefieldTacticalAI.create({layout:world.defenses,navigation:world.navigation,design:window.BattlefieldDefenseLayout});
  support=window.BattlefieldEmplacements.create({definitions:world.defenses.emplacements,allies,enemies,battle,navigation:world.navigation,
   coverFor:(u,a)=>window.BattlefieldDefenseLayout.coverAt(world.defenses,u,a),
   onShot:drawShot});
  fieldOrders=orders.create({hero:allies[0],allies,enemies,
-  farms:economy.farms,navigation:world.navigation,support,
+  farms:economy.farms,navigation:world.navigation,support,tactical:tacticalAI,
   centralOpen:()=>economy.summary().central.open,
   onArrive:()=>{if(destinationMark)destinationMark.isVisible=false;}
  });
@@ -841,6 +842,8 @@ function drawMiniMap(econ){
  c.fillStyle='#303b2c';c.fillRect(0,0,W,H);
  c.strokeStyle='#786b4c';c.lineWidth=4;
  c.beginPath();c.moveTo(W/2,0);c.lineTo(W/2,H);c.moveTo(0,H/2);c.lineTo(W,H/2);c.stroke();
+ for(const t of world.defenses.trenches){const [x1,y]=xy(t.a,t.z),[x2]=xy(t.b,t.z);c.strokeStyle=t.team==='blue'?'#7398a3':'#ad8173';c.lineWidth=1.5;c.beginPath();c.moveTo(x1,y);c.lineTo(x2,y);c.stroke();}
+ for(const m of support?.snapshot()||[]){const [x,y]=xy(m.x,m.z);c.strokeStyle=m.team==='blue'?'#a0d3e5':'#e5a08c';c.lineWidth=1;c.strokeRect(x-1.7,y-1.7,3.4,3.4);}
  // Bases and gold farms are visible without covering the live battlefield.
  for(const base of goldRules.MAP.bases){
   const [x,y]=xy(base.x,base.z);
@@ -874,6 +877,8 @@ function drawHud(){
  const snap=controller.snapshot();
  state.firstGameArmy=fieldOrders?.snapshot()||null;
  state.emplacements=support?.snapshot()||[];
+ state.tactical=tacticalAI?.snapshot();
+ state.heroCover=window.BattlefieldDefenseLayout.coverAt(world.defenses,hero,controller.getTarget(hero));
  state.heroPosition={x:hero.x,z:hero.z};
  state.cameraPosition=camera?{radius:camera.radius,alpha:camera.alpha,
   beta:camera.beta,targetX:camera.target.x,targetZ:camera.target.z}:null;
@@ -928,6 +933,7 @@ function drawHud(){
  drawMiniMap(econ);
  const short=$('quick-status');
  if(short)short.textContent='HP '+Math.round(hero.hp)+' · Золото '+funds+
+  (state.heroCover?' · Укрытие '+Math.round(state.heroCover*100)+'%':'')+(hero.suppressed>0?' · Подавлен':'')+
   ' · 🔵 '+snap.alliesAlive+' : '+snap.enemiesAlive+' 🔴'+(state.reinforcements?' · ⟳':'');
  const pause=$('quick-pause');
  if(pause)pause.textContent=atBase?'▶':'Ⅱ';
@@ -1041,6 +1047,11 @@ function updateTouchJoystick(dt){
  fieldOrders.setMovement(magnitude>1?-x/magnitude:-x,magnitude>1?z/magnitude:z);
 }
 function registerTouchControls(){
+ for(const button of document.querySelectorAll('[data-stance]'))button.addEventListener('click',()=>{
+  tacticalAI?.setStance(button.dataset.stance,findActor());
+  for(const b of document.querySelectorAll('[data-stance]'))b.setAttribute('aria-pressed',String(b===button));
+  alertStatus(button.dataset.stance==='hold'?'Армия удерживает район героя. Расчёты остаются на позициях.':button.dataset.stance==='attack'?'Самостоятельная армия наступает на ближайшую доступную ферму.':'Армия самостоятельно выбирает цели и защищает захваченное.');
+ });
  // Match the first game's W/A/S/D and arrow-key walking on desktop.
  // Key events only change a movement vector; the combat loop owns physics.
  for(const type of ['keydown','keyup'])window.addEventListener(type,e=>{

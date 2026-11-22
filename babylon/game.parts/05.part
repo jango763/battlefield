@@ -1,8 +1,3 @@
-    view.weaponError=String(error?.message||error);
-    console.error('Weapon model for soldier '+(view.index+1),error);
-    if(view.index===0)
-     alertStatus('Боец загружен, но оружейный IK недоступен: '+view.weaponError);
-   }
    // British body follows the same Mixamo animations. Start observer after
    // weapon IK so the new bare hands track its corrected wrist pose.
    if(view.britishSoldier?.applied)view.britishSoldier.start();
@@ -125,3 +120,9 @@ function setup(scenarioName){
   if(event.type==='central-open')
    alertStatus('ЦЕНТРАЛЬНАЯ ФЕРМА ОТКРЫТА! Захватите её ради большого золота.');
  }});
+ lastEconomyBlue=economy.treasury.blue;
+ battle=combat.createBattle({funds:goldRules.START_TREASURY,prices:PRICES});
+ allies=[];enemies=[];
+ // Symmetric army deployments around each approved base; one hero + 11 bots.
+ const alliesXY=Array.from({length:ours},(_,i)=>{
+  if(i===0)return {x:150,z:43};

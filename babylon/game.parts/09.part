@@ -1,6 +1,3 @@
-  $('order-attack').setAttribute('aria-pressed','true');
-  alertStatus('Атака: коснитесь противника для выбора цели.');
- });
  $('reload-manual').addEventListener('click',()=>{
   const r=battle.startReload(findActor());
   alertStatus(r.ok?'Перезарядка началась: '+r.seconds+' с.':
@@ -25,6 +22,11 @@ function updateTouchJoystick(dt){
  fieldOrders.setMovement(magnitude>1?-x/magnitude:-x,magnitude>1?z/magnitude:z);
 }
 function registerTouchControls(){
+ for(const button of document.querySelectorAll('[data-stance]'))button.addEventListener('click',()=>{
+  tacticalAI?.setStance(button.dataset.stance,findActor());
+  for(const b of document.querySelectorAll('[data-stance]'))b.setAttribute('aria-pressed',String(b===button));
+  alertStatus(button.dataset.stance==='hold'?'Армия удерживает район героя. Расчёты остаются на позициях.':button.dataset.stance==='attack'?'Самостоятельная армия наступает на ближайшую доступную ферму.':'Армия самостоятельно выбирает цели и защищает захваченное.');
+ });
  // Match the first game's W/A/S/D and arrow-key walking on desktop.
  // Key events only change a movement vector; the combat loop owns physics.
  for(const type of ['keydown','keyup'])window.addEventListener(type,e=>{
@@ -124,4 +126,3 @@ async function deployReinforcement({unit,side,hero},epoch){
   unit.suppressed=0;unit.weapon='Kar98k';
   if(unit.isHero)fieldOrders?.clearDestination();
   unit.characterModelImported=!!view.importedAlliedModel;
-  assignView(view,unit);

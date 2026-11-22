@@ -100,7 +100,7 @@ let replenisher=null,reinforcementEpoch=0;
 const REINFORCEMENT_LIMIT=8;
 let statusAt=0,lastFarmSyncAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 let weaponQueue=[],weaponWorker=false;
-let support=null;
+let support=null,tacticalAI=null;
 let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
 const touchJoystick={active:false,pointer:null,x:0,y:0,cooldown:0};
 const movementKeys={w:false,a:false,s:false,d:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false};
@@ -125,3 +125,5 @@ enterButton.addEventListener('click',()=>{
 });
 function position(unit,y=0){
  return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y+(world?.heightAt?.(unit.x,unit.z)||0),BASE_Z+unit.z*UNIT_SCALE);
+}
+function color(hex){return B.Color3.FromHexString(hex)}
