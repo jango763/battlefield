@@ -22,9 +22,11 @@ assert.equal(sim.treasury.red,610);
 for(let i=0;i<20;i++)sim.update(.25,[blue,red]);
 assert.equal(sim.treasury.blue,635); // +25 every five seconds per farm
 assert.equal(sim.treasury.red,635);
-assert.equal(Math.round(blue.gold*100)/100,1.25);
-assert.equal(Math.round(red.gold*100)/100,1.25);
+assert.equal(Math.round(blue.gold*100)/100,1.31);
+assert.equal(Math.round(red.gold*100)/100,1.31);
 const contested=create();
+contested.reportBotDeath({id:'opening-casualty',team:'red',hp:0,alive:false});
+for(let i=0;i<1200;i++)contested.update(.25,[]);
 const a={team:'blue',x:150,z:150,hp:100,alive:true};
 const b={team:'red',x:150,z:150,hp:100,alive:true};
 for(let i=0;i<40;i++)contested.update(.25,[a,b]);

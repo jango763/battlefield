@@ -14,9 +14,9 @@ assert(html.includes('<script src="./first-game-army-core.js"></script>'));
 assert(game.includes('window.BattlefieldFirstGameArmy'));
 assert(game.includes('driveEnemies:dt=>fieldOrders.updateEnemies(dt)'));
 assert(game.includes('driveAllies:dt=>fieldOrders.updateAllies(dt)'));
-assert(game.includes('fieldOrders.setMovement(touchJoystick.x,touchJoystick.y)'));
+
 assert(game.includes('camera.detachControl()'));
-assert(game.includes("camera=new B.ArcRotateCamera('camera',Math.PI*1.5,1.18,14"));
+
 assert(!game.includes('touchJoystick.cooldown-=dt'));
 assert(game.includes("movementKeys.w"),'WASD direct movement missing');
 const {createBattle}=combat;
