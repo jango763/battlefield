@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),E=require('../emplacements-core'),C=require('../combat-balance-core'),N=require('../navigation-core');
+const battle=C.createBattle(),crew=[battle.addUnit({id:'gunner',team:'blue',x:30,z:28.2}),battle.addUnit({id:'loader',team:'blue',x:31.6,z:29.6})];
+const target=battle.addUnit({id:'target',team:'red',x:30,z:65,hp:10000});let shots=0;
+const s=E.create({definitions:[{id:'mg',kind:'mg',team:'blue',x:30,z:30,heading:0}],allies:crew,enemies:[target],battle,navigation:N.create({size:100}),onShot:()=>shots++,random:()=>0});
+s.crewUpdate();for(const u of crew)Object.assign(u,s.assignment(u).seat);assert(s.snapshot()[0].ready);assert(!s.inSector(s.mounts[0],{x:30,z:5}));
+for(let i=0;i<500;i++)s.update(.05);assert(shots>30);assert(target.hp<10000);assert(target.suppressed>0);
+assert.equal(crew[0].weapon,'Kar98k','Mount must not mutate personal weapon');
+crew[1].alive=false;s.crewUpdate();const before=shots;for(let i=0;i<200;i++)s.update(.05);assert.equal(shots,before,'Gun needs living loader');
+const replacement=battle.addUnit({id:'replacement',team:'blue',x:31.6,z:29.6});crew.push(replacement);s.crewUpdate();Object.assign(replacement,s.assignment(replacement).seat);for(let i=0;i<200;i++)s.update(.05);assert(shots>before,'Replacement restores service');
+target.z=5;const reverse=shots;for(let i=0;i<100;i++)s.update(.05);assert.equal(shots,reverse,'Cannot fire outside sector');
+console.log('CREW_SECTOR_RELOAD_SUPPRESSION_PASS',shots);

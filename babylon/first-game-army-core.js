@@ -14,7 +14,7 @@
  const MAX_GUARDS=6, ENEMY_ALERT=30, FOLLOW_RECRUIT=14, FOLLOW_DROP=32;
  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
  const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
- function create({hero,allies,enemies,farms,centralOpen=()=>false,onArrive=()=>{},navigation=null}={}){
+ function create({hero,allies,enemies,farms,centralOpen=()=>false,onArrive=()=>{},navigation=null,support=null}={}){
   if(!hero||!Array.isArray(allies)||allies[0]!==hero||
      !Array.isArray(enemies)||!Array.isArray(farms)||!farms.length)
    throw Error('Invalid first Battlefield hero/army inputs');
@@ -66,13 +66,13 @@
   }
   function reconcileGuards(){
    for(const [u] of guardSlots){
-    if(!u.alive||!allies.includes(u)||!hero.alive||dist(u,hero)>FOLLOW_DROP)
+    if(support?.assignment(u)||!u.alive||!allies.includes(u)||!hero.alive||dist(u,hero)>FOLLOW_DROP)
      guardSlots.delete(u);
    }
    if(!hero.alive)return;
    // Magnet recruitment replicates the first Three.js game: ONLY nearby
    // uncommitted allies join the six-person escort. Others remain autonomous.
-   const available=allies.slice(1).filter(u=>u.alive&&!guardSlots.has(u)&&
+   const available=allies.slice(1).filter(u=>u.alive&&!support?.assignment(u)&&!guardSlots.has(u)&&
     dist(u,hero)<FOLLOW_RECRUIT).sort((a,b)=>dist(a,hero)-dist(b,hero));
    for(const u of available){
     if(guardSlots.size>=MAX_GUARDS)break;
@@ -143,6 +143,8 @@
   }
   function moveAutonomous(u,side,dt,moved){
    if(!u.alive)return;
+   const job=support?.assignment(u);
+   if(job){if(advance(u,job.seat,INFANTRY_SPEED,dt,.25))moved.add(u);return;}
    const enemy=soldierThreat(u,opposite(side));
    if(enemy){
     const d=dist(u,enemy);

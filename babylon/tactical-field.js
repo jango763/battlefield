@@ -51,7 +51,26 @@ function install({B,scene,world,layout,design}){
    for(let i=0;i<12;i++){const bar=box(id+'-barb-'+i,x-5.5+i,.85,z,.2,.15,.15,metal);bar.rotation.z=.7;}
   }
  }
- const api={layout,meshes,materials,box,mat,earth,timber,sand,world,scene,B};
+ const mounts=new Map();
+ for(const def of layout.emplacements){
+  const {x,z,id}=def,pivot=new B.TransformNode(id+'-turret',scene);pivot.position.set(x-150,0,z-150);
+  function part(label,dx,y,dz,w,h,d,m){const p=box(id+'-'+label,x+dx,y,z+dz,w,h,d,m);p.setParent(pivot);return p;}
+  part('receiver',0,1.25,0,.23,.25,.75,metal);
+  part('barrel',0,1.3,.95,.095,.095,1.35,metal);
+  part('muzzle',0,1.3,1.65,.16,.16,.18,metal);
+  part('stock',0,1.2,-.6,.18,.22,.5,timber);
+  part('ammo-box',-.38,1.05,-.05,.38,.37,.45,metal);
+  part('sight',0,1.47,.55,.08,.18,.07,metal);
+  for(const side of [-1,1]){const leg=part('tripod-'+side,side*.4,.55,.22,.09,1.15,.09,metal);leg.rotation.z=side*.45;}
+  const rear=part('rear-leg',0,.55,-.5,.09,1.15,.09,metal);rear.rotation.x=-.5;
+  pivot.rotation.y=def.heading;mounts.set(id,pivot);
+  // Visible sector boundary, broad enough to remain stable in mobile view.
+  const points=[new B.Vector3(x-150,.09,z-150)];
+  for(let i=0;i<=20;i++){const a=def.heading-Math.PI/3+i*Math.PI/30;points.push(new B.Vector3(x-150+Math.sin(a)*8,.09,z-150+Math.cos(a)*8));}
+  points.push(points[0]);const sector=B.MeshBuilder.CreateLines(id+'-sector',{points},scene);sector.color=B.Color3.FromHexString(def.team==='blue'?'#557f8b':'#9d6355');sector.isPickable=false;
+ }
+ const api={layout,meshes,materials,box,mat,earth,timber,sand,world,scene,B,mounts,
+  update:support=>{for(const m of support.mounts){const p=mounts.get(m.id);if(p)p.rotation.y=m.yaw;}}};
  world.field=api;return api;
 }
 return {install};

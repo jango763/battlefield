@@ -100,6 +100,7 @@ let replenisher=null,reinforcementEpoch=0;
 const REINFORCEMENT_LIMIT=8;
 let statusAt=0,lastFarmSyncAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 let weaponQueue=[],weaponWorker=false;
+let support=null;
 let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
 const touchJoystick={active:false,pointer:null,x:0,y:0,cooldown:0};
 const movementKeys={w:false,a:false,s:false,d:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false};
@@ -667,12 +668,16 @@ function setup(scenarioName){
  }
  for(const u of enemies){u.economyTeam='red';u.spawn={x:u.x,z:u.z};}
  for(const u of [...allies,...enemies]){const safe=world.navigation.nearestFree(u);if(safe){u.x=safe.x;u.z=safe.z;u.spawn={...safe};}}
+ support=window.BattlefieldEmplacements.create({definitions:world.defenses.emplacements,allies,enemies,battle,navigation:world.navigation,
+  coverFor:(u,a)=>window.BattlefieldDefenseLayout.coverAt(world.defenses,u,a),
+  onShot:drawShot});
  fieldOrders=orders.create({hero:allies[0],allies,enemies,
-  farms:economy.farms,navigation:world.navigation,
+  farms:economy.farms,navigation:world.navigation,support,
   centralOpen:()=>economy.summary().central.open,
   onArrive:()=>{if(destinationMark)destinationMark.isVisible=false;}
  });
  controller=tactics.create({battle,allies,enemies,driveAllies:dt=>fieldOrders.updateAllies(dt),driveEnemies:dt=>fieldOrders.updateEnemies(dt),endWhenEliminated:scenario!=='squads',
+  canFire:u=>!support.operating(u),
   lineOfSight:(a,b)=>world.navigation.lineOfSight(a,b),
   coverFor:(u,a)=>window.BattlefieldDefenseLayout.coverAt(world.defenses,u,a),
   onShot:drawShot,
@@ -725,7 +730,7 @@ function drawTracer(start,impact,colour,ttl){
  addEffect(slot.mesh,ttl,null,slot);
  state.engineering.tracerPoolSize=tracerPool.length;
 }
-function drawShot({unit,target,result}){
+function drawShot({unit,target,result,mount}){
  // Bounties are credited to the killer's army; the hero also earns
  // personal gold, exactly as in the original Three.js economy.
  if(economy && result.hits?.length){
@@ -745,7 +750,7 @@ function drawShot({unit,target,result}){
  if(!source||!targetView)return;
  const muzzle=source.rig?.getMuzzleWorld?.()?.position||
   source.rig?.weaponRig?.muzzleWorldPosition;
- const start=Array.isArray(muzzle)&&muzzle.length===3 ?
+ const start=mount?position({x:mount.x+Math.sin(mount.yaw)*1.65,z:mount.z+Math.cos(mount.yaw)*1.65},1.3):Array.isArray(muzzle)&&muzzle.length===3 ?
   new B.Vector3(...muzzle):source.anchor.position.add(new B.Vector3(0,1.5,0));
  const impact=result.impact?position(result.impact,.7):
   targetView.anchor.position.add(new B.Vector3(0,1.15,0));
@@ -862,6 +867,7 @@ function drawHud(){
  const hero=findActor();
  const snap=controller.snapshot();
  state.firstGameArmy=fieldOrders?.snapshot()||null;
+ state.emplacements=support?.snapshot()||[];
  state.heroPosition={x:hero.x,z:hero.z};
  state.cameraPosition=camera?{radius:camera.radius,alpha:camera.alpha,
   beta:camera.beta,targetX:camera.target.x,targetZ:camera.target.z}:null;
@@ -1164,7 +1170,9 @@ function frame(){
  if(state.ready&&controller){
   if(!gamePausedForBriefing){
    updateTouchJoystick(dt);
+   if(controller.snapshot().active)support.crewUpdate();
    controller.update(dt);
+   if(controller.snapshot().active){support.update(dt);world.field.update(support);}
    updateReinforcements(dt);
    // Stop economic and unlock clocks while the actual battle is paused
    // (not merely when the map briefing is dismissed).

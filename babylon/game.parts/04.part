@@ -1,5 +1,3 @@
-   }catch(error){
-    state.modelErrors[selected]=String(error?.message||error);
     state.engineering.glbFallbacks++;
     console.error('Allied licensed model rejected',selected,error);
    }
@@ -124,3 +122,5 @@ async function processWeaponQueue(){
      if(!assessment.ok)console.warn('Allied hand sockets pending QA',
       view.importedAlliedName,assessment.reason);
     }
+   }catch(error){
+    state.engineering.weaponFailures=(state.engineering.weaponFailures||0)+1;

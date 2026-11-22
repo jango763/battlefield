@@ -1,4 +1,3 @@
-function unitVisual(index,entries,{externalModel=null}={}){
  const anchor=new B.TransformNode('soldier-anchor-'+index,scene);
  const root=new B.TransformNode('approved-animated-rig-'+index,scene);
  root.parent=anchor;
@@ -124,3 +123,5 @@ async function ensureUnitsUnlocked(scenarioName){
    const selected=FEATURE_REAL_ALLIES?featureCasting(i):alliedModels.forBlueSlot(i).id;
    try{
     externalModel=await modelDepot.instantiate(selected,i);
+   }catch(error){
+    state.modelErrors[selected]=String(error?.message||error);

@@ -254,6 +254,15 @@
       }
       return result;
     }
+    // Shared damage entry point for crew-served weapons. Never replace a
+    // soldier's inventory or personal weapon to make a mounted gun fire.
+    function applyDamage(attacker,target,amount,weapon='support'){
+      unitOf(attacker);unitOf(target);
+      if(!attacker.alive||!target.alive||attacker.team===target.team||!Number.isFinite(amount)||amount<=0)return null;
+      const damage=Math.min(target.hp,Math.round(amount));target.hp-=damage;attacker.hits++;
+      if(target.hp<=0){target.alive=false;attacker.kills++;emit('kill',{attacker:attacker.id,victim:target.id,weapon});}
+      return {id:target.id,damage,hp:target.hp};
+    }
     // Optional external economy integration. Safe additive API for campaign gold;
     // existing weapon-balance callers are unchanged.
     function grantFunds(amount){
@@ -264,7 +273,7 @@
     }
     return {
       units, events, addUnit, buyWeapon, switchWeapon, resupply, totalAmmo,
-      fire, tick, startReload, grantFunds, getFunds: () => treasury
+      fire, tick, startReload, grantFunds, applyDamage, getFunds: () => treasury
     };
   }
   return { WEAPONS, hitChance, createBattle };

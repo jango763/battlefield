@@ -1,3 +1,4 @@
+  result.weapon==='Panzerschreck'?.24:.095);
  if(result.weapon==='Panzerschreck'){
   const diameter=combat.WEAPONS.Panzerschreck.blastRadius*UNIT_SCALE*2;
   const sphere=B.MeshBuilder.CreateSphere('blast',{diameter,segments:10},scene);
@@ -107,6 +108,7 @@ function drawHud(){
  const hero=findActor();
  const snap=controller.snapshot();
  state.firstGameArmy=fieldOrders?.snapshot()||null;
+ state.emplacements=support?.snapshot()||[];
  state.heroPosition={x:hero.x,z:hero.z};
  state.cameraPosition=camera?{radius:camera.radius,alpha:camera.alpha,
   beta:camera.beta,targetX:camera.target.x,targetZ:camera.target.z}:null;
@@ -122,4 +124,3 @@ function drawHud(){
    'ЗАКРЫТА — ждём гибель первого бота';
  $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
  $('supply').disabled=!atBase||!hero.alive;
- $('reload-manual').disabled=!hero.alive||hero.weapon==='Kar98k'||

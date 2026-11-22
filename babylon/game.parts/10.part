@@ -1,4 +1,3 @@
-  assignView(view,unit);
   actors.set(unit,view);
   replenisher.finish(unit,true);
   state.reinforcements=replenisher.snapshot();
@@ -34,7 +33,9 @@ function frame(){
  if(state.ready&&controller){
   if(!gamePausedForBriefing){
    updateTouchJoystick(dt);
+   if(controller.snapshot().active)support.crewUpdate();
    controller.update(dt);
+   if(controller.snapshot().active){support.update(dt);world.field.update(support);}
    updateReinforcements(dt);
    // Stop economic and unlock clocks while the actual battle is paused
    // (not merely when the map briefing is dismissed).

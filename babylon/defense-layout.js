@@ -43,7 +43,16 @@ function create(){
  // Existing sandbags and wreck silhouettes also provide usable cover.
  for(const [i,[x,z]] of [[86,123],[210,120],[120,175],[190,181],[150,83],[152,220]].entries())
   for(const facing of [-1,1])covers.push({id:'legacy-sandbag-'+i+'-'+facing,x,z:z-facing*1.25,hw:4.7,hd:.7,protection:.55,facing,type:'sandbags'});
- return {trenches,obstacles,covers,positions,fortifications,emplacements:[]};
+ const emplacements=[{id:'mg-blue',kind:'mg',team:'blue',x:132,z:104,heading:0},
+  {id:'mg-red',kind:'mg',team:'red',x:168,z:196,heading:Math.PI}];
+ for(const m of emplacements){
+  obstacles.push({id:m.id,type:'emplacement',x:m.x,z:m.z,hw:.6,hd:.55,blocksSight:false});
+  const facing=m.team==='blue'?1:-1;
+  fortifications.push({id:m.id+'-bags',type:'sandbags',x:m.x,z:m.z+facing*1.8});
+  obstacles.push({id:m.id+'-bags',type:'sandbags',x:m.x,z:m.z+facing*1.8,hw:5.4,hd:.55,blocksSight:false});
+  covers.push({id:m.id+'-cover',x:m.x,z:m.z-facing*.5,hw:3,hd:1.5,protection:.65,facing,type:'sandbags'});
+ }
+ return {trenches,obstacles,covers,positions,fortifications,emplacements};
 }
 function heightAt(layout,x,z){
  for(const t of layout.trenches){
