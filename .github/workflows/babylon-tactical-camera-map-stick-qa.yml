@@ -1,12 +1,14 @@
-name: Battlefield — tactical camera, responsive joystick and rural map
+name: "Battlefield CoH3-style countryside: daylight, verges, native-touch QA"
 on:
   push:
     branches:
-      - feature/babylon-coh3-camera-stick-map-20261122
+      - feature/babylon-coh3-terrain-readability-20261122
     paths:
       - 'babylon/game.js'
       - 'babylon/game.parts/**'
       - 'babylon/index.html'
+      - 'babylon/world-300.js'
+      - 'babylon/modern-art-v1.js'
       - 'babylon/tactical-camera.js'
       - 'babylon/mobile-thumbstick.js'
       - 'babylon/tactical-map-detail.js'
