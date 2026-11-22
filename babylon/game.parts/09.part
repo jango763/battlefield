@@ -1,3 +1,31 @@
+ document.querySelectorAll('[data-scenario]').forEach(button=>
+  button.addEventListener('click',()=>chooseScenario(button.dataset.scenario)));
+ document.querySelectorAll('[data-weapon]').forEach(button=>
+  button.addEventListener('click',()=>chooseGun(button.dataset.weapon)));
+ $('fight').addEventListener('click',()=>{
+  const hero=findActor();
+  if(!hero?.alive){alertStatus('Герой погиб. Нажмите «Сброс».');return;}
+  if(atBase){
+   const result=controller.start();
+   if(!result.ok){alertStatus('Бой не начат: '+result.reason);return;}
+   atBase=false;state.atBase=false;alertStatus('Продолжаем бой. Коснитесь земли для движения героя.');
+  }else{
+   controller.stop();atBase=true;state.atBase=true;
+   alertStatus('Пауза: доступна смена оружия и пополнение БК.');
+  }
+  drawHud();
+ });
+ $('reset').addEventListener('click',()=>{
+  setup(scenario);
+  const start=controller.start();
+  if(start.ok){atBase=false;state.atBase=false;}
+  alertStatus('Новый бой. Выбирайте направление движения касанием земли.');
+  drawHud();
+ });
+ $('supply').addEventListener('click',resupplyHero);
+ $('order-move').addEventListener('click',()=>{
+  inputMode='move';
+  $('order-move').setAttribute('aria-pressed','true');
   $('order-attack').setAttribute('aria-pressed','false');
   alertStatus('Движение: коснитесь земли для приказа.');
  });
@@ -40,44 +68,17 @@ function registerTouchControls(){
  });
  const pad=$('touch-stick'),knob=$('touch-stick-knob');
  if(!pad||!knob)return;
- function move(e){
-  const rect=pad.getBoundingClientRect();
-  const centerX=rect.left+rect.width/2,centerY=rect.top+rect.height/2;
-  const radius=Math.max(1,rect.width*.37);
-  const dx=(e.clientX-centerX)/radius,dy=(e.clientY-centerY)/radius;
-  const mag=Math.max(1,Math.hypot(dx,dy));
-  touchJoystick.x=dx/mag;touchJoystick.y=-dy/mag;
-  knob.style.transform='translate('+(touchJoystick.x*radius*.65)+'px,'+
-   (-touchJoystick.y*radius*.65)+'px)';
-  touchJoystick.cooldown=0;
- }
- function release(e){
-  if(e.pointerId!==touchJoystick.pointer)return;
-  touchJoystick.active=false;touchJoystick.pointer=null;
-  touchJoystick.x=touchJoystick.y=0;touchJoystick.cooldown=0;
-  knob.style.transform='translate(0,0)';
-  fieldOrders?.clearMovement();
- }
- pad.addEventListener('pointerdown',e=>{
-  if(!state.ready||!gameStarted||!findActor()?.alive)return;
-  e.preventDefault();
-  touchJoystick.active=true;touchJoystick.pointer=e.pointerId;
-  pad.setPointerCapture(e.pointerId);move(e);
- });
- pad.addEventListener('pointermove',e=>{
-  if(touchJoystick.active&&e.pointerId===touchJoystick.pointer){
-   e.preventDefault();move(e);
-  }
- });
- pad.addEventListener('pointerup',release);
- pad.addEventListener('pointercancel',release);
- pad.addEventListener('lostpointercapture',release);
+ joystickDriver=mobileThumbstick.create({pad,knob,win:window,
+  canStart:()=>state.ready&&gameStarted&&!!findActor()?.alive,
+  onMove:(x,z,active)=>{
+   touchJoystick.x=x;touchJoystick.y=z;touchJoystick.active=active;
+   touchJoystick.pointer=joystickDriver?.state.pointer??null;
+   if(active)fieldOrders?.setMovement(x,z);
+   else fieldOrders?.clearMovement();
+  }});
+ state.thumbstick=joystickDriver.state;
  window.addEventListener('blur',()=>{
-  // No stuck walking after iPhone tab suspension or incoming calls.
   for(const key of Object.keys(movementKeys))movementKeys[key]=false;
-  touchJoystick.active=false;touchJoystick.pointer=null;
-  touchJoystick.x=touchJoystick.y=0;
-  knob.style.transform='translate(0,0)';
   fieldOrders?.clearMovement();
  });
  $('quick-fire').addEventListener('click',()=>{
@@ -119,5 +120,3 @@ async function deployReinforcement({unit,side,hero},epoch){
   unit.suppressed=0;unit.weapon='Kar98k';
   if(unit.isHero)fieldOrders?.clearDestination();
   unit.characterModelImported=!!view.importedAlliedModel;
-  assignView(view,unit);
-  actors.set(unit,view);
