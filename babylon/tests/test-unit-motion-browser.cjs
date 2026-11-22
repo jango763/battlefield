@@ -9,7 +9,7 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
  const errors=[];page.on('pageerror',e=>errors.push(String(e)));
  page.on('console',msg=>{if(msg.text().includes('BATTLEFIELD_US_GUN_MESH_CANDIDATES'))console.log(msg.text())});
  try{
-  await page.goto('http://127.0.0.1:8858/babylon/units-first.html?nativeWeaponCarry=1',
+  await page.goto('http://127.0.0.1:8858/babylon/units-first.html',
    {waitUntil:'domcontentloaded',timeout:60000});
   // Mobile visual acceptance gate: the 3D canvas must have space for the
   // COMPLETE soldier before the user taps anything. The bottom controls are
@@ -115,6 +115,12 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
       error:r.error||null};
     },fighter);
     console.log('BATTLEFIELD_GAIT_FRAME',JSON.stringify({...report,label}));
+    if(fighter==='german'){
+     assert.equal(report.clip,'native-German-legs-with-Kar98k-ready',
+      'Whole-body German run must never overwrite the rifle holding wrists');
+     assert(report.rightGripMeters<=.075 && report.leftGripMeters<=.075,
+      'Both hands must stay within 7.5 cm of Kar98k throughout running');
+    }
     shot=await page.screenshot({type:'jpeg',quality:47,
       path:'/tmp/bf-motion-'+fighter+'-run-'+label+'-full.jpeg'});
     console.log('BATTLEFIELD_MOTION_'+fighter.toUpperCase()+'_RUN_'+label.toUpperCase()+'_FULL_JPEG_BASE64 '+shot.toString('base64'));
