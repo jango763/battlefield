@@ -66,6 +66,48 @@ fs.mkdirSync(dir,{recursive:true});
   await page.waitForTimeout(750);
   result.heroBefore=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.heroPosition);
   await page.screenshot({path:dir+'/'+name+'-portrait.png'});
+  result.terrainDiagnostics=await page.evaluate(()=>{
+   const scene=window.BABYLON.EngineStore.LastCreatedScene;
+   const g=scene.getMeshByName('map-ground-300'),mat=g.material;
+   const normals=g.getVerticesData('normal')||[];
+   const indices=g.getIndices()||[];
+   const positions=g.getVerticesData('position')||[];
+   const tx=mat.diffuseTexture;
+   let pixel=null;try{
+    const ctx=tx.getContext();
+    pixel=Array.from(ctx.getImageData(256,256,1,1).data);
+   }catch(e){pixel=String(e)}
+   return {ground:{visible:g.isVisible,enabled:g.isEnabled(),
+    ready:mat.isReady(g),vertices:g.getTotalVertices(),indices:g.getTotalIndices(),
+    normals:Array.from(normals.slice(0,9)),triangles:Array.from(indices.slice(0,6)),
+    positions:Array.from(positions.slice(0,12)),scaling:g.scaling.asArray(),
+    world:g.getWorldMatrix().toArray().slice(0,16)},
+    material:{name:mat.name,disableLighting:mat.disableLighting,
+      diffuse:mat.diffuseColor.asArray(),emissive:mat.emissiveColor.asArray(),
+      textureReady:tx?.isReady(),canvasPixel:pixel,backface:mat.backFaceCulling},
+    lightCount:scene.lights.length,clear:scene.clearColor.asArray(),
+    activeCamera:scene.activeCamera?.position.asArray()};
+  });
+  await page.evaluate(()=>{
+   const scene=window.BABYLON.EngineStore.LastCreatedScene;
+   const mat=scene.getMeshByName('map-ground-300').material;
+   mat.disableLighting=true;
+   mat.emissiveColor=new BABYLON.Color3(1,1,1);
+   mat.emissiveTexture=mat.diffuseTexture;
+   mat.diffuseColor=new BABYLON.Color3(1,1,1);
+   mat.markAsDirty(BABYLON.Material.AllDirtyFlag);
+  });
+  await page.waitForTimeout(220);
+  await page.screenshot({path:dir+'/'+name+'-diagnostic-unlit-texture.png'});
+  await page.evaluate(()=>{
+   const scene=window.BABYLON.EngineStore.LastCreatedScene;
+   const mat=scene.getMeshByName('map-ground-300').material;
+   mat.diffuseTexture=null;mat.emissiveTexture=null;
+   mat.emissiveColor=new BABYLON.Color3(.1,.9,.15);
+   mat.markAsDirty(BABYLON.Material.AllDirtyFlag);
+  });
+  await page.waitForTimeout(220);
+  await page.screenshot({path:dir+'/'+name+'-diagnostic-solid-green.png'});
   await page.mouse.move(160,693);await page.mouse.down();
   await page.mouse.move(94,693,{steps:7});
   await page.waitForTimeout(850);await page.mouse.up();
