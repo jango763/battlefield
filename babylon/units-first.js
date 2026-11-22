@@ -137,6 +137,10 @@ try{
   if(model.id==='german'&&model.rigState){
    model.rigState.weaponMotionRunCarryTest=
     new URLSearchParams(location.search).get('runCarry')==='1';
+   // The real German trigger fingers bend toward the wood along reverse
+   // local X in close-up. Limit this opt-in to the RIGHT hand while running.
+   model.rigState.weaponMotionGripDebug=
+    mode==='run'&&model.rigState.weaponMotionRunCarryTest?'reverseAxisX':null;
    model.rigState.weaponMotionRun=mode==='run';
    model.rigState.weaponMotionRightWristMax=
     Number(new URLSearchParams(location.search).get('rightWristCap')||55);
