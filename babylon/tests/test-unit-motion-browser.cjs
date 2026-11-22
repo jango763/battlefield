@@ -85,31 +85,52 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
    assert(status.motionReports[id]?.[mode]&&
     !['pending'].includes(status.motionReports[id][mode].status),
     id+' '+mode+' donor must be processed or explicitly rejected');
-  // Visual gait gate: test actual animated frames of all three real GLBs.
-  // Capture multiple positions in the cycle, not merely a static T/idle pose.
+  // Full-body gait inspection: NEVER inspect running soldiers behind menu.
+  // View the original GLB and the German donor mode in true mobile portrait.
   for(const fighter of ['german','jakeli','american']){
    await page.locator('[data-unit="'+fighter+'"]').click();
    await page.locator('#toggle-controls').click();
-   for(const [mode,delay] of [['idle',300],['run',380],['run',900]]){
-    if(mode==='run'&&delay===900)await page.waitForTimeout(delay);
-    else{await page.locator('[data-motion="'+mode+'"]').click();await page.waitForTimeout(delay);}
+   await page.locator('[data-motion="idle"]').click();
+   await page.locator('#toggle-controls').click();
+   await page.waitForTimeout(250);
+   let shot=await page.screenshot({type:'jpeg',quality:44,
+      path:'/tmp/bf-motion-'+fighter+'-idle-full.jpeg'});
+   console.log('BATTLEFIELD_MOTION_'+fighter.toUpperCase()+'_IDLE_FULL_JPEG_BASE64 '+shot.toString('base64'));
+   await page.locator('#toggle-controls').click();
+   await page.locator('[data-motion="run"]').click();
+   await page.locator('#toggle-controls').click();
+   for(const [label,delay] of [['early',340],['late',780]]){
+    await page.waitForTimeout(delay);
     const report=await page.evaluate(id=>{
      const model=window.__BF_UNIT_REVIEW_ACT__.getModel(id);
      const r=model?.rigState?.weaponRig||model?.rig?.report||{};
-     const pos=model?.pivot?.getAbsolutePosition?.();
      return {id,clip:model?.clip?.name,pose:r.pose||r.mode||null,
       rightGripMeters:r.rightGripMeters,leftGripMeters:r.leftGripMeters,
       stockRightShoulderMeters:r.stockRightShoulderMeters,
       stockToShoulderMeters:r.stockToShoulderMeters,
       rightIKMeters:r.rightIKMeters,leftIKMeters:r.leftIKMeters,
-      error:r.error||null,pivot:pos?.asArray()};
+      rightFingerDirectionErrorDegrees:r.rightFingerDirectionErrorDegrees,
+      leftFingerDirectionErrorDegrees:r.leftFingerDirectionErrorDegrees,
+      forwardDot:r.forwardDot,error:r.error||null};
     },fighter);
-    console.log('BATTLEFIELD_GAIT_FRAME',JSON.stringify({...report,delay}));
-    const jpg=await page.screenshot({type:'jpeg',quality:50,
-      path:'/tmp/bf-unit-'+fighter+'-'+mode+'-'+delay+'.jpeg'});
-    console.log('BATTLEFIELD_GAIT_'+fighter.toUpperCase()+'_'+mode.toUpperCase()+'_'+delay+'_JPEG_BASE64 '+jpg.toString('base64'));
+    console.log('BATTLEFIELD_GAIT_FRAME',JSON.stringify({...report,label}));
+    shot=await page.screenshot({type:'jpeg',quality:47,
+      path:'/tmp/bf-motion-'+fighter+'-run-'+label+'-full.jpeg'});
+    console.log('BATTLEFIELD_MOTION_'+fighter.toUpperCase()+'_RUN_'+label.toUpperCase()+'_FULL_JPEG_BASE64 '+shot.toString('base64'));
    }
-   await page.locator('#toggle-controls').click();
+   if(fighter!=='german'){
+    await page.locator('#toggle-controls').click();
+    await page.locator('#motion-standard').click();
+    await page.locator('#toggle-controls').click();
+    await page.waitForTimeout(380);
+    shot=await page.screenshot({type:'jpeg',quality:47,
+      path:'/tmp/bf-motion-'+fighter+'-native-run-full.jpeg'});
+    console.log('BATTLEFIELD_MOTION_'+fighter.toUpperCase()+'_NATIVE_RUN_FULL_JPEG_BASE64 '+shot.toString('base64'));
+    // Return donor state for next soldier comparison; the user toggle stays functional.
+    await page.locator('#toggle-controls').click();
+    await page.locator('#motion-standard').click();
+    await page.locator('#toggle-controls').click();
+   }
   }
   await page.locator('[data-unit="american"]').click();
   await page.locator('#toggle-controls').click();
