@@ -125,6 +125,30 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
       path:'/tmp/bf-motion-'+fighter+'-run-'+label+'-full.jpeg'});
     console.log('BATTLEFIELD_MOTION_'+fighter.toUpperCase()+'_RUN_'+label.toUpperCase()+'_FULL_JPEG_BASE64 '+shot.toString('base64'));
    }
+   if(fighter==='german'){
+    // Same live, skinned, animated character: sweep wrist limits instead of
+    // approving one blindly. Compare anatomy + target-angle metrics and pixels.
+    for(const cap of [55,80,100,120,140]){
+     const sample=await page.evaluate(max=>{
+      const model=window.__BF_UNIT_REVIEW_ACT__.getModel('german');
+      model.rigState.weaponMotionRightWristMax=max;
+      return {max};
+     },cap);
+     await page.waitForTimeout(220);
+     const m=await page.evaluate(()=>{
+      const model=window.__BF_UNIT_REVIEW_ACT__.getModel('german');
+      const r=model.rigState.weaponRig;
+      return {cap:r.rightWristLimitDeg,wristApplied:r.rightWristDegrees,
+       fingerError:r.rightFingerDirectionErrorDegrees,
+       rightGrip:r.rightGripMeters,leftGrip:r.leftGripMeters,
+       rightIK:r.rightIKMeters,leftIK:r.leftIKMeters,error:r.error||null};
+     });
+     console.log('BATTLEFIELD_RIGHT_WRIST_SWEEP',JSON.stringify(m));
+     const shot=await page.screenshot({type:'jpeg',quality:48,
+      path:'/tmp/bf-right-wrist-'+cap+'.jpeg'});
+     console.log('BATTLEFIELD_RIGHT_WRIST_'+cap+'_JPEG_BASE64 '+shot.toString('base64'));
+    }
+   }
    if(fighter!=='german'){
     await page.locator('#toggle-controls').click();
     await page.locator('#motion-standard').click();
