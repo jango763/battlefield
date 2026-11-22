@@ -194,23 +194,19 @@ try{
   container.addAllToScene();
   for(const clip of clips)clip.stop();
   // The source American Soldier WW2 includes five primitive M1 gun parts:
-  // one Chrome receiver + four TanPlastic components (Object_0..Object_4).
+  // one Chrome receiver + four TanPlastic components (GLB mesh 0..4).
+  // Babylon renumbers source glTF nodes to Object_7/10/13/16/19.
   // In this range the equipped Lee-Enfield is owned by the real hand IK.
   // Hide, NEVER dispose, the original gun to avoid a second rifle across
   // the face. Do not touch the 36 skinned costume/hand meshes or materials.
   let hiddenSourceGun=0;
   if(id==='american'){
-   const oldGun=container.meshes.filter(m=>/^Object_[0-4](?:$|[_\.])/.test(m.name));
+   const oldGun=container.meshes.filter(m=>/^(?:Object_7|Object_10|Object_13|Object_16|Object_19)$/.test(m.name));
    const materials=oldGun.map(m=>m.material?.name||'');
-   console.info('BATTLEFIELD_US_GUN_MESH_CANDIDATES',JSON.stringify({
-     matches:oldGun.map(m=>({name:m.name,material:m.material?.name,vertices:m.getTotalVertices?.()})),
-     all:container.meshes.filter(m=>m.getTotalVertices?.()>0).map(m=>({
-      name:m.name,material:m.material?.name,vertices:m.getTotalVertices()})).slice(0,40)
-   }));
    if(oldGun.length===5&&materials.filter(n=>n.includes('Chrome')).length===1&&
       materials.filter(n=>n.includes('TanPlastic')).length===4){
     for(const mesh of oldGun){mesh.setEnabled(false);hiddenSourceGun++;}
-   }else console.warn('American original gun needs source-mesh inspection before hiding');
+   }else throw Error('American original rifle mesh layout changed: cannot safely remove duplicate');
    // Reuse the tested Stage 8 source-hand skin material calibration.
    const donorSkin=container.materials.find(mat=>
     mat.name.includes('Battlefield_US_Donor_Hands_Skin'));
