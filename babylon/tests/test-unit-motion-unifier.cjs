@@ -76,4 +76,47 @@ assert(fail.ok&&fail.reports.run.status==='native-fallback','Invalid rigs retain
 assert.equal(faulty.clips.get('Kar98k_Run'),all.get('Kar98k_Run'));
 assert(!view.unifiedMotionGroups.get('legs:Kar98k_Run').targetedAnimations.some(t=>/arm|hand|shoulder|spine/i.test(t.target.name)));
 assert.equal(british.targetedAnimations.length,19,'British rig remains untouched');
+// Verify the very same original German GLB run is split in live Babylon
+// squad actors, not merely in the isolated 3D approval range.
+class NativeGroup{
+ constructor(name){this.name=name;this.targetedAnimations=[];this.disposed=false}
+ addTargetedAnimation(animation,target){this.targetedAnimations.push({animation,target})}
+ stop(){this.stopped=true}
+ dispose(){this.disposed=true}
+}
+const source=clip('Kar98k_Run');
+const baseRun=new Map([
+ ['Kar98k_Run',source],['Kar98k_Hold',{name:'source-hold'}],
+ ['MP40_Run',{name:'source-mp40'}]
+]);
+const production={index:12,imported:{skeletons:[skeleton()]},clips:baseRun};
+const installed=motion.installNativeGermanLegRun(production,{
+ B:{AnimationGroup:NativeGroup},scene:{}
+});
+assert(installed.ok&&installed.installed&&installed.joints===7,
+ 'Seven original lower-body tracks are assigned to each real German actor');
+assert.equal(production.nativeGermanFullRun,source,
+ 'Original 65-bone German authored Run must remain accessible');
+assert.equal(production.clips.get('Kar98k_Hold').name,'source-hold');
+assert.equal(production.clips.get('MP40_Run').name,'source-mp40');
+assert(production.clips.get('Kar98k_Run').targetedAnimations.every(t=>
+ /hips|upleg|leg|foot/i.test(t.target.name)),
+ 'Source full-body upper-arm, hand and finger Run animations must not affect IK');
+assert.equal(source.targetedAnimations.length,19,'Source GLB track list must never mutate');
+assert.equal(motion.installNativeGermanLegRun(production,{
+ B:{AnimationGroup:NativeGroup},scene:{}}).installed,false,
+ 'Do not duplicate local motion tracks per actor on repeated scene loads');
+const noSource={clips:new Map(),imported:{skeletons:[skeleton()]},index:13};
+assert.equal(motion.installNativeGermanLegRun(noSource,{
+ B:{AnimationGroup:NativeGroup},scene:{}}).ok,false,
+ 'Missing native source must fail harmlessly and preserve existing gameplay clips');
+const fs=require('node:fs'),sourceGame=fs.readFileSync(
+ require('node:path').join(__dirname,'../game.js'),'utf8');
+assert(sourceGame.includes('unitMotion.installNativeGermanLegRun(view,{B,scene})'),
+ 'German production actors must install their independently authored native legs');
+assert(sourceGame.includes('configureGermanRifleCarry(view,pose)'),
+ 'German production actor must pass weapon state to its attached IK system');
+assert(sourceGame.includes('weaponMotionGripDebug=originalRifle'),
+ 'Only original Kar98k German units may receive the anatomically calibrated curl');
+console.log('BATTLEFIELD_GERMAN_RUN_GAMEPLAY_INTEGRATION_TEST_PASS');
 console.log('BATTLEFIELD_UNIT_MOTION_UNIFIER_TEST_PASS');
