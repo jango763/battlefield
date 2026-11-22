@@ -271,6 +271,10 @@ try{
     // on screen. IK still owns positions; the preview owns only visibility.
     for(const weapon of other.weaponMeshes||[])weapon.setEnabled(selected);
    }
+   state.weaponVisibility=Object.fromEntries([...cache].map(([key,model])=>[
+    key,{total:model.weaponMeshes?.length||0,
+     visible:(model.weaponMeshes||[]).filter(m=>m.isEnabled()).length}
+   ]));
    state.selected=id;
    state.motion='idle';
    play('idle');state.ready=true;
