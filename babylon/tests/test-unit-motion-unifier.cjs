@@ -52,17 +52,19 @@ assert(grip.ok&&grip.clipped&&Math.abs(grip.target.x-.294)<1e-8);
 const made=motion.retarget({B,sourceGroup:german,targetRoot:{},
  skeletons:[skeleton()],tag:'soldier'});
 assert(made.ok&&made.joints>=19,'Valid donor clip must be mapped');
+const reduced=motion.legsOnly(made.group);
+assert(reduced.ok&&reduced.kept===7&&reduced.removed===12,'Donor may drive legs, NEVER the hands');
 const all=new Map(motion.WEAPONS.flatMap(w=>['Run','Hold','Aim','Fire']
  .map(p=>[w+'_'+p,{name:'native-'+w+'-'+p}])));
 const view={root:{},imported:{skeletons:[skeleton()]},clips:all,index:3,
  importedAlliedName:'americanHero'};
 const originalSmg=all.get('MP40_Run'),originalAim=all.get('Kar98k_Aim');
 const result=motion.install(view,{B,germanRun:german,britishReady:british});
-assert(result.ok&&result.transferred===2,'Both donor clips should map');
-assert.equal(view.unifiedMotionReports.run.status,'retargeted');
-assert.equal(view.unifiedMotionReports.ready.status,'retargeted');
+assert(result.ok&&result.transferred===1,'Only donor leg motion should map');
+assert.equal(view.unifiedMotionReports.run.status,'legs-only');
+assert.equal(view.unifiedMotionReports.ready.status,'native-weapon-stance');
 assert.notEqual(view.clips.get('Kar98k_Run').name,'native-Kar98k-Run');
-assert.notEqual(view.clips.get('Kar98k_Hold').name,'native-Kar98k-Hold');
+assert.equal(view.clips.get('Kar98k_Hold').name,'native-Kar98k-Hold','Do not replace American ready and hands with British pose');
 assert.equal(view.clips.get('MP40_Run'),originalSmg,'Preserve SMG authored grip');
 assert.equal(view.clips.get('Kar98k_Aim'),originalAim,'Do not overwrite aim');
 assert.equal(motion.install(view,{B,germanRun:german,britishReady:british}).transferred,0,
@@ -70,6 +72,8 @@ assert.equal(motion.install(view,{B,germanRun:german,britishReady:british}).tran
 const faulty={root:{},imported:{skeletons:[skeleton(['rightarm'])]},index:5,
  importedAlliedName:'britishJakeli',clips:new Map(all)};
 const fail=motion.install(faulty,{B,germanRun:german,britishReady:british});
-assert(fail.ok&&fail.reports.run.status==='fallback','Invalid rigs retain native clips');
+assert(fail.ok&&fail.reports.run.status==='native-fallback','Invalid rigs retain native clips');
 assert.equal(faulty.clips.get('Kar98k_Run'),all.get('Kar98k_Run'));
+assert(!view.unifiedMotionGroups.get('legs:Kar98k_Run').targetedAnimations.some(t=>/arm|hand|shoulder|spine/i.test(t.target.name)));
+assert.equal(british.targetedAnimations.length,19,'British rig remains untouched');
 console.log('BATTLEFIELD_UNIT_MOTION_UNIFIER_TEST_PASS');
