@@ -6,6 +6,8 @@
 (async function(){
 'use strict';
 const B=window.BABYLON, canvas=document.getElementById('view');
+const unitMotion=window.BattlefieldUnitMotionUnifier;
+const nativeBlend=window.BattlefieldNativeClipBlend;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const specs=Object.freeze({
  german:Object.freeze({
@@ -13,7 +15,7 @@ const specs=Object.freeze({
   approval:'ИСХОДНАЯ МОДЕЛЬ УТВЕРЖДЕНА',color:'#a9b7a3',
   clips:{idle:'Kar98k_Hold',walk:'Kar98k_Run',run:'Kar98k_Run',aim:'Kar98k_Aim',fire:'Kar98k_Fire'},
   speeds:{walk:.67,run:1.1,fire:1},
-  warning:'Это исходный анимированный GLB. Комплект немецкой формы, головного убора и оружия из Three.js ещё нужно перенести в Babylon.js.'
+  warning:'Бег ног — исходный немецкий GLB. В беговой стойке Kar98k держится перед грудью, правая и левая кисти используют отдельную настройку хвата. Качество движения требует оценки на iPhone.'
  }),
  american:Object.freeze({
   label:'Американский герой · оригинальная модель',source:'../assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb',
@@ -21,7 +23,7 @@ const specs=Object.freeze({
   clips:{idle:'Idle_Quaternius',walk:'Walk_Quaternius',run:'Jog_Quaternius',
    aim:'Idle_Quaternius',fire:null},
   speeds:{walk:1,run:1,aim:1},
-  warning:'Прицел — пока исходная стойка. Отдельной утверждённой анимации выстрела в этом GLB нет.'
+  warning:'Quaternius отвечает за ноги; готовый контроллер Lee-Enfield отвечает за две руки, пальцы, локти и приклад. Выстрел пока не имеет собственного клипа.'
  }),
  jakeli:Object.freeze({
   label:'Британский пехотинец · George Jakeli',source:'../assets/allied-soldiers/uk-jakeli-battle-lod1.glb',
@@ -32,7 +34,7 @@ const specs=Object.freeze({
  })
 });
 const state=window.__BF_UNIT_REVIEW__={
- ready:false,selected:'german',motion:'idle',error:null,
+ ready:false,selected:'german',motion:'idle',error:null,sharedMotion:false,panelOpen:false,motionReports:{},createdGroups:0,
  realModels:{},approved:{german:true,american:false,jakeli:false},
  trialOnly:true,characters:{},loadedCount:0,skinFailures:[]
 };
@@ -66,10 +68,45 @@ try{
  floorMat.roughness=.98;
  const cache=new Map();
  let active=null,requestIndex=0;
+ function rebuildSharedMotion(){
+  if(!unitMotion)return;
+  const donor=unitMotion.findGroup(cache.get('german')?.clips,'Kar98k_Run');
+  for(const model of cache.values()){
+   model.sharedClips||=new Map();
+   model.sharedReports||={};
+   model.sharedReports.idle={status:'native-weapon-ready',reason:'Hands remain controlled by original soldier rig'};
+   if(model.id==='german'){
+    model.sharedReports.run={status:'native-donor'};
+   }else if(!donor){
+    model.sharedReports.run={status:'pending'};
+   }else if(!model.sharedClips.has('run')){
+    const made=unitMotion.retarget({B,sourceGroup:donor,
+     targetRoot:model.pivot,skeletons:model.container.skeletons,
+     tag:'review-'+model.id+'-legs-run'});
+    if(made.ok){
+     const lower=unitMotion.legsOnly(made.group);
+     if(lower.ok){
+      model.sharedClips.set('run',made.group);
+      model.sharedReports.run={status:'legs-only',joints:lower.kept,protectedChannels:lower.removed};
+      state.createdGroups++;
+     }else{
+      made.group.dispose?.();
+      model.sharedReports.run={status:'native-fallback',reason:lower.reason};
+     }
+    }else model.sharedReports.run={status:'native-fallback',reason:made.reason};
+   }
+   state.motionReports[model.id]=model.sharedReports;
+  }
+ }
+
  const pos=new B.Vector3(0,1.1,0);
  function status(message){$('#status').textContent=message;}
  function error(message){$('#error').style.display='block';$('#error').textContent=message;}
  function groupFor(model,motion){
+  if(model.id==='german'&&motion==='run'&&model.nativeLegsRun)
+   return model.nativeLegsRun;
+  if(state.sharedMotion&&model.sharedClips?.has(motion))
+   return model.sharedClips.get(motion);
   const clip=model.spec.clips[motion];
   if(!clip)return null;
   return model.clips.find(g=>g.name===clip||g.name.replace(/-\d+$/,'')===clip);
@@ -87,9 +124,36 @@ try{
   if(!model)return;
   const clip=groupFor(model,mode);
   if(!clip){status('У '+model.spec.label+' ещё нет утверждённой анимации '+mode);return;}
-  for(const group of model.clips)group.stop();
-  const speed=model.spec.speeds?.[mode]||1;
-  clip.start(mode!=='fire',speed,clip.from,clip.to);
+  const speed=state.sharedMotion&&mode==='run'?1.1:(model.spec.speeds?.[mode]||1);
+  if(nativeBlend){
+   nativeBlend.play(model,clip,mode,{loop:mode!=='fire'});
+   clip.speedRatio=speed;
+  }else{
+   for(const group of [...model.clips,...(model.sharedClips?.values()||[])])group.stop();
+   clip.start(mode!=='fire',speed,clip.from,clip.to);
+  }
+  // The real two-handed rigs work AFTER the native animation and before rendering.
+  // No foreign soldier's arm/shoulder tracks are allowed to fight their IK.
+  if(model.id==='german'&&model.rigState){
+   // Accepted soldier-range running carry is ON by default.
+   // ?runCarry=0 retains the previous A/B path for regression comparison.
+   model.rigState.weaponMotionRunCarryTest=
+    new URLSearchParams(location.search).get('runCarry')!=='0';
+   // Both hands use their measured reverse-X finger hinges only in running
+   // carry; ready/aim/other weapons keep their existing authoring.
+   model.rigState.weaponMotionGripDebug=
+    mode==='run'&&model.rigState.weaponMotionRunCarryTest?'reverseAxisX':null;
+   model.rigState.weaponMotionRun=mode==='run';
+   model.rigState.weaponMotionRightWristMax=
+    Number(new URLSearchParams(location.search).get('rightWristCap')||
+      (mode==='run'&&model.rigState.weaponMotionRunCarryTest?120:55));
+  }
+  if(model.id==='german')
+   model.rigState?.setWeaponPose?.(mode==='run'&&model.rigState?.weaponMotionRunCarryTest?'run':
+    mode==='run'?'ready':
+    mode==='walk'?'run':mode==='aim'?'aim':mode==='fire'?'fire':'ready');
+  if(model.id==='american')
+   model.rig?.setPose?.(mode==='aim'||mode==='fire'?'aim':'ready');
   state.motion=mode;
   state.characters[state.selected].activeClip=clip.name;
   updateButtons();
@@ -97,7 +161,9 @@ try{
   status(model.spec.label+' · '+model.spec.approval+'\n'+
    'Реальная модель: '+c.triangles.toLocaleString('ru-RU')+
    ' треугольников · '+c.skinned+' скелетных сеток · '+c.bones+' костей\n'+
-   'Клип: '+clip.name+' · '+model.spec.warning);
+   'Клип: '+clip.name+' · '+
+   (state.sharedMotion?'Движение: '+JSON.stringify(model.sharedReports?.[mode]||{status:'native'}):'Исходная анимация')+
+   '\n'+model.spec.warning);
  }
  function area(container){
   const meshes=container.meshes.filter(m=>m.getTotalVertices?.()>0);
@@ -144,15 +210,96 @@ try{
    -min.y*scale,-(min.z+max.z)*.5*scale);
   container.addAllToScene();
   for(const clip of clips)clip.stop();
+  let nativeLegsRun=null;
+  if(id==='german'){
+   // Standard combat locomotion layering: the source German RUN drives
+   // ONLY the pelvis and legs. Upper body stays in its own native Kar98k
+   // READY grip. Reusing the whole Run clip on hands pulled the original
+   // rifle down and forced the IK solver to fight animated wrist curves.
+   const authored=unitMotion?.findGroup(clips,'Kar98k_Run');
+   if(!authored||typeof B.AnimationGroup!=='function')
+    throw Error('Не найден исходный немецкий бег для нижнего слоя');
+   const lower=new B.AnimationGroup('native-German-legs-with-Kar98k-ready',scene);
+   for(const track of authored.targetedAnimations||[])
+    lower.addTargetedAnimation(track.animation,track.target);
+   const masked=unitMotion.legsOnly(lower);
+   if(!masked.ok){lower.dispose();throw Error('Нельзя выделить бег ног: '+masked.reason);}
+   lower.stop();nativeLegsRun=lower;
+  }
+  // Preserve ALL source geometry. The reported "second rifle" came from
+  // another soldier's independently loaded weapon, not the US source mesh.
+  let hiddenSourceGun=0;
+  if(id==='american'){
+   // Reuse the tested Stage 8 source-hand skin material calibration.
+   const donorSkin=container.materials.find(mat=>
+    mat.name.includes('Battlefield_US_Donor_Hands_Skin'));
+   if(donorSkin?.albedoColor){
+    donorSkin.albedoColor=new B.Color3(.39,.275,.235);
+    donorSkin.metallic=0;donorSkin.roughness=.95;
+   }
+  }
+  // Reuse the ALREADY WORKING soldier-specific rigs instead of showing bare
+  // animation skeletons or a weaponless American mannequin.
+  const sceneMeshesBeforeRig=new Set(scene.meshes);
+  let rig=null,rigState=null;
+  if(id==='german'){
+   if(typeof window.BattlefieldWeaponRig?.create!=='function')
+    throw Error('Нет штатного немецкого оружейного IK');
+   rigState={combatPose:{active:false,crouch:0}};
+   rig=await window.BattlefieldWeaponRig.create({scene,imported:container,
+    root:pivot,state:rigState,animationDriven:true,bindUI:false,
+    acceptExportSockets:true,initialWeaponId:'de-kar98k',
+    previewNativeArmLayer:new URLSearchParams(location.search).get('previewNativeArmLayer')==='1',
+    previewHandSocketRun:new URLSearchParams(location.search).get('nativeWeaponCarry')==='1',
+    weaponRoot:'../assets/ww2-weapons/'});
+   if(!rigState.weaponRigReady)throw Error('Не удалось собрать руки и Kar98k');
+   // A/B gate only: test the user's previously saved 32-parameter Kar98k
+   // grip without mutating the original GLB or overwriting production IK.
+   const requestedPreset=new URLSearchParams(location.search).get('testedHandPreset');
+   if(requestedPreset==='1'||requestedPreset==='rightOnly'){
+    const response=await fetch('animstudio-preview/presets/kar98k-user-v2.json');
+    if(!response.ok)throw Error('Сохранённый мастер-хват Kar98k не найден');
+    const saved=await response.json();
+    if(saved.model!=='approved-panzergrenadier'||saved.weapon!=='Kar98k'||
+       Object.keys(saved.profile||{}).length!==32)
+      throw Error('Неожиданное содержимое сохранённой позы Kar98k');
+    if(typeof rigState.setMasterPose!=='function')
+      throw Error('Студия мастер-хвата отключена');
+    const profile=requestedPreset==='rightOnly'
+      ?Object.fromEntries(Object.entries(saved.profile).filter(([key])=>key.startsWith('right')))
+      :saved.profile;
+    rigState.setMasterPose(profile);
+    state.handPresetTest='kar98k-user-v2-'+requestedPreset;
+   }
+  }
+  if(id==='american'){
+   if(typeof window.BattlefieldUSLeeEnfieldStage4?.create!=='function')
+    throw Error('Нет американского контроллера двух рук');
+   rig=await window.BattlefieldUSLeeEnfieldStage4.create({
+    scene,imported:container,stage:pivot,weaponRoot:'../assets/ww2-weapons/'});
+   if(!rig?.report?.ready)throw Error('Не удалось собрать американца с винтовкой');
+  }
+  // Weapon meshes are created by their separate controllers under scene
+  // roots, NOT under the original character pivot. Preserve ownership so
+  // switching a character cannot leave a floating gun from a previous unit.
+  const weaponMeshes=scene.meshes.filter(m=>
+   !sceneMeshesBeforeRig.has(m)&&m.getTotalVertices?.()>0);
   const triangles=meshes.reduce((sum,m)=>
    sum+Math.round((m.getTotalIndices?.()||m.getTotalVertices())/3),0);
   const data={id,spec,container,pivot,clips,skinned:skinned.length,bones,triangles,
+   rig,rigState,rigReady:id==='jakeli'||!!rig,nativeLegsRun,hiddenSourceGun,weaponMeshes,
    textures:container.textures?.length||0};
   cache.set(id,data);
+  rebuildSharedMotion();
   state.realModels[id]=true;
   state.characters[id]={source:spec.source,skinned:skinned.length,
    skeletons:skel.length,bones,triangles,clips:clips.map(g=>g.name),activeClip:null,
-   approved:state.approved[id],hasFallback:false};
+   approved:state.approved[id],hasFallback:false,
+   assembled:id==='german'?'original soldier + German weapon rig + Kar98k':
+    id==='american'?'original US skin + Quaternius + Lee-Enfield hand IK':
+     'original British skin + native ready/weapon',
+   rigReady:data.rigReady,hiddenSourceGun:data.hiddenSourceGun,
+   weaponMeshCount:data.weaponMeshes.length};
   state.loadedCount=cache.size;
   return data;
  }
@@ -165,11 +312,22 @@ try{
    const model=await load(id);
    if(ticket!==requestIndex)return;
    if(active) {
-    for(const clip of active.clips)clip.stop();
+    nativeBlend?.stop(active);
+    for(const clip of [...active.clips,...(active.sharedClips?.values()||[])])clip.stop();
     active.pivot.setEnabled(false);
    }
    active=model;
-   for(const [key,other] of cache)other.pivot.setEnabled(key===id);
+   for(const [key,other] of cache){
+    const selected=key===id;
+    other.pivot.setEnabled(selected);
+    // A disabled character must never leave its independently mounted gun
+    // on screen. IK still owns positions; the preview owns only visibility.
+    for(const weapon of other.weaponMeshes||[])weapon.setEnabled(selected);
+   }
+   state.weaponVisibility=Object.fromEntries([...cache].map(([key,model])=>[
+    key,{total:model.weaponMeshes?.length||0,
+     visible:(model.weaponMeshes||[]).filter(m=>m.isEnabled()).length}
+   ]));
    state.selected=id;
    state.motion='idle';
    play('idle');state.ready=true;
@@ -182,10 +340,29 @@ try{
   }finally{$$('[data-unit]').forEach(b=>b.disabled=false);updateButtons();}
  }
  $$('[data-unit]').forEach(b=>b.addEventListener('click',()=>void select(b.dataset.unit)));
- $$('[data-motion]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.motion)));
+ document.querySelectorAll('[data-motion]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.motion))); // animated unit controls
+ const toggleControls=$('#toggle-controls'),controlsBody=$('#controls-body'),panel=$('#control');
+ function setPanel(open){
+  state.panelOpen=!!open;
+  panel.classList.toggle('open',state.panelOpen);
+  controlsBody.hidden=!state.panelOpen;
+  toggleControls.setAttribute('aria-expanded',String(state.panelOpen));
+  toggleControls.textContent=state.panelOpen?'Скрыть управление':'Показать управление';
+ }
+ toggleControls.addEventListener('click',()=>setPanel(!state.panelOpen));
+ setPanel(false); // Opening the range never hides the legs behind a giant menu.
+ $('#motion-standard').addEventListener('click',()=>{
+  state.sharedMotion=!state.sharedMotion;
+  $('#motion-standard').setAttribute('aria-pressed',String(state.sharedMotion));
+  $('#motion-standard').textContent='Перенос бега: '+(state.sharedMotion?'ТЕСТ ВКЛ':'ВЫКЛ');
+  if(active)play(state.motion);
+ });
  window.__BF_UNIT_REVIEW_ACT__={select,play,
-  getLoaded:()=>[...cache.keys()],getScene:()=>scene};
- engine.runRenderLoop(()=>{scene.render();});
+  getLoaded:()=>[...cache.keys()],getScene:()=>scene,getModel:id=>cache.get(id)};
+ engine.runRenderLoop(()=>{
+  if(active)nativeBlend?.update(active,Math.max(0,Math.min(.1,engine.getDeltaTime()/1000)));
+  scene.render();
+ });
  window.addEventListener('resize',()=>engine.resize());
  await select(new URLSearchParams(location.search).get('unit')||'german');
 }catch(e){state.error=String(e?.message||e);error(state.error);console.error('Battlefield unit lab',e);}

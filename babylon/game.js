@@ -19,6 +19,7 @@ const villageModels=window.BattlefieldModernVillageModels;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
 const nativeBlend=window.BattlefieldNativeClipBlend;
+const unitMotion=window.BattlefieldUnitMotionUnifier;
 const alliedModels=window.BattlefieldAlliedModels;
 const alliedLoader=window.BattlefieldAlliedAssetLoader;
 const characters=window.BattlefieldCharacterSources;
@@ -66,10 +67,29 @@ const NATIVE_POSES=Object.freeze({
 
 const state={ready:false, loading:true, error:null, models:0, clips:0,
  scenario:'squads',atBase:true,selected:'Kar98k',focus:null, fps:0,
- importedAlliedCount:0,modelErrors:{},alliedManifest:null,actorSources:{}};
+ importedAlliedCount:0,modelErrors:{},alliedManifest:null,actorSources:{},unitMotionReports:{}};
 window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
 let modelDepot=null;
+const motionDonors={germanRun:null,britishReady:null};
+// Cross-rig locomotion failed visual acceptance in the isolated soldier range.
+// Keep native authored clips in gameplay unless deliberately reviewing that
+// experimental branch with a URL flag. Never silently ship stiff donor legs.
+const DONOR_RUN_RESEARCH=new URLSearchParams(location.search).get('experimentalDonorRun')==='1';
+function promoteUnitMotion(view){
+ if(!unitMotion||!view||!DONOR_RUN_RESEARCH)return;
+ const previous=view.clip,pose=view.lastPose;
+ try{
+  const result=unitMotion.install(view,{B,...motionDonors});
+  state.unitMotionReports[view.index]=result.reports||{error:result.reason};
+  if(pose&&view.unit&&view.clips.get(view.weapon+'_'+CLIP_POSES[pose])!==previous)
+   setClip(view,pose);
+ }catch(error){
+  state.unitMotionReports[view.index]={error:String(error?.message||error)};
+  console.warn('Infantry motion fallback',view.index,error);
+ }
+}
+
 let actors=new Map(),fx=[],scenario='squads',atBase=true,world=null;
 let replenisher=null,reinforcementEpoch=0;
 const REINFORCEMENT_LIMIT=8;
@@ -291,6 +311,7 @@ async function ensureUnitsUnlocked(scenarioName){
   $('loading').textContent='Загружаю анимированного немецкого стрелка…';
   asset=await B.SceneLoader.LoadAssetContainerAsync(
    './animstudio-preview/models/','all-combat-run.glb',scene);
+  motionDonors.germanRun=unitMotion?.findGroup(asset.animationGroups,'Kar98k_Run')||null;
   if(asset.animationGroups.length<16)
    throw Error('В GLB отсутствуют 16 согласованных боевых анимаций');
  }
@@ -321,6 +342,12 @@ async function ensureUnitsUnlocked(scenarioName){
     console.error('Allied licensed model rejected',selected,error);
    }
   }
+  // Retarget Jakeli READY only after its original native rig is available.
+  if(externalModel?.modelId==='britishJakeli'&&!motionDonors.britishReady){
+   motionDonors.britishReady=unitMotion?.findGroup(externalModel.entries.animationGroups,'Ready')||null;
+   if(motionDonors.britishReady)for(const previous of views.filter(Boolean))
+    promoteUnitMotion(previous);
+  }
   // No invented download: if the original licensed file is missing, only
   // the explicitly labelled pre-existing prototype is available.
   // Record the real GLB identity (or a clearly marked fallback) per squad slot.
@@ -328,6 +355,7 @@ async function ensureUnitsUnlocked(scenarioName){
    const entries=externalModel?.entries||asset.instantiateModelsToScene(
    name=>name,false,{doNotInstantiate:true});
   const view=unitVisual(i,entries,{externalModel});
+  promoteUnitMotion(view);
   if(view.faction==='british'&&!externalModel){
    // These are ORIGINAL procedural placeholders, not new skins. Commando
    // stays blocked until its previously selected source is actually acquired.
