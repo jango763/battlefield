@@ -74,9 +74,7 @@ function frame(){
  // Adaptive GPU resolution affects graphics only: simulation, targeting,
  // ballistics, UI hit targets and all native skeleton animations stay fixed.
  if(renderQuality.mode==='auto'&&gameStarted){
-  // Quality must react to REAL frame time even when simulation delta is
-  // clamped during a mobile FPS drop.
-  renderQuality.fpsElapsed+=Math.min(1,Math.max(0,engine.getDeltaTime()/1000));
+  renderQuality.fpsElapsed+=Math.min(1,Math.max(0,engine.getDeltaTime()/1000)); // real frame time
   if(renderQuality.fpsElapsed>=3){
    renderQuality.fpsElapsed=0;
    const fps=engine.getFps();
