@@ -118,6 +118,33 @@
    return {ok:false,reason:'Incomplete animated leg chain',removed};
   return {ok:true,kept:group.targetedAnimations.length,removed};
  }
+ // Production-safe same-rig locomotion split: duplicate only the SOURCE
+ // group's approved leg channels. Do not retarget across factions and never
+ // let the rifle carry be controlled by the source's authored wrist tracks.
+ function installNativeGermanLegRun(view,{B,scene}={}){
+  if(!view?.clips||!view?.imported?.skeletons||!B?.AnimationGroup||!scene)
+   return {ok:false,reason:'Incomplete independent German actor or scene'};
+  if(view.nativeGermanLegsRun)return {ok:true,installed:false,group:view.nativeGermanLegsRun};
+  const source=view.clips.get('Kar98k_Run');
+  if(!source?.targetedAnimations?.length)
+   return {ok:false,reason:'Missing original German rifle run'};
+  const isolated=new B.AnimationGroup('german-native-legs-'+view.index,scene);
+  try{
+   for(const ta of source.targetedAnimations)
+    isolated.addTargetedAnimation(ta.animation,ta.target);
+   const mask=legsOnly(isolated);
+   if(!mask.ok){isolated.dispose();return {ok:false,reason:mask.reason};}
+   isolated.stop();
+   view.nativeGermanLegsRun=isolated;
+   view.nativeGermanFullRun=source;
+   view.clips.set('Kar98k_Run',isolated);
+   return {ok:true,installed:true,group:isolated,
+    joints:mask.kept,protectedChannels:mask.removed};
+  }catch(error){
+   isolated.dispose();
+   return {ok:false,reason:String(error?.message||error)};
+  }
+ }
  // Each actor owns a different rig. Do not replace READY with an unrelated
  // soldier's upper-body pose: the weapon/hand controller owns that stance.
  function install(view,{B,germanRun}={}){
@@ -159,5 +186,5 @@
   return {ok:true,transferred:1,family,reports:view.unifiedMotionReports};
  }
  return Object.freeze({REQUIRED,WEAPONS,canonical,sourceName,findGroup,
-  targetRig,armReach,clampGrip,retarget,legsOnly,install});
+  targetRig,armReach,clampGrip,retarget,legsOnly,installNativeGermanLegRun,install});
 });
