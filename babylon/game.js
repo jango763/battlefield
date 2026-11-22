@@ -809,7 +809,9 @@ function drawMiniMap(econ){
  if(!map)return;
  const c=map.getContext('2d');
  if(!c)return;
- const W=map.width,H=map.height;
+ // Draw logical 116px into a higher-DPI canvas for readable iPhone map.
+ const W=116,H=116,dpi=map.width/W;
+ c.setTransform(dpi,0,0,dpi,0,0);
  const xy=(x,z)=>[x/300*W,H-z/300*H];
  c.fillStyle='#303b2c';c.fillRect(0,0,W,H);
  c.strokeStyle='#786b4c';c.lineWidth=4;
@@ -852,6 +854,7 @@ function drawHud(){
  const inventory=hero.weapon==='Kar98k'?null:hero.inventory[hero.weapon];
  const funds=battle.getFunds();
  const econ=economy?.summary();
+ const mission=advanceObjectives(hero,econ);
  const central=econ?.central;
  const left=central?.started?Math.ceil(central.remainingSeconds):0;
  const timerLabel=central?.open?'ОТКРЫТА':
@@ -881,6 +884,9 @@ function drawHud(){
    ' · самостоятельные 🔵 '+(state.firstGameArmy?.autonomousBlue||0)+
    ' / 🔴 '+(state.firstGameArmy?.autonomousRed||0)+
   '\nВыстрелы героя: '+hero.shots+' · поражено: '+hero.kills+
+  '\nЗадача: '+mission.current+
+   (mission.finished?' ✓':' · '+Math.min(mission.progress,mission.target)+
+    '/'+mission.target)+' · награды: '+mission.completed+'/'+mission.total+
   (state.reinforcements?'\nПополнение каждые 1,4 с · лимит '+REINFORCEMENT_LIMIT+' на сторону'+
     '\nЗа бой прибыло: 🔵 '+state.reinforcements.totalBlueReinforced+
     ' · 🔴 '+state.reinforcements.totalRedReinforced:'')+
