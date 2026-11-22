@@ -116,6 +116,18 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
     },fighter);
     console.log('BATTLEFIELD_GAIT_FRAME',JSON.stringify({...report,label}));
     if(fighter==='german'){
+     const spine=await page.evaluate(()=>{
+      const status=window.__BF_UNIT_REVIEW__;
+      const model=window.__BF_UNIT_REVIEW_ACT__.getModel('german');
+      const t=model.nativeLegsRun?.targetedAnimations?.find(t=>
+        window.BattlefieldUnitMotionUnifier.canonical(t.target?.name)==='spine');
+      return {state:status.germanSpineMotion,tracks:model.nativeLegsRun.targetedAnimations.length,
+       target:t?.target?.name,quat:t?.target?.rotationQuaternion?.asArray()};
+     });
+     console.log('BATTLEFIELD_GERMAN_SPINE_CURVE',JSON.stringify({...spine,label}));
+     assert.equal(spine.state?.status,'authored-damped',
+      'Use actual authored German spine motion, not procedural/no-op animation');
+     assert(spine.state?.frames>2 && spine.tracks>=8);
      assert.equal(report.clip,'native-German-legs-with-Kar98k-ready',
       'Whole-body German run must never overwrite the rifle holding wrists');
      assert(report.rightGripMeters<=.035 && report.leftGripMeters<=.035,
