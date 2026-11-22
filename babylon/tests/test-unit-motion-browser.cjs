@@ -9,7 +9,7 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
  const errors=[];page.on('pageerror',e=>errors.push(String(e)));
  page.on('console',msg=>{if(msg.text().includes('BATTLEFIELD_US_GUN_MESH_CANDIDATES'))console.log(msg.text())});
  try{
-  await page.goto('http://127.0.0.1:8858/babylon/units-first.html?gripStudio=1&testedHandPreset=rightOnly',
+  await page.goto('http://127.0.0.1:8858/babylon/units-first.html?previewNativeArmLayer=1',
    {waitUntil:'domcontentloaded',timeout:60000});
   // Mobile visual acceptance gate: the 3D canvas must have space for the
   // COMPLETE soldier before the user taps anything. The bottom controls are
