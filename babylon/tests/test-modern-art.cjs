@@ -46,12 +46,12 @@ for(const obj of Object.values(villages.models)){
 }
 
 assert(art.includes("pbr('warped-timber','wood'"));
-assert(art.includes("world.ground.material=mud"));
-assert(art.includes("tex.uScale=1.6;tex.vScale=45"),'Road photographs must not stretch lengthwise');
+assert(art.includes("world.ground.material=smoothEarth"),'Ground must avoid photo-grain shimmer');
+assert(art.includes("road.albedoTexture=null;road.bumpTexture=null"),'Roads must avoid high-frequency moire');
 assert(art.includes("mesh.name.startsWith('rut-')"),'Remove toy-like raised tracks');
 assert(art.includes("circle.isVisible=false"),'Hide giant screen-covering base circles');
-assert(game.includes("camera=new B.ArcRotateCamera('camera',Math.PI*1.5,1.18,14"),
- 'Camera must show more forward world depth');
+assert(game.includes("camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.96,23"),
+ 'Camera must retain the elevated tactical profile');
 assert(art.includes("mesh.skeleton"),'Never rewrite soldier rig materials');
 console.log('BATTLEFIELD_MODERN_ART_STATIC_PASS',{
  scannedMaterialSets:5,textureMaps:10,realPBR:true,
