@@ -1,3 +1,23 @@
+  c.strokeStyle='#fff6d0';c.lineWidth=1.6;
+  c.beginPath();c.arc(x,y,4.1,0,Math.PI*2);c.stroke();
+ }
+}
+function drawHud(){
+ if(!state.ready||!battle||!controller)return;
+ const hero=findActor();
+ const snap=controller.snapshot();
+ state.firstGameArmy=fieldOrders?.snapshot()||null;
+ state.heroPosition={x:hero.x,z:hero.z};
+ state.cameraPosition=camera?{radius:camera.radius,alpha:camera.alpha,
+  beta:camera.beta,targetX:camera.target.x,targetZ:camera.target.z}:null;
+ const inventory=hero.weapon==='Kar98k'?null:hero.inventory[hero.weapon];
+ const funds=battle.getFunds();
+ const econ=economy?.summary();
+ const mission=advanceObjectives(hero,econ);
+ const central=econ?.central;
+ const left=central?.started?Math.ceil(central.remainingSeconds):0;
+ const timerLabel=central?.open?'ОТКРЫТА':
+  central?.started?'Откроется через '+String(Math.floor(left/60)).padStart(2,'0')+
    ':'+String(left%60).padStart(2,'0'):
    'ЗАКРЫТА — ждём гибель первого бота';
  $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
@@ -93,31 +113,10 @@ function resupplyHero(){
  drawHud();
 }
 function registerUI(){
- document.querySelectorAll('[data-scenario]').forEach(button=>
-  button.addEventListener('click',()=>chooseScenario(button.dataset.scenario)));
- document.querySelectorAll('[data-weapon]').forEach(button=>
-  button.addEventListener('click',()=>chooseGun(button.dataset.weapon)));
- $('fight').addEventListener('click',()=>{
-  const hero=findActor();
-  if(!hero?.alive){alertStatus('Герой погиб. Нажмите «Сброс».');return;}
-  if(atBase){
-   const result=controller.start();
-   if(!result.ok){alertStatus('Бой не начат: '+result.reason);return;}
-   atBase=false;state.atBase=false;alertStatus('Продолжаем бой. Коснитесь земли для движения героя.');
-  }else{
-   controller.stop();atBase=true;state.atBase=true;
-   alertStatus('Пауза: доступна смена оружия и пополнение БК.');
-  }
-  drawHud();
+ const camButton=$('camera-toggle');
+ if(camButton)camButton.addEventListener('click',()=>{
+  const next=cameraProfile.id==='tactical'?'classic':'tactical';
+  cameraProfile=tacticalCamera.configure(camera,{profile:next});
+  state.cameraProfile=cameraProfile.id;
+  camButton.textContent='Камера: '+(next==='tactical'?'тактическая':'близкая');
  });
- $('reset').addEventListener('click',()=>{
-  setup(scenario);
-  const start=controller.start();
-  if(start.ok){atBase=false;state.atBase=false;}
-  alertStatus('Новый бой. Выбирайте направление движения касанием земли.');
-  drawHud();
- });
- $('supply').addEventListener('click',resupplyHero);
- $('order-move').addEventListener('click',()=>{
-  inputMode='move';
-  $('order-move').setAttribute('aria-pressed','true');
