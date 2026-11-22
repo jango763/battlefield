@@ -1,3 +1,4 @@
+ for(const i of slots){
   if(views[i])continue;
   $('loading').textContent='Загружаю бойцов: '+state.models+'/'+slots.length+
    ' · создание №'+(i+1);
@@ -128,4 +129,3 @@ async function processWeaponQueue(){
      // Sample after the IK render observer has run. A numerical PASS does
      // not replace the final close-up visual acceptance on iPhone.
      const assessment=modelDepot.gripAssessment(rig.weaponRig,
-      weaponAsset(view,wanted));

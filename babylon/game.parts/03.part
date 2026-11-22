@@ -1,3 +1,4 @@
+ });
  engine.runRenderLoop(frame);
  window.addEventListener('resize',()=>engine.resize());
 }
@@ -128,4 +129,3 @@ async function ensureUnitsUnlocked(scenarioName){
    state.engineering.assetRetries++;
   }
  }
- for(const i of slots){

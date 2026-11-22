@@ -1,3 +1,4 @@
+      weaponAsset(view,wanted));
      view.gripStatus=assessment;
      if(!assessment.ok)console.warn('Allied hand sockets pending QA',
       view.importedAlliedName,assessment.reason);
@@ -128,4 +129,3 @@ function setup(scenarioName){
  const [ours,theirs]=SCENARIOS[scenario];
  economy=goldRules.create({onEvent:event=>{
   if(event.type==='central-countdown-start')
-   alertStatus('Первый бот погиб! До открытия центральной фермы — 05:00.');

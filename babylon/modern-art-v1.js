@@ -78,11 +78,11 @@ function apply({scene,B,world,camera,sun,map}){
  canvasGround.width=canvasGround.height=512;
  const brush=canvasGround.getContext('2d');
  if(!brush)throw Error('No terrain painting context');
- brush.fillStyle='#64734f';brush.fillRect(0,0,512,512);
+ brush.fillStyle='#586d49';brush.fillRect(0,0,512,512);
  for(let i=0;i<230;i++){
   const x=between(0,512),y=between(0,512);
   const radius=between(14,50);
-  brush.globalAlpha=between(.065,.15);
+  brush.globalAlpha=between(.12,.25);
   brush.fillStyle=choose(['#8b8768','#4b654a','#8d8265','#596746','#a08a68']);
   brush.beginPath();
   brush.ellipse(x,y,radius*between(.7,1.6),radius*between(.45,1.15),
@@ -99,12 +99,12 @@ function apply({scene,B,world,camera,sun,map}){
   gradient.addColorStop(1,hex.replace('ALPHA','0'));
   brush.fillStyle=gradient;brush.fillRect(px-rr,pz-rr,rr*2,rr*2);
  }
- for(let i=0;i<165;i++){
+ for(let i=0;i<330;i++){
   const x=between(3,297),z=between(3,297);
   if(Math.abs(x-150)<7||Math.abs(z-150)<7)continue;
   earthWash(x,z,between(7,22),
    choose(['rgba(43,65,35,ALPHA)','rgba(115,91,56,ALPHA)','rgba(95,102,62,ALPHA)']),
-   between(.06,.16));
+   between(.11,.29));
  }
  // Continuous dusty road margins avoid a blank straight brown runway.
  for(let z=20;z<281;z+=7)for(const side of [-1,1]){
@@ -128,7 +128,7 @@ function apply({scene,B,world,camera,sun,map}){
  terrainTexture.updateSamplingMode(B.Texture.TRILINEAR_SAMPLINGMODE);
  const smoothEarth=new B.PBRMaterial('hd2026-matte-terrain',scene);
  smoothEarth.albedoTexture=terrainTexture;
- smoothEarth.albedoColor=B.Color3.FromHexString('#e3ddc2');
+ smoothEarth.albedoColor=B.Color3.FromHexString('#bac4a6');
  smoothEarth.metallic=0;smoothEarth.roughness=1;smoothEarth.specularIntensity=0;
  const oldGround=world.ground.material;
  world.ground.material=smoothEarth;
@@ -427,6 +427,20 @@ function apply({scene,B,world,camera,sun,map}){
    buf.push(...m.asArray());
    report.shrubInstances=(report.shrubInstances||0)+1;
   }
+  // Deliberately place a few continuous roadside clumps in the starting
+  // camera corridor. Uniformly random global scatter looked empty at play.
+  for(let i=0;i<(lowPower?140:230);i++){
+   const side=i%2?1:-1;
+   const x=150+side*between(8.4,24.5),z=between(18,282);
+   if(map.farms.some(f=>Math.hypot(f.x-x,f.z-z)<10))continue;
+   if(map.bases.some(b=>Math.hypot(b.x-x,b.z-z)<24))continue;
+   const w=between(.65,1.85);
+   const m=B.Matrix.Compose(new B.Vector3(w*1.7,w*.74,w*1.2),
+    B.Quaternion.FromEulerAngles(0,between(0,Math.PI*2),0),
+    pos(x,w*.38,z));
+   buf.push(...m.asArray());
+   report.shrubInstances++;
+  }
   if(buf.length){
    shrubs.thinInstanceSetBuffer('matrix',new Float32Array(buf),16,true);
    shrubs.thinInstanceRefreshBoundingInfo();
@@ -441,7 +455,7 @@ function apply({scene,B,world,camera,sun,map}){
  }
  const config=scene.imageProcessingConfiguration;
  if(config){config.toneMappingEnabled=true;config.exposure=.96;config.contrast=1.105;}
- report.colorGrade='muted-olive-earth-v2';
+ report.colorGrade='muted-olive-earth-v3';
  report.mipmappedScans=true;report.opaqueHedgerows=true;
  report.ready=true;
  scene.metadata=scene.metadata||{};

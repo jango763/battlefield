@@ -1,3 +1,4 @@
+   alertStatus('Первый бот погиб! До открытия центральной фермы — 05:00.');
   if(event.type==='central-open')
    alertStatus('ЦЕНТРАЛЬНАЯ ФЕРМА ОТКРЫТА! Захватите её ради большого золота.');
  }});
@@ -128,4 +129,3 @@ function drawShot({unit,target,result,mount}){
  const start=mount?position({x:mount.x+Math.sin(mount.yaw)*1.65,z:mount.z+Math.cos(mount.yaw)*1.65},1.3):Array.isArray(muzzle)&&muzzle.length===3 ?
   new B.Vector3(...muzzle):source.anchor.position.add(new B.Vector3(0,1.5,0));
  const impact=result.impact?position(result.impact,.7):
-  targetView.anchor.position.add(new B.Vector3(0,1.15,0));

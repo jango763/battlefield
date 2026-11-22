@@ -58,10 +58,11 @@ function createWorld(){
  // Babylon map's northern direction is +Z, so stand behind the blue hero.
  // A higher, wider tactical view keeps the hero readable while exposing cover.
  // Keep the original north-up fixed bearing; thumbstick never turns the camera.
- camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.96,23,
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.88,29,
   new B.Vector3(0,1,-107),scene);
- camera.lowerRadiusLimit=22;camera.upperRadiusLimit=24;
- camera.lowerBetaLimit=.92;camera.upperBetaLimit=1.02;
+ camera.lowerRadiusLimit=27.5;camera.upperRadiusLimit=31;
+ camera.lowerBetaLimit=.83;camera.upperBetaLimit=.93;
+ camera.fov=.92;
  state.cameraProfile={mode:'elevated-tactical-follow',radius:camera.radius,
   beta:camera.beta,alpha:camera.alpha};
  camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
@@ -128,4 +129,3 @@ function createWorld(){
     alertStatus('Приказ: двигаться. Отряд следует за героем.');
    }
   }
- });

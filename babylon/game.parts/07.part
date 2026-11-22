@@ -1,3 +1,4 @@
+  targetView.anchor.position.add(new B.Vector3(0,1.15,0));
  if(!result.hit&&!result.impact)impact.z+=(Math.random()-.5)*1.4;
  if(result.phase!=='impact')drawTracer(start,impact,result.weapon==='Panzerschreck'?color('#ff9945'):
   color(unit.team==='свои'?'#ffe5a0':'#ff866f'),
@@ -128,4 +129,3 @@ function drawHud(){
  const timerLabel=central?.open?'ОТКРЫТА':
   central?.started?'Откроется через '+String(Math.floor(left/60)).padStart(2,'0')+
    ':'+String(left%60).padStart(2,'0'):
-   'ЗАКРЫТА — ждём гибель первого бота';

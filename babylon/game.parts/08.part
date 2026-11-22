@@ -1,3 +1,4 @@
+   'ЗАКРЫТА — ждём гибель первого бота';
  $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
  $('supply').disabled=!atBase||!hero.alive;
  $('reload-manual').disabled=!hero.alive||hero.weapon==='Kar98k'||

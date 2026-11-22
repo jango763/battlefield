@@ -51,7 +51,7 @@ assert(art.includes("road.albedoTexture=roadTexture"),'Roads must use coarse pai
 assert(art.includes("makeOrganicRoad('north-south',true"),'Road edge should be organic');
 assert(art.includes("mesh.name.startsWith('rut-')"),'Remove toy-like raised tracks');
 assert(art.includes("circle.isVisible=false"),'Hide giant screen-covering base circles');
-assert(game.includes("camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.96,23"),
+assert(game.includes("camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.88,29"),
  'Camera must retain the elevated tactical profile');
 assert(art.includes("mesh.skeleton"),'Never rewrite soldier rig materials');
 console.log('BATTLEFIELD_MODERN_ART_STATIC_PASS',{
