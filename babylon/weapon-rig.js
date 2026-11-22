@@ -490,7 +490,9 @@
       const rightHand = side === 'Right';
       // Research-only runtime A/B of the real knuckle hinge axis. The rest
       // pose, GLB and production finger curl are NEVER overwritten.
-      const gripMode=rightHand?(state.weaponMotionGripDebug||gripDebug):gripDebug;
+      // Actual close-up showed BOTH hands must curl around the correct hinge;
+      // leaving the support hand on the old Z axis leaves its fingers dangling.
+      const gripMode=state.weaponMotionGripDebug||gripDebug;
       for (const digit of ['Thumb','Index','Middle','Ring','Pinky']) {
         const segments = fingerRoots[side][digit];
         const amount = digit === 'Thumb' ? [-.36,-.38,-.20]
