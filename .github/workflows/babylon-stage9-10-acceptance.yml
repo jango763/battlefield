@@ -1,0 +1,65 @@
+name: Battlefield Babylon stage 9-10 mobile acceptance
+on:
+  push:
+    branches:
+      - experiment/babylon-stage9-10-visual-qa-20261122
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: battlefield-stage9-10-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  engineering:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate modules, all ten source segments, and battlefield mechanics
+        run: |
+          node babylon/tools/assemble-game-parts.cjs --check
+          node --check babylon/game.js
+          node --check babylon/modern-art-v1.js
+          node --check babylon/tactical-field.js
+          node babylon/tests/test-stage9-10-static.cjs
+          node babylon/tests/test-ten-part-engineering.cjs
+          node babylon/tests/test-navigation.cjs
+          node babylon/tests/test-defenses.cjs
+          node babylon/tests/test-emplacements.cjs
+          node babylon/tests/test-tactical-ai.cjs
+          node babylon/tests/test-world-300.cjs
+          node babylon/tests/test-gold-economy.cjs
+          node babylon/tests/test-first-game-behavior.cjs
+  mobile-webgl:
+    needs: engineering
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser engines including WebKit
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/bf-stage910 playwright@1.58.2
+          /tmp/bf-stage910/node_modules/.bin/playwright install --with-deps ${{ matrix.browser }}
+      - name: Assert playable portrait and landscape Battlefield with new defences
+        run: |
+          python3 -m http.server 8877 --bind 127.0.0.1 >/tmp/bf-stage910-server.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-stage9-10-mobile.cjs ${{ matrix.browser }}
+      - name: Keep screenshots, FPS diagnostic, and browser reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlefield-stage9-10-${{ matrix.browser }}
+          path: babylon-qa-results/stage9-10/
+          if-no-files-found: warn
+          retention-days: 14
