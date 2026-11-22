@@ -15,7 +15,7 @@ const specs=Object.freeze({
   approval:'ИСХОДНАЯ МОДЕЛЬ УТВЕРЖДЕНА',color:'#a9b7a3',
   clips:{idle:'Kar98k_Hold',walk:'Kar98k_Run',run:'Kar98k_Run',aim:'Kar98k_Aim',fire:'Kar98k_Fire'},
   speeds:{walk:.67,run:1.1,fire:1},
-  warning:'Это исходный анимированный GLB. Комплект немецкой формы, головного убора и оружия из Three.js ещё нужно перенести в Babylon.js.'
+  warning:'Оригинальная немецкая сетка и 16 боевых клипов. Kar98k установлен отдельным штатным модулем, обе руки удерживают оружие.'
  }),
  american:Object.freeze({
   label:'Американский герой · оригинальная модель',source:'../assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb',
@@ -23,7 +23,7 @@ const specs=Object.freeze({
   clips:{idle:'Idle_Quaternius',walk:'Walk_Quaternius',run:'Jog_Quaternius',
    aim:'Idle_Quaternius',fire:null},
   speeds:{walk:1,run:1,aim:1},
-  warning:'Прицел — пока исходная стойка. Отдельной утверждённой анимации выстрела в этом GLB нет.'
+  warning:'Quaternius отвечает за ноги; готовый контроллер Lee-Enfield отвечает за две руки, пальцы, локти и приклад. Выстрел пока не имеет собственного клипа.'
  }),
  jakeli:Object.freeze({
   label:'Британский пехотинец · George Jakeli',source:'../assets/allied-soldiers/uk-jakeli-battle-lod1.glb',
@@ -70,24 +70,30 @@ try{
  let active=null,requestIndex=0;
  function rebuildSharedMotion(){
   if(!unitMotion)return;
-  const germanRun=unitMotion.findGroup(cache.get('german')?.clips,'Kar98k_Run');
-  const britishReady=unitMotion.findGroup(cache.get('jakeli')?.clips,'Ready');
+  const donor=unitMotion.findGroup(cache.get('german')?.clips,'Kar98k_Run');
   for(const model of cache.values()){
    model.sharedClips||=new Map();
    model.sharedReports||={};
-   for(const [mode,donor,owner] of [
-    ['run',germanRun,'german'],['idle',britishReady,'jakeli']]){
-    if(model.id===owner){model.sharedReports[mode]={status:'native-donor'};continue;}
-    if(!donor){model.sharedReports[mode]={status:'pending'};continue;}
-    if(model.sharedClips.has(mode))continue;
+   model.sharedReports.idle={status:'native-weapon-ready',reason:'Hands remain controlled by original soldier rig'};
+   if(model.id==='german'){
+    model.sharedReports.run={status:'native-donor'};
+   }else if(!donor){
+    model.sharedReports.run={status:'pending'};
+   }else if(!model.sharedClips.has('run')){
     const made=unitMotion.retarget({B,sourceGroup:donor,
      targetRoot:model.pivot,skeletons:model.container.skeletons,
-     tag:'review-'+model.id+'-'+mode});
+     tag:'review-'+model.id+'-legs-run'});
     if(made.ok){
-     model.sharedClips.set(mode,made.group);
-     model.sharedReports[mode]={status:'retargeted',joints:made.joints};
-     state.createdGroups++;
-    }else model.sharedReports[mode]={status:'native-fallback',reason:made.reason};
+     const lower=unitMotion.legsOnly(made.group);
+     if(lower.ok){
+      model.sharedClips.set('run',made.group);
+      model.sharedReports.run={status:'legs-only',joints:lower.kept,protectedChannels:lower.removed};
+      state.createdGroups++;
+     }else{
+      made.group.dispose?.();
+      model.sharedReports.run={status:'native-fallback',reason:lower.reason};
+     }
+    }else model.sharedReports.run={status:'native-fallback',reason:made.reason};
    }
    state.motionReports[model.id]=model.sharedReports;
   }
@@ -124,6 +130,13 @@ try{
    for(const group of [...model.clips,...(model.sharedClips?.values()||[])])group.stop();
    clip.start(mode!=='fire',speed,clip.from,clip.to);
   }
+  // The real two-handed rigs work AFTER the native animation and before rendering.
+  // No foreign soldier's arm/shoulder tracks are allowed to fight their IK.
+  if(model.id==='german')
+   model.rigState?.setWeaponPose?.(mode==='run'||mode==='walk'?'run':
+    mode==='aim'?'aim':mode==='fire'?'fire':'ready');
+  if(model.id==='american')
+   model.rig?.setPose?.(mode==='aim'||mode==='fire'?'aim':'ready');
   state.motion=mode;
   state.characters[state.selected].activeClip=clip.name;
   updateButtons();
@@ -180,16 +193,41 @@ try{
    -min.y*scale,-(min.z+max.z)*.5*scale);
   container.addAllToScene();
   for(const clip of clips)clip.stop();
+  // Reuse the ALREADY WORKING soldier-specific rigs instead of showing bare
+  // animation skeletons or a weaponless American mannequin.
+  let rig=null,rigState=null;
+  if(id==='german'){
+   if(typeof window.BattlefieldWeaponRig?.create!=='function')
+    throw Error('Нет штатного немецкого оружейного IK');
+   rigState={combatPose:{active:false,crouch:0}};
+   rig=await window.BattlefieldWeaponRig.create({scene,imported:container,
+    root:pivot,state:rigState,animationDriven:true,bindUI:false,
+    acceptExportSockets:true,initialWeaponId:'de-kar98k',
+    weaponRoot:'../assets/ww2-weapons/'});
+   if(!rigState.weaponRigReady)throw Error('Не удалось собрать руки и Kar98k');
+  }
+  if(id==='american'){
+   if(typeof window.BattlefieldUSLeeEnfieldStage4?.create!=='function')
+    throw Error('Нет американского контроллера двух рук');
+   rig=await window.BattlefieldUSLeeEnfieldStage4.create({
+    scene,imported:container,stage:pivot,weaponRoot:'../assets/ww2-weapons/'});
+   if(!rig?.report?.ready)throw Error('Не удалось собрать американца с винтовкой');
+  }
   const triangles=meshes.reduce((sum,m)=>
    sum+Math.round((m.getTotalIndices?.()||m.getTotalVertices())/3),0);
   const data={id,spec,container,pivot,clips,skinned:skinned.length,bones,triangles,
+   rig,rigState,rigReady:id==='jakeli'||!!rig,
    textures:container.textures?.length||0};
   cache.set(id,data);
   rebuildSharedMotion();
   state.realModels[id]=true;
   state.characters[id]={source:spec.source,skinned:skinned.length,
    skeletons:skel.length,bones,triangles,clips:clips.map(g=>g.name),activeClip:null,
-   approved:state.approved[id],hasFallback:false};
+   approved:state.approved[id],hasFallback:false,
+   assembled:id==='german'?'original soldier + German weapon rig + Kar98k':
+    id==='american'?'original US skin + Quaternius + Lee-Enfield hand IK':
+     'original British skin + native ready/weapon',
+   rigReady:data.rigReady};
   state.loadedCount=cache.size;
   return data;
  }
