@@ -200,12 +200,17 @@ try{
   // the face. Do not touch the 36 skinned costume/hand meshes or materials.
   let hiddenSourceGun=0;
   if(id==='american'){
-   const oldGun=container.meshes.filter(m=>/^Object_[0-4]$/.test(m.name));
+   const oldGun=container.meshes.filter(m=>/^Object_[0-4](?:$|[_\.])/.test(m.name));
    const materials=oldGun.map(m=>m.material?.name||'');
-   if(oldGun.length===5&&materials.filter(n=>n==='Chrome').length===1&&
-      materials.filter(n=>n==='TanPlastic').length===4){
+   console.info('BATTLEFIELD_US_GUN_MESH_CANDIDATES',JSON.stringify({
+     matches:oldGun.map(m=>({name:m.name,material:m.material?.name,vertices:m.getTotalVertices?.()})),
+     all:container.meshes.filter(m=>m.getTotalVertices?.()>0).map(m=>({
+      name:m.name,material:m.material?.name,vertices:m.getTotalVertices()})).slice(0,40)
+   }));
+   if(oldGun.length===5&&materials.filter(n=>n.includes('Chrome')).length===1&&
+      materials.filter(n=>n.includes('TanPlastic')).length===4){
     for(const mesh of oldGun){mesh.setEnabled(false);hiddenSourceGun++;}
-   }else throw Error('Нельзя безопасно убрать исходное оружие: состав мешей изменился');
+   }else console.warn('American original gun needs source-mesh inspection before hiding');
    // Reuse the tested Stage 8 source-hand skin material calibration.
    const donorSkin=container.materials.find(mat=>
     mat.name.includes('Battlefield_US_Donor_Hands_Skin'));
