@@ -68,6 +68,9 @@ const NATIVE_POSES=Object.freeze({
 const state={ready:false, loading:true, error:null, models:0, clips:0,
  scenario:'squads',atBase:true,selected:'Kar98k',focus:null, fps:0,
  importedAlliedCount:0,modelErrors:{},alliedManifest:null,actorSources:{},unitMotionReports:{}};
+// The diagnostics below are local-only; no paid telemetry or account.
+state.engineering={version:'10-stage-20261122',parts:10,privacy:'local-only',
+ glbFallbacks:0,assetRetries:0,frameStats:{},source:'original-ww2-babylon'};
 window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
 let modelDepot=null;
