@@ -433,7 +433,10 @@ async function processWeaponQueue(){
  weaponWorker=true;
  try{
   while(weaponQueue.length){
-   const view=weaponQueue.shift();
+   // Stream visible guns before reserve models; mobile start stays responsive.
+   const liveIndex=weaponQueue.findIndex(v=>v?.unit?.alive&&!v.rig?.weaponRigReady);
+   const view=liveIndex>=0?weaponQueue.splice(liveIndex,1)[0]:weaponQueue.shift();
+   state.engineering.pendingWeaponAssets=weaponQueue.length;
    if(!view||!view.rig||view.rig.weaponRigReady)continue;
    try{
     const rig=view.rig;
@@ -487,6 +490,7 @@ async function processWeaponQueue(){
       view.importedAlliedName,assessment.reason);
     }
    }catch(error){
+    state.engineering.weaponFailures=(state.engineering.weaponFailures||0)+1;
     // The animated approved soldier stays visible and game logic works.
     view.weaponError=String(error?.message||error);
     console.error('Weapon model for soldier '+(view.index+1),error);
