@@ -42,8 +42,9 @@ const {chromium}=require('/tmp/bf-tactical-camera/node_modules/playwright');
   assert.equal(before.ready,true);assert(before.models>=2);
   assert.equal(before.camera,'tactical');
   assert(before.detail?.ready,'Organic non-pickable map overlay must render');
-  assert(before.detail?.patches>=120&&before.detail.drawCalls===3,
+  assert(before.detail?.patches>=120&&before.detail.drawCalls===4,
    'Terrain plus two shared-mesh roadside detail batches must be generated');
+  assert.equal(before.detail.roadSurface,'two-track-gravel-and-grass');
   assert(before.detail.hedges>=25&&before.detail.stones>=12,
    'The empty hero corridor needs visible rural foliage and rubble');
   assert(before.stickLoaded);
