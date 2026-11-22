@@ -23,10 +23,10 @@
   if(!g)throw Error('No canvas context for organic soil and vegetation');
   g.clearRect(0,0,size,size);
   const palettes=[
-   ['#7d8c65','#6e8059',.31], // dry meadow
-   ['#a4a07c','#b5af8b',.21], // straw
-   ['#4d5c44','#71805b',.27], // undergrowth
-   ['#947a63','#9e856c',.19]  // exposed earth
+   ['#829773','#829671',.48], // dry meadow
+   ['#b3ad87','#b9ae87',.31], // straw
+   ['#59694c','#798a64',.43], // undergrowth
+   ['#9e8a71','#a99675',.24]  // exposed earth
   ];
   let patches=0,roadVerges=0;
   function smear(x,z,rx,rz,primary,secondary,alpha){
@@ -39,7 +39,13 @@
    g.globalAlpha=alpha;g.fillStyle=grad;
    g.beginPath();g.arc(0,0,r,0,Math.PI*2);g.fill();g.restore();
   }
-  const patchBudget=lowPower?115:205;
+  // Broad, soft fields create map-scale contrast beyond repetitive mud.
+  // Main road geometry is higher than this map pigment and stays readable.
+  smear(101,64,43,58,'#728d63','#96a481',.47);
+  smear(207,91,43,54,'#708962','#8d9776',.50);
+  smear(108,197,52,51,'#829570','#b1ad84',.38);
+  smear(214,222,55,52,'#6e805e','#929b79',.47);
+  const patchBudget=lowPower?150:235;
   for(let i=0;i<patchBudget;i++){
    const x=8+random()*284,z=8+random()*284;
    if(map.bases.some(b=>Math.hypot(x-b.x,z-b.z)<17))continue;
@@ -69,7 +75,8 @@
   texture.getContext().drawImage(canvas,0,0);
   texture.hasAlpha=true;texture.update(false);
   const mat=new B.StandardMaterial('battlefield-organic-ground',scene);
-  mat.diffuseTexture=texture;mat.opacityTexture=texture;
+  // Do not double-multiply transparency (alpha from diffuse is sufficient).
+  mat.diffuseTexture=texture;
   mat.useAlphaFromDiffuseTexture=true;
   mat.backFaceCulling=false;mat.disableLighting=true;
   mat.specularColor=B.Color3.Black();
@@ -80,9 +87,48 @@
   surface.material=mat;surface.isPickable=false;
   surface.receiveShadows=false;surface.freezeWorldMatrix();
   surface.metadata={visualOnly:true,noCollision:true,reference:'CoH3-style rural terrain'};
+  // Roadside vegetation/stone piles: low-poly instanced scenery, placed
+  // outside the road. They give the player actual depth and landmarks in the
+  // previously empty 100m corridor. No collision, no shooting interception.
+  let hedges=0,stones=0;
+  const hedgeMat=new B.StandardMaterial('tactical-hedge-leaf',scene);
+  hedgeMat.diffuseColor=B.Color3.FromHexString('#64794d');
+  hedgeMat.specularColor=B.Color3.FromHexString('#101510');
+  const hedge=B.MeshBuilder.CreateSphere('tactical-hedge-master',
+   {diameter:2,segments:7},scene);
+  hedge.position.y=-1000;hedge.material=hedgeMat;
+  hedge.isPickable=false;hedge.checkCollisions=false;
+  const stoneMat=scene.getMaterialByName('hd2026-pitted-stone')||
+   new B.StandardMaterial('tactical-stone-fallback',scene);
+  if(stoneMat.diffuseColor&&!stoneMat.albedoColor)
+   stoneMat.diffuseColor=B.Color3.FromHexString('#8d897a');
+  const rubble=B.MeshBuilder.CreateBox('tactical-road-stone-master',
+   {width:1.1,height:.55,depth:.8},scene);
+  rubble.position.y=-1000;rubble.material=stoneMat;
+  rubble.isPickable=false;rubble.checkCollisions=false;
+  for(const direction of [-1,1]){
+   for(let i=0;i<28;i++){
+    const z=42+i*3.35+(random()-.5)*2;
+    const x=150+direction*(10.5+random()*10);
+    if(map.bases.some(b=>Math.hypot(x-b.x,z-b.z)<18))continue;
+    const shrub=hedge.createInstance('tactical-road-hedge-'+direction+'-'+i);
+    shrub.position.set(x-150,.58+random()*.28,z-150);
+    shrub.scaling.set(.7+random()*.85,.34+random()*.33,.65+random()*.7);
+    shrub.isPickable=false;shrub.checkCollisions=false;
+    hedges++;
+    if(i%2===0){
+     const rock=rubble.createInstance('tactical-road-rubble-'+direction+'-'+i);
+     rock.position.set(x-150+direction*.8,.2,z-150+2.5);
+     rock.rotation.y=random()*Math.PI;
+     rock.scaling.set(.5+random()*.85,.65+random()*.5,.55+random()*.7);
+     rock.isPickable=false;rock.checkCollisions=false;stones++;
+    }
+   }
+  }
   const result={ready:true,style:'tactical-rural-ww2',
    licensedReference:'CC0 Poly Haven ground, original procedurally drawn overlay',
-   canvasSize:size,patches,roadVerges,drawCalls:1,collisionChanges:0,
+   canvasSize:size,patches,roadVerges,hedges,stones,
+   drawCalls:3,collisionChanges:0,
    inputInterception:false};
   scene.metadata=scene.metadata||{};
   scene.metadata.battlefieldOrganicMap=result;
