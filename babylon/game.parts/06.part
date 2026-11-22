@@ -1,3 +1,7 @@
+ economy=goldRules.create({onEvent:event=>{
+  if(event.type==='central-countdown-start')
+   alertStatus('Первый бот погиб! До открытия центральной фермы — 05:00.');
+  if(event.type==='central-open')
    alertStatus('ЦЕНТРАЛЬНАЯ ФЕРМА ОТКРЫТА! Захватите её ради большого золота.');
  }});
  lastEconomyBlue=economy.treasury.blue;
@@ -34,8 +38,9 @@
   u.spawn={x:u.x,z:u.z};
  }
  for(const u of enemies){u.economyTeam='red';u.spawn={x:u.x,z:u.z};}
+ for(const u of [...allies,...enemies]){const safe=world.navigation.nearestFree(u);if(safe){u.x=safe.x;u.z=safe.z;u.spawn={...safe};}}
  fieldOrders=orders.create({hero:allies[0],allies,enemies,
-  farms:economy.farms,
+  farms:economy.farms,navigation:world.navigation,
   centralOpen:()=>economy.summary().central.open,
   onArrive:()=>{if(destinationMark)destinationMark.isVisible=false;}
  });
@@ -118,7 +123,3 @@ function drawShot({unit,target,result}){
  drawTracer(start,impact,result.weapon==='Panzerschreck'?color('#ff9945'):
   color(unit.team==='свои'?'#ffe5a0':'#ff866f'),
   result.weapon==='Panzerschreck'?.24:.095);
- if(result.weapon==='Panzerschreck'){
-  const diameter=combat.WEAPONS.Panzerschreck.blastRadius*UNIT_SCALE*2;
-  const sphere=B.MeshBuilder.CreateSphere('blast',{diameter,segments:10},scene);
-  sphere.position.copyFrom(impact);

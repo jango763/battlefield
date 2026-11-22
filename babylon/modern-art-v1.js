@@ -308,6 +308,8 @@ function apply({scene,B,world,camera,sun,map}){
    const wall=box('ruin-'+index+'-main-'+side,rx+side*wallLength*.35,
     h*.47,rz,ww,h*.95,.52,'battered-plaster');
    wall.rotation.y=between(-.11,.11);
+   const c=Math.abs(Math.cos(wall.rotation.y)),sn=Math.abs(Math.sin(wall.rotation.y));
+   world.addObstacle?.({x:rx+side*wallLength*.35,z:rz,hw:(ww*c+.68*sn)/2,hd:(ww*sn+.68*c)/2,type:'ruin-wall'});
    box('ruin-'+index+'-stone-course-'+side,rx+side*wallLength*.35,
     .45,rz,ww+.1,.86,.68,'pitted-stone');
    for(let j=0;j<2;j++)

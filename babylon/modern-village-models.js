@@ -14,12 +14,13 @@ const PLACES=Object.freeze([
  {asset:'normandy-hay-barn',name:'normandy-hay-store',x:130,z:50,size:10,rotate:-.12},
  {asset:'village-church',name:'stone-church-ruin-backdrop',x:217,z:222,size:11,rotate:Math.PI}
 ]);
-async function install({scene,B,art}){
+async function install({scene,B,art,world}){
  if(!scene||!B||!art)throw Error('Missing historical village scene');
  const output={started:true,loaded:0,pending:PLACES.length,errors:[],assets:[]};
  window.__BF_CC0_VILLAGE__=output;
  for(const place of PLACES){
   let container=null;
+  const blocker=world?.addObstacle?.({x:place.x,z:place.z,hw:place.size*.55,hd:place.size*.55,type:'village-building'});
   try{
    container=await B.SceneLoader.LoadAssetContainerAsync(
     './art/models/',place.asset+'.glb',scene);
@@ -54,6 +55,11 @@ async function install({scene,B,art}){
    outer.scaling.setAll(size);
    outer.position.set(place.x-150,0,place.z-150);
    outer.rotation.y=place.rotate;
+   if(blocker){
+    outer.computeWorldMatrix(true);let lo=new B.Vector3(Infinity,Infinity,Infinity),hi=new B.Vector3(-Infinity,-Infinity,-Infinity);
+    for(const m of real){m.computeWorldMatrix(true);const b=m.getBoundingInfo().boundingBox;lo=B.Vector3.Minimize(lo,b.minimumWorld);hi=B.Vector3.Maximize(hi,b.maximumWorld);}
+    blocker.x=(lo.x+hi.x)/2+150;blocker.z=(lo.z+hi.z)/2+150;blocker.hw=(hi.x-lo.x)/2;blocker.hd=(hi.z-lo.z)/2;world.navigation?.invalidate();
+   }
    output.loaded++;
    output.assets.push({asset:place.asset,triangles:real.reduce((sum,m)=>sum+
       (m.getTotalIndices?.()||0)/3,0),targetMetres:place.size});
@@ -62,6 +68,7 @@ async function install({scene,B,art}){
    output.errors.push({asset:place.asset,message});
    console.warn('Optional CC0 historical GLB fallback:',place.asset,error);
    try{container?.dispose();}catch(_){}
+   if(blocker){blocker.solid=false;world.navigation?.invalidate();}
   }finally{
    output.pending--;
   }

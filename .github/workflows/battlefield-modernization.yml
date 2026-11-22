@@ -1,0 +1,48 @@
+name: Battlefield modernization acceptance
+on:
+  push:
+    branches: ['experiment/battlefield-modernization-20261122']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: battlefield-modernization-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  core:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: |
+          node babylon/tools/assemble-game-parts.cjs --check
+          node --check babylon/game.js
+          node babylon/tests/test-navigation.cjs
+          node babylon/tests/test-world-300.cjs
+          node babylon/tests/test-gold-economy.cjs
+          node babylon/tests/test-central-unlock.cjs
+          node babylon/tests/test-first-game-behavior.cjs
+  mobile:
+    needs: core
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: {browser: [chromium, webkit]}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: |
+          npm install --no-audit --no-fund --prefix /tmp/bf-acceptance playwright@1.58.2
+          /tmp/bf-acceptance/node_modules/.bin/playwright install --with-deps ${{ matrix.browser }}
+      - run: |
+          python3 -m http.server 8877 --bind 127.0.0.1 > /tmp/bf-http.log 2>&1 &
+          node babylon/tests/test-modernization-browser.cjs ${{ matrix.browser }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modernization-${{ matrix.browser }}
+          path: babylon-qa-results/modernization/
+          retention-days: 14

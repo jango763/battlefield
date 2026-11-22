@@ -1,3 +1,7 @@
+ const anchor=new B.TransformNode('soldier-anchor-'+index,scene);
+ const root=new B.TransformNode('approved-animated-rig-'+index,scene);
+ root.parent=anchor;
+ const descendants=[...entries.rootNodes];
  for(const n of entries.rootNodes)descendants.push(...n.getDescendants(false));
  const unique=[...new Set(descendants)];
  const meshes=unique.filter(n=>n instanceof B.AbstractMesh);
@@ -119,7 +123,3 @@ async function ensureUnitsUnlocked(scenarioName){
    const selected=FEATURE_REAL_ALLIES?featureCasting(i):alliedModels.forBlueSlot(i).id;
    try{
     externalModel=await modelDepot.instantiate(selected,i);
-   }catch(error){
-    state.modelErrors[selected]=String(error?.message||error);
-    state.engineering.glbFallbacks++;
-    console.error('Allied licensed model rejected',selected,error);

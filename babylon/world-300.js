@@ -41,12 +41,18 @@ function create(scene,B,map){
  function box(id,w,h,d,x,y,z,m,rot=0,pickable=false){
   const o=B.MeshBuilder.CreateBox(id,{width:w,height:h,depth:d},scene);
   o.position.copyFrom(at(x,z,y,B));o.rotation.y=rot;o.material=m;
-  o.isPickable=pickable;nodes.push(o);return o;
+  o.isPickable=pickable;nodes.push(o);
+  if(/^(barrack-(?!roof)|legacy-ruin-|fence-rail-|sandbag-)/.test(id)){
+   const c=Math.abs(Math.cos(rot)),s=Math.abs(Math.sin(rot));
+   obstacle(x,z,w*c+d*s,d*c+w*s,id);
+   obstacles[obstacles.length-1].blocksSight=!id.startsWith('sandbag-');
+  }
+  return o;
  }
  function cylinder(id,diameter,height,x,y,z,m,tessellation=8){
   const o=B.MeshBuilder.CreateCylinder(id,{diameter,height,tessellation},scene);
   o.position.copyFrom(at(x,z,y,B));o.material=m;o.isPickable=false;
-  nodes.push(o);return o;
+  nodes.push(o);if(id.startsWith('tree-trunk-'))obstacle(x,z,diameter,diameter,'tree');return o;
  }
  function obstacle(x,z,w,d,type){
   obstacles.push({x,z,hw:w/2,hd:d/2,type});
@@ -367,6 +373,7 @@ function create(scene,B,map){
  }
  return {ground,nodes,obstacles,rings,syncFarms,loadOriginalBTR,
   getOriginalWreckCount:()=>originalWrecksLoaded,vehicleBounds,
+  addObstacle:o=>{obstacles.push(o);return o;},
   toScene:(x,z,y=0)=>at(x,z,y,B),
   fromScene:from,
   inBase:(x,z,team,radius=25)=>{

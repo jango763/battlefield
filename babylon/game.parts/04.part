@@ -1,3 +1,7 @@
+   }catch(error){
+    state.modelErrors[selected]=String(error?.message||error);
+    state.engineering.glbFallbacks++;
+    console.error('Allied licensed model rejected',selected,error);
    }
   }
   // Retarget Jakeli READY only after its original native rig is available.
@@ -119,7 +123,3 @@ async function processWeaponQueue(){
      view.gripStatus=assessment;
      if(!assessment.ok)console.warn('Allied hand sockets pending QA',
       view.importedAlliedName,assessment.reason);
-    }
-   }catch(error){
-    state.engineering.weaponFailures=(state.engineering.weaponFailures||0)+1;
-    // The animated approved soldier stays visible and game logic works.

@@ -152,6 +152,7 @@ function createWorld(){
  world=worldBuilder.create(scene,B,goldRules.MAP);
  terrain=world.ground;
  void world.loadOriginalBTR().then(info=>{
+  world.navigation?.invalidate();
   if(info.ok)console.info('Loaded '+info.loaded+' original wrecked armored cars (Tykryk / CC BY 4.0)');
   else console.warn('Vehicle asset fallback in use',info.error);
  });
@@ -180,7 +181,7 @@ function createWorld(){
    state.modernArt=modernArt.apply({scene,B,world,camera,sun,map:goldRules.MAP});
    if(villageModels?.install){
     state.villageModels={started:true,loaded:0,pending:3};
-    void villageModels.install({scene,B,art:state.modernArt}).then(
+    void villageModels.install({scene,B,world,art:state.modernArt}).then(
      result=>{state.villageModels=result},
      error=>{state.villageModels={error:String(error)}});
    }
@@ -188,6 +189,9 @@ function createWorld(){
   catch(error){console.warn('Modern art fallback to native map',error);
    state.modernArt={error:String(error)};}
  }else state.modernArt={profile:'original-babylon',ready:false};
+ world.navigation=window.BattlefieldNavigation.create({obstacles:world.obstacles});
+ state.navigation=world.navigation.stats;
+ state.vehicleBounds=world.vehicleBounds;
  const artTag=$('graphics-tag');
  if(artTag)artTag.textContent=state.modernArt?.ready?'HD 2026 · PBR · CC0':'ORIGINAL · BABYLON';
  // The first game never let a one-finger drag spin the battlefield.
@@ -659,8 +663,9 @@ function setup(scenarioName){
   u.spawn={x:u.x,z:u.z};
  }
  for(const u of enemies){u.economyTeam='red';u.spawn={x:u.x,z:u.z};}
+ for(const u of [...allies,...enemies]){const safe=world.navigation.nearestFree(u);if(safe){u.x=safe.x;u.z=safe.z;u.spawn={...safe};}}
  fieldOrders=orders.create({hero:allies[0],allies,enemies,
-  farms:economy.farms,
+  farms:economy.farms,navigation:world.navigation,
   centralOpen:()=>economy.summary().central.open,
   onArrive:()=>{if(destinationMark)destinationMark.isVisible=false;}
  });

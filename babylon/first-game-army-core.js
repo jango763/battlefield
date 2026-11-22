@@ -14,7 +14,7 @@
  const MAX_GUARDS=6, ENEMY_ALERT=30, FOLLOW_RECRUIT=14, FOLLOW_DROP=32;
  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
  const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
- function create({hero,allies,enemies,farms,centralOpen=()=>false,onArrive=()=>{}}={}){
+ function create({hero,allies,enemies,farms,centralOpen=()=>false,onArrive=()=>{},navigation=null}={}){
   if(!hero||!Array.isArray(allies)||allies[0]!==hero||
      !Array.isArray(enemies)||!Array.isArray(farms)||!farms.length)
    throw Error('Invalid first Battlefield hero/army inputs');
@@ -37,7 +37,8 @@
   function clearMovement(){direct={x:0,z:0}}
   function setDestination(x,z){
    if(!Number.isFinite(x)||!Number.isFinite(z))return {ok:false};
-   destination={x:clamp(x,0,SIZE),z:clamp(z,0,SIZE)};
+   destination=navigation?navigation.nearestFree({x,z}):{x:clamp(x,0,SIZE),z:clamp(z,0,SIZE)};
+   if(!destination)return {ok:false,reason:'blocked-destination'};
    direct={x:0,z:0};
    const dx=destination.x-hero.x,dz=destination.z-hero.z;
    if(Math.hypot(dx,dz)>.05)heading={x:dx/Math.hypot(dx,dz),z:dz/Math.hypot(dx,dz)};
@@ -45,6 +46,7 @@
   }
   function clearDestination(){destination=null}
   function advance(u,point,speed,dt,stop=.3){
+   if(navigation)return navigation.follow(u,point,speed,dt,stop);
    const dx=point.x-u.x,dz=point.z-u.z,d=Math.hypot(dx,dz);
    if(d<=stop)return false;
    const amount=Math.min(speed*dt,d-stop);
@@ -87,8 +89,9 @@
     // Direct analog motion like the ORIGINAL WASD/joystick, not a chain of
     // short-click destinations that makes the character hesitate.
     const oldX=hero.x,oldZ=hero.z;
-    hero.x=clamp(hero.x+direct.x*HERO_SPEED*dt,1,SIZE-1);
-    hero.z=clamp(hero.z+direct.z*HERO_SPEED*dt,1,SIZE-1);
+    if(navigation)navigation.slide(hero,direct.x*HERO_SPEED*dt,direct.z*HERO_SPEED*dt);
+    else {hero.x=clamp(hero.x+direct.x*HERO_SPEED*dt,1,SIZE-1);
+    hero.z=clamp(hero.z+direct.z*HERO_SPEED*dt,1,SIZE-1);}
     if(Math.hypot(hero.x-oldX,hero.z-oldZ)>.001)moved.add(hero);
     heading={x:direct.x/length,z:direct.z/length};
    }else if(destination){
