@@ -45,6 +45,12 @@
   smear(207,91,43,54,'#708962','#8d9776',.50);
   smear(108,197,52,51,'#829570','#b1ad84',.38);
   smear(214,222,55,52,'#6e805e','#929b79',.47);
+  // The hero's opening corridor must read as a green rural field, not a
+  // permanently brown texture around an unnaturally clean road.
+  smear(136,61,19,35,'#708d5e','#9da986',.71);
+  smear(164,66,18,34,'#73895d','#a7ac86',.69);
+  smear(135,111,18,40,'#70835a','#a1a47d',.59);
+  smear(165,112,19,38,'#728b5e','#9ca981',.62);
   const patchBudget=lowPower?150:235;
   for(let i=0;i<patchBudget;i++){
    const x=8+random()*284,z=8+random()*284;
@@ -133,7 +139,7 @@
   const c=roadCanvas.getContext('2d');
   if(c){
    c.clearRect(0,0,512,1024);
-   c.fillStyle='#b5a584';c.fillRect(0,0,512,1024);
+   c.fillStyle='#ac9a7b';c.fillRect(0,0,512,1024);
    for(const centre of [155,357]){
     c.beginPath();c.moveTo(centre,0);
     for(let y=0;y<=1024;y+=32)c.lineTo(centre+Math.sin(y*.019+centre)*11,y);
@@ -168,6 +174,10 @@
   roadMat.albedoTexture=roadTexture;
   roadMat.albedoColor=B.Color3.White();
   roadMat.metallic=0;roadMat.roughness=.96;
+  // Blend with existing scanned CC0 earth: neither black muddy trench nor
+  // an opaque pale road resembling a modern concrete highway.
+  roadMat.alpha=.57;
+  roadMat.transparencyMode=B.Material.MATERIAL_ALPHABLEND;
   const sourceRoad=scene.getMaterialByName('hd2026-tracked-earth');
   if(sourceRoad?.bumpTexture)roadMat.bumpTexture=sourceRoad.bumpTexture;
   roadMat.backFaceCulling=false;
@@ -219,7 +229,7 @@
   vergeMesh.metadata={visualOnly:true,noCollision:true};
   const result={ready:true,style:'tactical-rural-ww2',
    licensedReference:'CC0 Poly Haven ground, original procedurally drawn overlay',
-   canvasSize:size,patches,roadVerges,hedges,stones,roadMaterial:'PBR-opaque-dry-earth',
+   canvasSize:size,patches,roadVerges,hedges,stones,roadMaterial:'PBR-blended-dry-earth',
    drawCalls:5,roadSurface:'two-track-gravel-and-grass',roadVergesVisible:true,collisionChanges:0,
    inputInterception:false};
   scene.metadata=scene.metadata||{};
