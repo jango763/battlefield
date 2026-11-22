@@ -1,0 +1,123 @@
+ for(const n of entries.rootNodes)descendants.push(...n.getDescendants(false));
+ const unique=[...new Set(descendants)];
+ const meshes=unique.filter(n=>n instanceof B.AbstractMesh);
+ const transforms=unique.filter(n=>n instanceof B.TransformNode);
+ const drawable=meshes.filter(m=>m.getTotalVertices?.()>0);
+ if(drawable.length<4||!entries.skeletons.some(s=>s.bones.length>=(externalModel?65:60)))
+  throw Error('У отряда '+(index+1)+' не обнаружена утверждённая 65-костная модель');
+ for(const node of entries.rootNodes)if(!node.parent)node.parent=root;
+ const min=new B.Vector3(Infinity,Infinity,Infinity);
+ const max=new B.Vector3(-Infinity,-Infinity,-Infinity);
+ for(const mesh of drawable){
+  mesh.computeWorldMatrix(true);
+  const box=mesh.getBoundingInfo().boundingBox;
+  min.minimizeInPlace(box.minimumWorld);
+  max.maximizeInPlace(box.maximumWorld);
+ }
+ const height=max.y-min.y;
+ if(!Number.isFinite(height)||height<=0)throw Error('Некорректная высота копии солдата');
+ const factor=1.8/height;
+ root.scaling.setAll(factor);
+ root.position.set(-.5*(min.x+max.x)*factor,-min.y*factor,
+  -.5*(min.z+max.z)*factor);
+ const clips=new Map();
+ if(externalModel?.nativeClips){
+  const selected=NATIVE_POSES[externalModel.modelId];
+  if(!selected)throw Error('Missing native motion map for '+externalModel.modelId);
+  for(const id of CLIP_IDS){
+   const pose=id.split('_').at(-1);
+   const logical=Object.keys(CLIP_POSES).find(p=>CLIP_POSES[p]===pose);
+   const clipName=selected[logical];
+   const group=entries.animationGroups.find(g=>g.name===clipName||
+    g.name.endsWith(clipName)||g.name.startsWith(clipName+'-'));
+   if(!group)throw Error('Нет исходной анимации '+clipName+' для '+externalModel.modelId);
+   clips.set(id,group);
+  }
+ }else{
+  for(const id of CLIP_IDS){
+   const matches=entries.animationGroups.filter(group=>group.name.endsWith(id));
+   if(matches.length!==1)throw Error('Отряд '+(index+1)+': отсутствует анимация '+id);
+   clips.set(id,matches[0]);
+  }
+ }
+ const marker=B.MeshBuilder.CreateDisc('squad-ring-'+index,{radius:.47,tessellation:24},scene);
+ marker.parent=anchor;marker.rotation.x=Math.PI/2;marker.position.y=.025;
+ const ringMat=factionMat('ring',index<12?'blue':'red',
+  index<12?'#77bcea':'#e98668',{alpha:.75});
+ marker.material=ringMat;marker.isPickable=false;
+ const hpBack=B.MeshBuilder.CreatePlane('health-bg-'+index,{width:.8,height:.085},scene);
+ hpBack.parent=anchor;hpBack.billboardMode=B.Mesh.BILLBOARDMODE_ALL;
+ hpBack.position.y=2.08;
+ const hpBgMat=factionMat('hp-background','both','#27332a',
+  {disableLighting:true});
+ hpBack.material=hpBgMat;hpBack.isPickable=false;
+ const hpFill=B.MeshBuilder.CreatePlane('health-fill-'+index,{width:.76,height:.061},scene);
+ hpFill.parent=anchor;hpFill.billboardMode=B.Mesh.BILLBOARDMODE_ALL;
+ hpFill.position.y=2.081;hpFill.position.z=-.01;
+ const hpMat=factionMat('hp-fill',index<12?'blue':'red',
+  index<12?'#8bdaa0':'#e78f6b',{disableLighting:true});hpFill.material=hpMat;hpFill.isPickable=false;
+ for(const mesh of drawable)mesh.metadata={...(mesh.metadata||{}),squadSlot:index};
+ return {index,faction:factions.sideForSlot(index),
+  chosenAlliedModel:index<12?(FEATURE_REAL_ALLIES?featureCasting(index):alliedModels.forBlueSlot(index).id):null,
+  importedAlliedModel:!!externalModel,
+  importedAlliedName:externalModel?.modelId||null,
+  nativeAlliedClips:!!externalModel?.nativeClips,
+  anchor,root,entries,clips,imported:{
+  meshes,transformNodes:transforms,skeletons:entries.skeletons,
+  animationGroups:entries.animationGroups
+ },unit:null,rig:null,clip:null,weapon:'Kar98k',lastPose:null,
+  inactive:true,marker,hpBack,hpFill,healthMaterial:hpMat,
+  hitEffect:0,animationChanges:0,weaponError:null};
+}
+const SCENE_SLOTS={
+ duel:[0,12],assault:[0,12,13,14,15],
+ squads:Array.from({length:24},(_,i)=>i)
+};
+// Prevent racing initial 12v12 load and a rapidly tapped scenario button.
+// A second request rechecks slots after the first has finished, without
+// instantiating overlapping skeletons or double-counting soldier models.
+let ensureUnitsInFlight=null;
+async function ensureUnits(scenarioName){
+ while(ensureUnitsInFlight){try{await ensureUnitsInFlight;}catch(_){/* retry next slot */}}
+ const task=ensureUnitsUnlocked(scenarioName);
+ ensureUnitsInFlight=task;
+ try{return await task;}
+ finally{if(ensureUnitsInFlight===task)ensureUnitsInFlight=null;}
+}
+async function ensureUnitsUnlocked(scenarioName){
+ const slots=Array.isArray(scenarioName)?scenarioName:SCENE_SLOTS[scenarioName];
+ if(!slots)throw Error('Неизвестный режим отряда: '+scenarioName);
+ if(!asset){
+  $('loading').textContent='Загружаю анимированного немецкого стрелка…';
+  asset=await B.SceneLoader.LoadAssetContainerAsync(
+   './animstudio-preview/models/','all-combat-run.glb',scene);
+  motionDonors.germanRun=unitMotion?.findGroup(asset.animationGroups,'Kar98k_Run')||null;
+  if(asset.animationGroups.length<16)
+   throw Error('В GLB отсутствуют 16 согласованных боевых анимаций');
+ }
+ if(!modelDepot&&Date.now()>=modelDepotRetryAfter){
+  modelDepot=alliedLoader.create({B,scene,catalog:alliedModels,
+   sourceGroups:asset.animationGroups,featureTrial:FEATURE_REAL_ALLIES});
+  try{
+   state.alliedManifest=await modelDepot.init();
+  }catch(error){
+   state.modelErrors.manifest=String(error?.message||error);
+   // Missing manifest does not make 12v12 unplayable; no false model import.
+   console.warn('Allied GLB manifest unavailable; source models not installed',error);
+   modelDepot=null;
+   modelDepotRetryAfter=Date.now()+30000;
+   state.engineering.assetRetries++;
+  }
+ }
+ for(const i of slots){
+  if(views[i])continue;
+  $('loading').textContent='Загружаю бойцов: '+state.models+'/'+slots.length+
+   ' · создание №'+(i+1);
+  // Preserve exact Mixamo joint names in clone-local hierarchies for IK.
+  let externalModel=null;
+  if(i<12&&modelDepot){
+   const selected=FEATURE_REAL_ALLIES?featureCasting(i):alliedModels.forBlueSlot(i).id;
+   try{
+    externalModel=await modelDepot.instantiate(selected,i);
+   }catch(error){
+    state.modelErrors[selected]=String(error?.message||error);
