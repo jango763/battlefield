@@ -1,3 +1,22 @@
+   const victim=[...allies,...enemies].find(u=>u.id===hit.id);
+   if(victim&&!victim.alive){
+    // A hero dying must not start the countdown. Either army's first
+    // dead BOT starts exactly one five-minute game-time timer.
+    economy.reportBotDeath(victim);
+    economy.kill(unit.economyTeam,{team:victim.economyTeam},
+     {heroKill:unit.isHero,armoured:false});
+   }
+  }
+ }
+ const source=actors.get(unit),targetView=actors.get(target);
+ if(!source||!targetView)return;
+ const muzzle=source.rig?.getMuzzleWorld?.()?.position||
+  source.rig?.weaponRig?.muzzleWorldPosition;
+ const start=Array.isArray(muzzle)&&muzzle.length===3 ?
+  new B.Vector3(...muzzle):source.anchor.position.add(new B.Vector3(0,1.5,0));
+ const impact=result.impact?position(result.impact,.7):
+  targetView.anchor.position.add(new B.Vector3(0,1.15,0));
+ if(!result.hit&&!result.impact)impact.z+=(Math.random()-.5)*1.4;
  drawTracer(start,impact,result.weapon==='Panzerschreck'?color('#ff9945'):
   color(unit.team==='свои'?'#ffe5a0':'#ff866f'),
   result.weapon==='Panzerschreck'?.24:.095);
@@ -101,23 +120,3 @@ function drawMiniMap(econ){
  const hero=findActor();
  if(hero?.alive){
   const [x,y]=xy(hero.x,hero.z);
-  c.strokeStyle='#fff6d0';c.lineWidth=1.6;
-  c.beginPath();c.arc(x,y,4.1,0,Math.PI*2);c.stroke();
- }
-}
-function drawHud(){
- if(!state.ready||!battle||!controller)return;
- const hero=findActor();
- const snap=controller.snapshot();
- state.firstGameArmy=fieldOrders?.snapshot()||null;
- state.heroPosition={x:hero.x,z:hero.z};
- state.cameraPosition=camera?{radius:camera.radius,alpha:camera.alpha,
-  beta:camera.beta,targetX:camera.target.x,targetZ:camera.target.z}:null;
- const inventory=hero.weapon==='Kar98k'?null:hero.inventory[hero.weapon];
- const funds=battle.getFunds();
- const econ=economy?.summary();
- const mission=advanceObjectives(hero,econ);
- const central=econ?.central;
- const left=central?.started?Math.ceil(central.remainingSeconds):0;
- const timerLabel=central?.open?'ОТКРЫТА':
-  central?.started?'Откроется через '+String(Math.floor(left/60)).padStart(2,'0')+
