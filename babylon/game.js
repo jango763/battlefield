@@ -124,9 +124,20 @@ function position(unit,y=0){
  return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y,BASE_Z+unit.z*UNIT_SCALE);
 }
 function color(hex){return B.Color3.FromHexString(hex)}
+const graphicsPreference=new URLSearchParams(location.search).get('quality');
+const graphicsMode=['low','high','auto'].includes(graphicsPreference)?graphicsPreference:'auto';
+const deviceScale=Math.max(1,window.devicePixelRatio||1);
+const renderQuality={
+ mode:graphicsMode,low:Math.max(1,deviceScale/2.1),
+ high:Math.max(1,deviceScale/1.15),fpsElapsed:0,
+ scale:Math.max(1,deviceScale/(graphicsMode==='low'?1.15:
+  graphicsMode==='high'?2.1:1.7))
+};
 function createWorld(){
  engine=new B.Engine(canvas,true,{powerPreference:'high-performance'});
- engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.7));
+ engine.setHardwareScalingLevel(renderQuality.scale);
+ state.graphics={mode:graphicsMode,hardwareScale:renderQuality.scale,
+  adaptive:graphicsMode==='auto',changes:0};
  scene=new B.Scene(engine);
  scene.useRightHandedSystem=true;
  scene.skipPointerMovePicking=true;
