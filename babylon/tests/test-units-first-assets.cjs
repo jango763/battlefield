@@ -61,7 +61,7 @@ for(const [id,[filename,clips]] of Object.entries(sources)){
  const glbBinStart=20+bytes.readUInt32LE(12)+8;
  function readComponent(accessorIndex,vertex,slot){
   const a=content.accessors[accessorIndex];
-  if(!a||!a.bufferView)return null;
+  if(!a||a.bufferView===undefined)return null;
   const bv=content.bufferViews[a.bufferView],size={5120:1,5121:1,5122:2,5123:2,5125:4,5126:4}[a.componentType];
   const n={SCALAR:1,VEC2:2,VEC3:3,VEC4:4}[a.type]||1;
   const at=glbBinStart+(bv.byteOffset||0)+(a.byteOffset||0)+vertex*(bv.byteStride||n*size)+slot*size;
