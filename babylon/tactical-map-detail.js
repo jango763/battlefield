@@ -31,11 +31,11 @@
   let patches=0,roadVerges=0;
   function smear(x,z,rx,rz,primary,secondary,alpha){
    const scale=size/SIZE,cx=x*scale,cy=z*scale,r=Math.max(rx,rz)*scale;
-   const grad=g.createRadialGradient(cx,cy,0,cx,cy,r);
+   g.save();g.translate(cx,cy);g.scale(rx/Math.max(rx,rz),rz/Math.max(rx,rz));
+   const grad=g.createRadialGradient(0,0,0,0,0,r);
    grad.addColorStop(0,primary);
    grad.addColorStop(.50,secondary);
    grad.addColorStop(1,'rgba(0,0,0,0)');
-   g.save();g.translate(cx,cy);g.scale(rx/Math.max(rx,rz),rz/Math.max(rx,rz));
    g.globalAlpha=alpha;g.fillStyle=grad;
    g.beginPath();g.arc(0,0,r,0,Math.PI*2);g.fill();g.restore();
   }
