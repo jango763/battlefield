@@ -109,7 +109,7 @@
   for(const direction of [-1,1]){
    for(let i=0;i<28;i++){
     const z=42+i*3.35+(random()-.5)*2;
-    const x=150+direction*(10.5+random()*10);
+    const x=150+direction*(6.4+random()*6.5);
     if(map.bases.some(b=>Math.hypot(x-b.x,z-b.z)<18))continue;
     const shrub=hedge.createInstance('tactical-road-hedge-'+direction+'-'+i);
     shrub.position.set(x-150,.58+random()*.28,z-150);
@@ -125,10 +125,56 @@
     }
    }
   }
+  // Narrow, worn two-track military lane. Pixel details are painted ONCE
+  // into one WebGL texture; no 1000 separate stones or runtime particle loop.
+  // The original passable road and tap-to-walk ground remain intact.
+  const roadCanvas=document.createElement('canvas');
+  roadCanvas.width=512;roadCanvas.height=1024;
+  const c=roadCanvas.getContext('2d');
+  if(c){
+   c.clearRect(0,0,512,1024);
+   c.fillStyle='rgba(173,160,135,.20)';c.fillRect(0,0,512,1024);
+   for(const centre of [155,357]){
+    c.beginPath();c.moveTo(centre,0);
+    for(let y=0;y<=1024;y+=32)c.lineTo(centre+Math.sin(y*.019+centre)*11,y);
+    c.strokeStyle='rgba(53,50,43,.42)';c.lineWidth=41;c.stroke();
+    c.beginPath();c.moveTo(centre-25,0);
+    for(let y=0;y<=1024;y+=36)c.lineTo(centre-25+Math.sin(y*.021+centre)*10,y);
+    c.strokeStyle='rgba(191,179,151,.27)';c.lineWidth=17;c.stroke();
+   }
+   c.beginPath();c.moveTo(252,0);
+   for(let y=0;y<=1024;y+=18)c.lineTo(252+Math.sin(y*.027)*17,y);
+   c.strokeStyle='rgba(77,110,59,.48)';c.lineWidth=32;c.stroke();
+   for(let i=0;i<1900;i++){
+    const x=random()*512,y=random()*1024;
+    const centre=Math.abs(x-256);
+    if(i%3===0&&centre<50){
+     c.fillStyle='rgba(92,119,67,.47)';
+     c.fillRect(x,y,1+random()*4,2+random()*12);
+    }else{
+     c.fillStyle=i%2?'rgba(207,196,162,.27)':'rgba(74,69,57,.26)';
+     c.fillRect(x,y,1+random()*5,1+random()*4);
+    }
+   }
+  }
+  const roadTexture=new B.DynamicTexture('tactical-two-track-rural-dirt',
+   {width:512,height:1024},scene,false);
+  roadTexture.getContext().drawImage(roadCanvas,0,0);
+  roadTexture.hasAlpha=true;roadTexture.update(false);
+  const roadMat=new B.StandardMaterial('tactical-road-wear',scene);
+  roadMat.diffuseTexture=roadTexture;roadMat.useAlphaFromDiffuseTexture=true;
+  roadMat.backFaceCulling=false;roadMat.disableLighting=true;
+  roadMat.transparencyMode=B.Material.MATERIAL_ALPHABLEND;
+  const roadDetail=B.MeshBuilder.CreateGround('tactical-two-track-surface',
+   {width:6.7,height:265,subdivisions:1},scene);
+  roadDetail.position.y=.054;roadDetail.material=roadMat;
+  roadDetail.isPickable=false;roadDetail.checkCollisions=false;
+  roadDetail.metadata={visualOnly:true,noCollision:true};
+  roadDetail.freezeWorldMatrix();
   const result={ready:true,style:'tactical-rural-ww2',
    licensedReference:'CC0 Poly Haven ground, original procedurally drawn overlay',
    canvasSize:size,patches,roadVerges,hedges,stones,
-   drawCalls:3,collisionChanges:0,
+   drawCalls:4,roadSurface:'two-track-gravel-and-grass',collisionChanges:0,
    inputInterception:false};
   scene.metadata=scene.metadata||{};
   scene.metadata.battlefieldOrganicMap=result;
