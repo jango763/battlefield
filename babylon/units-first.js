@@ -224,6 +224,39 @@ try{
     lower.addTargetedAnimation(track.animation,track.target);
    const masked=unitMotion.legsOnly(lower);
    if(!masked.ok){lower.dispose();throw Error('Нельзя выделить бег ног: '+masked.reason);}
+   // Second-stage natural gait experiment: use the REAL German source's
+   // authored Spine rotation curve, not a sine-wave "robot" animation.
+   // Reduce its delta relative to the native first frame and apply it to
+   // the currently bound Spine. Head, shoulders, hands, gun and all 65+
+   // source skeleton links remain exclusively controlled by native skin/IK.
+   const swayStrength=B.Scalar.Clamp(Number(
+    new URLSearchParams(location.search).get('spineSway')??.28),0,.6);
+   const spineTrack=(authored.targetedAnimations||[]).find(t=>
+    unitMotion.canonical(t.target?.name)==='spine'&&
+    t.animation?.targetProperty==='rotationQuaternion');
+   if(spineTrack?.animation?.getKeys&&swayStrength>0){
+    const keys=spineTrack.animation.getKeys();
+    const startQ=keys[0]?.value;
+    if(keys.length>2&&startQ?.w!==undefined){
+     const bind=spineTrack.target.rotationQuaternion?.clone()||
+      B.Quaternion.Identity();
+     const inv=startQ.conjugate();
+     const a=new B.Animation('german-authored-soft-spine-sway',
+      'rotationQuaternion',spineTrack.animation.framePerSecond,
+      B.Animation.ANIMATIONTYPE_QUATERNION,
+      B.Animation.ANIMATIONLOOPMODE_CYCLE);
+     a.setKeys(keys.map(k=>{
+      const offset=inv.multiply(k.value).normalize();
+      const subtle=B.Quaternion.Slerp(B.Quaternion.Identity(),offset,swayStrength);
+      return {frame:k.frame,value:bind.multiply(subtle).normalize()};
+     }));
+     lower.addTargetedAnimation(a,spineTrack.target);
+     state.germanSpineMotion={source:'native-Kar98k_Run',
+      strength:swayStrength,frames:keys.length,status:'authored-damped'};
+    }
+   }
+   if(!state.germanSpineMotion)
+    state.germanSpineMotion={status:'source-curve-unavailable',strength:swayStrength};
    lower.stop();nativeLegsRun=lower;
   }
   // Preserve ALL source geometry. The reported "second rifle" came from

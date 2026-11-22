@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/unit-motion-unification-20261122
+      - feature/babylon-german-native-spine-motion-20261122
     paths:
       - 'babylon/units-first.html'
       - 'babylon/units-first.js'
