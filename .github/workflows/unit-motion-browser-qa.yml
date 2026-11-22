@@ -32,6 +32,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: battlefield-unit-motion-american-mobile
-          path: /tmp/bf-unit-motion-american-*.png
+          path: |
+            /tmp/bf-unit-motion-american-*.png
+            /tmp/bf-unit-soldier-*-full.jpeg
           if-no-files-found: warn
           retention-days: 10
