@@ -24,7 +24,10 @@ const {chromium}=require('/tmp/bf-tactical-camera/node_modules/playwright');
   assert.equal(before.ready,true);assert(before.models>=2);
   assert.equal(before.camera,'tactical');
   assert(before.detail?.ready,'Organic non-pickable map overlay must render');
-  assert(before.detail?.patches>=70&&before.detail.drawCalls===1);
+  assert(before.detail?.patches>=120&&before.detail.drawCalls===3,
+   'Terrain plus two shared-mesh roadside detail batches must be generated');
+  assert(before.detail.hedges>=25&&before.detail.stones>=12,
+   'The empty hero corridor needs visible rural foliage and rubble');
   assert(before.stickLoaded);
   assert(parseFloat(before.padWidth)>=120,'Thumbstick must be easy to reach');
   assert.equal(errors.length,0,'startup JS errors: '+errors.join('|'));
