@@ -32,7 +32,7 @@ function create(scene,B,map){
   track:material('track','#4c4237'),stone:material('stone','#777a76'),
   roof:material('roof','#4b463a'),wood:material('wood','#6b513a'),
   burnt:material('burnt','#242624'),rust:material('rust','#513c2d'),
-  black:material('black','#161c19'),sand:material('sand','#96886a'),
+  black:material('black','#161c19'),sand:material('sand','#81775f'),
   blue:material('blue','#517f99'),red:material('red','#9b5046'),
   gold:material('gold','#be9336','#493711'),
   corn:material('corn','#a3a079'),hedge:material('hedge','#465542'),
@@ -334,9 +334,15 @@ function create(scene,B,map){
   top.position.copyFrom(at(x,z,10.5,B));
   top.material=mat.hedge;top.isPickable=false;nodes.push(top);
  }
+ // Original long straight rows looked like floating concrete beams in
+ // the raised camera; break these into short, irregular flanking banks.
+ // They remain visual-only and NEVER obstruct the existing AI routes.
  for(const p of [[86,123],[210,120],[120,175],[190,181],[150,83],[152,220]]){
-  for(let i=-3;i<=3;i++)box('sandbag-'+p[0]+'-'+p[1]+'-'+i,1.5,.5,.85,
-   p[0]+i*1.3,.4,p[1],mat.sand);
+  for(const side of [-1,1])for(let i=0;i<3;i++){
+   const xx=p[0]+side*(5.1+i*.72),zz=p[1]+(i%2?.42:-.32);
+   box('sandbag-'+p[0]+'-'+p[1]+'-'+side+'-'+i,
+    1.15,.4,.9,xx,.3,zz,mat.sand,side*.08+i*.035);
+  }
  }
  function syncFarms(economy){
   if(!economy)return;
