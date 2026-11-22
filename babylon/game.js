@@ -163,10 +163,14 @@ function createWorld(){
 
  // Mirror the FIRST Three.js game's camera: elevated follow, stable heading.
  // Babylon map's northern direction is +Z, so stand behind the blue hero.
- camera=new B.ArcRotateCamera('camera',Math.PI*1.5,1.18,14,
+ // A higher, wider tactical view keeps the hero readable while exposing cover.
+ // Keep the original north-up fixed bearing; thumbstick never turns the camera.
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.96,23,
   new B.Vector3(0,1,-107),scene);
- camera.lowerRadiusLimit=13.5;camera.upperRadiusLimit=14.5;
- camera.lowerBetaLimit=1.17;camera.upperBetaLimit=1.19;
+ camera.lowerRadiusLimit=22;camera.upperRadiusLimit=24;
+ camera.lowerBetaLimit=.92;camera.upperBetaLimit=1.02;
+ state.cameraProfile={mode:'elevated-tactical-follow',radius:camera.radius,
+  beta:camera.beta,alpha:camera.alpha};
  camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
  state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
  // Real photographed materials and geometry; Babylon skinned soldiers, game AI,
@@ -1022,48 +1026,58 @@ function registerTouchControls(){
   movementKeys[e.key]=type==='keydown';
   if(e.key.startsWith('Arrow'))e.preventDefault();
  });
- const pad=$('touch-stick'),knob=$('touch-stick-knob');
- if(!pad||!knob)return;
- function move(e){
-  const rect=pad.getBoundingClientRect();
-  const centerX=rect.left+rect.width/2,centerY=rect.top+rect.height/2;
-  const radius=Math.max(1,rect.width*.37);
-  const dx=(e.clientX-centerX)/radius,dy=(e.clientY-centerY)/radius;
-  const mag=Math.max(1,Math.hypot(dx,dy));
-  touchJoystick.x=dx/mag;touchJoystick.y=-dy/mag;
-  knob.style.transform='translate('+(touchJoystick.x*radius*.65)+'px,'+
-   (-touchJoystick.y*radius*.65)+'px)';
-  touchJoystick.cooldown=0;
- }
- function release(e){
-  if(e.pointerId!==touchJoystick.pointer)return;
+ const zone=$('touch-zone'),pad=$('touch-stick'),knob=$('touch-stick-knob');
+ if(!zone||!pad||!knob)return;
+ function resetStick(){
   touchJoystick.active=false;touchJoystick.pointer=null;
   touchJoystick.x=touchJoystick.y=0;touchJoystick.cooldown=0;
-  knob.style.transform='translate(0,0)';
+  knob.style.transform='translate3d(0,0,0)';
+  pad.style.left='';pad.style.top='';pad.style.bottom='';
   fieldOrders?.clearMovement();
  }
- pad.addEventListener('pointerdown',e=>{
-  if(!state.ready||!gameStarted||!findActor()?.alive)return;
+ function move(e){
+  const rect=pad.getBoundingClientRect();
+  const radius=Math.max(28,Math.min(rect.width,rect.height)*.36);
+  const dx=(e.clientX-rect.left-rect.width/2)/radius;
+  const dy=(e.clientY-rect.top-rect.height/2)/radius;
+  const length=Math.hypot(dx,dy);
+  // Small dead-zone prevents idle twitch; full analog travel remains smooth.
+  const strength=Math.min(1,Math.max(0,(length-.09)/.91));
+  touchJoystick.x=length>.001?dx/length*strength:0;
+  touchJoystick.y=length>.001?-dy/length*strength:0;
+  knob.style.transform='translate3d('+(touchJoystick.x*radius*.65)+'px,'+
+   (-touchJoystick.y*radius*.65)+'px,0)';
+ }
+ zone.addEventListener('pointerdown',e=>{
+  if(!state.ready||!gameStarted||!findActor()?.alive||touchJoystick.active)return;
   e.preventDefault();
   touchJoystick.active=true;touchJoystick.pointer=e.pointerId;
-  pad.setPointerCapture(e.pointerId);move(e);
+  // Spawn the stick under the thumb, anywhere in the left movement zone.
+  const bounds=zone.getBoundingClientRect(),half=pad.offsetWidth/2;
+  const cx=Math.max(half+8,Math.min(bounds.width-half-8,e.clientX-bounds.left));
+  const cy=Math.max(half+8,Math.min(bounds.height-half-8,e.clientY-bounds.top));
+  pad.style.left=(cx-half)+'px';pad.style.top=(cy-half)+'px';pad.style.bottom='auto';
+  zone.setPointerCapture(e.pointerId);
+  move(e);
  });
- pad.addEventListener('pointermove',e=>{
+ zone.addEventListener('pointermove',e=>{
   if(touchJoystick.active&&e.pointerId===touchJoystick.pointer){
    e.preventDefault();move(e);
   }
  });
- pad.addEventListener('pointerup',release);
- pad.addEventListener('pointercancel',release);
- pad.addEventListener('lostpointercapture',release);
+ function release(e){
+  if(e.pointerId!==touchJoystick.pointer)return;
+  resetStick();
+ }
+ zone.addEventListener('pointerup',release);
+ zone.addEventListener('pointercancel',release);
+ zone.addEventListener('lostpointercapture',release);
  window.addEventListener('blur',()=>{
-  // No stuck walking after iPhone tab suspension or incoming calls.
   for(const key of Object.keys(movementKeys))movementKeys[key]=false;
-  touchJoystick.active=false;touchJoystick.pointer=null;
-  touchJoystick.x=touchJoystick.y=0;
-  knob.style.transform='translate(0,0)';
-  fieldOrders?.clearMovement();
+  resetStick();
  });
+ window.addEventListener('pagehide',resetStick);
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)resetStick();});
  $('quick-fire').addEventListener('click',()=>{
   if(!state.ready||!gameStarted||!controller)return;
   const hero=findActor();

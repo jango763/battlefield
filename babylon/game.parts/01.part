@@ -121,3 +121,5 @@ enterButton.addEventListener('click',()=>{
  atBase=false;state.atBase=false;
  alertStatus('Бой начался: британцы 🔵 против Вермахта 🔴. Касайтесь земли, чтобы управлять героем.');
  drawHud();
+});
+function position(unit,y=0){

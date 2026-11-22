@@ -1,7 +1,3 @@
-    }
-   }catch(error){
-    state.engineering.weaponFailures=(state.engineering.weaponFailures||0)+1;
-    // The animated approved soldier stays visible and game logic works.
     view.weaponError=String(error?.message||error);
     console.error('Weapon model for soldier '+(view.index+1),error);
     if(view.index===0)
@@ -121,3 +117,8 @@ function setup(scenarioName){
  missionIndex=0;state.mission={completed:0,total:SESSION_OBJECTIVES.length,
   current:SESSION_OBJECTIVES[0].title,progress:0,target:1,finished:false};
  if(destinationMark)destinationMark.isVisible=false;
+ state.scenario=scenario;state.atBase=true;state.focus=null;
+ const [ours,theirs]=SCENARIOS[scenario];
+ economy=goldRules.create({onEvent:event=>{
+  if(event.type==='central-countdown-start')
+   alertStatus('Первый бот погиб! До открытия центральной фермы — 05:00.');

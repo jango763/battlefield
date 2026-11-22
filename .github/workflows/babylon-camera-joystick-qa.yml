@@ -1,0 +1,27 @@
+name: Battlefield camera and joystick checkpoint QA
+on:
+  push:
+    branches:
+      - feature/coh3-map-camera-joystick-20261122
+    paths:
+      - 'babylon/game.js'
+      - 'babylon/game.parts/**'
+      - 'babylon/index.html'
+      - 'babylon/tests/test-camera-joystick-checkpoint.cjs'
+      - '.github/workflows/babylon-camera-joystick-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checkpoint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          node babylon/tools/assemble-game-parts.cjs --check
+          node --check babylon/game.js
+          node babylon/tests/test-ten-part-engineering.cjs
+          node babylon/tests/test-camera-joystick-checkpoint.cjs

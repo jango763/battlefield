@@ -1,3 +1,4 @@
+  actors.set(unit,view);
   replenisher.finish(unit,true);
   state.reinforcements=replenisher.snapshot();
   // Existing weapon assets/IK remain attached to the original rig.

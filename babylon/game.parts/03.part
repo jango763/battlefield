@@ -121,3 +121,5 @@ async function ensureUnitsUnlocked(scenarioName){
     externalModel=await modelDepot.instantiate(selected,i);
    }catch(error){
     state.modelErrors[selected]=String(error?.message||error);
+    state.engineering.glbFallbacks++;
+    console.error('Allied licensed model rejected',selected,error);

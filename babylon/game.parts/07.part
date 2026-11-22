@@ -1,9 +1,3 @@
- drawTracer(start,impact,result.weapon==='Panzerschreck'?color('#ff9945'):
-  color(unit.team==='свои'?'#ffe5a0':'#ff866f'),
-  result.weapon==='Panzerschreck'?.24:.095);
- if(result.weapon==='Panzerschreck'){
-  const diameter=combat.WEAPONS.Panzerschreck.blastRadius*UNIT_SCALE*2;
-  const sphere=B.MeshBuilder.CreateSphere('blast',{diameter,segments:10},scene);
   sphere.position.copyFrom(impact);
   const mat=new B.StandardMaterial('blast glow',scene);
   mat.emissiveColor=color('#fd7a2d');mat.alpha=.45;
@@ -121,3 +115,10 @@ function drawHud(){
  const left=central?.started?Math.ceil(central.remainingSeconds):0;
  const timerLabel=central?.open?'ОТКРЫТА':
   central?.started?'Откроется через '+String(Math.floor(left/60)).padStart(2,'0')+
+   ':'+String(left%60).padStart(2,'0'):
+   'ЗАКРЫТА — ждём гибель первого бота';
+ $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
+ $('supply').disabled=!atBase||!hero.alive;
+ $('reload-manual').disabled=!hero.alive||hero.weapon==='Kar98k'||
+  hero.reloadRemaining>0||!hero.inventory[hero.weapon]?.reserve||
+  hero.inventory[hero.weapon]?.loaded>=combat.WEAPONS[hero.weapon].magazineSize;

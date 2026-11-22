@@ -1,10 +1,3 @@
-   ':'+String(left%60).padStart(2,'0'):
-   'ЗАКРЫТА — ждём гибель первого бота';
- $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
- $('supply').disabled=!atBase||!hero.alive;
- $('reload-manual').disabled=!hero.alive||hero.weapon==='Kar98k'||
-  hero.reloadRemaining>0||!hero.inventory[hero.weapon]?.reserve||
-  hero.inventory[hero.weapon]?.loaded>=combat.WEAPONS[hero.weapon].magazineSize;
  for(const button of document.querySelectorAll('[data-weapon]'))
   button.setAttribute('aria-pressed',String(hero.weapon===button.dataset.weapon));
  const paid=Object.keys(hero.inventory).map(w=>w+':'+battle.totalAmmo(hero,w)).join(' · ');
@@ -121,3 +114,11 @@ function registerUI(){
  $('order-move').addEventListener('click',()=>{
   inputMode='move';
   $('order-move').setAttribute('aria-pressed','true');
+  $('order-attack').setAttribute('aria-pressed','false');
+  alertStatus('Движение: коснитесь земли для приказа.');
+ });
+ $('order-attack').addEventListener('click',()=>{
+  inputMode='attack';
+  $('order-move').setAttribute('aria-pressed','false');
+  $('order-attack').setAttribute('aria-pressed','true');
+  alertStatus('Атака: коснитесь противника для выбора цели.');

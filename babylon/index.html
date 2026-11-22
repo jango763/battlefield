@@ -62,7 +62,8 @@ button:disabled{opacity:.5;cursor:default}
 #panel{border-color:#9b916c;background:#202b24f0}
 #panel button[aria-pressed=true]{background:#e1c484;color:#24271c}
 #mobile-controls{display:none;position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 16px);z-index:5;pointer-events:none;align-items:end;justify-content:space-between;padding:0 13px}
-#touch-stick{position:relative;width:124px;height:124px;border-radius:50%;background:#1f261c85;border:2px solid #d4c08d88;box-shadow:inset 0 0 18px #111a,0 3px 10px #0007;touch-action:none;pointer-events:auto;user-select:none;-webkit-user-select:none}
+#touch-zone{position:fixed;left:0;bottom:0;width:57vw;max-width:430px;height:54vh;touch-action:none;pointer-events:auto;user-select:none;-webkit-user-select:none}
+#touch-stick{position:absolute;left:13px;bottom:calc(env(safe-area-inset-bottom) + 16px);width:124px;height:124px;pointer-events:none;border-radius:50%;background:#1f261c85;border:2px solid #d4c08d88;box-shadow:inset 0 0 18px #111a,0 3px 10px #0007;touch-action:none;pointer-events:auto;user-select:none;-webkit-user-select:none}
 #touch-stick:before{content:"";position:absolute;inset:20px;border-radius:50%;border:1px solid #d2c09255}
 #touch-stick-knob{position:absolute;left:calc(50% - 25px);top:calc(50% - 25px);width:50px;height:50px;border-radius:50%;border:2px solid #d9c18e;background:linear-gradient(135deg,#697357cc,#394536ee);box-shadow:0 2px 8px #0008;pointer-events:none}
 #quick-buttons{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:43px 78px;gap:8px;align-items:stretch;pointer-events:none}
@@ -182,7 +183,7 @@ button:disabled{opacity:.5;cursor:default}
 <div id="footer">WASD или джойстик — свободное движение · коснитесь цели — приоритет огня · армия захватывает фермы самостоятельно</div>
 <canvas id="battle-minimap" width="232" height="232" role="img" aria-label="Мини-карта: позиции британцев, Вермахта, фермы и базы"></canvas>
 <div id="mobile-controls" aria-label="Управление в стиле первой игры">
- <div id="touch-stick" aria-label="Джойстик движения героя" role="application"><div id="touch-stick-knob"></div></div>
+ <div id="touch-zone" aria-label="Левая зона движения героя" role="application"><div id="touch-stick" aria-label="Плавающий джойстик движения"><div id="touch-stick-knob"></div></div></div>
  <div id="quick-buttons">
   <button type="button" id="quick-gear" aria-label="Снаряжение" title="Снаряжение">⚙</button>
   <button type="button" id="quick-reload" aria-label="Перезарядить" title="Перезарядить">↻</button>

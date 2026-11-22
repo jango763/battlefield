@@ -1,5 +1,3 @@
-});
-function position(unit,y=0){
  return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y,BASE_Z+unit.z*UNIT_SCALE);
 }
 function color(hex){return B.Color3.FromHexString(hex)}
@@ -40,10 +38,14 @@ function createWorld(){
 
  // Mirror the FIRST Three.js game's camera: elevated follow, stable heading.
  // Babylon map's northern direction is +Z, so stand behind the blue hero.
- camera=new B.ArcRotateCamera('camera',Math.PI*1.5,1.18,14,
+ // A higher, wider tactical view keeps the hero readable while exposing cover.
+ // Keep the original north-up fixed bearing; thumbstick never turns the camera.
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.96,23,
   new B.Vector3(0,1,-107),scene);
- camera.lowerRadiusLimit=13.5;camera.upperRadiusLimit=14.5;
- camera.lowerBetaLimit=1.17;camera.upperBetaLimit=1.19;
+ camera.lowerRadiusLimit=22;camera.upperRadiusLimit=24;
+ camera.lowerBetaLimit=.92;camera.upperBetaLimit=1.02;
+ state.cameraProfile={mode:'elevated-tactical-follow',radius:camera.radius,
+  beta:camera.beta,alpha:camera.alpha};
  camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
  state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
  // Real photographed materials and geometry; Babylon skinned soldiers, game AI,
