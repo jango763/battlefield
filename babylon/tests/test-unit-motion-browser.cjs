@@ -19,11 +19,15 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
    const loaded=await page.evaluate(id=>{
     const s=window.__BF_UNIT_REVIEW__;
     return {id,error:s?.error,failures:s?.skinFailures,loadedCount:s?.loadedCount,
-     active:s?.characters[id]?.activeClip,models:s?.realModels};
+     active:s?.characters[id]?.activeClip,models:s?.realModels,
+     rigReady:s?.characters[id]?.rigReady,assembled:s?.characters[id]?.assembled};
    },id);
    console.log('BATTLEFIELD_UNIT_LOAD_STEP',JSON.stringify(loaded));
    assert(!loaded.error,'Original model '+id+' failed: '+loaded.error);
    assert(loaded.active,'Original '+id+' was not selected and animated');
+   assert(loaded.rigReady,'Soldier '+id+' must have complete hands / gun rig, never a mannequin');
+   if(id==='american')assert(/hand IK/.test(loaded.assembled),'American must have original Lee-Enfield rig');
+   if(id==='german')assert(/weapon rig/.test(loaded.assembled),'German must be equipped, not a naked animation source');
   }
   const status=await page.evaluate(()=>{
    const s=window.__BF_UNIT_REVIEW__;
@@ -43,6 +47,8 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
     !['pending'].includes(status.motionReports[id][mode].status),
     id+' '+mode+' donor must be processed or explicitly rejected');
   await page.locator('[data-motion="run"]').click();
+  assert.equal(status.motionReports.american.idle.status,'native-weapon-ready','Do not transfer foreign arm pose');
+  assert.equal(status.motionReports.german.idle.status,'native-weapon-ready','Do not transfer foreign arm pose');
   await page.waitForTimeout(500);
   await page.screenshot({path:'/tmp/bf-unit-motion-american-run.png'});
   await page.locator('#motion-standard').click();
