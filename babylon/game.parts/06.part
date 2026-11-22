@@ -1,4 +1,3 @@
-  if(event.type==='central-open')
    alertStatus('ЦЕНТРАЛЬНАЯ ФЕРМА ОТКРЫТА! Захватите её ради большого золота.');
  }});
  lastEconomyBlue=economy.treasury.blue;
@@ -122,3 +121,4 @@ function drawShot({unit,target,result}){
  if(result.weapon==='Panzerschreck'){
   const diameter=combat.WEAPONS.Panzerschreck.blastRadius*UNIT_SCALE*2;
   const sphere=B.MeshBuilder.CreateSphere('blast',{diameter,segments:10},scene);
+  sphere.position.copyFrom(impact);

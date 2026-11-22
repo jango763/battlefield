@@ -7,6 +7,7 @@ on:
       - 'babylon/game.js'
       - 'babylon/game.parts/**'
       - 'babylon/index.html'
+      - 'babylon/modern-art-v1.js'
       - 'babylon/tests/test-camera-joystick-checkpoint.cjs'
       - '.github/workflows/babylon-camera-joystick-qa.yml'
   workflow_dispatch:
@@ -23,5 +24,6 @@ jobs:
       - run: |
           node babylon/tools/assemble-game-parts.cjs --check
           node --check babylon/game.js
+          node --check babylon/modern-art-v1.js
           node babylon/tests/test-ten-part-engineering.cjs
           node babylon/tests/test-camera-joystick-checkpoint.cjs

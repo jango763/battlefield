@@ -5,8 +5,8 @@ const graphicsPreference=new URLSearchParams(location.search).get('quality');
 const graphicsMode=['low','high','auto'].includes(graphicsPreference)?graphicsPreference:'auto';
 const deviceScale=Math.max(1,window.devicePixelRatio||1);
 const renderQuality={
- mode:graphicsMode,low:Math.max(1,deviceScale/2.1),
- high:Math.max(1,deviceScale/1.15),fpsElapsed:0,
+ mode:graphicsMode,low:Math.max(1,deviceScale/2.0),
+ high:Math.max(1,deviceScale/1.5),fpsElapsed:0,
  scale:Math.max(1,deviceScale/(graphicsMode==='low'?1.15:
   graphicsMode==='high'?2.1:1.7))
 };

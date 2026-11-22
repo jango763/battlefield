@@ -122,3 +122,4 @@ function setup(scenarioName){
  economy=goldRules.create({onEvent:event=>{
   if(event.type==='central-countdown-start')
    alertStatus('Первый бот погиб! До открытия центральной фермы — 05:00.');
+  if(event.type==='central-open')

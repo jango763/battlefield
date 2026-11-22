@@ -48,7 +48,7 @@ function apply({scene,B,world,camera,sun,map}){
    t.uScale=t.vScale=scale;
    textures.push(t);
   }
-  normal.level=.52;
+  normal.level=.22;
   m.albedoTexture=base;m.bumpTexture=normal;
   material[label]=m;
   return m;
@@ -70,13 +70,48 @@ function apply({scene,B,world,camera,sun,map}){
  const roof=pbr('old-roof-tiles','brick',{scale:4,tint:'#817166',rough:1});
  const timber=pbr('warped-timber','wood',{scale:2,tint:'#9b8b76',rough:1});
  const dirt=pbr('soil-patches','mud',{scale:2,tint:'#9c927f',rough:1});
- // Ground was previously a single hand-painted 1024x1024 canvas that faded
- // into flat brown. Photographically scanned multi-surface PBR adds fine relief.
+ // Quiet tactical terrain: the 32x tiled high-frequency photo mud produced
+ // severe moire on iPhone while the elevated camera moved. Generate ONLY
+ // broad, low-contrast brush patches and build real mipmaps for minification.
+ const canvasGround=document.createElement('canvas');
+ canvasGround.width=canvasGround.height=512;
+ const brush=canvasGround.getContext('2d');
+ if(!brush)throw Error('No terrain painting context');
+ brush.fillStyle='#667354';brush.fillRect(0,0,512,512);
+ for(let i=0;i<230;i++){
+  const x=between(0,512),y=between(0,512);
+  const radius=between(14,50);
+  brush.globalAlpha=between(.035,.105);
+  brush.fillStyle=choose(['#8b8768','#4b654a','#8d8265','#596746','#a08a68']);
+  brush.beginPath();
+  brush.ellipse(x,y,radius*between(.7,1.6),radius*between(.45,1.15),
+   between(0,Math.PI),0,Math.PI*2);
+  brush.fill();
+ }
+ brush.globalAlpha=1;
+ const terrainTexture=new B.DynamicTexture('hd2026-soft-painted-earth',
+  {width:512,height:512},scene,true);
+ terrainTexture.getContext().drawImage(canvasGround,0,0);
+ terrainTexture.wrapU=terrainTexture.wrapV=B.Texture.CLAMP_ADDRESSMODE;
+ terrainTexture.anisotropicFilteringLevel=4;
+ terrainTexture.update(false);
+ terrainTexture.updateSamplingMode(B.Texture.TRILINEAR_SAMPLINGMODE);
+ const smoothEarth=new B.PBRMaterial('hd2026-matte-terrain',scene);
+ smoothEarth.albedoTexture=terrainTexture;
+ smoothEarth.albedoColor=B.Color3.FromHexString('#f1ebd9');
+ smoothEarth.metallic=0;smoothEarth.roughness=1;smoothEarth.specularIntensity=0;
  const oldGround=world.ground.material;
- world.ground.material=mud;
+ world.ground.material=smoothEarth;
  world.ground.receiveShadows=true;
- report.meshSurfaces++;
- if(oldGround&&oldGround!==mud)oldGround.dispose(true,true);
+ report.meshSurfaces++;report.terrainStyle='low-frequency-mipmapped-matte';
+ if(oldGround&&oldGround!==smoothEarth)oldGround.dispose(true,true);
+ // Large road textures repeated up to 45 times shimmered badly in motion.
+ // Matte colours retain the layout without flickering microdetail.
+ for(const [road,shade] of [[mudRoad,'#8c8269'],[crossRoad,'#8c8269']]){
+  road.albedoTexture=null;road.bumpTexture=null;
+  road.albedoColor=B.Color3.FromHexString(shade);
+  road.specularIntensity=0;
+ }
  const classify={
   'base-square-':stone,'base-hq-':plaster,'barrack-':plaster,
   'farm-yard-':dirt,'farm-house-':plaster,'farm-barn-':timber,
@@ -255,43 +290,27 @@ function apply({scene,B,world,camera,sun,map}){
     joined.freezeWorldMatrix();report.drawCallBatches++;}
   }catch(error){report.errors.push('mesh merge '+name+' '+String(error));}
  }
- // Mobile-friendly grass cards, generated once with alpha and instanced.
- // Cards replace no gameplay objects and are deliberately away from the road.
+ // Opaque low-poly grass clumps avoid alpha-tested edge crawl and flicker.
+ // They are decorative thin instances and do not change terrain collisions.
  try{
-  const canvas=document.createElement('canvas');
-  canvas.width=canvas.height=128;
-  const ctx=canvas.getContext('2d');
-  ctx.clearRect(0,0,128,128);
-  for(let i=0;i<48;i++){
-   const x=between(28,100),blade=between(35,107);
-   ctx.strokeStyle=choose(['#384c31','#596b3b','#7a8051','#8a8158','#485d37']);
-   ctx.lineWidth=between(1.5,4.2);
-   ctx.beginPath();ctx.moveTo(64,127);
-   ctx.quadraticCurveTo(x+between(-25,25),blade,x,between(25,85));ctx.stroke();
-  }
-  const tex=new B.DynamicTexture('hd2026-grass-alpha',{width:128,height:128},scene,true);
-  tex.getContext().drawImage(canvas,0,0);tex.hasAlpha=true;tex.update(false);
   const gm=new B.StandardMaterial('hd2026-grass-mat',scene);
-  gm.diffuseTexture=tex;gm.opacityTexture=tex;
-  gm.backFaceCulling=false;gm.specularColor=B.Color3.Black();
-  gm.useAlphaFromDiffuseTexture=true;gm.transparencyMode=B.Material.MATERIAL_ALPHATEST;
-  const mesh=B.MeshBuilder.CreatePlane('hd2026-meadow-blades',{width:1.5,height:1.55},scene);
+  gm.diffuseColor=B.Color3.FromHexString('#596b48');
+  gm.specularColor=B.Color3.Black();
+  const mesh=B.MeshBuilder.CreateCylinder('hd2026-meadow-tuft',
+   {diameterTop:.055,diameterBottom:.65,height:.60,tessellation:5},scene);
   mesh.material=gm;mesh.isPickable=false;
   const matrices=[];
-  // Avoid alpha overdraw on low-power phones while preserving the original
-  // photogrammetry/PBR surfaces, colliders, actors and animation systems.
   const lowPower=new URLSearchParams(
    typeof location!=='undefined'?location.search:'').get('quality')==='low';
-  const foliageBudget=lowPower?120:260;
+  const foliageBudget=lowPower?105:160;
   for(let i=0;i<foliageBudget;i++){
    const x=between(20,280),z=between(20,280);
-   // Keep spawn lanes, farm yards and the two center roads readable.
-   if(Math.abs(x-150)<8||Math.abs(z-150)<8)continue;
+   if(Math.abs(x-150)<9||Math.abs(z-150)<9)continue;
    if(map.farms.some(f=>Math.hypot(f.x-x,f.z-z)<12))continue;
    if(map.bases.some(b=>Math.hypot(b.x-x,b.z-z)<22))continue;
+   const w=between(.8,1.6);
    const q=B.Quaternion.FromEulerAngles(0,between(0,Math.PI),0);
-   const w=between(.6,1.8);
-   const m=B.Matrix.Compose(new B.Vector3(w,w,w),q,pos(x,.75*w,z));
+   const m=B.Matrix.Compose(new B.Vector3(w,w,w),q,pos(x,.30*w,z));
    matrices.push(...m.asArray());
    report.foliageInstances++;
   }
@@ -302,13 +321,13 @@ function apply({scene,B,world,camera,sun,map}){
  }catch(error){report.errors.push('foliage '+String(error));}
  // Restrained warm light — no extreme color filters, high-cost bloom or SSAO
  // at mobile resolution. Original sun casts PCF shadows where already supported.
- sun.intensity=1.2;
+ sun.intensity=1.10;
  if(scene.fogMode!==B.Scene.FOGMODE_NONE){
   scene.fogDensity=.0026;
   scene.fogColor=B.Color3.FromHexString('#9a9b8e');
  }
  const config=scene.imageProcessingConfiguration;
- if(config){config.toneMappingEnabled=true;config.exposure=1.06;config.contrast=1.11;}
+ if(config){config.toneMappingEnabled=true;config.exposure=1.05;config.contrast=1.025;}
  report.ready=true;
  scene.metadata=scene.metadata||{};
  scene.metadata.battlefieldModernArt=report;

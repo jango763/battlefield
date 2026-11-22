@@ -130,8 +130,8 @@ const graphicsPreference=new URLSearchParams(location.search).get('quality');
 const graphicsMode=['low','high','auto'].includes(graphicsPreference)?graphicsPreference:'auto';
 const deviceScale=Math.max(1,window.devicePixelRatio||1);
 const renderQuality={
- mode:graphicsMode,low:Math.max(1,deviceScale/2.1),
- high:Math.max(1,deviceScale/1.15),fpsElapsed:0,
+ mode:graphicsMode,low:Math.max(1,deviceScale/2.0),
+ high:Math.max(1,deviceScale/1.5),fpsElapsed:0,
  scale:Math.max(1,deviceScale/(graphicsMode==='low'?1.15:
   graphicsMode==='high'?2.1:1.7))
 };
@@ -1007,7 +1007,8 @@ function registerUI(){
 function updateTouchJoystick(dt){
  if(!fieldOrders)return;
  if(touchJoystick.active){
-  fieldOrders.setMovement(touchJoystick.x,touchJoystick.y);
+  // The north-up camera looks along +Z; screen-right is world -X.
+  fieldOrders.setMovement(-touchJoystick.x,touchJoystick.y);
   return;
  }
  const x=Number(movementKeys.d||movementKeys.ArrowRight)-
@@ -1015,7 +1016,7 @@ function updateTouchJoystick(dt){
  const z=Number(movementKeys.w||movementKeys.ArrowUp)-
   Number(movementKeys.s||movementKeys.ArrowDown);
  const magnitude=Math.hypot(x,z);
- fieldOrders.setMovement(magnitude>1?x/magnitude:x,magnitude>1?z/magnitude:z);
+ fieldOrders.setMovement(magnitude>1?-x/magnitude:-x,magnitude>1?z/magnitude:z);
 }
 function registerTouchControls(){
  // Match the first game's W/A/S/D and arrow-key walking on desktop.
@@ -1196,12 +1197,12 @@ function frame(){
  // ballistics, UI hit targets and all native skeleton animations stay fixed.
  if(renderQuality.mode==='auto'&&gameStarted){
   renderQuality.fpsElapsed+=Math.min(1,Math.max(0,engine.getDeltaTime()/1000)); // real frame time
-  if(renderQuality.fpsElapsed>=3){
+  if(renderQuality.fpsElapsed>=8){
    renderQuality.fpsElapsed=0;
    const fps=engine.getFps();
    const old=renderQuality.scale;
-   const next=fps<37?Math.min(renderQuality.high,old+.16):
-    fps>55?Math.max(renderQuality.low,old-.10):old;
+   const next=fps<34?Math.min(renderQuality.high,old+.08):
+    fps>57?Math.max(renderQuality.low,old-.06):old;
    if(Math.abs(next-old)>.04){
     renderQuality.scale=next;engine.setHardwareScalingLevel(next);
     state.graphics.hardwareScale=+next.toFixed(2);

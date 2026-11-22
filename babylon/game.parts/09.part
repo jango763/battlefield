@@ -1,4 +1,3 @@
- });
  $('reload-manual').addEventListener('click',()=>{
   const r=battle.startReload(findActor());
   alertStatus(r.ok?'Перезарядка началась: '+r.seconds+' с.':
@@ -11,7 +10,8 @@
 function updateTouchJoystick(dt){
  if(!fieldOrders)return;
  if(touchJoystick.active){
-  fieldOrders.setMovement(touchJoystick.x,touchJoystick.y);
+  // The north-up camera looks along +Z; screen-right is world -X.
+  fieldOrders.setMovement(-touchJoystick.x,touchJoystick.y);
   return;
  }
  const x=Number(movementKeys.d||movementKeys.ArrowRight)-
@@ -19,7 +19,7 @@ function updateTouchJoystick(dt){
  const z=Number(movementKeys.w||movementKeys.ArrowUp)-
   Number(movementKeys.s||movementKeys.ArrowDown);
  const magnitude=Math.hypot(x,z);
- fieldOrders.setMovement(magnitude>1?x/magnitude:x,magnitude>1?z/magnitude:z);
+ fieldOrders.setMovement(magnitude>1?-x/magnitude:-x,magnitude>1?z/magnitude:z);
 }
 function registerTouchControls(){
  // Match the first game's W/A/S/D and arrow-key walking on desktop.
