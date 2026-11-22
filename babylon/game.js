@@ -94,6 +94,8 @@ function promoteUnitMotion(view){
 }
 
 let actors=new Map(),fx=[],scenario='squads',atBase=true,world=null;
+const TRACER_LIMIT=48;
+const tracerPool=[];
 let replenisher=null,reinforcementEpoch=0;
 const REINFORCEMENT_LIMIT=8;
 let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
@@ -688,8 +690,26 @@ function setup(scenarioName){
  drawHud();
 }
 function findActor(){return allies[0]||null}
-function addEffect(mesh,ttl,material=null){
- fx.push({mesh,ttl,material});
+function addEffect(mesh,ttl,material=null,pooled=null){
+ fx.push({mesh,ttl,material,pooled});
+}
+function drawTracer(start,impact,colour,ttl){
+ let slot=tracerPool.find(t=>!t.active);
+ if(!slot){
+  if(tracerPool.length>=TRACER_LIMIT){
+   state.engineering.droppedTracerVisuals=
+    (state.engineering.droppedTracerVisuals||0)+1;
+   return; // Drop a VISUAL under load, never a real hit or its damage.
+  }
+  const mesh=B.MeshBuilder.CreateLines('tracer-pooled',{
+   points:[start,impact],updatable:true},scene);
+  slot={mesh,active:false};tracerPool.push(slot);
+ }else B.MeshBuilder.CreateLines('tracer-pooled',{
+  points:[start,impact],instance:slot.mesh},scene);
+ slot.mesh.color=colour;slot.mesh.isPickable=false;
+ slot.mesh.setEnabled(true);slot.active=true;
+ addEffect(slot.mesh,ttl,null,slot);
+ state.engineering.tracerPoolSize=tracerPool.length;
 }
 function drawShot({unit,target,result}){
  // Bounties are credited to the killer's army; the hero also earns
@@ -716,11 +736,9 @@ function drawShot({unit,target,result}){
  const impact=result.impact?position(result.impact,.7):
   targetView.anchor.position.add(new B.Vector3(0,1.15,0));
  if(!result.hit&&!result.impact)impact.z+=(Math.random()-.5)*1.4;
- const line=B.MeshBuilder.CreateLines('tracer',{
-  points:[start,impact]},scene);
- line.color=result.weapon==='Panzerschreck'?color('#ff9945'):
-  color(unit.team==='свои'?'#ffe5a0':'#ff866f');
- addEffect(line,result.weapon==='Panzerschreck'?.24:.095);
+ drawTracer(start,impact,result.weapon==='Panzerschreck'?color('#ff9945'):
+  color(unit.team==='свои'?'#ffe5a0':'#ff866f'),
+  result.weapon==='Panzerschreck'?.24:.095);
  if(result.weapon==='Panzerschreck'){
   const diameter=combat.WEAPONS.Panzerschreck.blastRadius*UNIT_SCALE*2;
   const sphere=B.MeshBuilder.CreateSphere('blast',{diameter,segments:10},scene);
@@ -740,6 +758,8 @@ function syncVisual(view){
  const unit=view.unit;
  if(!unit)return;
  if(!unit.alive){
+  if(view.inactive)return; // Dead rig was previously stopped every frame.
+  view.inactive=true;
   view.marker.setEnabled(false);
   view.hpBack.setEnabled(false);
   view.hpFill.setEnabled(false);
@@ -747,6 +767,7 @@ function syncVisual(view){
   stopAnimations(view);
   return;
  }
+ view.inactive=false;
  view.anchor.setEnabled(true);view.marker.setEnabled(true);
  view.hpBack.setEnabled(true);view.hpFill.setEnabled(true);
  const nextHP=Math.max(0,unit.hp/unit.maxHp);
@@ -1126,7 +1147,11 @@ function frame(){
  }
  for(let i=fx.length-1;i>=0;i--){
   const f=fx[i];f.ttl-=dt;
-  if(f.ttl<=0){f.mesh.dispose();f.material?.dispose();fx.splice(i,1);}
+  if(f.ttl<=0){
+   if(f.pooled){f.pooled.active=false;f.mesh.setEnabled(false);}
+   else{f.mesh.dispose();f.material?.dispose();}
+   fx.splice(i,1);
+  }
  }
  scene.render();
 }
