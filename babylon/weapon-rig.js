@@ -583,7 +583,10 @@
       } : {
         ready: [-.095, -.02, -.020],
         aim: [.012, 0, 0],
-        run: [.33, -.05, -.025],
+        // Keep the rifle nearly horizontal while running. The former
+        // +0.33 rad pitch visibly pointed the muzzle at the ground and
+        // made the wrists look detached despite passing distance-only IK.
+        run: rifle ? [.045, -.05, -.025] : [.22, -.05, -.025],
         fire: [.012, 0, 0]
       })[pose];
       // During mobile shooting, legs KEEP the Run clip. Only the upper-body
@@ -751,6 +754,13 @@
       report.muzzleWorldPosition=Array.isArray(meta.muzzle)
         ?pivot.position.add(rotated(v(meta.muzzle),gunQ)).asArray():null;
       report.stockWorldPosition=kar98k?stockWorld.asArray():null;
+      const muzzle=Array.isArray(meta.muzzle)
+        ?pivot.position.add(rotated(v(meta.muzzle),gunQ)):null;
+      if(muzzle){
+        const delta=muzzle.subtract(stockWorld);
+        report.barrelElevationDeg=+(Math.atan2(delta.y,
+          Math.hypot(delta.x,delta.z))*180/Math.PI).toFixed(2);
+      }
       report.stockSocketWorldPosition=kar98k?rifleShoulderSocket.asArray():null;
       report.stockToSocketMeters=kar98k
         ?+B.Vector3.Distance(stockWorld,rifleShoulderSocket).toFixed(5):null;
