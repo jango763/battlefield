@@ -286,7 +286,7 @@
   async function create({ scene, imported, root, state, animationDriven = false, bindUI = true,
     weaponRoot = '../assets/ww2-weapons/', acceptExportSockets = false,
     initialWeaponId = 'de-kar98k', allowRetargetedSkeleton = false,
-    previewNativeArmLayer = false }) {
+    previewNativeArmLayer = false, previewHandSocketRun = false }) {
     const skeleton = imported.skeletons[0];
     const linked = (skeleton?.bones || []).map(b => b.getTransformNode?.()).filter(Boolean);
     const nodes = [...imported.transformNodes, ...imported.meshes, ...linked];
@@ -523,11 +523,12 @@
     pivot.rotationQuaternion = B.Quaternion.Identity();
 
     let pose = 'ready', weaponId = null, meta = null, container = null;
+    let nativeRightHandMount=null;
     let needsPose = true, lastSolveTime = 0;
     let rocketDispose = null, generation = 0;
     state.weaponRig = {
       rig: 'Mixamo linked glTF nodes + 2-hand IK + elbow poles + grip fingers', pose, weapon: null,
-      animationDriven,previewNativeArmLayer,
+      animationDriven,previewNativeArmLayer,previewHandSocketRun,
       rightGripMeters: null, leftGripMeters: null,
       preliminaryGeometryOnly: true, experimentalFourthAsset: true,
       fingerJoints: fingers.length, anatomicalElbowPoles: true
@@ -557,6 +558,35 @@
     }
     function update() {
       if (!meta) return;
+      if(previewHandSocketRun&&pose==='run'&&nativeRightHandMount){
+        // Author-native weapon carry: treat the RIGHT hand as the physical
+        // mount. This GLB has animated RightHand rotations but NO animated
+        // Weapon_R socket track; the prior procedural 2-hand solver erased
+        // the authored arm motion and produced the floating-gun look.
+        // Compute the rigid transform in world space every frame so
+        // glTF's original 95-unit rig scaling cannot distort the gun.
+        refresh(right.hand);
+        const handQ=worldRotation(right.hand);
+        const origin=right.hand.getAbsolutePosition();
+        const q=handQ.multiply(nativeRightHandMount.localQ).normalize();
+        pivot.rotationQuaternion.copyFrom(q);
+        pivot.position.copyFrom(origin.add(rotated(nativeRightHandMount.localP,handQ)));
+        refresh(pivot);
+        refresh(left.hand);refresh(right.upper);
+        const trigger=pivot.position.add(rotated(v(meta.trigger),q));
+        const support=pivot.position.add(rotated(v(meta.support),q));
+        const stock=pivot.position.add(rotated(v(meta.shoulder),q));
+        const muzzle=pivot.position.add(rotated(v(meta.muzzle),q));
+        const delta=muzzle.subtract(stock);
+        report.barrelElevationDeg=+(Math.atan2(delta.y,
+          Math.hypot(delta.x,delta.z))*180/Math.PI).toFixed(2);
+        report.rightGripMeters=+B.Vector3.Distance(origin,trigger).toFixed(4);
+        report.leftGripMeters=+B.Vector3.Distance(left.hand.getAbsolutePosition(),support).toFixed(4);
+        report.stockRightShoulderMeters=+B.Vector3.Distance(stock,
+          right.upper.getAbsolutePosition()).toFixed(4);
+        report.nativeHandMounted=true;report.pose=pose;
+        return;
+      }
       const now = performance.now();
       if (!animationDriven && !needsPose && (pose === 'ready' || pose === 'aim')) return;
       if (!animationDriven && !needsPose && now - lastSolveTime < 65) return;
@@ -838,6 +868,14 @@
     }
     function setPose(value) {
       if (!['ready', 'aim', 'run', 'fire'].includes(value)) return;
+      if(value==='run'&&pose!=='run'&&previewHandSocketRun){
+        refresh(right.hand);refresh(pivot);
+        const handQ=worldRotation(right.hand);
+        nativeRightHandMount={
+         localP:rotated(pivot.position.subtract(right.hand.getAbsolutePosition()),handQ.conjugate()),
+         localQ:handQ.conjugate().multiply(worldRotation(pivot)).normalize()
+        };
+      }else if(value!=='run')nativeRightHandMount=null;
       pose = value; needsPose = true; buttonState();
     }
     async function equip(id) {
