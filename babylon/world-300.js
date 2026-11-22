@@ -16,7 +16,7 @@ function from(v){return {x:v.x+ORIGIN,z:v.z+ORIGIN}}
 function create(scene,B,map){
  if(!scene||!B||map?.size!==SIZE)throw Error('World300 requires 300x300 map');
  const nodes=[],obstacles=[],rings=new Map(),farmMats=new Map();
- const wreckProxies=new Map();let originalWrecksLoaded=0;
+ const wreckProxies=new Map(),vehicleBounds=[];let originalWrecksLoaded=0;
  const mats={};
  function material(id,hex,emissive=null){
   if(mats[id])return mats[id];
@@ -203,6 +203,7 @@ function create(scene,B,map){
    wheel.rotation.z=Math.PI/2;proxies.push(wheel);
   }
   obstacle(w.x,w.z,8,4,'btr-wreck');
+  obstacles[obstacles.length-1].id=w.id;
   const burn=cylinder('btr-scorch-'+w.id,10,.018,w.x,.07,w.z,mat.burnt,16);
   burn.scaling.z=.5;proxies.push(burn);
   wreckProxies.set(w.id,proxies);
@@ -229,14 +230,27 @@ function create(scene,B,map){
     const span=Math.max(bounds.x,bounds.z);
     if(!Number.isFinite(span)||span<.01)throw Error('Original BTR dimensions invalid');
     const anchor=new B.TransformNode('real-btr-'+w.id,scene);
-    anchor.position.copyFrom(at(w.x,w.z,0,B));
-    anchor.rotation.y=w.heading;
-    anchor.scaling.setAll(7.6/span);
-    // The original GLB nodes have identity parents and baked geometry.
-    mesh.parent=anchor;
+    // GLB has a -90 degree X rotation on Sketchfab_model. Detaching via
+    // setParent preserves that WORLD rotation; assigning parent alone lost it.
+    mesh.setParent(null,true,true);
+    mesh.parent=anchor; // Identity parent, then center in the preserved frame.
     mesh.position.x-=center.x;
     mesh.position.z-=center.z;
     mesh.position.y-=bound.min.y;
+    anchor.scaling.setAll(7.6/span);
+    anchor.rotation.y=w.heading;
+    anchor.position.copyFrom(at(w.x,w.z,.025,B));
+    anchor.computeWorldMatrix(true);mesh.computeWorldMatrix(true);
+    const placed=mesh.getHierarchyBoundingVectors(true);
+    const collider=obstacles.find(o=>o.id===w.id);
+    if(collider){
+     collider.x=(placed.min.x+placed.max.x)/2+ORIGIN;
+     collider.z=(placed.min.z+placed.max.z)/2+ORIGIN;
+     collider.hw=(placed.max.x-placed.min.x)/2;
+     collider.hd=(placed.max.z-placed.min.z)/2;
+    }
+    vehicleBounds.push({id:w.id,minY:placed.min.y,height:placed.max.y-placed.min.y,
+     width:placed.max.x-placed.min.x,depth:placed.max.z-placed.min.z});
     // Clone and darken the original vehicle materials as in the old game.
     // Avoid mutating shared source materials or altering the GLB asset.
     const parts=[mesh,...(mesh.getChildMeshes?mesh.getChildMeshes():[])];
@@ -352,7 +366,7 @@ function create(scene,B,map){
   }
  }
  return {ground,nodes,obstacles,rings,syncFarms,loadOriginalBTR,
-  getOriginalWreckCount:()=>originalWrecksLoaded,
+  getOriginalWreckCount:()=>originalWrecksLoaded,vehicleBounds,
   toScene:(x,z,y=0)=>at(x,z,y,B),
   fromScene:from,
   inBase:(x,z,team,radius=25)=>{

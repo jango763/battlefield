@@ -25,6 +25,7 @@ class Node{
  constructor(name){this.name=name;this.position=new Vector3();this.rotation=new Vector3();
   this.scaling=new Vector3(1,1,1);this.isVisible=true;this.enabled=true}
  dispose(){this.disposed=true}
+ setParent(parent){this.parent=parent;return this}
  computeWorldMatrix(){return null}
  setEnabled(enabled){this.enabled=enabled}
  getHierarchyBoundingVectors(){return {min:new Vector3(-3,-1,-2),max:new Vector3(3,2,2)}}
