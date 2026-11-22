@@ -136,6 +136,9 @@ function apply({scene,B,world,camera,sun,map}){
  smoothEarth.diffuseColor=B.Color3.FromHexString('#899b76');
  smoothEarth.specularColor=B.Color3.Black();
  smoothEarth.ambientColor=B.Color3.FromHexString('#414f34');
+ // Right-handed scene + custom trench vertex winding can leave the large
+ // terrain culled. A double-sided matte ground prevents sky-colour holes.
+ smoothEarth.backFaceCulling=false;
  const oldGround=world.ground.material;
  world.ground.material=smoothEarth;
  world.ground.receiveShadows=true;
