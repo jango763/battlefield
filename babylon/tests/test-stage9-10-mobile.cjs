@@ -40,7 +40,7 @@ fs.mkdirSync(dir,{recursive:true});
   });
   const s=result.initial;
   assert(s.ready&&!s.error,'Game startup failed: '+s.error);
-  assert.equal(s.art.colorGrade,'muted-olive-earth-v2');
+  assert.equal(s.art.colorGrade,'muted-olive-earth-v3');
   assert(s.art.mipmappedScans&&s.art.opaqueHedgerows);
   assert(s.art.scannedMaterialMaps>=12);
   assert(s.shrubInstances>=30,'Nontransparent low-poly ground foliage absent');
@@ -56,6 +56,7 @@ fs.mkdirSync(dir,{recursive:true});
   }
   assert.equal(s.graphics.mode,'low');
   assert(s.camera.mode==='elevated-tactical-follow');
+  assert(s.camera.radius>=28&&s.camera.radius<=31,'Camera must expose more of battlefield');
   await page.locator('#enter-game').click();
   await page.waitForTimeout(750);
   result.heroBefore=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.heroPosition);
