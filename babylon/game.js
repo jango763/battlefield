@@ -98,7 +98,7 @@ const TRACER_LIMIT=48;
 const tracerPool=[];
 let replenisher=null,reinforcementEpoch=0;
 const REINFORCEMENT_LIMIT=8;
-let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
+let statusAt=0,lastFarmSyncAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 let weaponQueue=[],weaponWorker=false;
 let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
 const touchJoystick={active:false,pointer:null,x:0,y:0,cooldown:0};
@@ -1162,8 +1162,12 @@ function frame(){
    const dest=position(allies[0],1.55).add(new B.Vector3(0,0,3.0));
    camera.target=B.Vector3.Lerp(camera.target,dest,Math.min(1,dt*2.8));
   }
-  if(world&&economy)world.syncFarms(economy.summary());
   const now=performance.now();
+  // The five capture-ring meshes change slowly. Rebuilding the complete
+  // economy summary and ring materials every rendered frame wastes CPU.
+  if(world&&economy&&now-lastFarmSyncAt>400){
+   world.syncFarms(economy.summary());lastFarmSyncAt=now;
+  }
   if(now-statusAt>220){statusAt=now;drawHud();}
  }
  for(let i=fx.length-1;i>=0;i--){
@@ -1172,6 +1176,27 @@ function frame(){
    if(f.pooled){f.pooled.active=false;f.mesh.setEnabled(false);}
    else{f.mesh.dispose();f.material?.dispose();}
    fx.splice(i,1);
+  }
+ }
+ // Adaptive GPU resolution affects graphics only: simulation, targeting,
+ // ballistics, UI hit targets and all native skeleton animations stay fixed.
+ if(renderQuality.mode==='auto'&&gameStarted){
+  renderQuality.fpsElapsed+=dt;
+  if(renderQuality.fpsElapsed>=3){
+   renderQuality.fpsElapsed=0;
+   const fps=engine.getFps();
+   const old=renderQuality.scale;
+   const next=fps<37?Math.min(renderQuality.high,old+.16):
+    fps>55?Math.max(renderQuality.low,old-.10):old;
+   if(Math.abs(next-old)>.04){
+    renderQuality.scale=next;engine.setHardwareScalingLevel(next);
+    state.graphics.hardwareScale=+next.toFixed(2);
+    state.graphics.changes++;
+   }
+   state.engineering.frameStats={fps:+fps.toFixed(1),scale:+next.toFixed(2),
+    visibleActors:views.filter(v=>v?.unit?.alive).length,
+    activeTracers:fx.filter(f=>f.pooled).length,
+    sharedSoldierMaterials:soldierMaterialCache.size};
   }
  }
  scene.render();
