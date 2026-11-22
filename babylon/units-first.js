@@ -15,7 +15,7 @@ const specs=Object.freeze({
   approval:'ИСХОДНАЯ МОДЕЛЬ УТВЕРЖДЕНА',color:'#a9b7a3',
   clips:{idle:'Kar98k_Hold',walk:'Kar98k_Run',run:'Kar98k_Run',aim:'Kar98k_Aim',fire:'Kar98k_Fire'},
   speeds:{walk:.67,run:1.1,fire:1},
-  warning:'Оригинальная немецкая сетка и 16 боевых клипов. Kar98k установлен отдельным штатным модулем, обе руки удерживают оружие.'
+  warning:'Бег ног — исходный немецкий GLB. Руки во время бега остаются в штатной стойке с Kar98k, без переноса анимации кистей. Проверка боевого хвата продолжается.'
  }),
  american:Object.freeze({
   label:'Американский герой · оригинальная модель',source:'../assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb',
@@ -103,6 +103,8 @@ try{
  function status(message){$('#status').textContent=message;}
  function error(message){$('#error').style.display='block';$('#error').textContent=message;}
  function groupFor(model,motion){
+  if(model.id==='german'&&motion==='run'&&model.nativeLegsRun)
+   return model.nativeLegsRun;
   if(state.sharedMotion&&model.sharedClips?.has(motion))
    return model.sharedClips.get(motion);
   const clip=model.spec.clips[motion];
@@ -133,8 +135,8 @@ try{
   // The real two-handed rigs work AFTER the native animation and before rendering.
   // No foreign soldier's arm/shoulder tracks are allowed to fight their IK.
   if(model.id==='german')
-   model.rigState?.setWeaponPose?.(mode==='run'||mode==='walk'?'run':
-    mode==='aim'?'aim':mode==='fire'?'fire':'ready');
+   model.rigState?.setWeaponPose?.(mode==='run'?'ready':
+    mode==='walk'?'run':mode==='aim'?'aim':mode==='fire'?'fire':'ready');
   if(model.id==='american')
    model.rig?.setPose?.(mode==='aim'||mode==='fire'?'aim':'ready');
   state.motion=mode;
@@ -193,6 +195,22 @@ try{
    -min.y*scale,-(min.z+max.z)*.5*scale);
   container.addAllToScene();
   for(const clip of clips)clip.stop();
+  let nativeLegsRun=null;
+  if(id==='german'){
+   // Standard combat locomotion layering: the source German RUN drives
+   // ONLY the pelvis and legs. Upper body stays in its own native Kar98k
+   // READY grip. Reusing the whole Run clip on hands pulled the original
+   // rifle down and forced the IK solver to fight animated wrist curves.
+   const authored=unitMotion?.findGroup(clips,'Kar98k_Run');
+   if(!authored||typeof B.AnimationGroup!=='function')
+    throw Error('Не найден исходный немецкий бег для нижнего слоя');
+   const lower=new B.AnimationGroup('native-German-legs-with-Kar98k-ready',scene);
+   for(const track of authored.targetedAnimations||[])
+    lower.addTargetedAnimation(track.animation,track.target);
+   const masked=unitMotion.legsOnly(lower);
+   if(!masked.ok){lower.dispose();throw Error('Нельзя выделить бег ног: '+masked.reason);}
+   lower.stop();nativeLegsRun=lower;
+  }
   // Preserve ALL source geometry. The reported "second rifle" came from
   // another soldier's independently loaded weapon, not the US source mesh.
   let hiddenSourceGun=0;
@@ -254,7 +272,7 @@ try{
   const triangles=meshes.reduce((sum,m)=>
    sum+Math.round((m.getTotalIndices?.()||m.getTotalVertices())/3),0);
   const data={id,spec,container,pivot,clips,skinned:skinned.length,bones,triangles,
-   rig,rigState,rigReady:id==='jakeli'||!!rig,hiddenSourceGun,weaponMeshes,
+   rig,rigState,rigReady:id==='jakeli'||!!rig,nativeLegsRun,hiddenSourceGun,weaponMeshes,
    textures:container.textures?.length||0};
   cache.set(id,data);
   rebuildSharedMotion();
