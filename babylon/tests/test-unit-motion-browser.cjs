@@ -85,6 +85,33 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
    assert(status.motionReports[id]?.[mode]&&
     !['pending'].includes(status.motionReports[id][mode].status),
     id+' '+mode+' donor must be processed or explicitly rejected');
+  // Visual gait gate: test actual animated frames of all three real GLBs.
+  // Capture multiple positions in the cycle, not merely a static T/idle pose.
+  for(const fighter of ['german','jakeli','american']){
+   await page.locator('[data-unit="'+fighter+'"]').click();
+   await page.locator('#toggle-controls').click();
+   for(const [mode,delay] of [['idle',300],['run',380],['run',900]]){
+    if(mode==='run'&&delay===900)await page.waitForTimeout(delay);
+    else{await page.locator('[data-motion="'+mode+'"]').click();await page.waitForTimeout(delay);}
+    const report=await page.evaluate(id=>{
+     const model=window.__BF_UNIT_REVIEW_ACT__.getModel(id);
+     const r=model?.rigState?.weaponRig||model?.rig?.report||{};
+     const pos=model?.pivot?.getAbsolutePosition?.();
+     return {id,clip:model?.clip?.name,pose:r.pose||r.mode||null,
+      rightGripMeters:r.rightGripMeters,leftGripMeters:r.leftGripMeters,
+      stockRightShoulderMeters:r.stockRightShoulderMeters,
+      stockToShoulderMeters:r.stockToShoulderMeters,
+      rightIKMeters:r.rightIKMeters,leftIKMeters:r.leftIKMeters,
+      error:r.error||null,pivot:pos?.asArray()};
+    },fighter);
+    console.log('BATTLEFIELD_GAIT_FRAME',JSON.stringify({...report,delay}));
+    const jpg=await page.screenshot({type:'jpeg',quality:50,
+      path:'/tmp/bf-unit-'+fighter+'-'+mode+'-'+delay+'.jpeg'});
+    console.log('BATTLEFIELD_GAIT_'+fighter.toUpperCase()+'_'+mode.toUpperCase()+'_'+delay+'_JPEG_BASE64 '+jpg.toString('base64'));
+   }
+   await page.locator('#toggle-controls').click();
+  }
+  await page.locator('[data-unit="american"]').click();
   await page.locator('#toggle-controls').click();
   assert.equal(await page.locator('#toggle-controls').getAttribute('aria-expanded'),'true');
   assert.equal(await page.locator('[data-motion="run"]').isVisible(),true,
