@@ -145,7 +145,7 @@ try{
    'Реальная модель: '+c.triangles.toLocaleString('ru-RU')+
    ' треугольников · '+c.skinned+' скелетных сеток · '+c.bones+' костей\n'+
    'Клип: '+clip.name+' · '+
-   (state.sharedMotion?'Общий стандарт: '+JSON.stringify(model.sharedReports?.[mode]||{status:'native'}):'Исходная анимация')+
+   (state.sharedMotion?'Движение: '+JSON.stringify(model.sharedReports?.[mode]||{status:'native'}):'Исходная анимация')+
    '\n'+model.spec.warning);
  }
  function area(container){
@@ -262,7 +262,7 @@ try{
  $('#motion-standard').addEventListener('click',()=>{
   state.sharedMotion=!state.sharedMotion;
   $('#motion-standard').setAttribute('aria-pressed',String(state.sharedMotion));
-  $('#motion-standard').textContent='Общий стандарт: '+(state.sharedMotion?'ВКЛ':'ВЫКЛ');
+  $('#motion-standard').textContent='Ноги: бег немца '+(state.sharedMotion?'ВКЛ':'ВЫКЛ');
   if(active)play(state.motion);
  });
  window.__BF_UNIT_REVIEW_ACT__={select,play,
