@@ -628,7 +628,9 @@
         // Keep the rifle nearly horizontal while running. The former
         // +0.33 rad pitch visibly pointed the muzzle at the ground and
         // made the wrists look detached despite passing distance-only IK.
-        run: rifle ? [.045, .34, -.025] : [.22, -.05, -.025],
+        run: rifle
+          ? (state.weaponMotionRunCarryTest ? [-.16,.20,-.025] : [.045,.34,-.025])
+          : [.22,-.05,-.025],
         fire: [.012, 0, 0]
       })[pose];
       // During mobile shooting, legs KEEP the Run clip. Only the upper-body
@@ -704,7 +706,7 @@
       // Aiming moves the left hand toward the receiver/launcher control,
       // preventing a fully locked support elbow while keeping the muzzle stable.
       const supportPoint=rifle
-        ? (running?[0,.04,.015]
+        ? (running?(state.weaponMotionRunCarryTest?[0,.04,.23]:[0,.04,.015]
           : pose==='aim'||pose==='fire'?[0,.04,.055]:meta.support)
         : (pose==='aim'||pose==='fire')
           ? (launcher?[0,-.135,-.09]:meta.support)
