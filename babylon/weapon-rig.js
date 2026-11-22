@@ -706,7 +706,7 @@
       // Aiming moves the left hand toward the receiver/launcher control,
       // preventing a fully locked support elbow while keeping the muzzle stable.
       const supportPoint=rifle
-        ? (running?(state.weaponMotionRunCarryTest?[0,.04,.23]:[0,.04,.015]
+        ? (running?(state.weaponMotionRunCarryTest?[0,.04,.23]:[0,.04,.015])
           : pose==='aim'||pose==='fire'?[0,.04,.055]:meta.support)
         : (pose==='aim'||pose==='fire')
           ? (launcher?[0,-.135,-.09]:meta.support)
