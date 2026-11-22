@@ -134,6 +134,11 @@ try{
   }
   // The real two-handed rigs work AFTER the native animation and before rendering.
   // No foreign soldier's arm/shoulder tracks are allowed to fight their IK.
+  if(model.id==='german'&&model.rigState){
+   model.rigState.weaponMotionRun=mode==='run';
+   model.rigState.weaponMotionRightWristMax=
+    Number(new URLSearchParams(location.search).get('rightWristCap')||55);
+  }
   if(model.id==='german')
    model.rigState?.setWeaponPose?.(mode==='run'?'ready':
     mode==='walk'?'run':mode==='aim'?'aim':mode==='fire'?'fire':'ready');
