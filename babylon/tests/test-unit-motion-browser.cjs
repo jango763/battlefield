@@ -126,65 +126,23 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
     console.log('BATTLEFIELD_MOTION_'+fighter.toUpperCase()+'_RUN_'+label.toUpperCase()+'_FULL_JPEG_BASE64 '+shot.toString('base64'));
    }
    if(fighter==='german'){
-    // Same live, skinned, animated character: sweep wrist limits instead of
-    // approving one blindly. Compare anatomy + target-angle metrics and pixels.
-    for(const cap of [55,80,100,120,140]){
-     const sample=await page.evaluate(max=>{
-      const model=window.__BF_UNIT_REVIEW_ACT__.getModel('german');
-      model.rigState.weaponMotionRightWristMax=max;
-      return {max};
-     },cap);
-     await page.waitForTimeout(220);
-     const m=await page.evaluate(()=>{
-      const model=window.__BF_UNIT_REVIEW_ACT__.getModel('german');
-      const r=model.rigState.weaponRig;
-      return {cap:r.rightWristLimitDeg,wristApplied:r.rightWristDegrees,
-       fingerError:r.rightFingerDirectionErrorDegrees,
-       rightGrip:r.rightGripMeters,leftGrip:r.leftGripMeters,
-       rightIK:r.rightIKMeters,leftIK:r.leftIKMeters,error:r.error||null};
-     });
-     console.log('BATTLEFIELD_RIGHT_WRIST_SWEEP',JSON.stringify(m));
-     const shot=await page.screenshot({type:'jpeg',quality:48,
-      path:'/tmp/bf-right-wrist-'+cap+'.jpeg'});
-     console.log('BATTLEFIELD_RIGHT_WRIST_'+cap+'_JPEG_BASE64 '+shot.toString('base64'));
-    }
-    // A/B the existing skinned finger hinges instead of accepting the
-    // theoretical wrist angle as proof of an actually closed trigger grip.
-    for(const gripMode of ['default','classic','neutral','reverse','axisX','reverseAxisX']){
-     await page.evaluate(mode=>{
-      const model=window.__BF_UNIT_REVIEW_ACT__.getModel('german');
-      model.rigState.weaponMotionGripDebug=mode==='default'?null:mode;
-      model.rigState.weaponMotionRightWristMax=125;
-     },gripMode);
-     await page.waitForTimeout(210);
-     const metrics=await page.evaluate(()=>{
-      const model=window.__BF_UNIT_REVIEW_ACT__.getModel('german');
-      const report=model.rigState.weaponRig;
-      return {rightGrip:report.rightGripMeters,leftGrip:report.leftGripMeters,
-       fingerError:report.rightFingerDirectionErrorDegrees,
-       fingerMode:model.rigState.weaponMotionGripDebug||'default'};
-     });
-     console.log('BATTLEFIELD_GERMAN_FINGER_SWEEP',JSON.stringify(metrics));
-     const full=await page.screenshot({type:'jpeg',quality:48});
-     console.log('BATTLEFIELD_FINGER_'+gripMode.toUpperCase()+'_FULL_JPEG_BASE64 '+full.toString('base64'));
-     // Physically inspect the grip closely while still retaining an
-     // independent full-body acceptance screenshot for each variation.
-     const saved=await page.evaluate(()=>{
-      const scene=window.__BF_UNIT_REVIEW_ACT__.getScene(),cam=scene.activeCamera;
-      const report=window.__BF_UNIT_REVIEW_ACT__.getModel('german').rigState.weaponRig;
-      const old={target:cam.target.asArray(),radius:cam.radius};
-      if(report.handFocus)cam.setTarget(new BABYLON.Vector3(...report.handFocus));
-      cam.radius=1.35;
-      return old;
-     });
-     await page.waitForTimeout(120);
-     const detail=await page.screenshot({type:'jpeg',quality:62});
-     console.log('BATTLEFIELD_FINGER_'+gripMode.toUpperCase()+'_CLOSE_JPEG_BASE64 '+detail.toString('base64'));
-     await page.evaluate(saved=>{
-      const cam=window.__BF_UNIT_REVIEW_ACT__.getScene().activeCamera;
-      cam.setTarget(new BABYLON.Vector3(...saved.target));cam.radius=saved.radius;
-     },saved);
-    }
+    const previous=await page.evaluate(()=>{
+     const model=window.__BF_UNIT_REVIEW_ACT__.getModel('german');
+     const cam=window.__BF_UNIT_REVIEW_ACT__.getScene().activeCamera;
+     const report=model.rigState.weaponRig;
+     const saved={target:cam.target.asArray(),radius:cam.radius};
+     if(report.handFocus)cam.setTarget(new BABYLON.Vector3(...report.handFocus));
+     cam.radius=1.35;
+     return saved;
+    });
+    await page.waitForTimeout(160);
+    const detail=await page.screenshot({type:'jpeg',quality:63,
+      path:'/tmp/bf-german-grip-close.jpeg'});
+    console.log('BATTLEFIELD_GERMAN_GRIP_CLOSE_JPEG_BASE64 '+detail.toString('base64'));
+    await page.evaluate(saved=>{
+     const cam=window.__BF_UNIT_REVIEW_ACT__.getScene().activeCamera;
+     cam.setTarget(new BABYLON.Vector3(...saved.target));cam.radius=saved.radius;
+    },previous);
    }
    if(fighter!=='german'){
     await page.locator('#toggle-controls').click();
