@@ -45,6 +45,8 @@ const {chromium}=require('/tmp/bf-tactical-camera/node_modules/playwright');
   assert(before.detail?.patches>=120&&before.detail.drawCalls===5,
    'Terrain plus two shared-mesh roadside detail batches must be generated');
   assert.equal(before.detail.roadSurface,'two-track-gravel-and-grass');
+  assert.equal(before.detail.roadMaterial,'PBR-opaque-dry-earth',
+   'Road must be physically lit with a clean, brighter soil texture');
   assert.equal(before.detail.roadVergesVisible,true,
    'Natural grass verges must be distinguishable from the road from above');
   assert(before.detail.hedges>=25&&before.detail.stones>=12,
@@ -111,6 +113,9 @@ const {chromium}=require('/tmp/bf-tactical-camera/node_modules/playwright');
   await page.locator('#camera-toggle').click();
   assert.equal(await page.evaluate(()=>window.__BATTLEFIELD_GAME__.cameraProfile),'tactical');
   await page.locator('#hud-toggle').click();
+  const graphicsBadge=await page.locator('#graphics-tag').evaluate(
+   e=>getComputedStyle(e).display);
+  assert.equal(graphicsBadge,'none','Debug art badge should not obscure battle');
   const image=await page.screenshot({type:'jpeg',quality:48,path:'/tmp/bf-coh3-style-mobile.jpg'});
   console.log('BATTLEFIELD_TACTICAL_RENDER_JPEG_BASE64 '+image.toString('base64'));
   assert.equal(errors.length,0,'In-game JS errors: '+errors.join('|'));
