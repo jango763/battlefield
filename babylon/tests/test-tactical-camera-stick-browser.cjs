@@ -8,11 +8,29 @@ const {chromium}=require('/tmp/bf-tactical-camera/node_modules/playwright');
  try{
   const page=await browser.newPage({viewport:{width:390,height:844},
    isMobile:true,hasTouch:true,deviceScaleFactor:3});
-  const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+  const errors=[];
+  page.on('pageerror',e=>{errors.push(String(e));console.log('BATTLEFIELD_PAGE_ERROR',String(e))});
+  page.on('console',m=>{
+   if(m.type()==='error'||m.type()==='warning')
+    console.log('BATTLEFIELD_BROWSER_CONSOLE',m.type(),m.text().slice(0,700));
+  });
+  page.on('requestfailed',req=>{
+   console.log('BATTLEFIELD_REQUEST_FAILED',req.url(),req.failure()?.errorText);
+  });
   await page.goto('http://127.0.0.1:8877/babylon/index.html?quality=low',
    {waitUntil:'domcontentloaded',timeout:60000});
+  await page.waitForTimeout(9000);
+  const diagnostics=await page.evaluate(()=>{
+   const state=window.__BATTLEFIELD_GAME__;
+   return {state:state?{ready:state.ready,loading:state.loading,error:state.error,
+    models:state.models,mapDetail:state.mapDetail}:null,
+    loading:document.querySelector('#loading')?.textContent,
+    status:document.querySelector('#brief-progress')?.textContent,
+    engine:!!window.BABYLON};
+  });
+  console.log('BATTLEFIELD_STARTUP_DIAGNOSTICS',JSON.stringify(diagnostics));
   await page.waitForFunction(()=>window.__BATTLEFIELD_GAME__?.ready||
-   window.__BATTLEFIELD_GAME__?.error,null,{timeout:110000});
+   window.__BATTLEFIELD_GAME__?.error,null,{timeout:55000});
   const before=await page.evaluate(()=>{
    const s=window.__BATTLEFIELD_GAME__,pad=document.getElementById('touch-stick');
    return {ready:s.ready,error:s.error,models:s.models,
