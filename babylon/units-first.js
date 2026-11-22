@@ -34,7 +34,7 @@ const specs=Object.freeze({
  })
 });
 const state=window.__BF_UNIT_REVIEW__={
- ready:false,selected:'german',motion:'idle',error:null,sharedMotion:true,panelOpen:false,motionReports:{},createdGroups:0,
+ ready:false,selected:'german',motion:'idle',error:null,sharedMotion:false,panelOpen:false,motionReports:{},createdGroups:0,
  realModels:{},approved:{german:true,american:false,jakeli:false},
  trialOnly:true,characters:{},loadedCount:0,skinFailures:[]
 };
@@ -301,7 +301,7 @@ try{
  $('#motion-standard').addEventListener('click',()=>{
   state.sharedMotion=!state.sharedMotion;
   $('#motion-standard').setAttribute('aria-pressed',String(state.sharedMotion));
-  $('#motion-standard').textContent='Ноги: бег немца '+(state.sharedMotion?'ВКЛ':'ВЫКЛ');
+  $('#motion-standard').textContent='Перенос бега: '+(state.sharedMotion?'ТЕСТ ВКЛ':'ВЫКЛ');
   if(active)play(state.motion);
  });
  window.__BF_UNIT_REVIEW_ACT__={select,play,
