@@ -121,14 +121,14 @@
  // Production-safe same-rig locomotion split: duplicate only the SOURCE
  // group's approved leg channels. Do not retarget across factions and never
  // let the rifle carry be controlled by the source's authored wrist tracks.
- function installNativeGermanLegRun(view,{B,scene}={}){
+ function installNativeGermanLegRun(view,{B,scene,groupName}={}){
   if(!view?.clips||!view?.imported?.skeletons||!B?.AnimationGroup||!scene)
    return {ok:false,reason:'Incomplete independent German actor or scene'};
   if(view.nativeGermanLegsRun)return {ok:true,installed:false,group:view.nativeGermanLegsRun};
   const source=view.clips.get('Kar98k_Run');
   if(!source?.targetedAnimations?.length)
    return {ok:false,reason:'Missing original German rifle run'};
-  const isolated=new B.AnimationGroup('german-native-legs-'+view.index,scene);
+  const isolated=new B.AnimationGroup(groupName||'german-native-legs-'+view.index,scene);
   try{
    for(const ta of source.targetedAnimations)
     isolated.addTargetedAnimation(ta.animation,ta.target);
