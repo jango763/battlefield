@@ -1,0 +1,123 @@
+ drawTracer(start,impact,result.weapon==='Panzerschreck'?color('#ff9945'):
+  color(unit.team==='свои'?'#ffe5a0':'#ff866f'),
+  result.weapon==='Panzerschreck'?.24:.095);
+ if(result.weapon==='Panzerschreck'){
+  const diameter=combat.WEAPONS.Panzerschreck.blastRadius*UNIT_SCALE*2;
+  const sphere=B.MeshBuilder.CreateSphere('blast',{diameter,segments:10},scene);
+  sphere.position.copyFrom(impact);
+  const mat=new B.StandardMaterial('blast glow',scene);
+  mat.emissiveColor=color('#fd7a2d');mat.alpha=.45;
+  sphere.material=mat;sphere.isPickable=false;
+  addEffect(sphere,.30,mat);
+ }
+ if(unit===findActor()){
+  const hit=result.hits.length?result.hits.map(h=>h.id+' −'+h.damage+' HP').join(', '):
+   'промах';
+  alertStatus(britishLabel(result.weapon)+': '+hit+(result.lethal?' · СМЕРТЕЛЬНЫЙ ВЫСТРЕЛ':''));
+ }
+}
+function syncVisual(view){
+ const unit=view.unit;
+ if(!unit)return;
+ if(!unit.alive){
+  if(view.inactive)return; // Dead rig was previously stopped every frame.
+  view.inactive=true;
+  view.marker.setEnabled(false);
+  view.hpBack.setEnabled(false);
+  view.hpFill.setEnabled(false);
+  view.anchor.setEnabled(false);
+  stopAnimations(view);
+  return;
+ }
+ view.inactive=false;
+ view.anchor.setEnabled(true);view.marker.setEnabled(true);
+ view.hpBack.setEnabled(true);view.hpFill.setEnabled(true);
+ const nextHP=Math.max(0,unit.hp/unit.maxHp);
+ view.hpFill.scaling.x=Math.max(.001,nextHP);
+ view.hpFill.position.x=-.38*(1-nextHP);
+ view.anchor.position.copyFrom(position(unit));
+ const target=controller?.getTarget(unit);
+ const dx=unit.x-(view.lastUnitX??unit.x);
+ const dz=unit.z-(view.lastUnitZ??unit.z);
+ const moving=controller?.isMoving(unit);
+ // Face the direction of actual movement. Previously every autonomous unit
+ // ran sideways while staring at an enemy hundreds of metres away.
+ if(moving && Math.hypot(dx,dz)>.005){
+  view.anchor.rotation.y=Math.atan2(dx,dz);
+ }else if(target && Math.hypot(target.x-unit.x,target.z-unit.z)<42){
+  view.anchor.rotation.y=Math.atan2(target.x-unit.x,target.z-unit.z);
+ }
+ view.lastUnitX=unit.x;view.lastUnitZ=unit.z;
+ if(unit.weapon!==view.weapon){
+  view.weapon=unit.weapon;
+  view.lastPose=null; // Force matching animation after fallback.
+  if(view.rig?.equipWeapon){
+   view.rig.equipWeapon(weaponAsset(view,unit.weapon)).catch(error=>{
+    view.weaponError=String(error);
+    alertStatus('Оружие не загрузилось: '+error);
+   });
+  }
+ }
+ const visual=presentation.describe(unit,{active:!!controller?.snapshot().active,
+  moving:controller?.isMoving(unit),shotAge:controller?.shotAge(unit)});
+ if(view.lastPose!==visual.pose)setClip(view,visual.pose);
+ view.rig.combatPose={active:visual.running||visual.firing,stage:visual.stage,
+  crouch:0,recoilPulse:visual.recoilPulse};
+ if(visual.stage==='reload'&&view.lastPose==='fire')
+  throw Error('Reload incorrectly displaying Fire animation');
+}
+function drawMiniMap(econ){
+ const map=$('battle-minimap');
+ if(!map)return;
+ const c=map.getContext('2d');
+ if(!c)return;
+ // Draw logical 116px into a higher-DPI canvas for readable iPhone map.
+ const W=116,H=116,dpi=map.width/W;
+ c.setTransform(dpi,0,0,dpi,0,0);
+ const xy=(x,z)=>[x/300*W,H-z/300*H];
+ c.fillStyle='#303b2c';c.fillRect(0,0,W,H);
+ c.strokeStyle='#786b4c';c.lineWidth=4;
+ c.beginPath();c.moveTo(W/2,0);c.lineTo(W/2,H);c.moveTo(0,H/2);c.lineTo(W,H/2);c.stroke();
+ // Bases and gold farms are visible without covering the live battlefield.
+ for(const base of goldRules.MAP.bases){
+  const [x,y]=xy(base.x,base.z);
+  c.fillStyle=base.team==='blue'?'#83b8db':'#d57868';
+  c.fillRect(x-4,y-4,8,8);
+ }
+ for(const farm of (econ?.farms||goldRules.MAP.farms)){
+  const [x,y]=xy(farm.x,farm.z);
+  c.fillStyle=farm.owner==='blue'?'#76b6db':farm.owner==='red'?'#dc8269':'#e7c771';
+  c.fillRect(x-2.3,y-2.3,4.6,4.6);
+ }
+ for(const army of [enemies,allies]){
+  const isBlue=army===allies;
+  c.fillStyle=isBlue?'#9bdaff':'#f18d7b';
+  for(const unit of army){
+   if(!unit?.alive)continue;
+   const [x,y]=xy(unit.x,unit.z);
+   c.beginPath();c.arc(x,y,1.6,0,Math.PI*2);c.fill();
+  }
+ }
+ const hero=findActor();
+ if(hero?.alive){
+  const [x,y]=xy(hero.x,hero.z);
+  c.strokeStyle='#fff6d0';c.lineWidth=1.6;
+  c.beginPath();c.arc(x,y,4.1,0,Math.PI*2);c.stroke();
+ }
+}
+function drawHud(){
+ if(!state.ready||!battle||!controller)return;
+ const hero=findActor();
+ const snap=controller.snapshot();
+ state.firstGameArmy=fieldOrders?.snapshot()||null;
+ state.heroPosition={x:hero.x,z:hero.z};
+ state.cameraPosition=camera?{radius:camera.radius,alpha:camera.alpha,
+  beta:camera.beta,targetX:camera.target.x,targetZ:camera.target.z}:null;
+ const inventory=hero.weapon==='Kar98k'?null:hero.inventory[hero.weapon];
+ const funds=battle.getFunds();
+ const econ=economy?.summary();
+ const mission=advanceObjectives(hero,econ);
+ const central=econ?.central;
+ const left=central?.started?Math.ceil(central.remainingSeconds):0;
+ const timerLabel=central?.open?'ОТКРЫТА':
+  central?.started?'Откроется через '+String(Math.floor(left/60)).padStart(2,'0')+

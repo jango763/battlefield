@@ -1,0 +1,123 @@
+ state.scenario=scenario;state.atBase=true;state.focus=null;
+ const [ours,theirs]=SCENARIOS[scenario];
+ economy=goldRules.create({onEvent:event=>{
+  if(event.type==='central-countdown-start')
+   alertStatus('Первый бот погиб! До открытия центральной фермы — 05:00.');
+  if(event.type==='central-open')
+   alertStatus('ЦЕНТРАЛЬНАЯ ФЕРМА ОТКРЫТА! Захватите её ради большого золота.');
+ }});
+ lastEconomyBlue=economy.treasury.blue;
+ battle=combat.createBattle({funds:goldRules.START_TREASURY,prices:PRICES});
+ allies=[];enemies=[];
+ // Symmetric army deployments around each approved base; one hero + 11 bots.
+ const alliesXY=Array.from({length:ours},(_,i)=>{
+  if(i===0)return {x:150,z:43};
+  const n=i-1;
+  return {x:150+(n%4-1.5)*6,z:32+Math.floor(n/4)*4};
+ });
+ const enemiesXY=Array.from({length:theirs},(_,i)=>({
+  x:150+(i%4-1.5)*6,z:267-Math.floor(i/4)*4
+ }));
+ for(let i=0;i<ours;i++){
+  const unit=battle.addUnit({id:i===0?'hero':'британец-'+(i+1),
+   team:'свои',...alliesXY[i]});
+  if(scenario==='squads'&&i>0)unit.alive=false;
+  unit.reinforcementSlot=i;
+  allies.push(unit);
+ }
+ for(let i=0;i<theirs;i++){
+  const unit=battle.addUnit({id:'вермахт-'+(i+1),
+   team:'враг',...enemiesXY[i]});
+  if(scenario==='squads'&&i>0)unit.alive=false;
+  unit.reinforcementSlot=i+12;
+  enemies.push(unit);
+ }
+ for(const [i,u] of allies.entries()){
+  u.economyTeam='blue';u.isHero=i===0;
+  // Selected casting, not a claim that original asset has been imported.
+  u.characterModel=views[i]?.chosenAlliedModel||alliedModels.forBlueSlot(i).id;
+  u.characterModelImported=!!views[i]?.importedAlliedModel;
+  u.spawn={x:u.x,z:u.z};
+ }
+ for(const u of enemies){u.economyTeam='red';u.spawn={x:u.x,z:u.z};}
+ fieldOrders=orders.create({hero:allies[0],allies,enemies,
+  farms:economy.farms,
+  centralOpen:()=>economy.summary().central.open,
+  onArrive:()=>{if(destinationMark)destinationMark.isVisible=false;}
+ });
+ controller=tactics.create({battle,allies,enemies,driveAllies:dt=>fieldOrders.updateAllies(dt),driveEnemies:dt=>fieldOrders.updateEnemies(dt),endWhenEliminated:scenario!=='squads',
+  onShot:drawShot,
+  onFinish:result=>alertStatus(result.winner==='allies'?
+   'Победа! Отряд удержал позицию. Нажмите «Новый бой» для продолжения.':
+   'Отряд разгромлен. Нажмите «Новый бой», чтобы повторить атаку.')
+ });
+ if(scenario==='squads'){
+  replenisher=replenishment.create({allies,enemies,hero:allies[0],
+   maxAlivePerSide:REINFORCEMENT_LIMIT});
+  state.reinforcements=replenisher.snapshot();
+ }else state.reinforcements=null;
+ actors=new Map();
+ for(let i=0;i<12;i++){
+  if(views[i]){
+   assignView(views[i],allies[i]?.alive?allies[i]:null);
+   if(allies[i])allies[i].characterModelImported=views[i].importedAlliedModel;
+  }
+  if(views[i]&&allies[i]?.alive)actors.set(allies[i],views[i]);
+ }
+ for(let i=0;i<12;i++){
+  if(views[i+12])assignView(views[i+12],enemies[i]?.alive?enemies[i]:null);
+  if(views[i+12]&&enemies[i]?.alive)actors.set(enemies[i],views[i+12]);
+ }
+ for(const button of document.querySelectorAll('[data-scenario]'))
+  button.setAttribute('aria-pressed',String(button.dataset.scenario===scenario));
+ state.selected='Kar98k';
+ alertStatus('Готов к приказам. Нажмите на землю, чтобы бежать; на врага — атаковать.');
+ drawHud();
+}
+function findActor(){return allies[0]||null}
+function addEffect(mesh,ttl,material=null,pooled=null){
+ fx.push({mesh,ttl,material,pooled});
+}
+function drawTracer(start,impact,colour,ttl){
+ let slot=tracerPool.find(t=>!t.active);
+ if(!slot){
+  if(tracerPool.length>=TRACER_LIMIT){
+   state.engineering.droppedTracerVisuals=
+    (state.engineering.droppedTracerVisuals||0)+1;
+   return; // Drop a VISUAL under load, never a real hit or its damage.
+  }
+  const mesh=B.MeshBuilder.CreateLines('tracer-pooled',{
+   points:[start,impact],updatable:true},scene);
+  slot={mesh,active:false};tracerPool.push(slot);
+ }else B.MeshBuilder.CreateLines('tracer-pooled',{
+  points:[start,impact],instance:slot.mesh},scene);
+ slot.mesh.color=colour;slot.mesh.isPickable=false;
+ slot.mesh.setEnabled(true);slot.active=true;
+ addEffect(slot.mesh,ttl,null,slot);
+ state.engineering.tracerPoolSize=tracerPool.length;
+}
+function drawShot({unit,target,result}){
+ // Bounties are credited to the killer's army; the hero also earns
+ // personal gold, exactly as in the original Three.js economy.
+ if(economy && result.hits?.length){
+  for(const hit of result.hits){
+   if(hit.hp>0)continue;
+   const victim=[...allies,...enemies].find(u=>u.id===hit.id);
+   if(victim&&!victim.alive){
+    // A hero dying must not start the countdown. Either army's first
+    // dead BOT starts exactly one five-minute game-time timer.
+    economy.reportBotDeath(victim);
+    economy.kill(unit.economyTeam,{team:victim.economyTeam},
+     {heroKill:unit.isHero,armoured:false});
+   }
+  }
+ }
+ const source=actors.get(unit),targetView=actors.get(target);
+ if(!source||!targetView)return;
+ const muzzle=source.rig?.getMuzzleWorld?.()?.position||
+  source.rig?.weaponRig?.muzzleWorldPosition;
+ const start=Array.isArray(muzzle)&&muzzle.length===3 ?
+  new B.Vector3(...muzzle):source.anchor.position.add(new B.Vector3(0,1.5,0));
+ const impact=result.impact?position(result.impact,.7):
+  targetView.anchor.position.add(new B.Vector3(0,1.15,0));
+ if(!result.hit&&!result.impact)impact.z+=(Math.random()-.5)*1.4;

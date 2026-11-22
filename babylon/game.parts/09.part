@@ -1,0 +1,123 @@
+  $('order-attack').setAttribute('aria-pressed','false');
+  alertStatus('Движение: коснитесь земли для приказа.');
+ });
+ $('order-attack').addEventListener('click',()=>{
+  inputMode='attack';
+  $('order-move').setAttribute('aria-pressed','false');
+  $('order-attack').setAttribute('aria-pressed','true');
+  alertStatus('Атака: коснитесь противника для выбора цели.');
+ });
+ $('reload-manual').addEventListener('click',()=>{
+  const r=battle.startReload(findActor());
+  alertStatus(r.ok?'Перезарядка началась: '+r.seconds+' с.':
+   'Перезарядка невозможна: '+r.reason);
+  drawHud();
+ });
+}
+// First game's direct WASD/joystick walking. No repeating waypoint commands.
+// Screen-up means NORTH (+Z) on the Babylon 300x300 battlefield.
+function updateTouchJoystick(dt){
+ if(!fieldOrders)return;
+ if(touchJoystick.active){
+  fieldOrders.setMovement(touchJoystick.x,touchJoystick.y);
+  return;
+ }
+ const x=Number(movementKeys.d||movementKeys.ArrowRight)-
+  Number(movementKeys.a||movementKeys.ArrowLeft);
+ const z=Number(movementKeys.w||movementKeys.ArrowUp)-
+  Number(movementKeys.s||movementKeys.ArrowDown);
+ const magnitude=Math.hypot(x,z);
+ fieldOrders.setMovement(magnitude>1?x/magnitude:x,magnitude>1?z/magnitude:z);
+}
+function registerTouchControls(){
+ // Match the first game's W/A/S/D and arrow-key walking on desktop.
+ // Key events only change a movement vector; the combat loop owns physics.
+ for(const type of ['keydown','keyup'])window.addEventListener(type,e=>{
+  if(!(e.key in movementKeys))return;
+  if(e.target?.matches?.('input,textarea,select,[contenteditable=true]'))return;
+  movementKeys[e.key]=type==='keydown';
+  if(e.key.startsWith('Arrow'))e.preventDefault();
+ });
+ const pad=$('touch-stick'),knob=$('touch-stick-knob');
+ if(!pad||!knob)return;
+ function move(e){
+  const rect=pad.getBoundingClientRect();
+  const centerX=rect.left+rect.width/2,centerY=rect.top+rect.height/2;
+  const radius=Math.max(1,rect.width*.37);
+  const dx=(e.clientX-centerX)/radius,dy=(e.clientY-centerY)/radius;
+  const mag=Math.max(1,Math.hypot(dx,dy));
+  touchJoystick.x=dx/mag;touchJoystick.y=-dy/mag;
+  knob.style.transform='translate('+(touchJoystick.x*radius*.65)+'px,'+
+   (-touchJoystick.y*radius*.65)+'px)';
+  touchJoystick.cooldown=0;
+ }
+ function release(e){
+  if(e.pointerId!==touchJoystick.pointer)return;
+  touchJoystick.active=false;touchJoystick.pointer=null;
+  touchJoystick.x=touchJoystick.y=0;touchJoystick.cooldown=0;
+  knob.style.transform='translate(0,0)';
+  fieldOrders?.clearMovement();
+ }
+ pad.addEventListener('pointerdown',e=>{
+  if(!state.ready||!gameStarted||!findActor()?.alive)return;
+  e.preventDefault();
+  touchJoystick.active=true;touchJoystick.pointer=e.pointerId;
+  pad.setPointerCapture(e.pointerId);move(e);
+ });
+ pad.addEventListener('pointermove',e=>{
+  if(touchJoystick.active&&e.pointerId===touchJoystick.pointer){
+   e.preventDefault();move(e);
+  }
+ });
+ pad.addEventListener('pointerup',release);
+ pad.addEventListener('pointercancel',release);
+ pad.addEventListener('lostpointercapture',release);
+ window.addEventListener('blur',()=>{
+  // No stuck walking after iPhone tab suspension or incoming calls.
+  for(const key of Object.keys(movementKeys))movementKeys[key]=false;
+  touchJoystick.active=false;touchJoystick.pointer=null;
+  touchJoystick.x=touchJoystick.y=0;
+  knob.style.transform='translate(0,0)';
+  fieldOrders?.clearMovement();
+ });
+ $('quick-fire').addEventListener('click',()=>{
+  if(!state.ready||!gameStarted||!controller)return;
+  const hero=findActor();
+  if(!hero?.alive)return;
+  // O(n) nearest living enemy without sorting or allocating arrays.
+  let target=null,best=Infinity;
+  for(const enemy of enemies){
+   if(!enemy?.alive)continue;
+   const d=(enemy.x-hero.x)**2+(enemy.z-hero.z)**2;
+   if(d<best){best=d;target=enemy;}
+  }
+  if(!target)return;
+  controller.setFocus(target);
+  alertStatus('ОГОНЬ · приоритетная цель: '+target.id);
+ });
+ $('quick-gear').addEventListener('click',()=>$('hud-toggle').click());
+ $('quick-pause').addEventListener('click',()=>$('fight').click());
+ $('quick-reload').addEventListener('click',()=>$('reload-manual').click());
+}
+async function deployReinforcement({unit,side,hero},epoch){
+ const slot=unit.reinforcementSlot;
+ try{
+  // Stream ONLY this requested approved model; never create all 24 at launch.
+  await ensureUnits([slot]);
+  if(epoch!==reinforcementEpoch||scenario!=='squads'||!replenisher?.snapshot().active)
+   return; // A Reset or mode switch invalidated an in-flight asset request.
+  if(!controller?.snapshot().active){
+   replenisher.finish(unit,false);
+   return;
+  }
+  const view=views[slot];
+  if(!view)throw Error('Model was not created for reserve slot '+slot);
+  unit.alive=true;unit.hp=unit.maxHp;
+  // Always start from the correct army base, never at the location of death.
+  unit.x=unit.spawn.x;unit.z=unit.spawn.z;
+  unit.cooldown=0;unit.reloadRemaining=0;unit.reloadWeapon=null;
+  unit.suppressed=0;unit.weapon='Kar98k';
+  if(unit.isHero)fieldOrders?.clearDestination();
+  unit.characterModelImported=!!view.importedAlliedModel;
+  assignView(view,unit);
+  actors.set(unit,view);

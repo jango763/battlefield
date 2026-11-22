@@ -1,0 +1,123 @@
+/* Battlefield Babylon: primary playable hero and squad scene using the approved animated Panzergrenadier.
+ * AssetContainer instantiates independent 65-bone skeletons + 16 clips per unit.
+ * Preserves the original GLB/weapon rig and legacy Three.js in its separate main branch.
+ */
+(async function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const B=window.BABYLON;
+const combat=window.BattlefieldBalance;
+const tactics=window.BattlefieldSquadController;
+const presentation=window.BattlefieldCombatPresentation;
+const orders=window.BattlefieldFirstGameArmy;
+const replenishment=window.BattlefieldReplenishment;
+const goldRules=window.BattlefieldGoldEconomy;
+const worldBuilder=window.BattlefieldWorld300;
+const legacyVisual=window.BattlefieldLegacyVisualStyle;
+const modernArt=window.BattlefieldModernArt;
+const villageModels=window.BattlefieldModernVillageModels;
+const factions=window.BattlefieldBritishFaction;
+const britishSoldier=window.BattlefieldBritishSoldier;
+const nativeBlend=window.BattlefieldNativeClipBlend;
+const unitMotion=window.BattlefieldUnitMotionUnifier;
+const alliedModels=window.BattlefieldAlliedModels;
+const alliedLoader=window.BattlefieldAlliedAssetLoader;
+const characters=window.BattlefieldCharacterSources;
+const briefing=$('battlefield-brief'),enterButton=$('enter-game'),briefingProgress=$('brief-progress');
+const canvas=$('view');
+// Retry and menu work even if CDN scripts or the 3D model failed to load.
+$('retry').addEventListener('click',()=>location.reload());
+$('hud-toggle').addEventListener('click',()=>{
+ const panel=$('panel'),closed=panel.classList.toggle('closed');
+ $('hud-toggle').setAttribute('aria-pressed',String(!closed));
+ $('hud-toggle').textContent=closed?'Меню':'Скрыть';
+});
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!window.BattlefieldWeaponRig){
+ const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
+ $('loading').textContent=message;
+ $('failure-text').textContent=message;
+ $('failure').style.display='block';
+ briefingProgress.textContent=message;
+ enterButton.textContent='Не удалось загрузить игру';
+ return;
+}
+// Refuse a silent source swap that could replace the approved appearance.
+characters.validateTrialFiles(alliedLoader.FEATURE_TRIAL_FILES);
+const META={Kar98k:'de-kar98k',MP40:'de-mp40',MG42:'de-mg42',
+ Panzerschreck:'de-panzerschreck'};
+// Preserve existing gameplay weapon IDs for identical damage, ammo and motion.
+const weaponAsset=(view,weapon)=>factions.asset(view.faction,weapon);
+const britishLabel=weapon=>factions.label('british',weapon);
+const PRICES={MP40:{weapon:100,magazine:15},MG42:{weapon:240,magazine:40},
+ Panzerschreck:{weapon:350,magazine:70}};
+const UNIT_SCALE=1,BASE_X=-150,BASE_Z=-150;
+const SCENARIOS={duel:[1,1],assault:[1,4],squads:[12,12]};
+const CLIP_POSES={ready:'Hold',aim:'Aim',fire:'Fire',run:'Run'};
+const CLIP_IDS=Object.keys(META).flatMap(w=>Object.values(CLIP_POSES).map(p=>w+'_'+p));
+// Feature-branch controlled rollout: one hero, eight real Jakeli infantry,
+// and three UNAPPROVED Commando slots still using the existing prototype.
+// Do not change the source catalog or the locked release manifest.
+const FEATURE_REAL_ALLIES=true;
+const featureCasting=slot=>characters.forSlot(slot).id;
+const NATIVE_POSES=Object.freeze({
+ americanHero:Object.freeze({ready:'Idle_Quaternius',aim:'Idle_Quaternius',
+  fire:'Idle_Quaternius',run:'Jog_Quaternius'}),
+ britishJakeli:Object.freeze({ready:'Ready',aim:'Aim',fire:'Fire',run:'Jog'})
+});
+
+const state={ready:false, loading:true, error:null, models:0, clips:0,
+ scenario:'squads',atBase:true,selected:'Kar98k',focus:null, fps:0,
+ importedAlliedCount:0,modelErrors:{},alliedManifest:null,actorSources:{},unitMotionReports:{}};
+// The diagnostics below are local-only; no paid telemetry or account.
+state.engineering={version:'10-stage-20261122',parts:10,privacy:'local-only',
+ glbFallbacks:0,assetRetries:0,frameStats:{},source:'original-ww2-babylon'};
+window.__BATTLEFIELD_GAME__=state;
+let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
+let modelDepot=null,modelDepotRetryAfter=0;
+const motionDonors={germanRun:null,britishReady:null};
+// Cross-rig locomotion failed visual acceptance in the isolated soldier range.
+// Keep native authored clips in gameplay unless deliberately reviewing that
+// experimental branch with a URL flag. Never silently ship stiff donor legs.
+const DONOR_RUN_RESEARCH=new URLSearchParams(location.search).get('experimentalDonorRun')==='1';
+function promoteUnitMotion(view){
+ if(!unitMotion||!view||!DONOR_RUN_RESEARCH)return;
+ const previous=view.clip,pose=view.lastPose;
+ try{
+  const result=unitMotion.install(view,{B,...motionDonors});
+  state.unitMotionReports[view.index]=result.reports||{error:result.reason};
+  if(pose&&view.unit&&view.clips.get(view.weapon+'_'+CLIP_POSES[pose])!==previous)
+   setClip(view,pose);
+ }catch(error){
+  state.unitMotionReports[view.index]={error:String(error?.message||error)};
+  console.warn('Infantry motion fallback',view.index,error);
+ }
+}
+
+let actors=new Map(),fx=[],scenario='squads',atBase=true,world=null;
+const TRACER_LIMIT=48;
+const tracerPool=[];
+let replenisher=null,reinforcementEpoch=0;
+const REINFORCEMENT_LIMIT=8;
+let statusAt=0,lastFarmSyncAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
+let weaponQueue=[],weaponWorker=false;
+let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
+const touchJoystick={active:false,pointer:null,x:0,y:0,cooldown:0};
+const movementKeys={w:false,a:false,s:false,d:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false};
+// Reinforcement clocks are owned by replenishment-core.js.
+function alertStatus(message){$('event').textContent=message}
+enterButton.addEventListener('click',()=>{
+ if(!state.ready||gameStarted)return;
+ const r=controller.start();
+ if(!r.ok){alertStatus('Бой не удалось начать: '+r.reason);return;}
+ gameStarted=true;gamePausedForBriefing=false;
+ // Character models now load individually when a reinforcement leaves its base.
+ // No eager 24-skeleton load on iPhone.
+ briefing.hidden=true;briefing.setAttribute('aria-hidden','true');
+ // The first game's combat screen prioritised the battlefield, not a settings panel.
+ $('panel').classList.add('closed');
+ $('hud-toggle').setAttribute('aria-pressed','false');
+ $('hud-toggle').textContent='Меню';
+ document.body.classList.add('battle-active');
+ atBase=false;state.atBase=false;
+ alertStatus('Бой начался: британцы 🔵 против Вермахта 🔴. Касайтесь земли, чтобы управлять героем.');
+ drawHud();

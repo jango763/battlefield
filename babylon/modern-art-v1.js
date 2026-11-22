@@ -278,7 +278,12 @@ function apply({scene,B,world,camera,sun,map}){
   const mesh=B.MeshBuilder.CreatePlane('hd2026-meadow-blades',{width:1.5,height:1.55},scene);
   mesh.material=gm;mesh.isPickable=false;
   const matrices=[];
-  for(let i=0;i<260;i++){
+  // Avoid alpha overdraw on low-power phones while preserving the original
+  // photogrammetry/PBR surfaces, colliders, actors and animation systems.
+  const lowPower=new URLSearchParams(
+   typeof location!=='undefined'?location.search:'').get('quality')==='low';
+  const foliageBudget=lowPower?120:260;
+  for(let i=0;i<foliageBudget;i++){
    const x=between(20,280),z=between(20,280);
    // Keep spawn lanes, farm yards and the two center roads readable.
    if(Math.abs(x-150)<8||Math.abs(z-150)<8)continue;

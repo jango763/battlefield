@@ -1,0 +1,62 @@
+name: Battlefield 10-part engineering — visual, gameplay and phone QA
+on:
+  push:
+    branches:
+      - feature/babylon-10-part-engineering-20261122
+    paths:
+      - 'babylon/game.js'
+      - 'babylon/game.parts/**'
+      - 'babylon/index.html'
+      - 'babylon/modern-art-v1.js'
+      - 'babylon/tools/assemble-game-parts.cjs'
+      - 'babylon/tests/test-ten-part-engineering.cjs'
+      - 'babylon/tests/test-game-ten-part-browser.cjs'
+      - '.github/workflows/babylon-10-part-engineering-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: bf-ten-part-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  contracts:
+    name: Source assembly + current gameplay contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prove ten balanced fragments reproduce the executable game byte-for-byte
+        run: |
+          node babylon/tools/assemble-game-parts.cjs --check
+          node --check babylon/game.js
+          node --check babylon/modern-art-v1.js
+          node babylon/tests/test-ten-part-engineering.cjs
+      - name: Existing first-game army, balance, game reinforcement and GLB movement tests
+        run: |
+          node babylon/tests/test-first-game-behavior.cjs
+          node babylon/tests/test-continuous-reinforcements.cjs
+          node babylon/tests/test-unit-motion-unifier.cjs
+  phone:
+    name: Real mobile WebGL scene with a playable start
+    needs: contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mobile Chromium with software WebGL
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/bf-ten-stage playwright@1.58.2
+          /tmp/bf-ten-stage/node_modules/.bin/playwright install --with-deps chromium
+      - name: Load REAL Battlefield GLBs and play on 390 × 844 screen
+        run: |
+          python3 -m http.server 8876 --bind 127.0.0.1 >/tmp/bf-ten-stage-server.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-game-ten-part-browser.cjs
+      - name: Archive human-review screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlefield-ten-part-mobile-visual-proof
+          path: /tmp/bf-ten-stage-mobile.jpeg
+          if-no-files-found: warn
+          retention-days: 14
