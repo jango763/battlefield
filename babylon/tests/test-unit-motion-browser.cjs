@@ -16,6 +16,14 @@ const {chromium}=require('/tmp/bf-unit-motion/node_modules/playwright');
     const s=window.__BF_UNIT_REVIEW__;
     return s?.error||s?.selected===id&&s?.characters[id]?.activeClip;
    },id,{timeout:90000});
+   const loaded=await page.evaluate(id=>{
+    const s=window.__BF_UNIT_REVIEW__;
+    return {id,error:s?.error,failures:s?.skinFailures,loadedCount:s?.loadedCount,
+     active:s?.characters[id]?.activeClip,models:s?.realModels};
+   },id);
+   console.log('BATTLEFIELD_UNIT_LOAD_STEP',JSON.stringify(loaded));
+   assert(!loaded.error,'Original model '+id+' failed: '+loaded.error);
+   assert(loaded.active,'Original '+id+' was not selected and animated');
   }
   const status=await page.evaluate(()=>{
    const s=window.__BF_UNIT_REVIEW__;
