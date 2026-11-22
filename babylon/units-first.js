@@ -6,6 +6,8 @@
 (async function(){
 'use strict';
 const B=window.BABYLON, canvas=document.getElementById('view');
+const unitMotion=window.BattlefieldUnitMotionUnifier;
+const nativeBlend=window.BattlefieldNativeClipBlend;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const specs=Object.freeze({
  german:Object.freeze({
@@ -32,7 +34,7 @@ const specs=Object.freeze({
  })
 });
 const state=window.__BF_UNIT_REVIEW__={
- ready:false,selected:'german',motion:'idle',error:null,
+ ready:false,selected:'german',motion:'idle',error:null,sharedMotion:true,motionReports:{},createdGroups:0,
  realModels:{},approved:{german:true,american:false,jakeli:false},
  trialOnly:true,characters:{},loadedCount:0,skinFailures:[]
 };
@@ -66,10 +68,37 @@ try{
  floorMat.roughness=.98;
  const cache=new Map();
  let active=null,requestIndex=0;
+ function rebuildSharedMotion(){
+  if(!unitMotion)return;
+  const germanRun=unitMotion.findGroup(cache.get('german')?.clips,'Kar98k_Run');
+  const britishReady=unitMotion.findGroup(cache.get('jakeli')?.clips,'Ready');
+  for(const model of cache.values()){
+   model.sharedClips||=new Map();
+   model.sharedReports||={};
+   for(const [mode,donor,owner] of [
+    ['run',germanRun,'german'],['idle',britishReady,'jakeli']]){
+    if(model.id===owner){model.sharedReports[mode]={status:'native-donor'};continue;}
+    if(!donor){model.sharedReports[mode]={status:'pending'};continue;}
+    if(model.sharedClips.has(mode))continue;
+    const made=unitMotion.retarget({B,sourceGroup:donor,
+     targetRoot:model.pivot,skeletons:model.container.skeletons,
+     tag:'review-'+model.id+'-'+mode});
+    if(made.ok){
+     model.sharedClips.set(mode,made.group);
+     model.sharedReports[mode]={status:'retargeted',joints:made.joints};
+     state.createdGroups++;
+    }else model.sharedReports[mode]={status:'native-fallback',reason:made.reason};
+   }
+   state.motionReports[model.id]=model.sharedReports;
+  }
+ }
+
  const pos=new B.Vector3(0,1.1,0);
  function status(message){$('#status').textContent=message;}
  function error(message){$('#error').style.display='block';$('#error').textContent=message;}
  function groupFor(model,motion){
+  if(state.sharedMotion&&model.sharedClips?.has(motion))
+   return model.sharedClips.get(motion);
   const clip=model.spec.clips[motion];
   if(!clip)return null;
   return model.clips.find(g=>g.name===clip||g.name.replace(/-\d+$/,'')===clip);
@@ -87,9 +116,14 @@ try{
   if(!model)return;
   const clip=groupFor(model,mode);
   if(!clip){status('У '+model.spec.label+' ещё нет утверждённой анимации '+mode);return;}
-  for(const group of model.clips)group.stop();
-  const speed=model.spec.speeds?.[mode]||1;
-  clip.start(mode!=='fire',speed,clip.from,clip.to);
+  const speed=state.sharedMotion&&mode==='run'?1.1:(model.spec.speeds?.[mode]||1);
+  if(nativeBlend){
+   nativeBlend.play(model,clip,mode,{loop:mode!=='fire'});
+   clip.speedRatio=speed;
+  }else{
+   for(const group of [...model.clips,...(model.sharedClips?.values()||[])])group.stop();
+   clip.start(mode!=='fire',speed,clip.from,clip.to);
+  }
   state.motion=mode;
   state.characters[state.selected].activeClip=clip.name;
   updateButtons();
@@ -97,7 +131,9 @@ try{
   status(model.spec.label+' · '+model.spec.approval+'\n'+
    'Реальная модель: '+c.triangles.toLocaleString('ru-RU')+
    ' треугольников · '+c.skinned+' скелетных сеток · '+c.bones+' костей\n'+
-   'Клип: '+clip.name+' · '+model.spec.warning);
+   'Клип: '+clip.name+' · '+
+   (state.sharedMotion?'Общий стандарт: '+JSON.stringify(model.sharedReports?.[mode]||{status:'native'}):'Исходная анимация')+
+   '\n'+model.spec.warning);
  }
  function area(container){
   const meshes=container.meshes.filter(m=>m.getTotalVertices?.()>0);
@@ -149,6 +185,7 @@ try{
   const data={id,spec,container,pivot,clips,skinned:skinned.length,bones,triangles,
    textures:container.textures?.length||0};
   cache.set(id,data);
+  rebuildSharedMotion();
   state.realModels[id]=true;
   state.characters[id]={source:spec.source,skinned:skinned.length,
    skeletons:skel.length,bones,triangles,clips:clips.map(g=>g.name),activeClip:null,
@@ -165,7 +202,8 @@ try{
    const model=await load(id);
    if(ticket!==requestIndex)return;
    if(active) {
-    for(const clip of active.clips)clip.stop();
+    nativeBlend?.stop(active);
+    for(const clip of [...active.clips,...(active.sharedClips?.values()||[])])clip.stop();
     active.pivot.setEnabled(false);
    }
    active=model;
@@ -182,10 +220,19 @@ try{
   }finally{$$('[data-unit]').forEach(b=>b.disabled=false);updateButtons();}
  }
  $$('[data-unit]').forEach(b=>b.addEventListener('click',()=>void select(b.dataset.unit)));
- $$('[data-motion]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.motion)));
+ $('[data-motion]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.motion)));
+ $('#motion-standard').addEventListener('click',()=>{
+  state.sharedMotion=!state.sharedMotion;
+  $('#motion-standard').setAttribute('aria-pressed',String(state.sharedMotion));
+  $('#motion-standard').textContent='Общий стандарт: '+(state.sharedMotion?'ВКЛ':'ВЫКЛ');
+  if(active)play(state.motion);
+ });
  window.__BF_UNIT_REVIEW_ACT__={select,play,
   getLoaded:()=>[...cache.keys()],getScene:()=>scene};
- engine.runRenderLoop(()=>{scene.render();});
+ engine.runRenderLoop(()=>{
+  if(active)nativeBlend?.update(active,Math.max(0,Math.min(.1,engine.getDeltaTime()/1000)));
+  scene.render();
+ });
  window.addEventListener('resize',()=>engine.resize());
  await select(new URLSearchParams(location.search).get('unit')||'german');
 }catch(e){state.error=String(e?.message||e);error(state.error);console.error('Battlefield unit lab',e);}
