@@ -1,3 +1,5 @@
+const renderQuality={
+ mode:graphicsMode,low:Math.max(1,deviceScale/2.0),
  high:Math.max(1,deviceScale/1.5),fpsElapsed:0,
  scale:Math.max(1,deviceScale/(graphicsMode==='low'?1.15:
   graphicsMode==='high'?2.1:1.7))
@@ -45,6 +47,8 @@ function createWorld(){
  $('quality-cycle').textContent='Качество: '+qualityLabels[graphicsMode];
  scene=new B.Scene(engine);
  scene.useRightHandedSystem=true;
+ infantryFill=infantryLighting.create({B,scene});
+ state.infantryLighting=infantryFill.snapshot();
  scene.skipPointerMovePicking=true;
  scene.clearColor=new B.Color4(.11,.16,.13,1);
  scene.ambientColor=new B.Color3(.25,.29,.23);
@@ -128,7 +132,3 @@ function createWorld(){
     alertStatus('Выберите врага. Для движения нажмите «Движение».');
     return;
    }
-   const x=(point.x-BASE_X)/UNIT_SCALE,z=(point.z-BASE_Z)/UNIT_SCALE;
-   const move=fieldOrders.setDestination(x,z);
-   if(move.ok){
-    destinationMark.position.set(BASE_X+move.destination.x*UNIT_SCALE,.06,

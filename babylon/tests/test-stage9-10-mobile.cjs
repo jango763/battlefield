@@ -40,6 +40,28 @@ fs.mkdirSync(dir,{recursive:true});
   });
   const s=result.initial;
   assert(s.ready&&!s.error,'Game startup failed: '+s.error);
+  result.infantryFill=await page.evaluate(()=>{
+   const sc=window.BABYLON.EngineStore.LastCreatedScene;
+   const light=sc.lights.find(l=>l.name==='infantry-fill-light');
+   const subset=light?.includedOnlyMeshes||[];
+   return {present:!!light,enabled:light?.isEnabled(),
+    intensity:light?.intensity,tracked:subset.length,
+    allSoldiers:subset.every(m=>Number.isInteger(m.metadata?.squadSlot)),
+    includesTerrain:subset.includes(sc.getMeshByName('map-ground-300')),
+    groundBtrs:subset.filter(m=>m.name.startsWith('legacy-btr-')).length,
+    sceneLightCount:sc.lights.length,
+    report:window.__BATTLEFIELD_GAME__.infantryLighting};
+  });
+  assert(result.infantryFill.present&&result.infantryFill.enabled,
+   'Soldier-only hemispheric fill not active');
+  assert(result.infantryFill.tracked>=4,'Original imported GLB meshes not registered');
+  assert(result.infantryFill.allSoldiers,
+   'Infantry fill incorrectly assigned to non-soldier meshes');
+  assert(!result.infantryFill.includesTerrain&&!result.infantryFill.groundBtrs,
+   'Lighting must never wash out the environment or vehicles');
+  assert.equal(result.infantryFill.sceneLightCount,3,
+   'No extra world lights or per-soldier light instances');
+  assert.equal(result.infantryFill.report.modifiedImportedMaterials,0);
   assert.equal(s.art.colorGrade,'muted-olive-earth-v4');
   assert.equal(s.art.roadVisualWidth,4.2,'Road must be narrowed');
   assert.equal(await page.evaluate(()=>{

@@ -1,3 +1,10 @@
+ if(!slots)throw Error('Неизвестный режим отряда: '+scenarioName);
+ if(!asset){
+  $('loading').textContent='Загружаю анимированного немецкого стрелка…';
+  asset=await B.SceneLoader.LoadAssetContainerAsync(
+   './animstudio-preview/models/','all-combat-run.glb',scene);
+  motionDonors.germanRun=unitMotion?.findGroup(asset.animationGroups,'Kar98k_Run')||null;
+  if(asset.animationGroups.length<16)
    throw Error('В GLB отсутствуют 16 согласованных боевых анимаций');
  }
  if(!modelDepot&&Date.now()>=modelDepotRetryAfter){
@@ -125,9 +132,3 @@ async function processWeaponQueue(){
      rig.weaponRigReady=true;
      rig.nativeBakedWeapon=true;
      view.weaponError=null;
-     continue;
-    }
-    await window.BattlefieldWeaponRig.create({
-     scene,imported:view.imported,root:view.root,state:rig,
-     animationDriven:true,bindUI:false,acceptExportSockets:true,
-     allowRetargetedSkeleton:view.importedAlliedModel,

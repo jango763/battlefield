@@ -1,3 +1,5 @@
+  $('order-attack').setAttribute('aria-pressed','false');
+  alertStatus('Движение: коснитесь земли для приказа.');
  });
  $('order-attack').addEventListener('click',()=>{
   inputMode='attack';
@@ -130,4 +132,3 @@ async function deployReinforcement({unit,side,hero},epoch){
   // Always start from the correct army base, never at the location of death.
   unit.x=unit.spawn.x;unit.z=unit.spawn.z;
   unit.cooldown=0;unit.reloadRemaining=0;unit.reloadWeapon=null;
-  unit.suppressed=0;unit.weapon='Kar98k';
