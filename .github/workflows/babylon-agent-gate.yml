@@ -49,6 +49,8 @@ jobs:
           node babylon/tests/test-defenses.cjs
           node babylon/tests/test-emplacements.cjs
           node babylon/tests/test-tactical-ai.cjs
+          node babylon/tests/test-garrison-orders.cjs
+          node babylon/tests/test-sandbag-silhouette.cjs
           node babylon/tests/test-gold-economy.cjs
           node babylon/tests/test-first-game-behavior.cjs
           node babylon/tests/test-camera-joystick-checkpoint.cjs
