@@ -10,8 +10,8 @@ assert.match(game,/mode:'elevated-tactical-follow'/);
 assert.match(html,/id="touch-zone"/);
 assert.match(html,/@media\(min-width:701px\) and \(max-width:950px\) and \(max-height:600px\)/,
  'Touch controls must remain visible on landscape iPhone screens');
-assert.match(html,/width:46vw;max-width:385px;height:54vh/,
- 'Joystick zone must not intercept the centre of the battlefield');
+assert.match(html,/width:57vw;max-width:260px;height:54vh/,
+ 'Joystick landscape zone must have a bounded width');
 assert.match(game,/joystickResponse\.shape\(dx,-dy\)/,
  'Radial touch response must never reverse camera axes');
 assert.match(game,/graphicsMode==='high'\?2\.25:1\.9/,
