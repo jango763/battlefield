@@ -1,0 +1,31 @@
+name: Public units first iPhone preview HTTP check
+on:
+  push:
+    branches:
+      - feature/babylon-units-first-20261121
+    paths:
+      - 'babylon/units-first.html'
+      - 'babylon/units-first.js'
+      - '.github/workflows/units-first-public-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify actual public iPhone viewer and three original 3D assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="https://raw.githack.com/jango763/battlefield/$GITHUB_SHA"
+          for asset in babylon/units-first.html babylon/units-first.js babylon/animstudio-preview/models/all-combat-run.glb assets/allied-soldiers/us-hero-quaternius-donor-hands-v7.glb assets/allied-soldiers/uk-jakeli-battle-lod1.glb; do
+            url="$prefix/$asset"
+            curl --fail --location --silent --show-error --max-time 100 "$url" --output /tmp/public-unit
+            size=$(wc -c </tmp/public-unit)
+            echo "PUBLIC_UNIT_OK $asset $size"
+            test "$size" -gt 2000
+            case "$asset" in *.glb) test "$(head -c4 /tmp/public-unit)" = "glTF";; esac
+          done

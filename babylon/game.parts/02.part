@@ -1,0 +1,122 @@
+ $('hud-toggle').setAttribute('aria-pressed','false');
+ $('hud-toggle').textContent='Меню';
+ document.body.classList.add('battle-active');
+ atBase=false;state.atBase=false;
+ alertStatus('Бой начался: британцы 🔵 против Вермахта 🔴. Касайтесь земли, чтобы управлять героем.');
+ drawHud();
+});
+function position(unit,y=0){
+ return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y,BASE_Z+unit.z*UNIT_SCALE);
+}
+function color(hex){return B.Color3.FromHexString(hex)}
+const graphicsPreference=new URLSearchParams(location.search).get('quality');
+const graphicsMode=['low','high','auto'].includes(graphicsPreference)?graphicsPreference:'auto';
+const deviceScale=Math.max(1,window.devicePixelRatio||1);
+const renderQuality={
+ mode:graphicsMode,low:Math.max(1,deviceScale/2.1),
+ high:Math.max(1,deviceScale/1.15),fpsElapsed:0,
+ scale:Math.max(1,deviceScale/(graphicsMode==='low'?1.15:
+  graphicsMode==='high'?2.1:1.7))
+};
+function createWorld(){
+ engine=new B.Engine(canvas,true,{powerPreference:'high-performance'});
+ engine.setHardwareScalingLevel(renderQuality.scale);
+ state.graphics={mode:graphicsMode,hardwareScale:renderQuality.scale,
+  adaptive:graphicsMode==='auto',changes:0};
+ scene=new B.Scene(engine);
+ scene.useRightHandedSystem=true;
+ scene.skipPointerMovePicking=true;
+ scene.clearColor=new B.Color4(.11,.16,.13,1);
+ scene.ambientColor=new B.Color3(.25,.29,.23);
+ const hemi=new B.HemisphericLight('ambient',new B.Vector3(0,1,0),scene);
+ hemi.intensity=1.35;
+ const sun=new B.DirectionalLight('sun',new B.Vector3(-.5,-1,.3),scene);
+ sun.intensity=1.55;sun.diffuse=new B.Color3(1,.94,.83);
+ world=worldBuilder.create(scene,B,goldRules.MAP);
+ terrain=world.ground;
+ void world.loadOriginalBTR().then(info=>{
+  if(info.ok)console.info('Loaded '+info.loaded+' original wrecked armored cars (Tykryk / CC BY 4.0)');
+  else console.warn('Vehicle asset fallback in use',info.error);
+ });
+ destinationMark=B.MeshBuilder.CreateTorus('destination-marker',{diameter:.75,thickness:.055,tessellation:16},scene);
+ destinationMark.rotation.x=Math.PI/2;destinationMark.position.y=.055;
+ destinationMark.isVisible=false;destinationMark.isPickable=false;
+ const markMaterial=new B.StandardMaterial('destination-mat',scene);
+ markMaterial.emissiveColor=color('#eed58b');destinationMark.material=markMaterial;
+
+ // The first game's elevated patrol viewpoint, now a readable tactical
+ // perspective. ?camera=classic safely restores the previous close profile.
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.83,23.5,
+  new B.Vector3(0,1,-105),scene);
+ cameraProfile=tacticalCamera.configure(camera,{profile:
+  new URLSearchParams(location.search).get('camera')});
+ state.cameraProfile=cameraProfile.id;
+ camera.wheelPrecision=1e9;camera.pinchDeltaPercentage=0;
+ state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
+ // Real photographed materials and geometry; Babylon skinned soldiers, game AI,
+ // colliders, controls and camera remain entirely unchanged.
+ if(new URLSearchParams(location.search).get('art')!=='classic'){
+  try{
+   state.modernArt=modernArt.apply({scene,B,world,camera,sun,map:goldRules.MAP});
+   try{
+    state.mapDetail=mapDetail.apply({scene,B,map:goldRules.MAP,
+     lowPower:graphicsMode==='low'});
+   }catch(error){
+    state.mapDetail={ready:false,error:String(error)};
+    console.warn('Organic terrain fallback to licensed ground PBR',error);
+   }
+   if(villageModels?.install){
+    state.villageModels={started:true,loaded:0,pending:3};
+    void villageModels.install({scene,B,art:state.modernArt}).then(
+     result=>{state.villageModels=result},
+     error=>{state.villageModels={error:String(error)}});
+   }
+  }
+  catch(error){console.warn('Modern art fallback to native map',error);
+   state.modernArt={error:String(error)};}
+ }else state.modernArt={profile:'original-babylon',ready:false};
+ const artTag=$('graphics-tag');
+ if(artTag)artTag.textContent=state.modernArt?.ready?'HD 2026 · PBR · CC0':'ORIGINAL · BABYLON';
+ // The first game never let a one-finger drag spin the battlefield.
+ // Keep direct touch joystick + tap-to-move; camera is follow-locked.
+ camera.detachControl();
+ state.controls='first-game-free-walking';
+ state.armyBehavior='autonomous-capture-and-magnet';
+ scene.onPointerObservable.add(info=>{
+  if(info.type!==B.PointerEventTypes.POINTERPICK||!info.pickInfo?.hit)return;
+  let mesh=info.pickInfo.pickedMesh;
+  while(mesh&&!mesh.metadata?.squadSlot)mesh=mesh.parent;
+  if(mesh?.metadata?.squadSlot !== undefined) {
+   const slot=Number(mesh.metadata.squadSlot);
+   const unit=views[slot]?.unit;
+   if(unit?.alive && unit.team==='враг' && controller){
+    controller.setFocus(unit);
+    alertStatus('Приказ атаковать: '+unit.id);
+    drawHud();
+   }
+   return;
+  }
+  if(info.pickInfo.pickedMesh===terrain && fieldOrders && state.ready&&!touchJoystick.active){
+   const point=info.pickInfo.pickedPoint;
+   if(!point)return;
+   if(inputMode==='attack'){
+    alertStatus('Выберите врага. Для движения нажмите «Движение».');
+    return;
+   }
+   const x=(point.x-BASE_X)/UNIT_SCALE,z=(point.z-BASE_Z)/UNIT_SCALE;
+   const move=fieldOrders.setDestination(x,z);
+   if(move.ok){
+    destinationMark.position.set(BASE_X+move.destination.x*UNIT_SCALE,.06,
+     BASE_Z+move.destination.z*UNIT_SCALE);
+    destinationMark.isVisible=true;
+    if(gameStarted&&!controller.snapshot().active&&!controller.snapshot().done){
+     controller.start();atBase=false;state.atBase=false;
+    }
+    alertStatus('Приказ: двигаться. Отряд следует за героем.');
+   }
+  }
+ });
+ engine.runRenderLoop(frame);
+ window.addEventListener('resize',()=>engine.resize());
+}
+// Squad markers and health bars share faction GPU materials without

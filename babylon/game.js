@@ -14,9 +14,15 @@ const replenishment=window.BattlefieldReplenishment;
 const goldRules=window.BattlefieldGoldEconomy;
 const worldBuilder=window.BattlefieldWorld300;
 const legacyVisual=window.BattlefieldLegacyVisualStyle;
+const modernArt=window.BattlefieldModernArt;
+const tacticalCamera=window.BattlefieldTacticalCamera;
+const mobileThumbstick=window.BattlefieldMobileThumbstick;
+const mapDetail=window.BattlefieldTacticalMapDetail;
+const villageModels=window.BattlefieldModernVillageModels;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
 const nativeBlend=window.BattlefieldNativeClipBlend;
+const unitMotion=window.BattlefieldUnitMotionUnifier;
 const alliedModels=window.BattlefieldAlliedModels;
 const alliedLoader=window.BattlefieldAlliedAssetLoader;
 const characters=window.BattlefieldCharacterSources;
@@ -29,7 +35,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!tacticalCamera||!mobileThumbstick||!mapDetail||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -64,17 +70,42 @@ const NATIVE_POSES=Object.freeze({
 
 const state={ready:false, loading:true, error:null, models:0, clips:0,
  scenario:'squads',atBase:true,selected:'Kar98k',focus:null, fps:0,
- importedAlliedCount:0,modelErrors:{},alliedManifest:null,actorSources:{}};
+ importedAlliedCount:0,modelErrors:{},alliedManifest:null,actorSources:{},unitMotionReports:{}};
+// The diagnostics below are local-only; no paid telemetry or account.
+state.engineering={version:'10-stage-20261122',parts:10,privacy:'local-only',
+ glbFallbacks:0,assetRetries:0,frameStats:{},source:'original-ww2-babylon'};
 window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
-let modelDepot=null;
+let modelDepot=null,modelDepotRetryAfter=0;
+const motionDonors={germanRun:null,britishReady:null};
+// Cross-rig locomotion failed visual acceptance in the isolated soldier range.
+// Keep native authored clips in gameplay unless deliberately reviewing that
+// experimental branch with a URL flag. Never silently ship stiff donor legs.
+const DONOR_RUN_RESEARCH=new URLSearchParams(location.search).get('experimentalDonorRun')==='1';
+function promoteUnitMotion(view){
+ if(!unitMotion||!view||!DONOR_RUN_RESEARCH)return;
+ const previous=view.clip,pose=view.lastPose;
+ try{
+  const result=unitMotion.install(view,{B,...motionDonors});
+  state.unitMotionReports[view.index]=result.reports||{error:result.reason};
+  if(pose&&view.unit&&view.clips.get(view.weapon+'_'+CLIP_POSES[pose])!==previous)
+   setClip(view,pose);
+ }catch(error){
+  state.unitMotionReports[view.index]={error:String(error?.message||error)};
+  console.warn('Infantry motion fallback',view.index,error);
+ }
+}
+
 let actors=new Map(),fx=[],scenario='squads',atBase=true,world=null;
+const TRACER_LIMIT=48;
+const tracerPool=[];
 let replenisher=null,reinforcementEpoch=0;
 const REINFORCEMENT_LIMIT=8;
-let statusAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
+let statusAt=0,lastFarmSyncAt=0,starting=false,fieldOrders=null,terrain=null,destinationMark=null,inputMode='move';
 let weaponQueue=[],weaponWorker=false;
 let economy=null,gameStarted=false,gamePausedForBriefing=true,lastEconomyBlue=0;
 const touchJoystick={active:false,pointer:null,x:0,y:0,cooldown:0};
+let joystickDriver=null,cameraProfile=null;
 const movementKeys={w:false,a:false,s:false,d:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false};
 // Reinforcement clocks are owned by replenishment-core.js.
 function alertStatus(message){$('event').textContent=message}
@@ -99,9 +130,20 @@ function position(unit,y=0){
  return new B.Vector3(BASE_X+unit.x*UNIT_SCALE,y,BASE_Z+unit.z*UNIT_SCALE);
 }
 function color(hex){return B.Color3.FromHexString(hex)}
+const graphicsPreference=new URLSearchParams(location.search).get('quality');
+const graphicsMode=['low','high','auto'].includes(graphicsPreference)?graphicsPreference:'auto';
+const deviceScale=Math.max(1,window.devicePixelRatio||1);
+const renderQuality={
+ mode:graphicsMode,low:Math.max(1,deviceScale/2.1),
+ high:Math.max(1,deviceScale/1.15),fpsElapsed:0,
+ scale:Math.max(1,deviceScale/(graphicsMode==='low'?1.15:
+  graphicsMode==='high'?2.1:1.7))
+};
 function createWorld(){
  engine=new B.Engine(canvas,true,{powerPreference:'high-performance'});
- engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/1.7));
+ engine.setHardwareScalingLevel(renderQuality.scale);
+ state.graphics={mode:graphicsMode,hardwareScale:renderQuality.scale,
+  adaptive:graphicsMode==='auto',changes:0};
  scene=new B.Scene(engine);
  scene.useRightHandedSystem=true;
  scene.skipPointerMovePicking=true;
@@ -123,14 +165,39 @@ function createWorld(){
  const markMaterial=new B.StandardMaterial('destination-mat',scene);
  markMaterial.emissiveColor=color('#eed58b');destinationMark.material=markMaterial;
 
- // Mirror the FIRST Three.js game's camera: elevated follow, stable heading.
- // Babylon map's northern direction is +Z, so stand behind the blue hero.
- camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.88,24,
-  new B.Vector3(0,1,-107),scene);
- camera.lowerRadiusLimit=23;camera.upperRadiusLimit=25;
- camera.lowerBetaLimit=.87;camera.upperBetaLimit=.89;
- camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
+ // The first game's elevated patrol viewpoint, now a readable tactical
+ // perspective. ?camera=classic safely restores the previous close profile.
+ camera=new B.ArcRotateCamera('camera',Math.PI*1.5,.83,23.5,
+  new B.Vector3(0,1,-105),scene);
+ cameraProfile=tacticalCamera.configure(camera,{profile:
+  new URLSearchParams(location.search).get('camera')});
+ state.cameraProfile=cameraProfile.id;
+ camera.wheelPrecision=1e9;camera.pinchDeltaPercentage=0;
  state.visualProfile=legacyVisual?.apply({scene,B,camera,sun,world,ambient:hemi})||null;
+ // Real photographed materials and geometry; Babylon skinned soldiers, game AI,
+ // colliders, controls and camera remain entirely unchanged.
+ if(new URLSearchParams(location.search).get('art')!=='classic'){
+  try{
+   state.modernArt=modernArt.apply({scene,B,world,camera,sun,map:goldRules.MAP});
+   try{
+    state.mapDetail=mapDetail.apply({scene,B,map:goldRules.MAP,
+     lowPower:graphicsMode==='low'});
+   }catch(error){
+    state.mapDetail={ready:false,error:String(error)};
+    console.warn('Organic terrain fallback to licensed ground PBR',error);
+   }
+   if(villageModels?.install){
+    state.villageModels={started:true,loaded:0,pending:3};
+    void villageModels.install({scene,B,art:state.modernArt}).then(
+     result=>{state.villageModels=result},
+     error=>{state.villageModels={error:String(error)}});
+   }
+  }
+  catch(error){console.warn('Modern art fallback to native map',error);
+   state.modernArt={error:String(error)};}
+ }else state.modernArt={profile:'original-babylon',ready:false};
+ const artTag=$('graphics-tag');
+ if(artTag)artTag.textContent=state.modernArt?.ready?'HD 2026 · PBR · CC0':'ORIGINAL · BABYLON';
  // The first game never let a one-finger drag spin the battlefield.
  // Keep direct touch joystick + tap-to-move; camera is follow-locked.
  camera.detachControl();
@@ -150,7 +217,7 @@ function createWorld(){
    }
    return;
   }
-  if(info.pickInfo.pickedMesh===terrain && fieldOrders && state.ready){
+  if(info.pickInfo.pickedMesh===terrain && fieldOrders && state.ready&&!touchJoystick.active){
    const point=info.pickInfo.pickedPoint;
    if(!point)return;
    if(inputMode==='attack'){
@@ -172,6 +239,17 @@ function createWorld(){
  });
  engine.runRenderLoop(frame);
  window.addEventListener('resize',()=>engine.resize());
+}
+// Squad markers and health bars share faction GPU materials without
+// sharing health state, hit boxes, or independent skinned character rigs.
+const soldierMaterialCache=new Map();
+function factionMat(kind,side,hex,{alpha=1,disableLighting=false}={}){
+ const key=kind+'-'+side;
+ if(soldierMaterialCache.has(key))return soldierMaterialCache.get(key);
+ const m=new B.StandardMaterial('soldier-shared-'+key,scene);
+ m.emissiveColor=color(hex);m.alpha=alpha;m.disableLighting=disableLighting;
+ soldierMaterialCache.set(key,m);
+ return m;
 }
 function unitVisual(index,entries,{externalModel=null}={}){
  const anchor=new B.TransformNode('soldier-anchor-'+index,scene);
@@ -222,21 +300,20 @@ function unitVisual(index,entries,{externalModel=null}={}){
  }
  const marker=B.MeshBuilder.CreateDisc('squad-ring-'+index,{radius:.47,tessellation:24},scene);
  marker.parent=anchor;marker.rotation.x=Math.PI/2;marker.position.y=.025;
- const ringMat=new B.StandardMaterial('squad-ring-mat-'+index,scene);
- ringMat.emissiveColor=color(index<12?'#77bcea':'#e98668');ringMat.alpha=.75;
+ const ringMat=factionMat('ring',index<12?'blue':'red',
+  index<12?'#77bcea':'#e98668',{alpha:.75});
  marker.material=ringMat;marker.isPickable=false;
  const hpBack=B.MeshBuilder.CreatePlane('health-bg-'+index,{width:.8,height:.085},scene);
  hpBack.parent=anchor;hpBack.billboardMode=B.Mesh.BILLBOARDMODE_ALL;
  hpBack.position.y=2.08;
- const hpBgMat=new B.StandardMaterial('health-bg-mat-'+index,scene);
- hpBgMat.emissiveColor=color('#27332a');hpBgMat.disableLighting=true;
+ const hpBgMat=factionMat('hp-background','both','#27332a',
+  {disableLighting:true});
  hpBack.material=hpBgMat;hpBack.isPickable=false;
  const hpFill=B.MeshBuilder.CreatePlane('health-fill-'+index,{width:.76,height:.061},scene);
  hpFill.parent=anchor;hpFill.billboardMode=B.Mesh.BILLBOARDMODE_ALL;
  hpFill.position.y=2.081;hpFill.position.z=-.01;
- const hpMat=new B.StandardMaterial('hp-mat-'+index,scene);
- hpMat.emissiveColor=color(index<12?'#8bdaa0':'#e78f6b');
- hpMat.disableLighting=true;hpFill.material=hpMat;hpFill.isPickable=false;
+ const hpMat=factionMat('hp-fill',index<12?'blue':'red',
+  index<12?'#8bdaa0':'#e78f6b',{disableLighting:true});hpFill.material=hpMat;hpFill.isPickable=false;
  for(const mesh of drawable)mesh.metadata={...(mesh.metadata||{}),squadSlot:index};
  return {index,faction:factions.sideForSlot(index),
   chosenAlliedModel:index<12?(FEATURE_REAL_ALLIES?featureCasting(index):alliedModels.forBlueSlot(index).id):null,
@@ -272,10 +349,11 @@ async function ensureUnitsUnlocked(scenarioName){
   $('loading').textContent='Загружаю анимированного немецкого стрелка…';
   asset=await B.SceneLoader.LoadAssetContainerAsync(
    './animstudio-preview/models/','all-combat-run.glb',scene);
+  motionDonors.germanRun=unitMotion?.findGroup(asset.animationGroups,'Kar98k_Run')||null;
   if(asset.animationGroups.length<16)
    throw Error('В GLB отсутствуют 16 согласованных боевых анимаций');
  }
- if(!modelDepot){
+ if(!modelDepot&&Date.now()>=modelDepotRetryAfter){
   modelDepot=alliedLoader.create({B,scene,catalog:alliedModels,
    sourceGroups:asset.animationGroups,featureTrial:FEATURE_REAL_ALLIES});
   try{
@@ -285,6 +363,8 @@ async function ensureUnitsUnlocked(scenarioName){
    // Missing manifest does not make 12v12 unplayable; no false model import.
    console.warn('Allied GLB manifest unavailable; source models not installed',error);
    modelDepot=null;
+   modelDepotRetryAfter=Date.now()+30000;
+   state.engineering.assetRetries++;
   }
  }
  for(const i of slots){
@@ -299,8 +379,15 @@ async function ensureUnitsUnlocked(scenarioName){
     externalModel=await modelDepot.instantiate(selected,i);
    }catch(error){
     state.modelErrors[selected]=String(error?.message||error);
+    state.engineering.glbFallbacks++;
     console.error('Allied licensed model rejected',selected,error);
    }
+  }
+  // Retarget Jakeli READY only after its original native rig is available.
+  if(externalModel?.modelId==='britishJakeli'&&!motionDonors.britishReady){
+   motionDonors.britishReady=unitMotion?.findGroup(externalModel.entries.animationGroups,'Ready')||null;
+   if(motionDonors.britishReady)for(const previous of views.filter(Boolean))
+    promoteUnitMotion(previous);
   }
   // No invented download: if the original licensed file is missing, only
   // the explicitly labelled pre-existing prototype is available.
@@ -309,6 +396,16 @@ async function ensureUnitsUnlocked(scenarioName){
    const entries=externalModel?.entries||asset.instantiateModelsToScene(
    name=>name,false,{doNotInstantiate:true});
   const view=unitVisual(i,entries,{externalModel});
+  // This is the SAME original German rig as the approved soldier-only lab.
+  // Transfer its tested leg-only native Run into the actual Babylon squad.
+  // Never overwrite American/UK authored animation tracks or weapon grips.
+  if(!externalModel&&unitMotion?.installNativeGermanLegRun){
+   const local=unitMotion.installNativeGermanLegRun(view,{B,scene});
+   state.unitMotionReports[i]={nativeGermanRun:local.ok?
+    'seven-leg-tracks':String(local.reason)};
+   if(!local.ok)console.warn('Original German run fallback',i,local.reason);
+  }
+  promoteUnitMotion(view);
   if(view.faction==='british'&&!externalModel){
    // These are ORIGINAL procedural placeholders, not new skins. Commando
    // stays blocked until its previously selected source is actually acquired.
@@ -350,7 +447,10 @@ async function processWeaponQueue(){
  weaponWorker=true;
  try{
   while(weaponQueue.length){
-   const view=weaponQueue.shift();
+   // Stream visible guns before reserve models; mobile start stays responsive.
+   const liveIndex=weaponQueue.findIndex(v=>v?.unit?.alive&&!v.rig?.weaponRigReady);
+   const view=liveIndex>=0?weaponQueue.splice(liveIndex,1)[0]:weaponQueue.shift();
+   state.engineering.pendingWeaponAssets=weaponQueue.length;
    if(!view||!view.rig||view.rig.weaponRigReady)continue;
    try{
     const rig=view.rig;
@@ -388,6 +488,8 @@ async function processWeaponQueue(){
      weaponRoot:'../assets/ww2-weapons/'
     });
     if(!rig.weaponRigReady)throw Error('Двухручный IK не подготовлен');
+    configureGermanRifleCarry(view,view.lastPose||'ready');
+    rig.setWeaponPose?.(view.lastPose||'ready');
     const wanted=view.unit?.weapon||view.weapon;
     if(rig.weaponRig?.weapon!==weaponAsset(view,wanted)&&rig.equipWeapon)
      await rig.equipWeapon(weaponAsset(view,wanted));
@@ -402,6 +504,7 @@ async function processWeaponQueue(){
       view.importedAlliedName,assessment.reason);
     }
    }catch(error){
+    state.engineering.weaponFailures=(state.engineering.weaponFailures||0)+1;
     // The animated approved soldier stays visible and game logic works.
     view.weaponError=String(error?.message||error);
     console.error('Weapon model for soldier '+(view.index+1),error);
@@ -441,7 +544,21 @@ async function chooseScenario(name){
 function stopAnimations(view){
  nativeBlend.stop(view);
 }
+function configureGermanRifleCarry(view,pose){
+ const rig=view?.rig;
+ if(!rig)return;
+ const originalRifle=!!view.nativeGermanLegsRun&&
+  !view.importedAlliedModel&&rig.weaponRig?.weapon==='de-kar98k';
+ // Only the approved German Kar98k receives the validated ~horizontal
+ // run carry and the anatomically measured 2-hand finger curl.
+ // MP40, MG42, launchers and allied rigs retain their existing controllers.
+ rig.weaponMotionRunCarryTest=originalRifle;
+ rig.weaponMotionRun=originalRifle&&pose==='run';
+ rig.weaponMotionRightWristMax=originalRifle&&pose==='run'?120:55;
+ rig.weaponMotionGripDebug=originalRifle&&pose==='run'?'reverseAxisX':null;
+}
 function setClip(view,pose){
+ configureGermanRifleCarry(view,pose);
  const id=view.weapon+'_'+CLIP_POSES[pose];
  const target=view.clips.get(id);
  if(!target){
@@ -470,6 +587,34 @@ function assignView(view,unit){
  view.rig.combatPose={active:false,stage:'ready',crouch:0,recoilPulse:0};
  // Approved rig starts with Kar98k loaded; avoid duplicate requests.
 }
+// Lightweight session objectives are earned through real combat/capture,
+ // not daily login gates, advertising, paywalls, or duplicated army gold.
+const SESSION_OBJECTIVES=Object.freeze([
+ {kind:'kills',target:1,title:'Первое устранение'},
+ {kind:'farms',target:1,title:'Первая ферма'},
+ {kind:'kills',target:3,title:'Три устранения'},
+ {kind:'farms',target:3,title:'Удержать три фермы'}
+]);
+let missionIndex=0;
+function advanceObjectives(hero,econ){
+ let advanced=false;
+ while(missionIndex<SESSION_OBJECTIVES.length){
+  const task=SESSION_OBJECTIVES[missionIndex];
+  const progress=task.kind==='kills'?hero.kills:(econ?.owners?.blue?.length||0);
+  if(progress<task.target)break;
+  missionIndex++;advanced=true;
+ }
+ const task=SESSION_OBJECTIVES[missionIndex];
+ const progress=task?(task.kind==='kills'?hero.kills:
+  econ?.owners?.blue?.length||0):SESSION_OBJECTIVES.length;
+ state.mission={completed:missionIndex,total:SESSION_OBJECTIVES.length,
+  current:task?.title||'Все цели выполнены',progress,
+  target:task?.target||SESSION_OBJECTIVES.length,finished:!task};
+ if(advanced&&gameStarted)alertStatus(task?
+  'Задача выполнена! Следующая: '+task.title:
+  'Все боевые задачи выполнены! Продолжайте защищать фермы.');
+ return state.mission;
+}
 function setup(scenarioName){
  if(!state.ready)return;
  if(!SCENARIOS[scenarioName])throw Error('Unknown scenario');
@@ -477,6 +622,8 @@ function setup(scenarioName){
  replenisher?.stop();replenisher=null;
  reinforcementEpoch++;
  scenario=scenarioName;atBase=true;
+ missionIndex=0;state.mission={completed:0,total:SESSION_OBJECTIVES.length,
+  current:SESSION_OBJECTIVES[0].title,progress:0,target:1,finished:false};
  if(destinationMark)destinationMark.isVisible=false;
  state.scenario=scenario;state.atBase=true;state.focus=null;
  const [ours,theirs]=SCENARIOS[scenario];
@@ -555,8 +702,26 @@ function setup(scenarioName){
  drawHud();
 }
 function findActor(){return allies[0]||null}
-function addEffect(mesh,ttl,material=null){
- fx.push({mesh,ttl,material});
+function addEffect(mesh,ttl,material=null,pooled=null){
+ fx.push({mesh,ttl,material,pooled});
+}
+function drawTracer(start,impact,colour,ttl){
+ let slot=tracerPool.find(t=>!t.active);
+ if(!slot){
+  if(tracerPool.length>=TRACER_LIMIT){
+   state.engineering.droppedTracerVisuals=
+    (state.engineering.droppedTracerVisuals||0)+1;
+   return; // Drop a VISUAL under load, never a real hit or its damage.
+  }
+  const mesh=B.MeshBuilder.CreateLines('tracer-pooled',{
+   points:[start,impact],updatable:true},scene);
+  slot={mesh,active:false};tracerPool.push(slot);
+ }else B.MeshBuilder.CreateLines('tracer-pooled',{
+  points:[start,impact],instance:slot.mesh},scene);
+ slot.mesh.color=colour;slot.mesh.isPickable=false;
+ slot.mesh.setEnabled(true);slot.active=true;
+ addEffect(slot.mesh,ttl,null,slot);
+ state.engineering.tracerPoolSize=tracerPool.length;
 }
 function drawShot({unit,target,result}){
  // Bounties are credited to the killer's army; the hero also earns
@@ -583,11 +748,9 @@ function drawShot({unit,target,result}){
  const impact=result.impact?position(result.impact,.7):
   targetView.anchor.position.add(new B.Vector3(0,1.15,0));
  if(!result.hit&&!result.impact)impact.z+=(Math.random()-.5)*1.4;
- const line=B.MeshBuilder.CreateLines('tracer',{
-  points:[start,impact]},scene);
- line.color=result.weapon==='Panzerschreck'?color('#ff9945'):
-  color(unit.team==='свои'?'#ffe5a0':'#ff866f');
- addEffect(line,result.weapon==='Panzerschreck'?.24:.095);
+ drawTracer(start,impact,result.weapon==='Panzerschreck'?color('#ff9945'):
+  color(unit.team==='свои'?'#ffe5a0':'#ff866f'),
+  result.weapon==='Panzerschreck'?.24:.095);
  if(result.weapon==='Panzerschreck'){
   const diameter=combat.WEAPONS.Panzerschreck.blastRadius*UNIT_SCALE*2;
   const sphere=B.MeshBuilder.CreateSphere('blast',{diameter,segments:10},scene);
@@ -607,6 +770,8 @@ function syncVisual(view){
  const unit=view.unit;
  if(!unit)return;
  if(!unit.alive){
+  if(view.inactive)return; // Dead rig was previously stopped every frame.
+  view.inactive=true;
   view.marker.setEnabled(false);
   view.hpBack.setEnabled(false);
   view.hpFill.setEnabled(false);
@@ -614,6 +779,7 @@ function syncVisual(view){
   stopAnimations(view);
   return;
  }
+ view.inactive=false;
  view.anchor.setEnabled(true);view.marker.setEnabled(true);
  view.hpBack.setEnabled(true);view.hpFill.setEnabled(true);
  const nextHP=Math.max(0,unit.hp/unit.maxHp);
@@ -655,7 +821,9 @@ function drawMiniMap(econ){
  if(!map)return;
  const c=map.getContext('2d');
  if(!c)return;
- const W=map.width,H=map.height;
+ // Draw logical 116px into a higher-DPI canvas for readable iPhone map.
+ const W=116,H=116,dpi=map.width/W;
+ c.setTransform(dpi,0,0,dpi,0,0);
  const xy=(x,z)=>[x/300*W,H-z/300*H];
  c.fillStyle='#303b2c';c.fillRect(0,0,W,H);
  c.strokeStyle='#786b4c';c.lineWidth=4;
@@ -698,6 +866,7 @@ function drawHud(){
  const inventory=hero.weapon==='Kar98k'?null:hero.inventory[hero.weapon];
  const funds=battle.getFunds();
  const econ=economy?.summary();
+ const mission=advanceObjectives(hero,econ);
  const central=econ?.central;
  const left=central?.started?Math.ceil(central.remainingSeconds):0;
  const timerLabel=central?.open?'ОТКРЫТА':
@@ -727,6 +896,9 @@ function drawHud(){
    ' · самостоятельные 🔵 '+(state.firstGameArmy?.autonomousBlue||0)+
    ' / 🔴 '+(state.firstGameArmy?.autonomousRed||0)+
   '\nВыстрелы героя: '+hero.shots+' · поражено: '+hero.kills+
+  '\nЗадача: '+mission.current+
+   (mission.finished?' ✓':' · '+Math.min(mission.progress,mission.target)+
+    '/'+mission.target)+' · награды: '+mission.completed+'/'+mission.total+
   (state.reinforcements?'\nПополнение каждые 1,4 с · лимит '+REINFORCEMENT_LIMIT+' на сторону'+
     '\nЗа бой прибыло: 🔵 '+state.reinforcements.totalBlueReinforced+
     ' · 🔴 '+state.reinforcements.totalRedReinforced:'')+
@@ -794,6 +966,13 @@ function resupplyHero(){
  drawHud();
 }
 function registerUI(){
+ const camButton=$('camera-toggle');
+ if(camButton)camButton.addEventListener('click',()=>{
+  const next=cameraProfile.id==='tactical'?'classic':'tactical';
+  cameraProfile=tacticalCamera.configure(camera,{profile:next});
+  state.cameraProfile=cameraProfile.id;
+  camButton.textContent='Камера: '+(next==='tactical'?'тактическая':'близкая');
+ });
  document.querySelectorAll('[data-scenario]').forEach(button=>
   button.addEventListener('click',()=>chooseScenario(button.dataset.scenario)));
  document.querySelectorAll('[data-weapon]').forEach(button=>
@@ -850,7 +1029,8 @@ function updateTouchJoystick(dt){
   Number(movementKeys.a||movementKeys.ArrowLeft);
  const z=Number(movementKeys.w||movementKeys.ArrowUp)-
   Number(movementKeys.s||movementKeys.ArrowDown);
- fieldOrders.setMovement(x,z);
+ const magnitude=Math.hypot(x,z);
+ fieldOrders.setMovement(magnitude>1?x/magnitude:x,magnitude>1?z/magnitude:z);
 }
 function registerTouchControls(){
  // Match the first game's W/A/S/D and arrow-key walking on desktop.
@@ -863,43 +1043,30 @@ function registerTouchControls(){
  });
  const pad=$('touch-stick'),knob=$('touch-stick-knob');
  if(!pad||!knob)return;
- function move(e){
-  const rect=pad.getBoundingClientRect();
-  const centerX=rect.left+rect.width/2,centerY=rect.top+rect.height/2;
-  const radius=Math.max(1,rect.width*.37);
-  const dx=(e.clientX-centerX)/radius,dy=(e.clientY-centerY)/radius;
-  const mag=Math.max(1,Math.hypot(dx,dy));
-  touchJoystick.x=dx/mag;touchJoystick.y=-dy/mag;
-  knob.style.transform='translate('+(touchJoystick.x*radius*.65)+'px,'+
-   (-touchJoystick.y*radius*.65)+'px)';
-  touchJoystick.cooldown=0;
- }
- function release(e){
-  if(e.pointerId!==touchJoystick.pointer)return;
-  touchJoystick.active=false;touchJoystick.pointer=null;
-  touchJoystick.x=touchJoystick.y=0;touchJoystick.cooldown=0;
-  knob.style.transform='translate(0,0)';
+ joystickDriver=mobileThumbstick.create({pad,knob,win:window,
+  canStart:()=>state.ready&&gameStarted&&!!findActor()?.alive,
+  onMove:(x,z,active)=>{
+   touchJoystick.x=x;touchJoystick.y=z;touchJoystick.active=active;
+   touchJoystick.pointer=joystickDriver?.state.pointer??null;
+   if(active)fieldOrders?.setMovement(x,z);
+   else fieldOrders?.clearMovement();
+  }});
+ state.thumbstick=joystickDriver.state;
+ window.addEventListener('blur',()=>{
+  for(const key of Object.keys(movementKeys))movementKeys[key]=false;
   fieldOrders?.clearMovement();
- }
- pad.addEventListener('pointerdown',e=>{
-  if(!state.ready||!gameStarted||!findActor()?.alive)return;
-  e.preventDefault();
-  touchJoystick.active=true;touchJoystick.pointer=e.pointerId;
-  pad.setPointerCapture(e.pointerId);move(e);
  });
- pad.addEventListener('pointermove',e=>{
-  if(touchJoystick.active&&e.pointerId===touchJoystick.pointer){
-   e.preventDefault();move(e);
-  }
- });
- pad.addEventListener('pointerup',release);
- pad.addEventListener('pointercancel',release);
  $('quick-fire').addEventListener('click',()=>{
   if(!state.ready||!gameStarted||!controller)return;
   const hero=findActor();
   if(!hero?.alive)return;
-  const target=enemies.filter(u=>u.alive).sort((a,b)=>
-   Math.hypot(a.x-hero.x,a.z-hero.z)-Math.hypot(b.x-hero.x,b.z-hero.z))[0];
+  // O(n) nearest living enemy without sorting or allocating arrays.
+  let target=null,best=Infinity;
+  for(const enemy of enemies){
+   if(!enemy?.alive)continue;
+   const d=(enemy.x-hero.x)**2+(enemy.z-hero.z)**2;
+   if(d<best){best=d;target=enemy;}
+  }
   if(!target)return;
   controller.setFocus(target);
   alertStatus('ОГОНЬ · приоритетная цель: '+target.id);
@@ -981,19 +1148,45 @@ function frame(){
    syncVisual(view);
    nativeBlend.update(view,dt);
   }
-  // Fixed original Three.js follow profile, without rotating on the joystick.
-  if(allies[0]?.alive&&camera){
-   // Leave room ahead to see enemies and cover, as in the original.
-   const dest=position(allies[0],.75).add(new B.Vector3(0,0,0));
-   camera.target=B.Vector3.Lerp(camera.target,dest,Math.min(1,dt*2.8));
-  }
-  if(world&&economy)world.syncFarms(economy.summary());
+  // Never rotate the camera or consume thumbstick touches while following.
+  if(allies[0]?.alive&&camera)tacticalCamera.follow(camera,allies[0],
+   {B,profile:cameraProfile.id,dt});
   const now=performance.now();
+  // The five capture-ring meshes change slowly. Rebuilding the complete
+  // economy summary and ring materials every rendered frame wastes CPU.
+  if(world&&economy&&now-lastFarmSyncAt>400){
+   world.syncFarms(economy.summary());lastFarmSyncAt=now;
+  }
   if(now-statusAt>220){statusAt=now;drawHud();}
  }
  for(let i=fx.length-1;i>=0;i--){
   const f=fx[i];f.ttl-=dt;
-  if(f.ttl<=0){f.mesh.dispose();f.material?.dispose();fx.splice(i,1);}
+  if(f.ttl<=0){
+   if(f.pooled){f.pooled.active=false;f.mesh.setEnabled(false);}
+   else{f.mesh.dispose();f.material?.dispose();}
+   fx.splice(i,1);
+  }
+ }
+ // Adaptive GPU resolution affects graphics only: simulation, targeting,
+ // ballistics, UI hit targets and all native skeleton animations stay fixed.
+ if(renderQuality.mode==='auto'&&gameStarted){
+  renderQuality.fpsElapsed+=Math.min(1,Math.max(0,engine.getDeltaTime()/1000)); // real frame time
+  if(renderQuality.fpsElapsed>=3){
+   renderQuality.fpsElapsed=0;
+   const fps=engine.getFps();
+   const old=renderQuality.scale;
+   const next=fps<37?Math.min(renderQuality.high,old+.16):
+    fps>55?Math.max(renderQuality.low,old-.10):old;
+   if(Math.abs(next-old)>.04){
+    renderQuality.scale=next;engine.setHardwareScalingLevel(next);
+    state.graphics.hardwareScale=+next.toFixed(2);
+    state.graphics.changes++;
+   }
+   state.engineering.frameStats={fps:+fps.toFixed(1),scale:+next.toFixed(2),
+    visibleActors:views.filter(v=>v?.unit?.alive).length,
+    activeTracers:fx.filter(f=>f.pooled).length,
+    sharedSoldierMaterials:soldierMaterialCache.size};
+  }
  }
  scene.render();
 }

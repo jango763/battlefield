@@ -1,0 +1,122 @@
+  assignView(view,unit);
+  actors.set(unit,view);
+  replenisher.finish(unit,true);
+  state.reinforcements=replenisher.snapshot();
+  // Existing weapon assets/IK remain attached to the original rig.
+  // Subsequent equip requests use the existing weapon queue.
+  if(unit.isHero)alertStatus('Герой вернулся на базу. Подкрепления продолжают прибывать.');
+  else if(state.reinforcements.totalBlueReinforced+
+   state.reinforcements.totalRedReinforced<=6)
+   alertStatus(side==='blue'?'Подкрепление союзников вышло с базы.':
+    'Подкрепление Вермахта вышло с базы.');
+  void processWeaponQueue();
+ }catch(error){
+  if(epoch!==reinforcementEpoch)return;
+  replenisher?.finish(unit,false);
+  const key='reinforcement-'+slot;
+  state.modelErrors[key]=String(error?.message||error);
+  console.warn('Не удалось загрузить подкрепление',side,slot,error);
+ }
+}
+function updateReinforcements(dt){
+ if(scenario!=='squads'||!gameStarted||!controller?.snapshot().active||!replenisher)
+  return;
+ const requests=replenisher.update(dt);
+ const epoch=reinforcementEpoch;
+ for(const request of requests)void deployReinforcement(request,epoch);
+ state.reinforcements=replenisher.snapshot();
+}
+function frame(){
+ // Under mobile software rendering, clamping to 50ms made real-time
+ // walking, army spawning and gold clocks slow down dramatically at <20 FPS.
+ // 120ms is still safely below every core's maximum simulation step (200ms).
+ const dt=Math.max(0,Math.min(.12,engine.getDeltaTime()/1000));
+ if(state.ready&&controller){
+  if(!gamePausedForBriefing){
+   updateTouchJoystick(dt);
+   controller.update(dt);
+   updateReinforcements(dt);
+   // Stop economic and unlock clocks while the actual battle is paused
+   // (not merely when the map briefing is dismissed).
+   if(economy&&controller.snapshot().active){
+    economy.update(dt,[...allies,...enemies]);
+    // Only newly earned income enters the combat treasury. Purchases
+    // deduct from BOTH treasuries, preventing an accidental money refund.
+    const credited=economy.treasury.blue-lastEconomyBlue;
+    if(credited>0)battle.grantFunds(credited);
+    lastEconomyBlue=economy.treasury.blue;
+   }
+  }
+  for(const view of views)if(view?.unit){
+   syncVisual(view);
+   nativeBlend.update(view,dt);
+  }
+  // Never rotate the camera or consume thumbstick touches while following.
+  if(allies[0]?.alive&&camera)tacticalCamera.follow(camera,allies[0],
+   {B,profile:cameraProfile.id,dt});
+  const now=performance.now();
+  // The five capture-ring meshes change slowly. Rebuilding the complete
+  // economy summary and ring materials every rendered frame wastes CPU.
+  if(world&&economy&&now-lastFarmSyncAt>400){
+   world.syncFarms(economy.summary());lastFarmSyncAt=now;
+  }
+  if(now-statusAt>220){statusAt=now;drawHud();}
+ }
+ for(let i=fx.length-1;i>=0;i--){
+  const f=fx[i];f.ttl-=dt;
+  if(f.ttl<=0){
+   if(f.pooled){f.pooled.active=false;f.mesh.setEnabled(false);}
+   else{f.mesh.dispose();f.material?.dispose();}
+   fx.splice(i,1);
+  }
+ }
+ // Adaptive GPU resolution affects graphics only: simulation, targeting,
+ // ballistics, UI hit targets and all native skeleton animations stay fixed.
+ if(renderQuality.mode==='auto'&&gameStarted){
+  renderQuality.fpsElapsed+=Math.min(1,Math.max(0,engine.getDeltaTime()/1000)); // real frame time
+  if(renderQuality.fpsElapsed>=3){
+   renderQuality.fpsElapsed=0;
+   const fps=engine.getFps();
+   const old=renderQuality.scale;
+   const next=fps<37?Math.min(renderQuality.high,old+.16):
+    fps>55?Math.max(renderQuality.low,old-.10):old;
+   if(Math.abs(next-old)>.04){
+    renderQuality.scale=next;engine.setHardwareScalingLevel(next);
+    state.graphics.hardwareScale=+next.toFixed(2);
+    state.graphics.changes++;
+   }
+   state.engineering.frameStats={fps:+fps.toFixed(1),scale:+next.toFixed(2),
+    visibleActors:views.filter(v=>v?.unit?.alive).length,
+    activeTracers:fx.filter(f=>f.pooled).length,
+    sharedSoldierMaterials:soldierMaterialCache.size};
+  }
+ }
+ scene.render();
+}
+try{
+ createWorld();
+ await ensureUnits('duel'); // Two actors first, not eight blocking the entire UI.
+ state.loading=false;state.ready=true;
+ for(const el of document.querySelectorAll('button'))el.disabled=false;
+ registerUI();
+ registerTouchControls();
+ setup('squads');
+ briefingProgress.textContent='Бойцы загружены. Читайте карту и нажмите «В бой».';
+ enterButton.disabled=false;
+ enterButton.textContent='В бой · начать игру';
+ // The first playable frame is available before armature IK/weapon loading.
+ void processWeaponQueue();
+// Do not start combat under the briefing: player chooses the start time.
+ $('loading').textContent='Готово. На заставке нажмите «В бой», когда прочитаете правила.';
+ drawHud();
+}catch(error){
+ state.loading=false;state.error=String(error?.stack||error);
+ $('loading').textContent='Ошибка: '+(error?.message||error);
+ $('readout').textContent='Не удалось запустить игру. Проверьте загрузку модели.';
+ $('failure-text').textContent=(error?.message||String(error));
+ $('failure').style.display='block';
+ briefingProgress.textContent='Ошибка загрузки: '+(error?.message||error);
+ enterButton.textContent='Ошибка загрузки. Перезапустите игру';
+ console.error('Battlefield main game',error);
+}
+})();

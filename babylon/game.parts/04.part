@@ -1,0 +1,122 @@
+   modelDepotRetryAfter=Date.now()+30000;
+   state.engineering.assetRetries++;
+  }
+ }
+ for(const i of slots){
+  if(views[i])continue;
+  $('loading').textContent='Загружаю бойцов: '+state.models+'/'+slots.length+
+   ' · создание №'+(i+1);
+  // Preserve exact Mixamo joint names in clone-local hierarchies for IK.
+  let externalModel=null;
+  if(i<12&&modelDepot){
+   const selected=FEATURE_REAL_ALLIES?featureCasting(i):alliedModels.forBlueSlot(i).id;
+   try{
+    externalModel=await modelDepot.instantiate(selected,i);
+   }catch(error){
+    state.modelErrors[selected]=String(error?.message||error);
+    state.engineering.glbFallbacks++;
+    console.error('Allied licensed model rejected',selected,error);
+   }
+  }
+  // Retarget Jakeli READY only after its original native rig is available.
+  if(externalModel?.modelId==='britishJakeli'&&!motionDonors.britishReady){
+   motionDonors.britishReady=unitMotion?.findGroup(externalModel.entries.animationGroups,'Ready')||null;
+   if(motionDonors.britishReady)for(const previous of views.filter(Boolean))
+    promoteUnitMotion(previous);
+  }
+  // No invented download: if the original licensed file is missing, only
+  // the explicitly labelled pre-existing prototype is available.
+  // Record the real GLB identity (or a clearly marked fallback) per squad slot.
+   const sourceReport=characters.audit(i,externalModel);
+   const entries=externalModel?.entries||asset.instantiateModelsToScene(
+   name=>name,false,{doNotInstantiate:true});
+  const view=unitVisual(i,entries,{externalModel});
+  // This is the SAME original German rig as the approved soldier-only lab.
+  // Transfer its tested leg-only native Run into the actual Babylon squad.
+  // Never overwrite American/UK authored animation tracks or weapon grips.
+  if(!externalModel&&unitMotion?.installNativeGermanLegRun){
+   const local=unitMotion.installNativeGermanLegRun(view,{B,scene});
+   state.unitMotionReports[i]={nativeGermanRun:local.ok?
+    'seven-leg-tracks':String(local.reason)};
+   if(!local.ok)console.warn('Original German run fallback',i,local.reason);
+  }
+  promoteUnitMotion(view);
+  if(view.faction==='british'&&!externalModel){
+   // These are ORIGINAL procedural placeholders, not new skins. Commando
+   // stays blocked until its previously selected source is actually acquired.
+   const soldier=britishSoldier.create({B,scene,view});
+   if(!soldier.applied)throw Error('Temporary British prototype: '+soldier.reason);
+  }
+  if(externalModel)state.importedAlliedCount++;
+  // A shared skeleton or shared track would animate two actors at once.
+  for(const prev of views.filter(Boolean)){
+   if(prev.imported.skeletons[0]===view.imported.skeletons[0])
+    throw Error('У бойцов общий скелет: клонирование отклонено');
+   const clipA=prev.clips.get('Kar98k_Run');
+   const clipB=view.clips.get('Kar98k_Run');
+   if(!clipA||!clipB)throw Error('No squad run animation for comparison');
+   if(clipA===clipB ||
+      clipA.targetedAnimations[0]?.target===clipB.targetedAnimations[0]?.target)
+    throw Error('У бойцов общая анимация бега');
+  }
+  // A soldier's existing GLB + 16 clips render without weapon IK.
+  // Do not block the *entire game* on several 1.7 MB rifle loads or IK errors.
+  view.rig={combatPose:{active:false,stage:'ready',crouch:0,recoilPulse:0}};
+  view.anchor.setEnabled(false);
+  views[i]=view;state.actorSources[i]=sourceReport;
+   state.models++;state.clips+=new Set(view.clips.values()).size;
+  weaponQueue.push(view);
+  const unit=i<12?allies[i]:enemies[i-12];
+  if(state.ready&&unit?.alive){
+   unit.characterModelImported=!!externalModel;
+   assignView(view,unit);actors.set(unit,view);
+  }
+  // Allow browser to paint loading progress on mobile between clones.
+  await new Promise(resolve=>requestAnimationFrame(resolve));
+ }
+ $('loading').textContent='Готово: '+state.models+
+  ' анимированных бойцов · выберите режим и нажмите «Начать бой»';
+}
+async function processWeaponQueue(){
+ if(weaponWorker||!state.ready)return;
+ weaponWorker=true;
+ try{
+  while(weaponQueue.length){
+   // Stream visible guns before reserve models; mobile start stays responsive.
+   const liveIndex=weaponQueue.findIndex(v=>v?.unit?.alive&&!v.rig?.weaponRigReady);
+   const view=liveIndex>=0?weaponQueue.splice(liveIndex,1)[0]:weaponQueue.shift();
+   state.engineering.pendingWeaponAssets=weaponQueue.length;
+   if(!view||!view.rig||view.rig.weaponRigReady)continue;
+   try{
+    const rig=view.rig;
+    if(view.nativeAlliedClips&&view.importedAlliedName==='americanHero'){
+     const maker=window.BattlefieldUSLeeEnfieldStage4;
+     if(typeof maker?.create!=='function')
+      throw Error('Approved American four-weapon grip controller missing');
+     const realGrip=await maker.create({
+      scene,imported:view.imported,stage:view.root,
+      weaponRoot:'../assets/ww2-weapons/',
+      initialWeaponId:weaponAsset(view,view.unit?.weapon||view.weapon)
+     });
+     rig.weaponRigReady=true;
+     rig.nativeGrip=realGrip;
+     rig.equipWeapon=id=>realGrip.equipWeapon(id);
+     rig.weaponRig={get weapon(){return realGrip.state?.weaponId||null}};
+     rig.getMuzzleWorld=()=>realGrip.getMuzzleWorld();
+     view.weaponError=null;
+     continue;
+    }
+    if(view.nativeAlliedClips&&view.importedAlliedName==='britishJakeli'){
+     // The exact pre-baked Lee-Enfield rig has physically checked hand
+     // contact. Legacy German IK would deform this licensed British mesh.
+     // Do not attach a second rifle or overwrite the approved pose.
+     rig.weaponRigReady=true;
+     rig.nativeBakedWeapon=true;
+     view.weaponError=null;
+     continue;
+    }
+    await window.BattlefieldWeaponRig.create({
+     scene,imported:view.imported,root:view.root,state:rig,
+     animationDriven:true,bindUI:false,acceptExportSockets:true,
+     allowRetargetedSkeleton:view.importedAlliedModel,
+     initialWeaponId:weaponAsset(view,view.unit?.weapon||view.weapon),

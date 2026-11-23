@@ -1,0 +1,44 @@
+name: Battlefield three-soldier motion browser inspection
+on:
+  push:
+    branches:
+      - feature/unit-motion-unification-20261122
+      - feature/babylon-german-native-spine-motion-20261122
+      - feature/babylon-german-run-gameplay-integration-20261122
+    paths:
+      - 'babylon/units-first.html'
+      - 'babylon/units-first.js'
+      - 'babylon/unit-motion-unifier.js'
+      - 'babylon/weapon-rig.js'
+      - 'babylon/us-hero-ara-lee-enfield-stage4.js'
+      - 'babylon/native-clip-blend.js'
+      - 'babylon/tests/test-unit-motion-browser.cjs'
+      - '.github/workflows/unit-motion-browser-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unit-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mobile Chromium test engine
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/bf-unit-motion playwright@1.58.2
+          /tmp/bf-unit-motion/node_modules/.bin/playwright install --with-deps chromium
+      - name: Load three original GLBs and report real donor retarget outcomes
+        run: |
+          python3 -m http.server 8858 --bind 127.0.0.1 >/tmp/bf-unit-motion-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-unit-motion-browser.cjs
+      - name: Upload unit motion comparison frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlefield-unit-motion-american-mobile
+          path: |
+            /tmp/bf-unit-motion-american-*.png
+            /tmp/bf-unit-soldier-*-full.jpeg
+          if-no-files-found: warn
+          retention-days: 10

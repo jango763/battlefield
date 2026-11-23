@@ -1,0 +1,52 @@
+name: Battlefield three original soldiers first · iPhone QA
+on:
+  push:
+    branches:
+      - feature/babylon-units-first-20261121
+    paths:
+      - 'babylon/units-first.html'
+      - 'babylon/units-first.js'
+      - 'babylon/tests/test-units-first-assets.cjs'
+      - 'babylon/tests/test-units-first-browser.cjs'
+      - '.github/workflows/units-first-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: bf-units-first
+  cancel-in-progress: true
+jobs:
+  source-audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify GLB skins, joint hierarchy, real geometry and native clips
+        run: |
+          node --check babylon/units-first.js
+          node --check babylon/tests/test-units-first-assets.cjs
+          node --check babylon/tests/test-units-first-browser.cjs
+          node babylon/tests/test-units-first-assets.cjs
+          node babylon/tests/test-character-integration.cjs
+  mobile-visual:
+    needs: source-audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install real browser WebGL engines
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/bf-units-first playwright@1.58.2
+          /tmp/bf-units-first/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Test three actual animated GLB characters with phone viewport
+        run: |
+          python3 -m http.server 8858 --bind 127.0.0.1 >/tmp/bf-units-first-http.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-units-first-browser.cjs
+      - name: Save screenshots of soldiers and Jakeli hands
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlefield-three-original-units-iphone-screenshots
+          path: babylon-qa-results/units-first/
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,122 @@
+ document.querySelectorAll('[data-scenario]').forEach(button=>
+  button.addEventListener('click',()=>chooseScenario(button.dataset.scenario)));
+ document.querySelectorAll('[data-weapon]').forEach(button=>
+  button.addEventListener('click',()=>chooseGun(button.dataset.weapon)));
+ $('fight').addEventListener('click',()=>{
+  const hero=findActor();
+  if(!hero?.alive){alertStatus('Герой погиб. Нажмите «Сброс».');return;}
+  if(atBase){
+   const result=controller.start();
+   if(!result.ok){alertStatus('Бой не начат: '+result.reason);return;}
+   atBase=false;state.atBase=false;alertStatus('Продолжаем бой. Коснитесь земли для движения героя.');
+  }else{
+   controller.stop();atBase=true;state.atBase=true;
+   alertStatus('Пауза: доступна смена оружия и пополнение БК.');
+  }
+  drawHud();
+ });
+ $('reset').addEventListener('click',()=>{
+  setup(scenario);
+  const start=controller.start();
+  if(start.ok){atBase=false;state.atBase=false;}
+  alertStatus('Новый бой. Выбирайте направление движения касанием земли.');
+  drawHud();
+ });
+ $('supply').addEventListener('click',resupplyHero);
+ $('order-move').addEventListener('click',()=>{
+  inputMode='move';
+  $('order-move').setAttribute('aria-pressed','true');
+  $('order-attack').setAttribute('aria-pressed','false');
+  alertStatus('Движение: коснитесь земли для приказа.');
+ });
+ $('order-attack').addEventListener('click',()=>{
+  inputMode='attack';
+  $('order-move').setAttribute('aria-pressed','false');
+  $('order-attack').setAttribute('aria-pressed','true');
+  alertStatus('Атака: коснитесь противника для выбора цели.');
+ });
+ $('reload-manual').addEventListener('click',()=>{
+  const r=battle.startReload(findActor());
+  alertStatus(r.ok?'Перезарядка началась: '+r.seconds+' с.':
+   'Перезарядка невозможна: '+r.reason);
+  drawHud();
+ });
+}
+// First game's direct WASD/joystick walking. No repeating waypoint commands.
+// Screen-up means NORTH (+Z) on the Babylon 300x300 battlefield.
+function updateTouchJoystick(dt){
+ if(!fieldOrders)return;
+ if(touchJoystick.active){
+  fieldOrders.setMovement(touchJoystick.x,touchJoystick.y);
+  return;
+ }
+ const x=Number(movementKeys.d||movementKeys.ArrowRight)-
+  Number(movementKeys.a||movementKeys.ArrowLeft);
+ const z=Number(movementKeys.w||movementKeys.ArrowUp)-
+  Number(movementKeys.s||movementKeys.ArrowDown);
+ const magnitude=Math.hypot(x,z);
+ fieldOrders.setMovement(magnitude>1?x/magnitude:x,magnitude>1?z/magnitude:z);
+}
+function registerTouchControls(){
+ // Match the first game's W/A/S/D and arrow-key walking on desktop.
+ // Key events only change a movement vector; the combat loop owns physics.
+ for(const type of ['keydown','keyup'])window.addEventListener(type,e=>{
+  if(!(e.key in movementKeys))return;
+  if(e.target?.matches?.('input,textarea,select,[contenteditable=true]'))return;
+  movementKeys[e.key]=type==='keydown';
+  if(e.key.startsWith('Arrow'))e.preventDefault();
+ });
+ const pad=$('touch-stick'),knob=$('touch-stick-knob');
+ if(!pad||!knob)return;
+ joystickDriver=mobileThumbstick.create({pad,knob,win:window,
+  canStart:()=>state.ready&&gameStarted&&!!findActor()?.alive,
+  onMove:(x,z,active)=>{
+   touchJoystick.x=x;touchJoystick.y=z;touchJoystick.active=active;
+   touchJoystick.pointer=joystickDriver?.state.pointer??null;
+   if(active)fieldOrders?.setMovement(x,z);
+   else fieldOrders?.clearMovement();
+  }});
+ state.thumbstick=joystickDriver.state;
+ window.addEventListener('blur',()=>{
+  for(const key of Object.keys(movementKeys))movementKeys[key]=false;
+  fieldOrders?.clearMovement();
+ });
+ $('quick-fire').addEventListener('click',()=>{
+  if(!state.ready||!gameStarted||!controller)return;
+  const hero=findActor();
+  if(!hero?.alive)return;
+  // O(n) nearest living enemy without sorting or allocating arrays.
+  let target=null,best=Infinity;
+  for(const enemy of enemies){
+   if(!enemy?.alive)continue;
+   const d=(enemy.x-hero.x)**2+(enemy.z-hero.z)**2;
+   if(d<best){best=d;target=enemy;}
+  }
+  if(!target)return;
+  controller.setFocus(target);
+  alertStatus('ОГОНЬ · приоритетная цель: '+target.id);
+ });
+ $('quick-gear').addEventListener('click',()=>$('hud-toggle').click());
+ $('quick-pause').addEventListener('click',()=>$('fight').click());
+ $('quick-reload').addEventListener('click',()=>$('reload-manual').click());
+}
+async function deployReinforcement({unit,side,hero},epoch){
+ const slot=unit.reinforcementSlot;
+ try{
+  // Stream ONLY this requested approved model; never create all 24 at launch.
+  await ensureUnits([slot]);
+  if(epoch!==reinforcementEpoch||scenario!=='squads'||!replenisher?.snapshot().active)
+   return; // A Reset or mode switch invalidated an in-flight asset request.
+  if(!controller?.snapshot().active){
+   replenisher.finish(unit,false);
+   return;
+  }
+  const view=views[slot];
+  if(!view)throw Error('Model was not created for reserve slot '+slot);
+  unit.alive=true;unit.hp=unit.maxHp;
+  // Always start from the correct army base, never at the location of death.
+  unit.x=unit.spawn.x;unit.z=unit.spawn.z;
+  unit.cooldown=0;unit.reloadRemaining=0;unit.reloadWeapon=null;
+  unit.suppressed=0;unit.weapon='Kar98k';
+  if(unit.isHero)fieldOrders?.clearDestination();
+  unit.characterModelImported=!!view.importedAlliedModel;

@@ -1,0 +1,122 @@
+     weaponRoot:'../assets/ww2-weapons/'
+    });
+    if(!rig.weaponRigReady)throw Error('Двухручный IK не подготовлен');
+    configureGermanRifleCarry(view,view.lastPose||'ready');
+    rig.setWeaponPose?.(view.lastPose||'ready');
+    const wanted=view.unit?.weapon||view.weapon;
+    if(rig.weaponRig?.weapon!==weaponAsset(view,wanted)&&rig.equipWeapon)
+     await rig.equipWeapon(weaponAsset(view,wanted));
+    view.weaponError=null;
+    if(view.importedAlliedModel){
+     // Sample after the IK render observer has run. A numerical PASS does
+     // not replace the final close-up visual acceptance on iPhone.
+     const assessment=modelDepot.gripAssessment(rig.weaponRig,
+      weaponAsset(view,wanted));
+     view.gripStatus=assessment;
+     if(!assessment.ok)console.warn('Allied hand sockets pending QA',
+      view.importedAlliedName,assessment.reason);
+    }
+   }catch(error){
+    state.engineering.weaponFailures=(state.engineering.weaponFailures||0)+1;
+    // The animated approved soldier stays visible and game logic works.
+    view.weaponError=String(error?.message||error);
+    console.error('Weapon model for soldier '+(view.index+1),error);
+    if(view.index===0)
+     alertStatus('Боец загружен, но оружейный IK недоступен: '+view.weaponError);
+   }
+   // British body follows the same Mixamo animations. Start observer after
+   // weapon IK so the new bare hands track its corrected wrist pose.
+   if(view.britishSoldier?.applied)view.britishSoldier.start();
+   // Keep the UI responsive between expensive weapon imports on mobile.
+   await new Promise(resolve=>requestAnimationFrame(resolve));
+  }
+ }finally{weaponWorker=false;}
+}
+async function chooseScenario(name){
+ if(starting||!state.ready)return;
+ starting=true;
+ for(const button of document.querySelectorAll('button'))button.disabled=true;
+ try{
+  await ensureUnits(name==='squads'?'duel':name);
+  setup(name);
+  void processWeaponQueue();
+  const launch=gameStarted?controller.start():{ok:false};
+  if(launch.ok){atBase=false;state.atBase=false;}
+  alertStatus('Подкрепление прибыло. Нажмите на землю, чтобы управлять отрядом.');
+ }catch(error){
+  state.error=String(error?.stack||error);
+  $('loading').textContent='Не удалось добавить отряд: '+(error?.message||error);
+  alertStatus('Подкрепление не загрузилось. Герой остаётся доступен для управления.');
+  console.error('Squad load',error);
+ }finally{
+  starting=false;
+  for(const button of document.querySelectorAll('button'))button.disabled=false;
+  drawHud();
+ }
+}
+function stopAnimations(view){
+ nativeBlend.stop(view);
+}
+function configureGermanRifleCarry(view,pose){
+ const rig=view?.rig;
+ if(!rig)return;
+ const originalRifle=!!view.nativeGermanLegsRun&&
+  !view.importedAlliedModel&&rig.weaponRig?.weapon==='de-kar98k';
+ // Only the approved German Kar98k receives the validated ~horizontal
+ // run carry and the anatomically measured 2-hand finger curl.
+ // MP40, MG42, launchers and allied rigs retain their existing controllers.
+ rig.weaponMotionRunCarryTest=originalRifle;
+ rig.weaponMotionRun=originalRifle&&pose==='run';
+ rig.weaponMotionRightWristMax=originalRifle&&pose==='run'?120:55;
+ rig.weaponMotionGripDebug=originalRifle&&pose==='run'?'reverseAxisX':null;
+}
+function setClip(view,pose){
+ configureGermanRifleCarry(view,pose);
+ const id=view.weapon+'_'+CLIP_POSES[pose];
+ const target=view.clips.get(id);
+ if(!target){
+  view.weaponError='Нет готовой анимации '+id;
+  throw Error(view.weaponError);
+ }
+ const didChange=nativeBlend.play(view,target,pose,{loop:pose!=='fire'||view.nativeAlliedClips&&view.importedAlliedName==='americanHero'});
+ if(didChange)view.rig?.setWeaponPose?.(pose);
+}
+function assignView(view,unit){
+ view.unit=unit;view.inactive=!unit;
+ if(!unit){
+  stopAnimations(view);
+  view.anchor.setEnabled(false);
+  return;
+ }
+ view.weapon='Kar98k';
+ view.lastUnitX=unit.x;view.lastUnitZ=unit.z;
+ view.anchor.setEnabled(true);
+ view.anchor.position.copyFrom(position(unit));
+ view.anchor.rotation.y=unit.team==='враг'?-Math.PI/2:Math.PI/2;
+ view.hpFill.scaling.x=1;view.hpFill.position.x=0;
+ view.marker.setEnabled(true);
+ stopAnimations(view);
+ setClip(view,'ready');
+ view.rig.combatPose={active:false,stage:'ready',crouch:0,recoilPulse:0};
+ // Approved rig starts with Kar98k loaded; avoid duplicate requests.
+}
+// Lightweight session objectives are earned through real combat/capture,
+ // not daily login gates, advertising, paywalls, or duplicated army gold.
+const SESSION_OBJECTIVES=Object.freeze([
+ {kind:'kills',target:1,title:'Первое устранение'},
+ {kind:'farms',target:1,title:'Первая ферма'},
+ {kind:'kills',target:3,title:'Три устранения'},
+ {kind:'farms',target:3,title:'Удержать три фермы'}
+]);
+let missionIndex=0;
+function advanceObjectives(hero,econ){
+ let advanced=false;
+ while(missionIndex<SESSION_OBJECTIVES.length){
+  const task=SESSION_OBJECTIVES[missionIndex];
+  const progress=task.kind==='kills'?hero.kills:(econ?.owners?.blue?.length||0);
+  if(progress<task.target)break;
+  missionIndex++;advanced=true;
+ }
+ const task=SESSION_OBJECTIVES[missionIndex];
+ const progress=task?(task.kind==='kills'?hero.kills:
+  econ?.owners?.blue?.length||0):SESSION_OBJECTIVES.length;

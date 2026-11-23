@@ -186,7 +186,7 @@
     refresh(arm.hand);
     return +(theta*180/Math.PI).toFixed(1);
   }
-  function setHandRotation(hand, worldQ, bindLocal) {
+  function setHandRotation(hand, worldQ, bindLocal, maxDegrees = 55) {
     refresh(hand.parent);
     const qParent = hand.parent ? worldRotation(hand.parent) : B.Quaternion.Identity();
     const desired = qParent.conjugate().multiply(worldQ).normalize();
@@ -196,7 +196,7 @@
     const dot = Math.abs(bindLocal.x*desired.x+bindLocal.y*desired.y+
       bindLocal.z*desired.z+bindLocal.w*desired.w);
     const theta = 2*Math.acos(B.Scalar.Clamp(dot,0,1));
-    const maxWrist = 55*Math.PI/180;
+    const maxWrist = maxDegrees*Math.PI/180;
     const blend = theta>maxWrist ? maxWrist/theta : 1;
     hand.rotationQuaternion = B.Quaternion.Slerp(bindLocal,desired,blend).normalize();
     refresh(hand);
@@ -285,7 +285,8 @@
   }
   async function create({ scene, imported, root, state, animationDriven = false, bindUI = true,
     weaponRoot = '../assets/ww2-weapons/', acceptExportSockets = false,
-    initialWeaponId = 'de-kar98k', allowRetargetedSkeleton = false }) {
+    initialWeaponId = 'de-kar98k', allowRetargetedSkeleton = false,
+    previewNativeArmLayer = false, previewHandSocketRun = false }) {
     const skeleton = imported.skeletons[0];
     const linked = (skeleton?.bones || []).map(b => b.getTransformNode?.()).filter(Boolean);
     const nodes = [...imported.transformNodes, ...imported.meshes, ...linked];
@@ -474,12 +475,18 @@
       Right:measureHandBasis('Right',right),
       Left:measureHandBasis('Left',left)
     };
+    // The approved source hands are not aligned to the generic +Y
+    // Mixamo guess. Preserve the old pose for idle/aim; for the dedicated
+    // German running carry use measured real finger/knuckle landmarks.
+    const useKnuckleBasis=()=>anatomicalDebug||
+      (state.weaponMotionRunCarryTest&&state.weaponMotionRun&&
+       weaponId==='de-kar98k');
     function desiredHandFrame(side,axis,palm,gunQ) {
       const target=makeHandOrientation(axis,palm,gunQ);
-      const basis=anatomicalDebug?anatomicalBases[side]:null;
+      const basis=useKnuckleBasis()?anatomicalBases[side]:null;
       return basis?target.multiply(basis.quat.conjugate()).normalize():target;
     }
-    const localHandForward=side=>anatomicalDebug&&anatomicalBases[side]
+    const localHandForward=side=>useKnuckleBasis()&&anatomicalBases[side]
       ?anatomicalBases[side].localForward:B.Axis.Y;
 
     function flexFingers(side) {
@@ -487,6 +494,11 @@
       // Curl around joint-local Z and tuck the THUMB around a separate X axis.
       // No hand meshes or skeletal joints are duplicated.
       const rightHand = side === 'Right';
+      // Research-only runtime A/B of the real knuckle hinge axis. The rest
+      // pose, GLB and production finger curl are NEVER overwritten.
+      // Actual close-up showed BOTH hands must curl around the correct hinge;
+      // leaving the support hand on the old Z axis leaves its fingers dangling.
+      const gripMode=state.weaponMotionGripDebug||gripDebug;
       for (const digit of ['Thumb','Index','Middle','Ring','Pinky']) {
         const segments = fingerRoots[side][digit];
         const amount = digit === 'Thumb' ? [-.36,-.38,-.20]
@@ -502,13 +514,13 @@
           const sideKey=rightHand?'right':'left';
           const multiplier=gripStudio
             ?master[sideKey+digit+'Curl']
-            :gripDebug==='neutral'?0:gripDebug==='classic'?1:1.55;
+            :gripMode==='neutral'?0:gripMode==='classic'?1:1.55;
           const spread=gripStudio?master[sideKey+digit+'Spread']*Math.PI/180:0;
-          const sign=gripDebug==='reverse'?-1:1;
-          const curlAxis=gripDebug==='axisX'?B.Axis.X:B.Axis.Z;
+          const sign=(gripMode==='reverse'||gripMode==='reverseAxisX')?-1:1;
+          const curlAxis=(gripMode==='axisX'||gripMode==='reverseAxisX')?B.Axis.X:B.Axis.Z;
           const bend=B.Quaternion.RotationAxis(curlAxis,amount[i]*multiplier*sign);
           const fan=i===0 ?B.Quaternion.RotationAxis(B.Axis.X,spread) :B.Quaternion.Identity();
-          const tuck=digit==='Thumb'&&gripDebug!=='neutral'
+          const tuck=digit==='Thumb'&&gripMode!=='neutral'
             ?B.Quaternion.RotationAxis(B.Axis.X,(rightHand?-.30:.30)*(i===0?1:.50))
             :B.Quaternion.Identity();
           node.rotationQuaternion=rest.get(node).multiply(tuck).multiply(fan).multiply(bend).normalize();
@@ -522,11 +534,12 @@
     pivot.rotationQuaternion = B.Quaternion.Identity();
 
     let pose = 'ready', weaponId = null, meta = null, container = null;
+    let nativeRightHandMount=null;
     let needsPose = true, lastSolveTime = 0;
     let rocketDispose = null, generation = 0;
     state.weaponRig = {
       rig: 'Mixamo linked glTF nodes + 2-hand IK + elbow poles + grip fingers', pose, weapon: null,
-      animationDriven,
+      animationDriven,previewNativeArmLayer,previewHandSocketRun,
       rightGripMeters: null, leftGripMeters: null,
       preliminaryGeometryOnly: true, experimentalFourthAsset: true,
       fingerJoints: fingers.length, anatomicalElbowPoles: true
@@ -556,11 +569,48 @@
     }
     function update() {
       if (!meta) return;
+      if(previewHandSocketRun&&pose==='run'&&nativeRightHandMount){
+        // Author-native weapon carry: treat the RIGHT hand as the physical
+        // mount. This GLB has animated RightHand rotations but NO animated
+        // Weapon_R socket track; the prior procedural 2-hand solver erased
+        // the authored arm motion and produced the floating-gun look.
+        // Compute the rigid transform in world space every frame so
+        // glTF's original 95-unit rig scaling cannot distort the gun.
+        refresh(right.hand);
+        const handQ=worldRotation(right.hand);
+        const origin=right.hand.getAbsolutePosition();
+        const q=handQ.multiply(nativeRightHandMount.localQ).normalize();
+        pivot.rotationQuaternion.copyFrom(q);
+        pivot.position.copyFrom(origin.add(rotated(nativeRightHandMount.localP,handQ)));
+        refresh(pivot);
+        refresh(left.hand);refresh(right.upper);
+        const trigger=pivot.position.add(rotated(v(meta.trigger),q));
+        const support=pivot.position.add(rotated(v(meta.support),q));
+        const stock=pivot.position.add(rotated(v(meta.shoulder),q));
+        const muzzle=pivot.position.add(rotated(v(meta.muzzle),q));
+        const delta=muzzle.subtract(stock);
+        report.barrelElevationDeg=+(Math.atan2(delta.y,
+          Math.hypot(delta.x,delta.z))*180/Math.PI).toFixed(2);
+        report.rightGripMeters=+B.Vector3.Distance(origin,trigger).toFixed(4);
+        report.leftGripMeters=+B.Vector3.Distance(left.hand.getAbsolutePosition(),support).toFixed(4);
+        report.stockRightShoulderMeters=+B.Vector3.Distance(stock,
+          right.upper.getAbsolutePosition()).toFixed(4);
+        report.nativeHandMounted=true;report.pose=pose;
+        return;
+      }
       const now = performance.now();
       if (!animationDriven && !needsPose && (pose === 'ready' || pose === 'aim')) return;
       if (!animationDriven && !needsPose && now - lastSolveTime < 65) return;
       needsPose = false; lastSolveTime = now;
-      for (const [node, q] of rest) node.rotationQuaternion = q.clone();
+      // A/B: respect the author's native upper-body animation during run.
+      // The previous unconditional bind-pose reset erased authored arm swing
+      // every frame, leaving stiff mannequin-like shoulders in motion.
+      // Finger bones still reset before applying the separate grip curl.
+      for (const [node, q] of rest){
+        if(previewNativeArmLayer&&animationDriven&&pose==='run'&&!fingers.includes(node))
+          continue;
+        node.rotationQuaternion=q.clone();
+      }
       applyCombatStance();
       refresh(chest); refresh(right.shoulder); refresh(left.shoulder);
       const t = performance.now() * .001;
@@ -583,7 +633,12 @@
       } : {
         ready: [-.095, -.02, -.020],
         aim: [.012, 0, 0],
-        run: [.33, -.05, -.025],
+        // Keep the rifle nearly horizontal while running. The former
+        // +0.33 rad pitch visibly pointed the muzzle at the ground and
+        // made the wrists look detached despite passing distance-only IK.
+        run: rifle
+          ? (state.weaponMotionRunCarryTest ? [.19,.20,-.025] : [.045,.34,-.025])
+          : [.22,-.05,-.025],
         fire: [.012, 0, 0]
       })[pose];
       // During mobile shooting, legs KEEP the Run clip. Only the upper-body
@@ -659,7 +714,7 @@
       // Aiming moves the left hand toward the receiver/launcher control,
       // preventing a fully locked support elbow while keeping the muzzle stable.
       const supportPoint=rifle
-        ? (running?[0,.04,.015]
+        ? (running?(state.weaponMotionRunCarryTest?[0,.04,.23]:[0,.04,.015])
           : pose==='aim'||pose==='fire'?[0,.04,.055]:meta.support)
         : (pose==='aim'||pose==='fire')
           ? (launcher?[0,-.135,-.09]:meta.support)
@@ -751,6 +806,13 @@
       report.muzzleWorldPosition=Array.isArray(meta.muzzle)
         ?pivot.position.add(rotated(v(meta.muzzle),gunQ)).asArray():null;
       report.stockWorldPosition=kar98k?stockWorld.asArray():null;
+      const muzzle=Array.isArray(meta.muzzle)
+        ?pivot.position.add(rotated(v(meta.muzzle),gunQ)):null;
+      if(muzzle){
+        const delta=muzzle.subtract(stockWorld);
+        report.barrelElevationDeg=+(Math.atan2(delta.y,
+          Math.hypot(delta.x,delta.z))*180/Math.PI).toFixed(2);
+      }
       report.stockSocketWorldPosition=kar98k?rifleShoulderSocket.asArray():null;
       report.stockToSocketMeters=kar98k
         ?+B.Vector3.Distance(stockWorld,rifleShoulderSocket).toFixed(5):null;
@@ -779,7 +841,13 @@
       report.leftElbowDegrees = elbowBend(left);
       report.rightForearmTwistDegrees=twistForearmToPalm(right,rightQ);
       report.leftForearmTwistDegrees=twistForearmToPalm(left,leftQ);
-      report.rightWristDegrees=setHandRotation(right.hand,rightQ,rest.get(right.hand));
+      // Experimental only: test whether the old 55° wrist guard is the reason
+      // the actual right fingers miss the trigger axis by ~64° in German run.
+      // This does NOT change the production default or GLB bind pose.
+      const rightCap=state.weaponMotionRun
+        ?B.Scalar.Clamp(Number(state.weaponMotionRightWristMax)||55,55,140):55;
+      report.rightWristLimitDeg=rightCap;
+      report.rightWristDegrees=setHandRotation(right.hand,rightQ,rest.get(right.hand),rightCap);
       report.leftWristDegrees=setHandRotation(left.hand,leftQ,rest.get(left.hand));
       flexFingers('Right'); flexFingers('Left');
       // Report REAL post-constraint palm directions, not an unattained ideal
@@ -819,6 +887,14 @@
     }
     function setPose(value) {
       if (!['ready', 'aim', 'run', 'fire'].includes(value)) return;
+      if(value==='run'&&pose!=='run'&&previewHandSocketRun){
+        refresh(right.hand);refresh(pivot);
+        const handQ=worldRotation(right.hand);
+        nativeRightHandMount={
+         localP:rotated(pivot.position.subtract(right.hand.getAbsolutePosition()),handQ.conjugate()),
+         localQ:handQ.conjugate().multiply(worldRotation(pivot)).normalize()
+        };
+      }else if(value!=='run')nativeRightHandMount=null;
       pose = value; needsPose = true; buttonState();
     }
     async function equip(id) {
