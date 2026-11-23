@@ -79,8 +79,14 @@ fs.mkdirSync(dir,{recursive:true});
     palmPresent:!!palm,palmVertices:palm?.getTotalVertices(),
     palmPickable:palm?.isPickable,
     adobeMeshes:scene.meshes.filter(m=>m.name.startsWith('libya-')).length,
-    errors:g?.errors};
+    errors:g?.errors,
+    stuccoDiffuse:scene.getMaterialByName('libya-sunlit-stucco')?.diffuseColor?.asArray(),
+    stuccoEmission:scene.getMaterialByName('libya-sunlit-stucco')?.emissiveColor?.asArray()};
   });
+  assert(result.libyaVillage.stuccoDiffuse?.[0]>.85,
+   'Libyan adobe walls must remain light sand, not black PBR facades');
+  assert(result.libyaVillage.stuccoEmission?.[0]>.25,
+   'Sunlit stucco needs a restrained warm shadow lift');
   assert.equal(result.libyaVillage.style,'libya-adobe-procedural');
   assert.equal(result.libyaVillage.loaded,3);
   assert(result.libyaVillage.adobeMeshes>30);
