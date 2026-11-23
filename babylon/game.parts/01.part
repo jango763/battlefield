@@ -19,6 +19,7 @@ const villageModels=window.BattlefieldModernVillageModels;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
 const nativeBlend=window.BattlefieldNativeClipBlend;
+const joystickResponse=window.BattlefieldJoystickResponse;
 const infantryLighting=window.BattlefieldInfantryLighting;
 const unitMotion=window.BattlefieldUnitMotionUnifier;
 const alliedModels=window.BattlefieldAlliedModels;
@@ -33,7 +34,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!infantryLighting||!replenishment||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!joystickResponse||!infantryLighting||!replenishment||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;

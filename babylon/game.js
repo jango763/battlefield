@@ -19,6 +19,7 @@ const villageModels=window.BattlefieldModernVillageModels;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
 const nativeBlend=window.BattlefieldNativeClipBlend;
+const joystickResponse=window.BattlefieldJoystickResponse;
 const infantryLighting=window.BattlefieldInfantryLighting;
 const unitMotion=window.BattlefieldUnitMotionUnifier;
 const alliedModels=window.BattlefieldAlliedModels;
@@ -33,7 +34,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!infantryLighting||!replenishment||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!joystickResponse||!infantryLighting||!replenishment||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -133,10 +134,12 @@ const graphicsPreference=new URLSearchParams(location.search).get('quality');
 const graphicsMode=['low','high','auto'].includes(graphicsPreference)?graphicsPreference:'auto';
 const deviceScale=Math.max(1,window.devicePixelRatio||1);
 const renderQuality={
- mode:graphicsMode,low:Math.max(1,deviceScale/2.0),
- high:Math.max(1,deviceScale/1.5),fpsElapsed:0,
+ // Hardware scaling = device pixel ratio / rendered pixels per CSS pixel.
+ // Auto starts sharper and adapts toward ~1.2x for constrained GPUs.
+ mode:graphicsMode,low:Math.max(1,deviceScale/2.25),
+ high:Math.max(1,deviceScale/1.20),fpsElapsed:0,
  scale:Math.max(1,deviceScale/(graphicsMode==='low'?1.15:
-  graphicsMode==='high'?2.1:1.7))
+  graphicsMode==='high'?2.25:1.9))
 };
 const CAMERA_FOV_TACTICAL=.92,CAMERA_FOV_HERO=.74;
 let heroCloseView=false;
@@ -157,7 +160,7 @@ function changeGraphicsMode(mode){
  if(!qualityLabels[mode])return;
  renderQuality.mode=mode;
  renderQuality.scale=Math.max(1,deviceScale/(mode==='low'?1.15:
-  mode==='high'?2.1:1.7));
+  mode==='high'?2.25:1.9));
  renderQuality.fpsElapsed=0;
  if(engine)engine.setHardwareScalingLevel(renderQuality.scale);
  if(state.graphics){
@@ -1132,11 +1135,11 @@ function registerTouchControls(){
   const dy=(e.clientY-rect.top-rect.height/2)/radius;
   const length=Math.hypot(dx,dy);
   // Small dead-zone prevents idle twitch; full analog travel remains smooth.
-  const strength=Math.min(1,Math.max(0,(length-.09)/.91));
-  touchJoystick.x=length>.001?dx/length*strength:0;
-  touchJoystick.y=length>.001?-dy/length*strength:0;
-  knob.style.transform='translate3d('+(touchJoystick.x*radius*.65)+'px,'+
-   (-touchJoystick.y*radius*.65)+'px,0)';
+  const response=joystickResponse.shape(dx,-dy);
+  touchJoystick.x=response.x;
+  touchJoystick.y=response.y;
+  knob.style.transform='translate3d('+(touchJoystick.x*radius*.80)+'px,'+
+   (-touchJoystick.y*radius*.80)+'px,0)';
  }
  zone.addEventListener('pointerdown',e=>{
   if(!state.ready||!gameStarted||!findActor()?.alive||touchJoystick.active)return;

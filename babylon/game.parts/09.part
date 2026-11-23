@@ -60,11 +60,11 @@ function registerTouchControls(){
   const dy=(e.clientY-rect.top-rect.height/2)/radius;
   const length=Math.hypot(dx,dy);
   // Small dead-zone prevents idle twitch; full analog travel remains smooth.
-  const strength=Math.min(1,Math.max(0,(length-.09)/.91));
-  touchJoystick.x=length>.001?dx/length*strength:0;
-  touchJoystick.y=length>.001?-dy/length*strength:0;
-  knob.style.transform='translate3d('+(touchJoystick.x*radius*.65)+'px,'+
-   (-touchJoystick.y*radius*.65)+'px,0)';
+  const response=joystickResponse.shape(dx,-dy);
+  touchJoystick.x=response.x;
+  touchJoystick.y=response.y;
+  knob.style.transform='translate3d('+(touchJoystick.x*radius*.80)+'px,'+
+   (-touchJoystick.y*radius*.80)+'px,0)';
  }
  zone.addEventListener('pointerdown',e=>{
   if(!state.ready||!gameStarted||!findActor()?.alive||touchJoystick.active)return;
