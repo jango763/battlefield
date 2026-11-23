@@ -25,14 +25,29 @@ function installNorthAfrica({scene,B,world}){
  const stone=scene.getMaterialByName('hd2026-pitted-stone');
  const brick=scene.getMaterialByName('hd2026-weathered-brick');
  if(!adobe||!stone||!brick)throw Error('Libya hamlet needs local scanned stucco and stone');
- // Imported PBR walls appeared almost black without an environment IBL.
- // Keep the licensed local stucco scan but render it with bounded, lit
- // StandardMaterial + subtle warm ambient so the facade stays readable.
+ // Tactical-camera sunlit facades need readable warm albedo even when
+ // facing away from the single directional sun. The earlier scanned PBR
+ // texture made vertical walls almost black. Author a lightweight, mipmapped
+ // stucco wash and bake gentle shade into the texture instead of overexposing
+ // every other GLB and ground mesh.
+ const wash=new B.DynamicTexture('libya-stucco-wash',
+  {width:256,height:256},scene,true);
+ const c=wash.getContext();
+ c.fillStyle='#d5b58a';c.fillRect(0,0,256,256);
+ let seed=1942;
+ const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ for(let i=0;i<700;i++){
+  const x=random()*256,y=random()*256,w=2+random()*26;
+  c.globalAlpha=.05+random()*.14;
+  c.fillStyle=i%3===0?'#9f825e':i%3===1?'#f4dfb9':'#b3956b';
+  c.fillRect(x,y,w,1+random()*7);
+ }
+ c.globalAlpha=1;wash.update(false);
+ wash.anisotropicFilteringLevel=4;
  const sunStucco=new B.StandardMaterial('libya-sunlit-stucco',scene);
- sunStucco.diffuseTexture=adobe.albedoTexture;
- sunStucco.diffuseColor=B.Color3.FromHexString('#f2dbb5');
- sunStucco.ambientColor=B.Color3.FromHexString('#c5a17e');
- sunStucco.emissiveColor=B.Color3.FromHexString('#4e3f2c');
+ sunStucco.diffuseTexture=wash;
+ sunStucco.diffuseColor=B.Color3.FromHexString('#f4e2c2');
+ sunStucco.disableLighting=true;
  sunStucco.specularColor=B.Color3.Black();
  const recessed=new B.StandardMaterial('libya-arched-recess-shadow',scene);
  recessed.diffuseColor=B.Color3.FromHexString('#493e31');
