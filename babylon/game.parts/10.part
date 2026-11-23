@@ -1,3 +1,6 @@
+  if(unit.isHero)fieldOrders?.clearDestination();
+  unit.characterModelImported=!!view.importedAlliedModel;
+  assignView(view,unit);
   actors.set(unit,view);
   replenisher.finish(unit,true);
   state.reinforcements=replenisher.snapshot();

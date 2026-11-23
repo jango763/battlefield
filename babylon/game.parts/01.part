@@ -129,3 +129,6 @@ function position(unit,y=0){
 function color(hex){return B.Color3.FromHexString(hex)}
 const graphicsPreference=new URLSearchParams(location.search).get('quality');
 const graphicsMode=['low','high','auto'].includes(graphicsPreference)?graphicsPreference:'auto';
+const deviceScale=Math.max(1,window.devicePixelRatio||1);
+const renderQuality={
+ mode:graphicsMode,low:Math.max(1,deviceScale/2.0),

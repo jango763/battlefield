@@ -1,3 +1,11 @@
+     BASE_Z+move.destination.z*UNIT_SCALE);
+    destinationMark.isVisible=true;
+    if(gameStarted&&!controller.snapshot().active&&!controller.snapshot().done){
+     controller.start();atBase=false;state.atBase=false;
+    }
+    alertStatus('Приказ: двигаться. Отряд следует за героем.');
+   }
+  }
  });
  engine.runRenderLoop(frame);
  window.addEventListener('resize',()=>engine.resize());
@@ -124,19 +132,3 @@ async function ensureUnitsUnlocked(scenarioName){
    './animstudio-preview/models/','all-combat-run.glb',scene);
   motionDonors.germanRun=unitMotion?.findGroup(asset.animationGroups,'Kar98k_Run')||null;
   if(asset.animationGroups.length<16)
-   throw Error('В GLB отсутствуют 16 согласованных боевых анимаций');
- }
- if(!modelDepot&&Date.now()>=modelDepotRetryAfter){
-  modelDepot=alliedLoader.create({B,scene,catalog:alliedModels,
-   sourceGroups:asset.animationGroups,featureTrial:FEATURE_REAL_ALLIES});
-  try{
-   state.alliedManifest=await modelDepot.init();
-  }catch(error){
-   state.modelErrors.manifest=String(error?.message||error);
-   // Missing manifest does not make 12v12 unplayable; no false model import.
-   console.warn('Allied GLB manifest unavailable; source models not installed',error);
-   modelDepot=null;
-   modelDepotRetryAfter=Date.now()+30000;
-   state.engineering.assetRetries++;
-  }
- }

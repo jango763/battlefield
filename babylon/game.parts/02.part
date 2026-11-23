@@ -1,6 +1,3 @@
-const deviceScale=Math.max(1,window.devicePixelRatio||1);
-const renderQuality={
- mode:graphicsMode,low:Math.max(1,deviceScale/2.0),
  high:Math.max(1,deviceScale/1.5),fpsElapsed:0,
  scale:Math.max(1,deviceScale/(graphicsMode==='low'?1.15:
   graphicsMode==='high'?2.1:1.7))
@@ -135,11 +132,3 @@ function createWorld(){
    const move=fieldOrders.setDestination(x,z);
    if(move.ok){
     destinationMark.position.set(BASE_X+move.destination.x*UNIT_SCALE,.06,
-     BASE_Z+move.destination.z*UNIT_SCALE);
-    destinationMark.isVisible=true;
-    if(gameStarted&&!controller.snapshot().active&&!controller.snapshot().done){
-     controller.start();atBase=false;state.atBase=false;
-    }
-    alertStatus('Приказ: двигаться. Отряд следует за героем.');
-   }
-  }
