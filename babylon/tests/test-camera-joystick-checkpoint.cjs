@@ -26,7 +26,7 @@ assert.match(art,/CreateRibbon\('hd2026-organic-road-'/);
 assert.match(art,/new B\.DynamicTexture\('hd2026-soft-road'/);
 assert.match(html,/#quick-buttons\{margin-left:auto/);
 assert.match(art,/new B\.DynamicTexture\('hd2026-soft-painted-earth'/);
-assert.match(art,/terrainTexture\.anisotropicFilteringLevel=4/);
+assert.match(art,/terrainTexture\.anisotropicFilteringLevel=8/);
 assert.match(art,/terrainTexture\.updateSamplingMode\(B\.Texture\.TRILINEAR_SAMPLINGMODE\)/);
 assert.match(art,/world\.ground\.material=smoothEarth/);
 assert.match(art,/CreateCylinder\('hd2026-meadow-tuft'/);
