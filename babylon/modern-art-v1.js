@@ -78,7 +78,7 @@ function apply({scene,B,world,camera,sun,map}){
  canvasGround.width=canvasGround.height=512;
  const brush=canvasGround.getContext('2d');
  if(!brush)throw Error('No terrain painting context');
- brush.fillStyle='#586d49';brush.fillRect(0,0,512,512);
+ brush.fillStyle='#687957';brush.fillRect(0,0,512,512);
  for(let i=0;i<230;i++){
   const x=between(0,512),y=between(0,512);
   const radius=between(14,50);
@@ -109,6 +109,19 @@ function apply({scene,B,world,camera,sun,map}){
    choose(['rgba(43,65,35,ALPHA)','rgba(115,91,56,ALPHA)','rgba(95,102,62,ALPHA)']),
    between(.11,.29));
  }
+ // Large fallow-meadow belts break up the uniform 300m green slab from
+ // the elevated mobile camera. Painted into the same 512px albedo: 0 draw calls.
+ for(const [x,z,shade,area] of [
+  [54,62,'rgba(139,119,78,ALPHA)',30],
+  [246,63,'rgba(91,117,67,ALPHA)',34],
+  [45,152,'rgba(84,111,59,ALPHA)',36],
+  [245,158,'rgba(133,111,76,ALPHA)',29],
+  [72,244,'rgba(134,119,77,ALPHA)',31],
+  [228,241,'rgba(93,115,64,ALPHA)',33]
+ ]){
+  for(let j=0;j<10;j++)earthWash(x+between(-area,area),
+   z+between(-area*.6,area*.6),between(8,20),shade,between(.20,.36));
+ }
  // Continuous dusty road margins avoid a blank straight brown runway.
  for(let z=20;z<281;z+=7)for(const side of [-1,1]){
   earthWash(150+side*between(4,7),z+between(-3,3),between(3.4,7.5),
@@ -133,7 +146,7 @@ function apply({scene,B,world,camera,sun,map}){
  // high-exposure PBR ground. Historic buildings retain full scanned PBR.
  const smoothEarth=new B.StandardMaterial('hd2026-matte-terrain',scene);
  smoothEarth.diffuseTexture=terrainTexture;
- smoothEarth.diffuseColor=B.Color3.FromHexString('#899b76');
+ smoothEarth.diffuseColor=B.Color3.FromHexString('#cbd2bd');
  smoothEarth.specularColor=B.Color3.Black();
  smoothEarth.ambientColor=B.Color3.FromHexString('#414f34');
  // Right-handed scene + custom trench vertex winding can leave the large
@@ -162,10 +175,32 @@ function apply({scene,B,world,camera,sun,map}){
   rc.fill();
  }
  rc.globalAlpha=1;
+ // Two wheel ruts + soft vegetated road shoulders. Repeating cross-section
+ // is authored without high-frequency particles that shimmer on iPhone.
+ for(const trackX of [68,188]){
+  const rut=rc.createLinearGradient(trackX-28,0,trackX+28,0);
+  rut.addColorStop(0,'rgba(42,38,30,0)');
+  rut.addColorStop(.34,'rgba(48,40,31,.22)');
+  rut.addColorStop(.5,'rgba(43,37,28,.32)');
+  rut.addColorStop(.66,'rgba(48,40,31,.22)');
+  rut.addColorStop(1,'rgba(42,38,30,0)');
+  rc.fillStyle=rut;rc.fillRect(trackX-28,0,56,256);
+ }
+ for(const edge of [0,256]){
+  const shoulder=rc.createLinearGradient(edge===0?0:229,0,
+   edge===0?27:256,0);
+  if(edge===0){shoulder.addColorStop(0,'rgba(52,66,43,.31)');
+   shoulder.addColorStop(1,'rgba(52,66,43,0)');}
+  else{shoulder.addColorStop(0,'rgba(52,66,43,0)');
+   shoulder.addColorStop(1,'rgba(52,66,43,.31)');}
+  rc.fillStyle=shoulder;rc.fillRect(edge===0?0:229,0,27,256);
+ }
+ rc.globalAlpha=1;
  const roadTexture=new B.DynamicTexture('hd2026-soft-road',
   {width:256,height:256},scene,true);
  roadTexture.getContext().drawImage(roadCanvas,0,0);
- roadTexture.wrapU=roadTexture.wrapV=B.Texture.CLAMP_ADDRESSMODE;
+ roadTexture.wrapU=B.Texture.CLAMP_ADDRESSMODE;
+ roadTexture.wrapV=B.Texture.WRAP_ADDRESSMODE;
  roadTexture.anisotropicFilteringLevel=4;
  roadTexture.update(false);
  roadTexture.updateSamplingMode(B.Texture.TRILINEAR_SAMPLINGMODE);
@@ -194,7 +229,20 @@ function apply({scene,B,world,camera,sun,map}){
   }
   const mesh=B.MeshBuilder.CreateRibbon('hd2026-organic-road-'+name,
    {pathArray:[sideA,sideB],sideOrientation:B.Mesh.DOUBLESIDE},scene);
+  // Default UVs stretch one 256px image over the full 265m route.
+  // Metre-based texture coordinates repeat longitudinally every 11m.
+  const uv=mesh.getVerticesData(B.VertexBuffer.UVKind);
+  if(!uv)throw Error('Road ribbon has no UV channel');
+  const sideLength=sections+1,front=sideLength*2;
+  for(let k=0;k<uv.length/2;k++){
+   const vertex=k%front;
+   uv[k*2]=Math.floor(vertex/sideLength);
+   uv[k*2+1]=(vertex%sideLength)/sections*(end-begin)/11;
+  }
+  mesh.setVerticesData(B.VertexBuffer.UVKind,uv);
   mesh.material=mat;mesh.isPickable=false;mesh.receiveShadows=true;
+  report.roadTextureRepeats=Math.round((end-begin)/11);
+  report.roadUvTiled=true;
   return mesh;
  }
  makeOrganicRoad('north-south',true,17.5,282.5,4.2,mudRoad,.055);
@@ -466,6 +514,8 @@ function apply({scene,B,world,camera,sun,map}){
  if(config){config.toneMappingEnabled=true;config.exposure=.96;config.contrast=1.105;}
  report.colorGrade='muted-olive-earth-v4';
  report.mipmappedScans=true;report.opaqueHedgerows=true;
+ report.roadStyle='dual-ruts-with-meadow-shoulders';
+ report.terrainReadability='lightened-earth-with-fallow-belts';
  report.ready=true;
  scene.metadata=scene.metadata||{};
  scene.metadata.battlefieldModernArt=report;
