@@ -53,7 +53,7 @@ assert(nav.clear({x:150,z:70},{x:150,z:90}),'Open central route preserved');
 assert.match(art,/roadTexture\.wrapV=B\.Texture\.WRAP_ADDRESSMODE/);
 assert.match(art,/mesh\.setVerticesData\(B\.VertexBuffer\.UVKind,uv\)/);
 assert.match(art,/dual-ruts-with-meadow-shoulders/);
-assert.match(art,/lightened-earth-with-fallow-belts/);
+assert.match(art,/sunlit-sandstone-and-dune-washes/);
 require('./test-heading-smoothing.cjs');
 require('./test-infantry-lighting.cjs');
 console.log('BATTLEFIELD_STAGE9_STAGE10_STATIC_PASS',{parts:parts.length,
