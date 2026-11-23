@@ -27,17 +27,17 @@ function create(scene,B,map){
   return mats[id]=m;
  }
  const mat={
-  earth:material('earth','#777957'),grass:material('grass','#555f43'),
-  dirt:material('dirt','#6b5945'),road:material('road','#b4aa8d'),
-  track:material('track','#4c4237'),stone:material('stone','#777a76'),
-  roof:material('roof','#4b463a'),wood:material('wood','#6b513a'),
+  earth:material('earth','#c8ae82'),grass:material('grass','#b6a277'),
+  dirt:material('dirt','#b99b72'),road:material('road','#d1b18a'),
+  track:material('track','#927657'),stone:material('stone','#ccb38b'),
+  roof:material('roof','#a98267'),wood:material('wood','#8d704e'),
   burnt:material('burnt','#242624'),rust:material('rust','#513c2d'),
-  black:material('black','#161c19'),sand:material('sand','#96886a'),
+  black:material('black','#161c19'),sand:material('sand','#e0c5a0'),
   blue:material('blue','#517f99'),red:material('red','#9b5046'),
   gold:material('gold','#be9336','#493711'),
-  corn:material('corn','#a3a079'),hedge:material('hedge','#465542'),
-  trunk:material('trunk','#554b37'),stem:material('stem','#aaa080'),
-  leaves:material('leaves','#526743')
+  corn:material('corn','#d0b87c'),hedge:material('hedge','#8b8d63'),
+  trunk:material('trunk','#725941'),stem:material('stem','#c7b38a'),
+  leaves:material('leaves','#99976c')
  };
  function box(id,w,h,d,x,y,z,m,rot=0,pickable=false){
   const o=B.MeshBuilder.CreateBox(id,{width:w,height:h,depth:d},scene);
@@ -72,7 +72,7 @@ function create(scene,B,map){
   subdivisions:60},scene);
  const groundMaterial=new B.StandardMaterial('map-ground-material',scene);
  // Muted tint prevents bright sunlight from blowing earthy tones to white.
- groundMaterial.diffuseColor=B.Color3.FromHexString('#bdb8a5');
+ groundMaterial.diffuseColor=B.Color3.FromHexString('#e8d7b5');
  let groundTextureReady=false;
  if(typeof document!=='undefined' && B.DynamicTexture){
   try{
@@ -80,21 +80,21 @@ function create(scene,B,map){
     {width:1024,height:1024},scene,false);
    const c=tx.getContext();
    if(!c||typeof c.fillRect!=='function')throw Error('No 2D terrain context');
-   c.fillStyle='#77735e';c.fillRect(0,0,1024,1024);
+   c.fillStyle='#cbb08a';c.fillRect(0,0,1024,1024);
    let seed=721;
    const rnd=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);
    // Broad, overlapping variations are readable from the RTS camera.
    for(let i=0;i<2800;i++){
     const x=rnd()*1024,y=rnd()*1024,r=12+rnd()*65;
     c.globalAlpha=.04+rnd()*.10;
-    c.fillStyle=['#4c5941','#a18d68','#5e684c','#b39a75','#665e4b'][Math.floor(rnd()*5)];
+    c.fillStyle=['#d4ba91','#aa8964','#c7a77b','#e0c79e','#967755'][Math.floor(rnd()*5)];
     c.beginPath();c.ellipse(x,y,r*(.6+rnd()),r*(.25+rnd()*.35),
       rnd()*Math.PI,0,Math.PI*2);c.fill();
    }
    // Fine earth and grass breakup; deterministic across game sessions.
    for(let i=0;i<24000;i++){
     const x=rnd()*1024,y=rnd()*1024,r=.5+rnd()*3.6;
-    c.fillStyle=['#414b37','#a79572','#7e855b','#574e3d','#c0ae83'][Math.floor(rnd()*5)];
+    c.fillStyle=['#a48a64','#dac098','#b99d77','#927456','#e9d4b2'][Math.floor(rnd()*5)];
     c.globalAlpha=.15+rnd()*.31;
     c.fillRect(x,y,r*2,r);
    }
@@ -109,7 +109,7 @@ function create(scene,B,map){
    console.warn('Terrain texture fallback',error);
   }
  }
- if(!groundTextureReady)groundMaterial.diffuseColor=B.Color3.FromHexString('#77735e');
+ if(!groundTextureReady)groundMaterial.diffuseColor=B.Color3.FromHexString('#cbb08a');
  groundMaterial.specularColor=new B.Color3(.02,.02,.02);
  ground.material=groundMaterial;ground.isPickable=true;ground.receiveShadows=true;
  // Dirt road is narrow, weathered and textured: no featureless white highway.
@@ -119,12 +119,12 @@ function create(scene,B,map){
    const tx=new B.DynamicTexture('battlefield-dirt-track',
     {width:512,height:512},scene,false);
    const c=tx.getContext();
-   c.fillStyle='#73614a';c.fillRect(0,0,512,512);
+   c.fillStyle='#b69b77';c.fillRect(0,0,512,512);
    let seed=1776;
    const rand=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);
    for(let i=0;i<9000;i++){
     c.globalAlpha=.10+rand()*.22;
-    c.fillStyle=['#342f28','#aea083','#887756','#564633'][Math.floor(rand()*4)];
+    c.fillStyle=['#92734f','#e1c59f','#b89a73','#82664a'][Math.floor(rand()*4)];
     const x=rand()*512,y=rand()*512,r=.8+rand()*5.5;
     c.fillRect(x,y,r*1.6,r);
    }
@@ -281,8 +281,8 @@ function create(scene,B,map){
  }
  // Ruins, shell craters and debris from the approved first-generation battlefield.
  // Non-pickable decoration never intercepts click-to-move or enemy targeting.
- const rubble=material('rubble','#625c4f'),crater=material('shell-crater','#423e32');
- const craterRim=material('shell-rim','#87765c');
+ const rubble=material('rubble','#b49a79'),crater=material('shell-crater','#87684d');
+ const craterRim=material('shell-rim','#c4aa81');
  for(let i=0;i<35;i++){
   const x=19+(i*47)%261,z=23+(i*71)%253;
   if(Math.hypot(x-150,z-43)<25||Math.hypot(x-150,z-275)<25)continue;

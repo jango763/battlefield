@@ -47,6 +47,9 @@ for(const obj of Object.values(villages.models)){
 
 assert(art.includes("pbr('warped-timber','wood'"));
 assert(art.includes("world.ground.material=smoothEarth"),'Ground must avoid photo-grain shimmer');
+assert(art.includes('north-africa-libya-sunlit-v1'),
+ 'Map must use the approved dry North African palette');
+assert(art.includes('sunlit-sandstone-and-dune-washes'));
 assert(art.includes("road.albedoTexture=roadTexture"),'Roads must use coarse painted material');
 assert(art.includes("makeOrganicRoad('north-south',true"),'Road edge should be organic');
 assert(art.includes("mesh.name.startsWith('rut-')"),'Remove toy-like raised tracks');

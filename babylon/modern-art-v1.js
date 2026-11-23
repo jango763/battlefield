@@ -13,6 +13,7 @@
 })(typeof window!=='undefined'?window:null,function(){
 'use strict';
 const PROFILE='modern-battlefield-pbr-v1';
+const THEATRE='north-africa-libya-sunlit-v1';
 function apply({scene,B,world,camera,sun,map}){
  if(!scene||!B||!world||!camera||!sun||!map)
   throw Error('Modern-art scene dependencies are incomplete');
@@ -54,36 +55,36 @@ function apply({scene,B,world,camera,sun,map}){
   material[label]=m;
   return m;
  }
- const mud=pbr('scanned-mud','mud',{scale:32,tint:'#bbc1b1',rough:1});
+ const mud=pbr('scanned-mud','mud',{scale:32,tint:'#dfc49b',rough:1});
  // Road boxes are 265 x 9 metres. Texture UVs need DISTANCE-PROPORTIONAL
  // repeat counts or photoscanned soil stretches into ugly vertical streaks.
- const mudRoad=pbr('tracked-earth','mud',{scale:1,tint:'#b5a486',rough:1});
- const crossRoad=pbr('tracked-earth-east-west','mud',{scale:1,tint:'#b5a486',rough:1});
+ const mudRoad=pbr('tracked-earth','mud',{scale:1,tint:'#d2b38b',rough:1});
+ const crossRoad=pbr('tracked-earth-east-west','mud',{scale:1,tint:'#d2b38b',rough:1});
  for(const tex of [mudRoad.albedoTexture,mudRoad.bumpTexture]){
   tex.uScale=1.6;tex.vScale=45;
  }
  for(const tex of [crossRoad.albedoTexture,crossRoad.bumpTexture]){
   tex.uScale=40;tex.vScale=1.3;
  }
- const plaster=pbr('battered-plaster','plaster',{scale:2,tint:'#d4c8b5'});
- const brick=pbr('weathered-brick','brick',{scale:2,tint:'#c4aa9b',rough:1});
- const stone=pbr('pitted-stone','stone',{scale:2,tint:'#c4bfaf',rough:1});
- const roof=pbr('old-roof-tiles','brick',{scale:4,tint:'#817166',rough:1});
- const timber=pbr('warped-timber','wood',{scale:2,tint:'#9b8b76',rough:1});
- const dirt=pbr('soil-patches','mud',{scale:2,tint:'#9c927f',rough:1});
+ const plaster=pbr('battered-plaster','plaster',{scale:2,tint:'#ebd3ad'});
+ const brick=pbr('weathered-brick','brick',{scale:2,tint:'#d3a67f',rough:1});
+ const stone=pbr('pitted-stone','stone',{scale:2,tint:'#d2b895',rough:1});
+ const roof=pbr('old-roof-tiles','brick',{scale:4,tint:'#aa8066',rough:1});
+ const timber=pbr('warped-timber','wood',{scale:2,tint:'#9c7956',rough:1});
+ const dirt=pbr('soil-patches','mud',{scale:2,tint:'#b79a74',rough:1});
  // Quiet tactical terrain: the 32x tiled high-frequency photo mud produced
  // severe moire on iPhone while the elevated camera moved. Generate ONLY
  // broad, low-contrast brush patches and build real mipmaps for minification.
  const canvasGround=document.createElement('canvas');
- canvasGround.width=canvasGround.height=512;
+ canvasGround.width=canvasGround.height=1024;
  const brush=canvasGround.getContext('2d');
  if(!brush)throw Error('No terrain painting context');
- brush.fillStyle='#687957';brush.fillRect(0,0,512,512);
+ brush.fillStyle='#c6a878';brush.fillRect(0,0,1024,1024);
  for(let i=0;i<230;i++){
-  const x=between(0,512),y=between(0,512);
-  const radius=between(14,50);
+  const x=between(0,1024),y=between(0,1024);
+  const radius=between(28,100);
   brush.globalAlpha=between(.12,.25);
-  brush.fillStyle=choose(['#8b8768','#4b654a','#8d8265','#596746','#a08a68']);
+  brush.fillStyle=choose(['#e2c799','#b99468','#d1b080','#ac8c63','#dec093']);
   brush.beginPath();
   brush.ellipse(x,y,radius*between(.7,1.6),radius*between(.45,1.15),
    between(0,Math.PI),0,Math.PI*2);
@@ -95,7 +96,7 @@ function apply({scene,B,world,camera,sun,map}){
  // Paint large, gently feathered fields, shell scars and road shoulders in
  // the ground albedo. Unlike micro-noise decals these survive minification.
  function earthWash(x,z,r,hex,opacity){
-  const px=x*512/300,pz=z*512/300,rr=r*512/300;
+  const px=x*1024/300,pz=z*1024/300,rr=r*1024/300;
   const gradient=brush.createRadialGradient(px,pz,rr*.10,px,pz,rr);
   gradient.addColorStop(0,hex.replace('ALPHA',String(opacity)));
   gradient.addColorStop(.54,hex.replace('ALPHA',String(opacity*.48)));
@@ -106,49 +107,58 @@ function apply({scene,B,world,camera,sun,map}){
   const x=between(3,297),z=between(3,297);
   if(Math.abs(x-150)<7||Math.abs(z-150)<7)continue;
   earthWash(x,z,between(7,22),
-   choose(['rgba(43,65,35,ALPHA)','rgba(115,91,56,ALPHA)','rgba(95,102,62,ALPHA)']),
+   choose(['rgba(151,103,65,ALPHA)','rgba(228,200,150,ALPHA)','rgba(167,135,95,ALPHA)']),
    between(.11,.29));
  }
  // Large fallow-meadow belts break up the uniform 300m green slab from
  // the elevated mobile camera. Painted into the same 512px albedo: 0 draw calls.
  for(const [x,z,shade,area] of [
-  [54,62,'rgba(139,119,78,ALPHA)',30],
-  [246,63,'rgba(91,117,67,ALPHA)',34],
-  [45,152,'rgba(84,111,59,ALPHA)',36],
-  [245,158,'rgba(133,111,76,ALPHA)',29],
-  [72,244,'rgba(134,119,77,ALPHA)',31],
-  [228,241,'rgba(93,115,64,ALPHA)',33]
+  [54,62,'rgba(227,195,141,ALPHA)',30],
+  [246,63,'rgba(154,113,75,ALPHA)',34],
+  [45,152,'rgba(225,191,141,ALPHA)',36],
+  [245,158,'rgba(174,118,78,ALPHA)',29],
+  [72,244,'rgba(218,184,137,ALPHA)',31],
+  [228,241,'rgba(166,134,90,ALPHA)',33]
  ]){
   for(let j=0;j<10;j++)earthWash(x+between(-area,area),
    z+between(-area*.6,area*.6),between(8,20),shade,between(.20,.36));
  }
+ // Gentle light-and-shadow dune layers remain visible at an elevated
+ // tactical camera height without adding obstructing landscape meshes.
+ for(let i=0;i<72;i++){
+  const x=between(8,292),z=between(8,292);
+  if(Math.abs(x-150)<9||Math.abs(z-150)<9)continue;
+  earthWash(x,z,between(6,21),
+   i%3===0?'rgba(229,198,151,ALPHA)':'rgba(169,126,83,ALPHA)',
+   between(.11,.24));
+ }
  // Continuous dusty road margins avoid a blank straight brown runway.
  for(let z=20;z<281;z+=7)for(const side of [-1,1]){
   earthWash(150+side*between(4,7),z+between(-3,3),between(3.4,7.5),
-   'rgba(121,98,63,ALPHA)',between(.12,.24));
+   'rgba(155,111,73,ALPHA)',between(.12,.24));
  }
  for(const t of [{z:82},{z:218}]){
   for(let x=35;x<=265;x+=10)
    earthWash(x,t.z+between(-2,2),between(4.5,8.5),
-    'rgba(91,69,45,ALPHA)',between(.16,.29));
+    'rgba(127,92,60,ALPHA)',between(.16,.29));
  }
  for(const w of map.wrecks||[])
-  earthWash(w.x,w.z,between(5,8),'rgba(43,39,31,ALPHA)',.32);
+  earthWash(w.x,w.z,between(5,8),'rgba(113,78,53,ALPHA)',.32);
  brush.globalAlpha=1;
  const terrainTexture=new B.DynamicTexture('hd2026-soft-painted-earth',
-  {width:512,height:512},scene,true);
+  {width:1024,height:1024},scene,true);
  terrainTexture.getContext().drawImage(canvasGround,0,0);
  terrainTexture.wrapU=terrainTexture.wrapV=B.Texture.CLAMP_ADDRESSMODE;
- terrainTexture.anisotropicFilteringLevel=4;
+ terrainTexture.anisotropicFilteringLevel=8;
  terrainTexture.update(false);
  terrainTexture.updateSamplingMode(B.Texture.TRILINEAR_SAMPLINGMODE);
  // Painted countryside uses a matte diffuse shader instead of washed-out
  // high-exposure PBR ground. Historic buildings retain full scanned PBR.
  const smoothEarth=new B.StandardMaterial('hd2026-matte-terrain',scene);
  smoothEarth.diffuseTexture=terrainTexture;
- smoothEarth.diffuseColor=B.Color3.FromHexString('#cbd2bd');
+ smoothEarth.diffuseColor=B.Color3.FromHexString('#f1e3c6');
  smoothEarth.specularColor=B.Color3.Black();
- smoothEarth.ambientColor=B.Color3.FromHexString('#414f34');
+ smoothEarth.ambientColor=B.Color3.FromHexString('#514438');
  // Right-handed scene + custom trench vertex winding can leave the large
  // terrain culled. A double-sided matte ground prevents sky-colour holes.
  smoothEarth.backFaceCulling=false;
@@ -165,10 +175,10 @@ function apply({scene,B,world,camera,sun,map}){
  roadCanvas.width=roadCanvas.height=256;
  const rc=roadCanvas.getContext('2d');
  if(!rc)throw Error('No road painting context');
- rc.fillStyle='#716b54';rc.fillRect(0,0,256,256);
+ rc.fillStyle='#b89d75';rc.fillRect(0,0,256,256);
  for(let i=0;i<130;i++){
   rc.globalAlpha=between(.045,.14);
-  rc.fillStyle=choose(['#99896b','#59644b','#5c5545','#9a8868']);
+  rc.fillStyle=choose(['#e1c39a','#9f815e','#b59a73','#d6b38a']);
   rc.beginPath();
   rc.ellipse(between(0,256),between(0,256),between(9,35),
    between(12,49),between(0,Math.PI),0,Math.PI*2);
@@ -179,20 +189,20 @@ function apply({scene,B,world,camera,sun,map}){
  // is authored without high-frequency particles that shimmer on iPhone.
  for(const trackX of [68,188]){
   const rut=rc.createLinearGradient(trackX-28,0,trackX+28,0);
-  rut.addColorStop(0,'rgba(42,38,30,0)');
-  rut.addColorStop(.34,'rgba(48,40,31,.22)');
-  rut.addColorStop(.5,'rgba(43,37,28,.32)');
-  rut.addColorStop(.66,'rgba(48,40,31,.22)');
-  rut.addColorStop(1,'rgba(42,38,30,0)');
+  rut.addColorStop(0,'rgba(91,71,49,0)');
+  rut.addColorStop(.34,'rgba(105,79,53,.20)');
+  rut.addColorStop(.5,'rgba(111,79,51,.27)');
+  rut.addColorStop(.66,'rgba(105,79,53,.20)');
+  rut.addColorStop(1,'rgba(91,71,49,0)');
   rc.fillStyle=rut;rc.fillRect(trackX-28,0,56,256);
  }
  for(const edge of [0,256]){
   const shoulder=rc.createLinearGradient(edge===0?0:229,0,
    edge===0?27:256,0);
-  if(edge===0){shoulder.addColorStop(0,'rgba(52,66,43,.31)');
-   shoulder.addColorStop(1,'rgba(52,66,43,0)');}
-  else{shoulder.addColorStop(0,'rgba(52,66,43,0)');
-   shoulder.addColorStop(1,'rgba(52,66,43,.31)');}
+  if(edge===0){shoulder.addColorStop(0,'rgba(143,113,73,.25)');
+   shoulder.addColorStop(1,'rgba(143,113,73,0)');}
+  else{shoulder.addColorStop(0,'rgba(143,113,73,0)');
+   shoulder.addColorStop(1,'rgba(143,113,73,.25)');}
   rc.fillStyle=shoulder;rc.fillRect(edge===0?0:229,0,27,256);
  }
  rc.globalAlpha=1;
@@ -207,7 +217,7 @@ function apply({scene,B,world,camera,sun,map}){
  for(const road of [mudRoad,crossRoad]){
   road.albedoTexture=roadTexture;
   road.bumpTexture=null;
-  road.albedoColor=B.Color3.FromHexString('#ece5d3');
+  road.albedoColor=B.Color3.FromHexString('#eed9b2');
   road.roughness=1;road.specularIntensity=0;
  }
  // Avoid disconnected green ellipses: actual road boundaries undulate
@@ -434,7 +444,7 @@ function apply({scene,B,world,camera,sun,map}){
  // They are decorative thin instances and do not change terrain collisions.
  try{
   const gm=new B.StandardMaterial('hd2026-grass-mat',scene);
-  gm.diffuseColor=B.Color3.FromHexString('#596b48');
+  gm.diffuseColor=B.Color3.FromHexString('#ad9a69');
   gm.specularColor=B.Color3.Black();
   const mesh=B.MeshBuilder.CreateCylinder('hd2026-meadow-tuft',
    {diameterTop:.055,diameterBottom:.65,height:.60,tessellation:5},scene);
@@ -485,9 +495,9 @@ function apply({scene,B,world,camera,sun,map}){
    plots.push({x,z,w:between(.65,1.85),angle:between(0,Math.PI*2)});
   }
   const lobes=[
-   {id:'hedgerow',shade:'#455e39',dx:0,dz:0,h:.43,sx:1.4,sy:.7,sz:1.06},
-   {id:'hedgerow-leaf-west',shade:'#577047',dx:-.48,dz:.31,h:.64,sx:.88,sy:.66,sz:.78},
-   {id:'hedgerow-leaf-east',shade:'#3b5637',dx:.55,dz:-.22,h:.58,sx:.83,sy:.61,sz:.85}
+   {id:'hedgerow',shade:'#8e8c63',dx:0,dz:0,h:.43,sx:1.4,sy:.7,sz:1.06},
+   {id:'hedgerow-leaf-west',shade:'#aa9c70',dx:-.48,dz:.31,h:.64,sx:.88,sy:.66,sz:.78},
+   {id:'hedgerow-leaf-east',shade:'#777b58',dx:.55,dz:-.22,h:.58,sx:.83,sy:.61,sz:.85}
   ];
   for(const lobe of lobes){
    const shrubMat=new B.StandardMaterial('hd2026-'+lobe.id+'-mat',scene);
@@ -516,17 +526,25 @@ function apply({scene,B,world,camera,sun,map}){
  }catch(error){report.errors.push('hedgerows '+String(error));}
  // Restrained warm light — no extreme color filters, high-cost bloom or SSAO
  // at mobile resolution. Original sun casts PCF shadows where already supported.
- sun.intensity=1.04;
+ sun.intensity=1.25;
  if(scene.fogMode!==B.Scene.FOGMODE_NONE){
-  scene.fogDensity=.0020;
-  scene.fogColor=B.Color3.FromHexString('#939a86');
+  scene.fogDensity=.0009;
+  scene.fogColor=B.Color3.FromHexString('#d6c2a4');
+   scene.clearColor=new B.Color4(scene.fogColor.r,scene.fogColor.g,
+    scene.fogColor.b,1);
  }
+ const ambientDaylight=scene.getLightByName?.('ambient');
+ if(ambientDaylight)ambientDaylight.intensity=.83;
+ scene.ambientColor=B.Color3.FromHexString('#7d7161');
  const config=scene.imageProcessingConfiguration;
- if(config){config.toneMappingEnabled=true;config.exposure=.96;config.contrast=1.105;}
- report.colorGrade='muted-olive-earth-v4';
+ if(config){config.toneMappingEnabled=true;config.exposure=1.02;config.contrast=1.12;}
+ report.colorGrade=THEATRE;
+ report.theatre=THEATRE;
+ report.lightMood='warm-dry-high-noon';
+ report.sandTextureSize=1024;
  report.mipmappedScans=true;report.opaqueHedgerows=true;
  report.roadStyle='dual-ruts-with-meadow-shoulders';
- report.terrainReadability='lightened-earth-with-fallow-belts';
+ report.terrainReadability='sunlit-sandstone-and-dune-washes';
  report.ready=true;
  scene.metadata=scene.metadata||{};
  scene.metadata.battlefieldModernArt=report;
