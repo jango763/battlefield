@@ -39,6 +39,10 @@ for(const w of layout.emplacements)
 for(const trench of layout.trenches)
  assert(D.heightAt(layout,trench.x,trench.z)<-.8);
 assert(nav.clear({x:150,z:70},{x:150,z:90}),'Open central route preserved');
+assert.match(art,/roadTexture\.wrapV=B\.Texture\.WRAP_ADDRESSMODE/);
+assert.match(art,/mesh\.setVerticesData\(B\.VertexBuffer\.UVKind,uv\)/);
+assert.match(art,/dual-ruts-with-meadow-shoulders/);
+assert.match(art,/lightened-earth-with-fallow-belts/);
 require('./test-heading-smoothing.cjs');
 console.log('BATTLEFIELD_STAGE9_STAGE10_STATIC_PASS',{parts:parts.length,
  terrain:'feathered, mipmapped, shrub-thin-instances',guns:layout.emplacements.length,

@@ -36,7 +36,8 @@ function create(scene,B,map){
   blue:material('blue','#517f99'),red:material('red','#9b5046'),
   gold:material('gold','#be9336','#493711'),
   corn:material('corn','#a3a079'),hedge:material('hedge','#465542'),
-  trunk:material('trunk','#554b37'),stem:material('stem','#aaa080')
+  trunk:material('trunk','#554b37'),stem:material('stem','#aaa080'),
+  leaves:material('leaves','#526743')
  };
  function box(id,w,h,d,x,y,z,m,rot=0,pickable=false){
   const o=B.MeshBuilder.CreateBox(id,{width:w,height:h,depth:d},scene);
@@ -345,14 +346,18 @@ function create(scene,B,map){
   if(x<18||x>282||z<15||z>285)continue;
   if(Math.hypot(x-150,z-150)<24)continue;
   cylinder('tree-trunk-'+i,1.1,4.2,x,2.1,z,mat.trunk,6);
-  const cone=B.MeshBuilder.CreateCylinder('tree-crown-'+i,
-   {diameterTop:.8,diameterBottom:6.4,height:6.7,tessellation:7},scene);
-  cone.position.copyFrom(at(x,z,7.3,B));
-  cone.material=mat.hedge;cone.isPickable=false;nodes.push(cone);
-  const top=B.MeshBuilder.CreateCylinder('tree-top-'+i,
-   {diameterTop:0,diameterBottom:4,height:4.7,tessellation:7},scene);
-  top.position.copyFrom(at(x,z,10.5,B));
-  top.material=mat.hedge;top.isPickable=false;nodes.push(top);
+  // Two faceted foliage lobes, replacing 1990s-looking identical cones.
+  // Same mesh count and unchanged tree trunk obstacles/coordinates.
+  const crown=B.MeshBuilder.CreateSphere('tree-crown-'+i,
+   {diameter:1,segments:5},scene);
+  crown.position.copyFrom(at(x-.55,z+.25,7.2,B));
+  crown.scaling.copyFrom(new B.Vector3(6.3,4.4,5.7));
+  crown.material=mat.hedge;crown.isPickable=false;nodes.push(crown);
+  const top=B.MeshBuilder.CreateSphere('tree-top-'+i,
+   {diameter:1,segments:5},scene);
+  top.position.copyFrom(at(x+1.05,z-.35,9.6,B));
+  top.scaling.copyFrom(new B.Vector3(4.9,4.1,4.7));
+  top.material=mat.leaves;top.isPickable=false;nodes.push(top);
  }
  for(const p of [[86,123],[210,120],[120,175],[190,181],[150,83],[152,220]]){
   for(let i=-3;i<=3;i++)box('sandbag-'+p[0]+'-'+p[1]+'-'+i,1.5,.5,.85,

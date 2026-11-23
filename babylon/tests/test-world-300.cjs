@@ -43,6 +43,7 @@ const B={
  MeshBuilder:{
   CreateBox:name=>{drawn.push(name);return new Node(name)},
   CreateCylinder:name=>{drawn.push(name);return new Node(name)},
+  CreateSphere:name=>{drawn.push(name);return new Node(name)},
   CreateGround:name=>{drawn.push(name);return new Node(name)},
   CreateTorus:name=>{drawn.push(name);return new Node(name)}
  },
@@ -66,6 +67,12 @@ const B={
  assert.equal(drawn.filter(n=>n.startsWith('farm-house-')).length,5);
  assert.equal(drawn.filter(n=>n.startsWith('pillbox-bunker-')).length,7);
  assert.equal(drawn.filter(n=>n.startsWith('legacy-btr-position-')).length,3);
+ assert.equal(drawn.filter(n=>n.startsWith('tree-crown-')).length,50,
+  'Every tree should have a broad lobed silhouette');
+ assert.equal(drawn.filter(n=>n.startsWith('tree-top-')).length,50,
+  'Keep two foliage meshes per tree to bound draw calls');
+ assert.equal(m.obstacles.filter(o=>o.type==='tree').length,50,
+  'Tree-trunk collisions must remain intact');
  const status=await m.loadOriginalBTR();
  assert.equal(status.ok,true);
  assert.equal(status.loaded,3);
