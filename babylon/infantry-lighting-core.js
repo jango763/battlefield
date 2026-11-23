@@ -8,15 +8,15 @@
  if(root)root.BattlefieldInfantryLighting=api;
 })(typeof window!=='undefined'?window:null,function(){
  'use strict';
- const PROFILE=Object.freeze({name:'infantry-fill-light',intensity:.72});
+ const PROFILE=Object.freeze({name:'infantry-fill-light',intensity:1.08});
  function create({B,scene}={}){
   if(!B?.HemisphericLight||!B?.Color3||!B?.Vector3||!scene)
    throw Error('Infantry fill requires a Babylon scene');
   const light=new B.HemisphericLight(PROFILE.name,
    new B.Vector3(-.45,.72,.62),scene);
   light.intensity=PROFILE.intensity;
-  light.diffuse=B.Color3.FromHexString('#e9dfc8');
-  light.groundColor=B.Color3.FromHexString('#757d66');
+  light.diffuse=B.Color3.FromHexString('#f2e8d7');
+  light.groundColor=B.Color3.FromHexString('#a0a18d');
   light.specular=B.Color3.FromHexString('#1e1b16');
   // A light with an empty includedOnlyMeshes array lights *everything*.
   // Keep disabled until at least one verified soldier mesh is registered.
