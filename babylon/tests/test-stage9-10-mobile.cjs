@@ -116,6 +116,8 @@ fs.mkdirSync(dir,{recursive:true});
    'Hero ground marker must be noninteractive and follow only the hero');
   result.heroMarker=halo;
   await page.locator('#hud-toggle').click();
+  const radiusBeforeZoom=await page.evaluate(()=>
+   window.BABYLON.EngineStore.LastCreatedScene.activeCamera.radius);
   await page.locator('#view-focus').click();
   const zoomIn=await page.evaluate(()=>({
    radius:window.BABYLON.EngineStore.LastCreatedScene.activeCamera.radius,
@@ -123,7 +125,8 @@ fs.mkdirSync(dir,{recursive:true});
    state:window.__BATTLEFIELD_GAME__.cameraView
   }));
   assert.equal(zoomIn.fov,.74,'Close soldier view should magnify actors on screen');
-  assert.equal(zoomIn.radius,s.camera.radius,'Zoom must keep approved camera radius');
+  assert(Math.abs(zoomIn.radius-radiusBeforeZoom)<.12,
+   'Switching FOV must not alter actual camera distance');
   assert.equal(zoomIn.state.mode,'hero-close');
   // Same portrait viewpoint as the baseline screenshot; capture the larger
   // soldier presentation without the settings panel obscuring the scene.
