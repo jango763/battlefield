@@ -1,0 +1,87 @@
+name: Battlefield Babylon AI regression gate
+on:
+  pull_request:
+    branches:
+      - experiment/babylon-stage9-10-visual-qa-20261122
+    paths:
+      - 'babylon/**'
+      - 'docs/**'
+      - 'AGENTS.md'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/workflows/babylon-*.yml'
+  push:
+    branches:
+      - experiment/ai-agent-coordination-20261123
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: battlefield-agent-gate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Block accidental Three.js and shared asset edits in Babylon PR
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" | node babylon/tools/check-ai-change-scope.cjs
+      - name: Validate sources, contracts and offline gameplay regressions
+        run: |
+          node babylon/tests/test-agent-contract.cjs
+          node babylon/tools/assemble-game-parts.cjs --check
+          node --check babylon/game.js
+          node --check babylon/modern-art-v1.js
+          node --check babylon/tactical-field.js
+          node babylon/tests/test-stage9-10-static.cjs
+          node babylon/tests/test-ten-part-engineering.cjs
+          node babylon/tests/test-navigation.cjs
+          node babylon/tests/test-defenses.cjs
+          node babylon/tests/test-emplacements.cjs
+          node babylon/tests/test-tactical-ai.cjs
+          node babylon/tests/test-gold-economy.cjs
+          node babylon/tests/test-first-game-behavior.cjs
+          node babylon/tests/test-camera-joystick-checkpoint.cjs
+          node babylon/tests/test-weapon-balance.cjs
+          node babylon/tests/test-world-300.cjs
+  mobile-webgl:
+    if: github.event_name == 'pull_request'
+    needs: regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install mobile browser engines
+        run: |
+          npm install --no-audit --no-fund --prefix /tmp/bf-stage910 playwright@1.58.2
+          /tmp/bf-stage910/node_modules/.bin/playwright install --with-deps ${{ matrix.browser }}
+      - name: Assert Battlefield mobile rendering, camera and joystick
+        run: |
+          python3 -m http.server 8877 --bind 127.0.0.1 >/tmp/bf-stage910-server.log 2>&1 &
+          sleep 2
+          node babylon/tests/test-stage9-10-mobile.cjs ${{ matrix.browser }}
+      - name: Upload screenshots and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlefield-agent-mobile-${{ matrix.browser }}
+          path: babylon-qa-results/stage9-10/
+          if-no-files-found: warn
+          retention-days: 14
