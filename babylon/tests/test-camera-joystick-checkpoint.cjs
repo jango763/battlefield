@@ -44,4 +44,12 @@ assert(hero.x>before,'Left joystick must move toward +X, visually left');
 const stopped=hero.x;
 control.clearMovement();control.updateAllies(.1);
 assert.equal(hero.x,stopped);
+assert.match(html,/\.battle-active #graphics-tag\{display:none\}/,
+ 'Hide distracting HD debug tag while the game is active');
+assert.match(html,/@media\(max-height:600px\)/,
+ 'Landscape mobile must have its own small-height HUD layout');
+assert.match(html,/\.battle-active #footer\{display:none\}/,
+ 'Long help footer must not obscure landscape combat');
+assert.match(html,/\.battle-active #heading small\{display:none\}/,
+ 'Landscape status line must not overlap player HP');
 console.log('BATTLEFIELD_VISUAL_STABILITY_JOYSTICK_PASS');
