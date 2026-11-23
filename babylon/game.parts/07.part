@@ -45,9 +45,9 @@ function syncVisual(view){
  // Face the direction of actual movement. Previously every autonomous unit
  // ran sideways while staring at an enemy hundreds of metres away.
  if(moving && Math.hypot(dx,dz)>.005){
-  view.anchor.rotation.y=Math.atan2(dx,dz);
+  view.anchor.rotation.y=window.BattlefieldHeadingSmoothing.step(view.anchor.rotation.y,Math.atan2(dx,dz),engine.getDeltaTime()/1000);
  }else if(target && Math.hypot(target.x-unit.x,target.z-unit.z)<42){
-  view.anchor.rotation.y=Math.atan2(target.x-unit.x,target.z-unit.z);
+  view.anchor.rotation.y=window.BattlefieldHeadingSmoothing.step(view.anchor.rotation.y,Math.atan2(target.x-unit.x,target.z-unit.z),engine.getDeltaTime()/1000);
  }
  view.lastUnitX=unit.x;view.lastUnitZ=unit.z;
  if(unit.weapon!==view.weapon){
