@@ -64,7 +64,10 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(result.infantryFill.sceneLightCount,3,
    'No extra world lights or per-soldier light instances');
   assert.equal(result.infantryFill.report.modifiedImportedMaterials,0);
-  assert.equal(s.art.colorGrade,'muted-olive-earth-v4');
+  assert.equal(s.art.colorGrade,'north-africa-libya-sunlit-v1');
+  assert.equal(s.art.theatre,'north-africa-libya-sunlit-v1');
+  assert.equal(s.art.sandTextureSize,1024);
+  assert.equal(s.art.lightMood,'warm-dry-high-noon');
   assert.equal(s.art.roadVisualWidth,4.2,'Road must be narrowed');
   assert.equal(await page.evaluate(()=>{
    const m=window.BABYLON.EngineStore.LastCreatedScene.getMeshByName('map-ground-300');
