@@ -18,6 +18,10 @@ const soldier=tag=>({tag,getTotalVertices:()=>300,material:{baseColor:tag}});
 const a=soldier('german'),b=soldier('british'),c=soldier('reinforcement');
 const originalMaterials=[a.material,b.material,c.material];
 const fill=L.create({B,scene:{}});
+assert(L.PROFILE.intensity>=1&&L.PROFILE.intensity<=1.10,
+ 'Warm fill must stay within a controlled low-cost exposure budget');
+assert.equal(fill.light.groundColor.hex,'#a0a18d');
+assert.equal(fill.light.diffuse.hex,'#f2e8d7');
 assert.equal(fill.light.enabled,false,'Unscoped fill must not light the map');
 assert.equal(fill.light.includedOnlyMeshes.length,0);
 assert.equal(fill.track([a,b,a,null,world].filter(x=>x!==world)),2);

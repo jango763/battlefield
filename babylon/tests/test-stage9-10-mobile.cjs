@@ -52,6 +52,8 @@ fs.mkdirSync(dir,{recursive:true});
     sceneLightCount:sc.lights.length,
     report:window.__BATTLEFIELD_GAME__.infantryLighting};
   });
+  assert(result.infantryFill.intensity>=1&&result.infantryFill.intensity<=1.10,
+   'Character light profile must be bounded and consistent');
   assert(result.infantryFill.present&&result.infantryFill.enabled,
    'Soldier-only hemispheric fill not active');
   assert(result.infantryFill.tracked>=4,'Original imported GLB meshes not registered');
