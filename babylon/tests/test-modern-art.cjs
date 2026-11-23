@@ -16,6 +16,8 @@ assert(game.includes('villageModels.install({scene,B,art:state.modernArt})'));
 assert(village.includes('B.SceneLoader.LoadAssetContainerAsync'));
 assert(village.includes('m.isPickable=false'));
 assert(village.includes('normandy-timber-house'));
+assert(village.includes('libya-sunlit-stucco'),
+ 'Adobe walls must have a readable sunlit material');
 assert(village.includes('libya-adobe-procedural'),
  'North African scene must use original adobe models, not Norman houses');
 assert(village.includes('libya-village-wall'),
