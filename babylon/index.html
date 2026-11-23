@@ -88,6 +88,14 @@ button:disabled{opacity:.5;cursor:default}
 #battle-minimap{display:none;position:fixed;top:calc(env(safe-area-inset-top) + 61px);right:11px;width:116px;height:116px;z-index:5;border:2px solid #a79a70;border-radius:5px;background:#334034ed;box-shadow:0 3px 15px #0009;pointer-events:none;image-rendering:auto}
 .battle-active #battle-minimap{display:block}
 @media(max-width:700px){#battle-minimap{width:104px;height:104px}}
+/* Keep the battle viewport clear. The HD badge is a diagnostic label,
+   not a gameplay control; do not cover HP, movement or tactical targets. */
+.battle-active #graphics-tag{display:none}
+@media(max-height:600px){
+ .battle-active #heading small{display:none}
+ .battle-active #heading{right:auto;max-width:calc(100vw - 115px)}
+ .battle-active #footer{display:none}
+}
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
