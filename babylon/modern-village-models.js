@@ -25,6 +25,15 @@ function installNorthAfrica({scene,B,world}){
  const stone=scene.getMaterialByName('hd2026-pitted-stone');
  const brick=scene.getMaterialByName('hd2026-weathered-brick');
  if(!adobe||!stone||!brick)throw Error('Libya hamlet needs local scanned stucco and stone');
+ // Imported PBR walls appeared almost black without an environment IBL.
+ // Keep the licensed local stucco scan but render it with bounded, lit
+ // StandardMaterial + subtle warm ambient so the facade stays readable.
+ const sunStucco=new B.StandardMaterial('libya-sunlit-stucco',scene);
+ sunStucco.diffuseTexture=adobe.albedoTexture;
+ sunStucco.diffuseColor=B.Color3.FromHexString('#f2dbb5');
+ sunStucco.ambientColor=B.Color3.FromHexString('#c5a17e');
+ sunStucco.emissiveColor=B.Color3.FromHexString('#4e3f2c');
+ sunStucco.specularColor=B.Color3.Black();
  const recessed=new B.StandardMaterial('libya-arched-recess-shadow',scene);
  recessed.diffuseColor=B.Color3.FromHexString('#493e31');
  recessed.specularColor=B.Color3.Black();
@@ -45,14 +54,14 @@ function installNorthAfrica({scene,B,world}){
   // through walls, unlike purely decorative no-collision buildings.
   world?.addObstacle?.({x:p.x,z:p.z,hw:width/2+.45,
    hd:depth/2+.45,type:'libya-village-wall',blocksSight:true});
-  cuboid('adobe-body-'+i,p.x,height/2,p.z,width,height,depth,adobe);
+  cuboid('adobe-body-'+i,p.x,height/2,p.z,width,height,depth,sunStucco);
   cuboid('stone-footing-'+i,p.x,.18,p.z,width+.45,.36,depth+.5,stone);
   cuboid('flat-roof-'+i,p.x,height+.18,p.z,width+.55,.36,depth+.55,stone);
   const wall=.28,rise=.76;
   for(const sx of [-1,1])cuboid('roof-rail-x-'+i+'-'+sx,
-   p.x+sx*(width/2),height+.57,p.z,wall,rise,depth+.66,adobe);
+   p.x+sx*(width/2),height+.57,p.z,wall,rise,depth+.66,sunStucco);
   for(const sz of [-1,1])cuboid('roof-rail-z-'+i+'-'+sz,
-   p.x,height+.57,p.z+sz*depth/2,width+.66,rise,wall,adobe);
+   p.x,height+.57,p.z+sz*depth/2,width+.66,rise,wall,sunStucco);
   // Recessed door + sandstone lintel and two narrow shielded windows.
   cuboid('deep-door-'+i,p.x,1.27,p.z+depth/2+.035,1.45,2.5,.10,recessed);
   cuboid('door-lintel-'+i,p.x,2.55,p.z+depth/2+.14,1.9,.30,.40,stone);
