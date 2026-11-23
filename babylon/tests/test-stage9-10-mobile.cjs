@@ -125,6 +125,11 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(zoomIn.fov,.74,'Close soldier view should magnify actors on screen');
   assert.equal(zoomIn.radius,s.camera.radius,'Zoom must keep approved camera radius');
   assert.equal(zoomIn.state.mode,'hero-close');
+  // Same portrait viewpoint as the baseline screenshot; capture the larger
+  // soldier presentation without the settings panel obscuring the scene.
+  await page.locator('#hud-toggle').click();
+  await page.screenshot({path:dir+'/'+name+'-hero-close.png'});
+  await page.locator('#hud-toggle').click();
   await page.locator('#view-focus').click();
   const zoomOut=await page.evaluate(()=>({
    fov:window.BABYLON.EngineStore.LastCreatedScene.activeCamera.fov,
