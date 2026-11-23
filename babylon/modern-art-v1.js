@@ -476,7 +476,7 @@ function apply({scene,B,world,camera,sun,map}){
  try{
   const lowPower=new URLSearchParams(
    typeof location!=='undefined'?location.search:'').get('quality')==='low';
-  const plots=[],budget=lowPower?72:132;
+  const plots=[],budget=lowPower?62:110;
   function acceptSite(x,z,roadside){
    if(Math.abs(x-150)<(roadside?7:11)||Math.abs(z-150)<(roadside?0:11))return false;
    if(map.farms.some(f=>Math.hypot(f.x-x,f.z-z)<(roadside?10:14)))return false;
@@ -488,7 +488,7 @@ function apply({scene,B,world,camera,sun,map}){
    if(!acceptSite(x,z,false))continue;
    plots.push({x,z,w:between(.65,1.55),angle:between(0,Math.PI*2)});
   }
-  for(let k=0;k<(lowPower?140:230);k++){
+  for(let k=0;k<(lowPower?98:165);k++){
    const side=k%2?1:-1;
    const x=150+side*between(8.4,24.5),z=between(18,282);
    if(!acceptSite(x,z,true))continue;
@@ -499,12 +499,33 @@ function apply({scene,B,world,camera,sun,map}){
    {id:'hedgerow-leaf-west',shade:'#aa9c70',dx:-.48,dz:.31,h:.64,sx:.88,sy:.66,sz:.78},
    {id:'hedgerow-leaf-east',shade:'#777b58',dx:.55,dz:-.22,h:.58,sx:.83,sy:.61,sz:.85}
   ];
+  // Fronds of an arid thorn scrub, not green/ochre pebble spheres.
+  // Each 9-frond crown is a single faceted GPU mesh, thin-instanced for
+  // all locations. No transparency, alpha flicker or additional obstacles.
+  function makeDryScrub(name){
+   const vertices=[],indices=[],normals=[];
+   for(let k=0;k<9;k++){
+    const a=k*Math.PI*2/9,dx=Math.cos(a),dz=Math.sin(a);
+    const px=-dz,pz=dx;
+    const start=vertices.length/3,r=.78+.16*Math.sin(k*2.3);
+    vertices.push(0,.07,0,
+     dx*.30+px*.16,.60,dz*.30+pz*.16,
+     dx*r,.32+.12*Math.cos(k*2),dz*r,
+     dx*.30-px*.16,.54,dz*.30-pz*.16);
+    indices.push(start,start+1,start+2,start,start+2,start+3);
+   }
+   const mesh=new B.Mesh(name,scene),data=new B.VertexData();
+   B.VertexData.ComputeNormals(vertices,indices,normals);
+   data.positions=vertices;data.indices=indices;data.normals=normals;
+   data.applyToMesh(mesh);
+   return mesh;
+  }
   for(const lobe of lobes){
    const shrubMat=new B.StandardMaterial('hd2026-'+lobe.id+'-mat',scene);
    shrubMat.diffuseColor=B.Color3.FromHexString(lobe.shade);
    shrubMat.specularColor=B.Color3.Black();
-   const shrub=B.MeshBuilder.CreateSphere('hd2026-'+lobe.id,
-    {diameter:1,segments:5},scene);
+   shrubMat.backFaceCulling=false;
+   const shrub=makeDryScrub('hd2026-'+lobe.id);
    shrub.material=shrubMat;shrub.isPickable=false;shrub.receiveShadows=false;
    const buf=[];
    for(const p of plots){
@@ -523,6 +544,7 @@ function apply({scene,B,world,camera,sun,map}){
   }
   report.shrubInstances=plots.length;
   report.shrubLobes=lobes.length;
+  report.shrubSilhouette='faceted-dry-thorn-scrub-v2';
  }catch(error){report.errors.push('hedgerows '+String(error));}
  // Restrained warm light — no extreme color filters, high-cost bloom or SSAO
  // at mobile resolution. Original sun casts PCF shadows where already supported.
