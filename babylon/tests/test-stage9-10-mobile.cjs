@@ -68,6 +68,8 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(s.art.theatre,'north-africa-libya-sunlit-v1');
   assert.equal(s.art.shrubSilhouette,'faceted-dry-thorn-scrub-v2');
   assert.equal(s.art.sandTextureSize,1024);
+  assert.equal(s.art.terrainLandforms,'wind-etched-dune-ridges-v1');
+  assert.equal(s.art.duneRidges,48);
   assert.equal(s.art.lightMood,'warm-dry-high-noon');
   await page.waitForFunction(()=>
    window.__BATTLEFIELD_GAME__?.villageModels?.finished===true,
