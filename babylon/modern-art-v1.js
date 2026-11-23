@@ -459,49 +459,60 @@ function apply({scene,B,world,camera,sun,map}){
    mesh.thinInstanceRefreshBoundingInfo();
   }
  }catch(error){report.errors.push('foliage '+String(error));}
- // Angular, opaque hedgerow clumps add silhouettes without alpha overdraw.
- // Thin instances are single-draw-call decoration: never collision proxies.
+ // Group three differently shaped low-poly canopy lobes per site:
+ // the previous single sphere read like a scattered green stone at RTS zoom.
+ // Each lobe is one thin-instance draw call, regardless of site count.
+ // This remains purely decorative; farm positions and collisions are intact.
  try{
-  const shrubMat=new B.StandardMaterial('hd2026-shrub-mat',scene);
-  shrubMat.diffuseColor=B.Color3.FromHexString('#43583c');
-  shrubMat.specularColor=B.Color3.Black();
-  const shrubs=B.MeshBuilder.CreateSphere('hd2026-hedgerow',
-   {diameter:1,segments:5},scene);
-  shrubs.material=shrubMat;shrubs.isPickable=false;shrubs.receiveShadows=false;
-  const buf=[];
   const lowPower=new URLSearchParams(
    typeof location!=='undefined'?location.search:'').get('quality')==='low';
-  const budget=lowPower?72:132;
-  for(let i=0;i<budget;i++){
+  const plots=[],budget=lowPower?72:132;
+  function acceptSite(x,z,roadside){
+   if(Math.abs(x-150)<(roadside?7:11)||Math.abs(z-150)<(roadside?0:11))return false;
+   if(map.farms.some(f=>Math.hypot(f.x-x,f.z-z)<(roadside?10:14)))return false;
+   if(map.bases.some(b=>Math.hypot(b.x-x,b.z-z)<(roadside?24:26)))return false;
+   return true;
+  }
+  for(let k=0;k<budget;k++){
    const x=between(10,290),z=between(10,290);
-   if(Math.abs(x-150)<11||Math.abs(z-150)<11)continue;
-   if(map.farms.some(f=>Math.hypot(f.x-x,f.z-z)<14))continue;
-   if(map.bases.some(b=>Math.hypot(b.x-x,b.z-z)<26))continue;
-   const w=between(.65,1.55);
-   const m=B.Matrix.Compose(new B.Vector3(w*1.8,w*.72,w*1.15),
-    B.Quaternion.FromEulerAngles(0,between(0,Math.PI*2),0),
-    pos(x,w*.38,z));
-   buf.push(...m.asArray());
-   report.shrubInstances=(report.shrubInstances||0)+1;
+   if(!acceptSite(x,z,false))continue;
+   plots.push({x,z,w:between(.65,1.55),angle:between(0,Math.PI*2)});
   }
-  // Deliberately place a few continuous roadside clumps in the starting
-  // camera corridor. Uniformly random global scatter looked empty at play.
-  for(let i=0;i<(lowPower?140:230);i++){
-   const side=i%2?1:-1;
+  for(let k=0;k<(lowPower?140:230);k++){
+   const side=k%2?1:-1;
    const x=150+side*between(8.4,24.5),z=between(18,282);
-   if(map.farms.some(f=>Math.hypot(f.x-x,f.z-z)<10))continue;
-   if(map.bases.some(b=>Math.hypot(b.x-x,b.z-z)<24))continue;
-   const w=between(.65,1.85);
-   const m=B.Matrix.Compose(new B.Vector3(w*1.7,w*.74,w*1.2),
-    B.Quaternion.FromEulerAngles(0,between(0,Math.PI*2),0),
-    pos(x,w*.38,z));
-   buf.push(...m.asArray());
-   report.shrubInstances++;
+   if(!acceptSite(x,z,true))continue;
+   plots.push({x,z,w:between(.65,1.85),angle:between(0,Math.PI*2)});
   }
-  if(buf.length){
-   shrubs.thinInstanceSetBuffer('matrix',new Float32Array(buf),16,true);
-   shrubs.thinInstanceRefreshBoundingInfo();
+  const lobes=[
+   {id:'hedgerow',shade:'#455e39',dx:0,dz:0,h:.43,sx:1.4,sy:.7,sz:1.06},
+   {id:'hedgerow-leaf-west',shade:'#577047',dx:-.48,dz:.31,h:.64,sx:.88,sy:.66,sz:.78},
+   {id:'hedgerow-leaf-east',shade:'#3b5637',dx:.55,dz:-.22,h:.58,sx:.83,sy:.61,sz:.85}
+  ];
+  for(const lobe of lobes){
+   const shrubMat=new B.StandardMaterial('hd2026-'+lobe.id+'-mat',scene);
+   shrubMat.diffuseColor=B.Color3.FromHexString(lobe.shade);
+   shrubMat.specularColor=B.Color3.Black();
+   const shrub=B.MeshBuilder.CreateSphere('hd2026-'+lobe.id,
+    {diameter:1,segments:5},scene);
+   shrub.material=shrubMat;shrub.isPickable=false;shrub.receiveShadows=false;
+   const buf=[];
+   for(const p of plots){
+    const yaw=B.Quaternion.FromEulerAngles(0,p.angle,0);
+    const dx=(lobe.dx*Math.cos(p.angle)-lobe.dz*Math.sin(p.angle))*p.w;
+    const dz=(lobe.dx*Math.sin(p.angle)+lobe.dz*Math.cos(p.angle))*p.w;
+    const matrix=B.Matrix.Compose(new B.Vector3(
+     p.w*lobe.sx,p.w*lobe.sy,p.w*lobe.sz),yaw,
+     pos(p.x+dx,p.w*lobe.h,p.z+dz));
+    buf.push(...matrix.asArray());
+   }
+   if(buf.length){
+    shrub.thinInstanceSetBuffer('matrix',new Float32Array(buf),16,true);
+    shrub.thinInstanceRefreshBoundingInfo();
+   }
   }
+  report.shrubInstances=plots.length;
+  report.shrubLobes=lobes.length;
  }catch(error){report.errors.push('hedgerows '+String(error));}
  // Restrained warm light — no extreme color filters, high-cost bloom or SSAO
  // at mobile resolution. Original sun casts PCF shadows where already supported.

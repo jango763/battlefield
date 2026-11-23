@@ -11,7 +11,11 @@ for(const [name,src] of [['game',game],['art',art],['field',field],['legacy',old
 assert.match(art,/scene,false,false,/,'Scanned texture must have mipmaps');
 assert.match(art,/t\.anisotropicFilteringLevel=4/);
 assert.match(art,/earthWash\(/);
-assert.match(art,/hd2026-hedgerow/);
+assert.match(art,/id:'hedgerow'/,'Keep the original named shrub layer');
+assert.match(art,/CreateSphere\('hd2026-'\+lobe\.id/,'Build real instanced shrub meshes');
+assert.match(art,/shrubLobes=lobes\.length/);
+assert.match(art,/hedgerow-leaf-west/);
+assert.match(art,/hedgerow-leaf-east/);
 assert.match(art,/report\.mipmappedScans=true/);
 assert.match(art,/terrainStyle='low-frequency-mipmapped-matte'/);
 assert.match(field,/B\.Mesh\.MergeMeshes\(group,true,true\)/);
