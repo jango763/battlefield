@@ -1,4 +1,10 @@
  });
+ $('order-attack').addEventListener('click',()=>{
+  inputMode='attack';
+  $('order-move').setAttribute('aria-pressed','false');
+  $('order-attack').setAttribute('aria-pressed','true');
+  alertStatus('Атака: коснитесь противника для выбора цели.');
+ });
  $('reload-manual').addEventListener('click',()=>{
   const r=battle.startReload(findActor());
   alertStatus(r.ok?'Перезарядка началась: '+r.seconds+' с.':
@@ -125,6 +131,3 @@ async function deployReinforcement({unit,side,hero},epoch){
   unit.x=unit.spawn.x;unit.z=unit.spawn.z;
   unit.cooldown=0;unit.reloadRemaining=0;unit.reloadWeapon=null;
   unit.suppressed=0;unit.weapon='Kar98k';
-  if(unit.isHero)fieldOrders?.clearDestination();
-  unit.characterModelImported=!!view.importedAlliedModel;
-  assignView(view,unit);

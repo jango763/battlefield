@@ -1,3 +1,11 @@
+ const funds=battle.getFunds();
+ const econ=economy?.summary();
+ const mission=advanceObjectives(hero,econ);
+ const central=econ?.central;
+ const left=central?.started?Math.ceil(central.remainingSeconds):0;
+ const timerLabel=central?.open?'ОТКРЫТА':
+  central?.started?'Откроется через '+String(Math.floor(left/60)).padStart(2,'0')+
+   ':'+String(left%60).padStart(2,'0'):
    'ЗАКРЫТА — ждём гибель первого бота';
  $('fight').textContent=atBase?'▶ Продолжить бой':'Ⅱ Пауза / снаряжение';
  $('supply').disabled=!atBase||!hero.alive;
@@ -123,9 +131,3 @@ function registerUI(){
   $('order-move').setAttribute('aria-pressed','true');
   $('order-attack').setAttribute('aria-pressed','false');
   alertStatus('Движение: коснитесь земли для приказа.');
- });
- $('order-attack').addEventListener('click',()=>{
-  inputMode='attack';
-  $('order-move').setAttribute('aria-pressed','false');
-  $('order-attack').setAttribute('aria-pressed','true');
-  alertStatus('Атака: коснитесь противника для выбора цели.');

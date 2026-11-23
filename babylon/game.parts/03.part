@@ -1,3 +1,11 @@
+     BASE_Z+move.destination.z*UNIT_SCALE);
+    destinationMark.isVisible=true;
+    if(gameStarted&&!controller.snapshot().active&&!controller.snapshot().done){
+     controller.start();atBase=false;state.atBase=false;
+    }
+    alertStatus('Приказ: двигаться. Отряд следует за героем.');
+   }
+  }
  });
  engine.runRenderLoop(frame);
  window.addEventListener('resize',()=>engine.resize());
@@ -62,6 +70,17 @@ function unitVisual(index,entries,{externalModel=null}={}){
  }
  const marker=B.MeshBuilder.CreateDisc('squad-ring-'+index,{radius:.47,tessellation:24},scene);
  marker.parent=anchor;marker.rotation.x=Math.PI/2;marker.position.y=.025;
+ // Single-hero golden outline above the existing faction marker. Unlike a
+ // billboard sprite it never covers the soldier's uniform or weapon.
+ // Child of anchor: follows hero automatically and disappears on death.
+ if(index===0){
+  const halo=B.MeshBuilder.CreateTorus('hero-halo-0',
+   {diameter:1.42,thickness:.105,tessellation:20},scene);
+  halo.parent=anchor;halo.position.y=.07;
+  halo.material=factionMat('hero-halo','hero','#f1d17b',
+   {alpha:.94,disableLighting:true});
+  halo.isPickable=false;halo.receiveShadows=false;
+ }
  const ringMat=factionMat('ring',index<12?'blue':'red',
   index<12?'#77bcea':'#e98668',{alpha:.75});
  marker.material=ringMat;marker.isPickable=false;
@@ -113,19 +132,3 @@ async function ensureUnitsUnlocked(scenarioName){
    './animstudio-preview/models/','all-combat-run.glb',scene);
   motionDonors.germanRun=unitMotion?.findGroup(asset.animationGroups,'Kar98k_Run')||null;
   if(asset.animationGroups.length<16)
-   throw Error('В GLB отсутствуют 16 согласованных боевых анимаций');
- }
- if(!modelDepot&&Date.now()>=modelDepotRetryAfter){
-  modelDepot=alliedLoader.create({B,scene,catalog:alliedModels,
-   sourceGroups:asset.animationGroups,featureTrial:FEATURE_REAL_ALLIES});
-  try{
-   state.alliedManifest=await modelDepot.init();
-  }catch(error){
-   state.modelErrors.manifest=String(error?.message||error);
-   // Missing manifest does not make 12v12 unplayable; no false model import.
-   console.warn('Allied GLB manifest unavailable; source models not installed',error);
-   modelDepot=null;
-   modelDepotRetryAfter=Date.now()+30000;
-   state.engineering.assetRetries++;
-  }
- }
