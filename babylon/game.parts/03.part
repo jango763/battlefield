@@ -1,3 +1,7 @@
+   const x=(point.x-BASE_X)/UNIT_SCALE,z=(point.z-BASE_Z)/UNIT_SCALE;
+   const move=fieldOrders.setDestination(x,z);
+   if(move.ok){
+    destinationMark.position.set(BASE_X+move.destination.x*UNIT_SCALE,.06,
      BASE_Z+move.destination.z*UNIT_SCALE);
     destinationMark.isVisible=true;
     if(gameStarted&&!controller.snapshot().active&&!controller.snapshot().done){
@@ -96,6 +100,9 @@ function unitVisual(index,entries,{externalModel=null}={}){
  const hpMat=factionMat('hp-fill',index<12?'blue':'red',
   index<12?'#8bdaa0':'#e78f6b',{disableLighting:true});hpFill.material=hpMat;hpFill.isPickable=false;
  for(const mesh of drawable)mesh.metadata={...(mesh.metadata||{}),squadSlot:index};
+ // New GLB soldier rigs arrive asynchronously; scope the fill to them only.
+ infantryFill.track(drawable);
+ state.infantryLighting=infantryFill.snapshot();
  return {index,faction:factions.sideForSlot(index),
   chosenAlliedModel:index<12?(FEATURE_REAL_ALLIES?featureCasting(index):alliedModels.forBlueSlot(index).id):null,
   importedAlliedModel:!!externalModel,
@@ -125,10 +132,3 @@ async function ensureUnits(scenarioName){
 }
 async function ensureUnitsUnlocked(scenarioName){
  const slots=Array.isArray(scenarioName)?scenarioName:SCENE_SLOTS[scenarioName];
- if(!slots)throw Error('Неизвестный режим отряда: '+scenarioName);
- if(!asset){
-  $('loading').textContent='Загружаю анимированного немецкого стрелка…';
-  asset=await B.SceneLoader.LoadAssetContainerAsync(
-   './animstudio-preview/models/','all-combat-run.glb',scene);
-  motionDonors.germanRun=unitMotion?.findGroup(asset.animationGroups,'Kar98k_Run')||null;
-  if(asset.animationGroups.length<16)

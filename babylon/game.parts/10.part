@@ -1,3 +1,4 @@
+  unit.suppressed=0;unit.weapon='Kar98k';
   if(unit.isHero)fieldOrders?.clearDestination();
   unit.characterModelImported=!!view.importedAlliedModel;
   assignView(view,unit);

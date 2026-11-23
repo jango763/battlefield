@@ -1,3 +1,6 @@
+ state.cameraPosition=camera?{radius:camera.radius,alpha:camera.alpha,
+  beta:camera.beta,targetX:camera.target.x,targetZ:camera.target.z}:null;
+ const inventory=hero.weapon==='Kar98k'?null:hero.inventory[hero.weapon];
  const funds=battle.getFunds();
  const econ=economy?.summary();
  const mission=advanceObjectives(hero,econ);
@@ -129,5 +132,3 @@ function registerUI(){
  $('order-move').addEventListener('click',()=>{
   inputMode='move';
   $('order-move').setAttribute('aria-pressed','true');
-  $('order-attack').setAttribute('aria-pressed','false');
-  alertStatus('Движение: коснитесь земли для приказа.');

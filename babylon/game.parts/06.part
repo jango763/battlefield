@@ -1,3 +1,8 @@
+  'Все боевые задачи выполнены! Продолжайте защищать фермы.');
+ return state.mission;
+}
+function setup(scenarioName){
+ if(!state.ready)return;
  if(!SCENARIOS[scenarioName])throw Error('Unknown scenario');
  controller?.stop();
  replenisher?.stop();replenisher=null;
@@ -127,7 +132,3 @@ function drawShot({unit,target,result,mount}){
      {heroKill:unit.isHero,armoured:false});
    }
   }
- }
- if(mount?.kind==='cannon'&&result.phase==='launch'){
-  const start=position({x:mount.x+Math.sin(mount.yaw)*2.5,z:mount.z+Math.cos(mount.yaw)*2.5},1.25),end=position(result.impact,.25);
-  const shell=B.MeshBuilder.CreateSphere('field-shell',{diameter:.23,segments:6},scene);

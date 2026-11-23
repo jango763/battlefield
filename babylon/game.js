@@ -19,6 +19,7 @@ const villageModels=window.BattlefieldModernVillageModels;
 const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
 const nativeBlend=window.BattlefieldNativeClipBlend;
+const infantryLighting=window.BattlefieldInfantryLighting;
 const unitMotion=window.BattlefieldUnitMotionUnifier;
 const alliedModels=window.BattlefieldAlliedModels;
 const alliedLoader=window.BattlefieldAlliedAssetLoader;
@@ -32,7 +33,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!replenishment||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!infantryLighting||!replenishment||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -73,6 +74,7 @@ state.engineering={version:'10-stage-20261122',parts:10,privacy:'local-only',
  glbFallbacks:0,assetRetries:0,frameStats:{},source:'original-ww2-babylon'};
 window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
+let infantryFill=null;
 let modelDepot=null,modelDepotRetryAfter=0;
 const motionDonors={germanRun:null,britishReady:null};
 // Cross-rig locomotion failed visual acceptance in the isolated soldier range.
@@ -179,6 +181,8 @@ function createWorld(){
  $('quality-cycle').textContent='Качество: '+qualityLabels[graphicsMode];
  scene=new B.Scene(engine);
  scene.useRightHandedSystem=true;
+ infantryFill=infantryLighting.create({B,scene});
+ state.infantryLighting=infantryFill.snapshot();
  scene.skipPointerMovePicking=true;
  scene.clearColor=new B.Color4(.11,.16,.13,1);
  scene.ambientColor=new B.Color3(.25,.29,.23);
@@ -364,6 +368,9 @@ function unitVisual(index,entries,{externalModel=null}={}){
  const hpMat=factionMat('hp-fill',index<12?'blue':'red',
   index<12?'#8bdaa0':'#e78f6b',{disableLighting:true});hpFill.material=hpMat;hpFill.isPickable=false;
  for(const mesh of drawable)mesh.metadata={...(mesh.metadata||{}),squadSlot:index};
+ // New GLB soldier rigs arrive asynchronously; scope the fill to them only.
+ infantryFill.track(drawable);
+ state.infantryLighting=infantryFill.snapshot();
  return {index,faction:factions.sideForSlot(index),
   chosenAlliedModel:index<12?(FEATURE_REAL_ALLIES?featureCasting(index):alliedModels.forBlueSlot(index).id):null,
   importedAlliedModel:!!externalModel,
