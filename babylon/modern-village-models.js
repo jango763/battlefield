@@ -48,6 +48,9 @@ function installNorthAfrica({scene,B,world}){
  sunStucco.diffuseTexture=wash;
  sunStucco.diffuseColor=B.Color3.FromHexString('#f4e2c2');
  sunStucco.disableLighting=true;
+ // Explicit emissive lift makes wall faces readable even when the mobile
+ // shader receives no useful indirect light. Texture detail stays intact.
+ sunStucco.emissiveColor=B.Color3.FromHexString('#9a7e5d');
  sunStucco.specularColor=B.Color3.Black();
  const recessed=new B.StandardMaterial('libya-arched-recess-shadow',scene);
  recessed.diffuseColor=B.Color3.FromHexString('#493e31');
