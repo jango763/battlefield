@@ -343,7 +343,7 @@ function create(scene,B,map){
   // a single faceted world mesh for one draw call; trunk collisions unchanged.
   const palmPositions=[],palmIndices=[],palmNormals=[],palmTriangles=[];
   function palmFronds(x,z,top,phase){
-   const arms=7,steps=3;
+   const arms=9,steps=4;
    for(let a=0;a<arms;a++){
     const angle=phase+a*Math.PI*2/arms,dirX=Math.cos(angle),dirZ=Math.sin(angle);
     const sideX=-dirZ,sideZ=dirX;
