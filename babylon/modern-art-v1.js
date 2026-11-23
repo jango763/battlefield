@@ -328,17 +328,16 @@ function apply({scene,B,world,camera,sun,map}){
   return addShape(mesh,matName);
  }
  function roofPair(label,x,z,y,width,depth){
-  // Pitched gable roof, not a flat rectangular slab. Two separate slopes.
-  const half=width/2, rise=1.25;
+  // North African flat roof with raised adobe parapet. The original
+  // pitched shell is hidden below and all approved building collisions
+  // remain exactly where they were, including bases and capture farms.
+  box(label+'-flat-deck',x,y+.12,z,width+.46,.34,depth+.46,'pitted-stone');
   for(const side of [-1,1]){
-   const slope=Math.atan2(rise,half);
-   const horizontal=Math.sqrt(half*half+rise*rise);
-   const panel=box(label+'-'+side,x+side*half/2,y+rise/2,z,
-    horizontal+.18,.28,depth+.35,'old-roof-tiles',side*slope);
-   panel.receiveShadows=true;
+   box(label+'-parapet-long-'+side,x+side*width*.5,y+.57,z,
+    .48,.94,depth+.75,'battered-plaster');
+   box(label+'-parapet-end-'+side,x,y+.57,z+side*depth*.5,
+    width+.70,.94,.48,'battered-plaster');
   }
-  box(label+'-ridge',x,y+rise+.02,z,width*.04,.24,depth+.6,
-   'warped-timber');
  }
  function frameWindow(label,x,y,z,facesBack=false){
   // Deep window reveal, diagonal broken shutter, stone sill.
@@ -371,9 +370,9 @@ function apply({scene,B,world,camera,sun,map}){
     box('farm-'+farm.id+'-edge-column-'+direction+'-'+side,
      x+side*4.38,2.45,face,.47,4.5,.48,'weathered-brick');
   }
-  // Wooden beams and soot-darkened chimney.
-  box('farm-chimney-'+farm.id,x+2.2,7.45,z-1,1.3,3.2,1.2,'weathered-brick');
-  box('farm-chimney-top-'+farm.id,x+2.2,9.13,z-1,1.55,.32,1.55,'pitted-stone');
+  // Low ventilation shaft instead of the tall Northern European chimney.
+  box('farm-chimney-'+farm.id,x+2.2,6.25,z-1,1.2,1.0,1.1,'battered-plaster');
+  box('farm-chimney-top-'+farm.id,x+2.2,6.85,z-1,1.42,.18,1.42,'pitted-stone');
   for(let i=0;i<8;i++){
    const dx=between(-5,5),dz=between(-5,5);
    box('farm-rubble-'+farm.id+'-'+i,x+dx,.13,z+3.7+Math.abs(dz)*.34,
@@ -382,8 +381,9 @@ function apply({scene,B,world,camera,sun,map}){
    report.groundDebris++;
   }
  }
- // Country headquarters: rough stone base, timber pilasters, windows,
- // pitched tiled roof. Faction banner stays separate for color recognition.
+ // North African field headquarters: original building and capture
+ // collider, redesigned as flat-roof sandstone barracks with parapets.
+ // Faction banner stays separate for color recognition.
  for(const base of map.bases){
   const x=base.x,z=base.z,y=5.72;
   const old=byName.get('base-hq-roof-'+base.id);
@@ -402,7 +402,7 @@ function apply({scene,B,world,camera,sun,map}){
    box('hq-'+base.id+'-corner-'+side,left,2.9,z-3,.66,5.2,.73,'weathered-brick');
    box('hq-'+base.id+'-second-corner-'+side,left,2.9,z+3,.66,5.2,.73,'weathered-brick');
   }
-  box('hq-chimney-'+base.id,x+3.4,7.7,z-1.5,1.7,3.6,1.3,'weathered-brick');
+  box('hq-chimney-'+base.id,x+3.4,6.45,z-1.5,1.4,1.1,1.4,'battered-plaster');
   // Blue/red equipment banner is cloth, not a whole neon-blue building.
   const banner=new B.StandardMaterial('hd2026-banner-'+base.team,scene);
   banner.diffuseColor=B.Color3.FromHexString(base.team==='blue'?'#6b9aaa':'#aa6755');
@@ -584,6 +584,7 @@ function apply({scene,B,world,camera,sun,map}){
  report.lightMood='warm-dry-high-noon';
  report.sandTextureSize=1024;
  report.terrainLandforms='wind-etched-dune-ridges-v1';
+ report.historicalRoofStyle='flat-adobe-parapets-v1';
  report.duneRidges=48;
  report.mipmappedScans=true;report.opaqueHedgerows=true;
  report.roadStyle='dual-ruts-with-meadow-shoulders';

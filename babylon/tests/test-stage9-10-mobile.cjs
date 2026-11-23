@@ -70,6 +70,18 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(s.art.sandTextureSize,1024);
   assert.equal(s.art.terrainLandforms,'wind-etched-dune-ridges-v1');
   assert.equal(s.art.duneRidges,48);
+  assert.equal(s.art.historicalRoofStyle,'flat-adobe-parapets-v1');
+  result.parapetRoofs=await page.evaluate(()=>{
+   const meshes=window.BABYLON.EngineStore.LastCreatedScene.meshes;
+   return {decks:meshes.filter(m=>/hd2026-(?:farm-|hq-).*flat-deck/.test(m.name)).length,
+    parapets:meshes.filter(m=>/hd2026-(?:farm-|hq-).*parapet-/.test(m.name)).length,
+    legacy:meshes.filter(m=>/hd2026-(?:farm-|hq-).*ridge/.test(m.name)).length};
+  });
+  assert.equal(result.parapetRoofs.decks,7,'All five farms and two HQs require flat roofs');
+  assert.equal(result.parapetRoofs.parapets,28,
+   'Flat roofs must have four parapet edges each');
+  assert.equal(result.parapetRoofs.legacy,0,
+   'No pitched Northern European roof ridge may remain');
   assert.equal(s.art.lightMood,'warm-dry-high-noon');
   await page.waitForFunction(()=>
    window.__BATTLEFIELD_GAME__?.villageModels?.finished===true,

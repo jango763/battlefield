@@ -24,6 +24,7 @@ assert.match(art,/north-africa-libya-sunlit-v1/);
 assert.match(art,/sandTextureSize=1024/);
 assert.match(art,/terrainLandforms='wind-etched-dune-ridges-v1'/);
 assert.match(art,/duneRidges=48/);
+assert.match(art,/historicalRoofStyle='flat-adobe-parapets-v1'/);
 assert.match(art,/scene\.fogDensity=\.0009/);
 assert.match(field,/B\.Mesh\.MergeMeshes\(group,true,true\)/);
 assert.match(field,/if\(part\.parent\)/,'Must keep rotating weapon rigs out of static batches');
