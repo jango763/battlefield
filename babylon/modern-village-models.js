@@ -14,7 +14,113 @@ const PLACES=Object.freeze([
  {asset:'normandy-hay-barn',name:'normandy-hay-store',x:130,z:50,size:10,rotate:-.12},
  {asset:'village-church',name:'stone-church-ruin-backdrop',x:217,z:222,size:11,rotate:Math.PI}
 ]);
+/* Authored North African hamlet: no imported European church or hay barn.
+ * Three original stucco buildings retain real navigation collisions at the
+ * same approved scenery positions. No proprietary game art is required.
+ */
+function installNorthAfrica({scene,B,world}){
+ const output={started:true,loaded:0,pending:0,finished:false,
+  style:'libya-adobe-procedural',errors:[],assets:[],drawMeshes:0};
+ const adobe=scene.getMaterialByName('hd2026-battered-plaster');
+ const stone=scene.getMaterialByName('hd2026-pitted-stone');
+ const brick=scene.getMaterialByName('hd2026-weathered-brick');
+ if(!adobe||!stone||!brick)throw Error('Libya hamlet needs local scanned stucco and stone');
+ // Tactical-camera sunlit facades need readable warm albedo even when
+ // facing away from the single directional sun. The earlier scanned PBR
+ // texture made vertical walls almost black. Author a lightweight, mipmapped
+ // stucco wash and bake gentle shade into the texture instead of overexposing
+ // every other GLB and ground mesh.
+ const wash=new B.DynamicTexture('libya-stucco-wash',
+  {width:256,height:256},scene,true);
+ const c=wash.getContext();
+ c.fillStyle='#d5b58a';c.fillRect(0,0,256,256);
+ let seed=1942;
+ const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ for(let i=0;i<700;i++){
+  const x=random()*256,y=random()*256,w=2+random()*26;
+  c.globalAlpha=.05+random()*.14;
+  c.fillStyle=i%3===0?'#9f825e':i%3===1?'#f4dfb9':'#b3956b';
+  c.fillRect(x,y,w,1+random()*7);
+ }
+ c.globalAlpha=1;wash.update(false);
+ wash.anisotropicFilteringLevel=4;
+ const sunStucco=new B.StandardMaterial('libya-sunlit-stucco',scene);
+ sunStucco.diffuseTexture=wash;
+ sunStucco.diffuseColor=B.Color3.FromHexString('#f4e2c2');
+ sunStucco.disableLighting=true;
+ // Explicit emissive lift makes wall faces readable even when the mobile
+ // shader receives no useful indirect light. Texture detail stays intact.
+ sunStucco.emissiveColor=B.Color3.FromHexString('#9a7e5d');
+ sunStucco.specularColor=B.Color3.Black();
+ const recessed=new B.StandardMaterial('libya-arched-recess-shadow',scene);
+ recessed.diffuseColor=B.Color3.FromHexString('#493e31');
+ recessed.specularColor=B.Color3.Black();
+ const dust=new B.StandardMaterial('libya-weathered-ochre',scene);
+ dust.diffuseColor=B.Color3.FromHexString('#c5a47a');
+ dust.specularColor=B.Color3.Black();
+ function cuboid(id,x,y,z,w,h,d,mat,rot=0){
+  const m=B.MeshBuilder.CreateBox('libya-'+id,
+   {width:w,height:h,depth:d},scene);
+  m.position.set(x-150,y,z-150);m.rotation.y=rot;
+  m.material=mat;m.isPickable=false;m.receiveShadows=true;
+  output.drawMeshes++;return m;
+ }
+ for(let i=0;i<PLACES.length;i++){
+  const p=PLACES[i],width=p.size*(i===2?.76:.85);
+  const depth=p.size*(i===1?.68:.72),height=i===2?5.2:i===1?3.5:4.1;
+  // Broad rendered volumes and matching pathfinding obstacle: no walking
+  // through walls, unlike purely decorative no-collision buildings.
+  world?.addObstacle?.({x:p.x,z:p.z,hw:width/2+.45,
+   hd:depth/2+.45,type:'libya-village-wall',blocksSight:true});
+  cuboid('adobe-body-'+i,p.x,height/2,p.z,width,height,depth,sunStucco);
+  cuboid('stone-footing-'+i,p.x,.18,p.z,width+.45,.36,depth+.5,stone);
+  cuboid('flat-roof-'+i,p.x,height+.18,p.z,width+.55,.36,depth+.55,stone);
+  const wall=.28,rise=.76;
+  for(const sx of [-1,1])cuboid('roof-rail-x-'+i+'-'+sx,
+   p.x+sx*(width/2),height+.57,p.z,wall,rise,depth+.66,sunStucco);
+  for(const sz of [-1,1])cuboid('roof-rail-z-'+i+'-'+sz,
+   p.x,height+.57,p.z+sz*depth/2,width+.66,rise,wall,sunStucco);
+  // Recessed door + sandstone lintel and two narrow shielded windows.
+  cuboid('deep-door-'+i,p.x,1.27,p.z+depth/2+.035,1.45,2.5,.10,recessed);
+  cuboid('door-lintel-'+i,p.x,2.55,p.z+depth/2+.14,1.9,.30,.40,stone);
+  for(const side of [-1,1]){
+   cuboid('window-'+i+'-'+side,p.x+side*width*.28,2.48,
+    p.z+depth/2+.045,.67,.89,.10,recessed);
+   cuboid('window-sill-'+i+'-'+side,p.x+side*width*.28,1.96,
+    p.z+depth/2+.16,.92,.18,.35,stone);
+  }
+  // Patchy lower stucco and corner buttresses break the toy-box silhouette.
+  for(const side of [-1,1]){
+   cuboid('buttress-'+i+'-'+side,p.x+side*(width/2-.25),
+    1.05,p.z+depth/2-.10,.65,2.1,.66,dust);
+  }
+  if(i===2){
+   // Partially collapsed merchant tower with an asymmetric roofline.
+   cuboid('broken-crest-'+i,p.x-width*.23,height+1.15,
+    p.z-depth*.30,width*.20,1.3,depth*.25,brick);
+   cuboid('broken-crest-small-'+i,p.x+width*.28,height+.94,
+    p.z+depth*.26,width*.16,.9,depth*.25,stone);
+  }else{
+   cuboid('awning-'+i,p.x,height*.64,p.z+depth/2+1.0,
+    width*.64,.16,2.0,brick);
+   cuboid('awning-support-'+i,p.x-width*.23,height*.32,
+    p.z+depth/2+1.85,.18,height*.63,.18,stone);
+  }
+  output.assets.push({asset:'authored-libya-adobe-'+i,
+   targetMetres:p.size,triangles:output.drawMeshes*12});
+  output.loaded++;
+ }
+ world?.navigation?.invalidate();
+ output.finished=true;
+ scene.metadata=scene.metadata||{};
+ scene.metadata.battlefieldNorthAfricaVillage={style:output.style,
+  buildings:output.loaded,collision:true};
+ if(typeof window!=='undefined')window.__BF_CC0_VILLAGE__=output;
+ return output;
+}
 async function install({scene,B,art,world}){
+ if(art?.theatre==='north-africa-libya-sunlit-v1')
+  return installNorthAfrica({scene,B,world});
  if(!scene||!B||!art)throw Error('Missing historical village scene');
  const output={started:true,loaded:0,pending:PLACES.length,errors:[],assets:[]};
  window.__BF_CC0_VILLAGE__=output;

@@ -68,6 +68,42 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(s.art.theatre,'north-africa-libya-sunlit-v1');
   assert.equal(s.art.sandTextureSize,1024);
   assert.equal(s.art.lightMood,'warm-dry-high-noon');
+  await page.waitForFunction(()=>
+   window.__BATTLEFIELD_GAME__?.villageModels?.finished===true,
+   null,{timeout:45000});
+  result.libyaVillage=await page.evaluate(()=>{
+   const g=window.__BATTLEFIELD_GAME__.villageModels;
+   const scene=window.BABYLON.EngineStore.LastCreatedScene;
+   const palm=scene.getMeshByName('north-africa-palm-fronds');
+   return {style:g?.style,loaded:g?.loaded,pending:g?.pending,
+    palmPresent:!!palm,palmVertices:palm?.getTotalVertices(),
+    palmPickable:palm?.isPickable,
+    adobeMeshes:scene.meshes.filter(m=>m.name.startsWith('libya-')).length,
+    errors:g?.errors,
+    stuccoDiffuse:scene.getMaterialByName('libya-sunlit-stucco')?.diffuseColor?.asArray(),
+    stuccoUnlit:scene.getMaterialByName('libya-sunlit-stucco')?.disableLighting,
+    stuccoTextureReady:scene.getMaterialByName('libya-sunlit-stucco')?.diffuseTexture?.isReady(),
+    stuccoEmission:scene.getMaterialByName('libya-sunlit-stucco')?.emissiveColor?.asArray(),
+    wallBodies:scene.meshes.filter(m=>m.name.startsWith('libya-adobe-body-')).map(m=>({
+     name:m.name,material:m.material?.name,unlit:m.material?.disableLighting,
+     visible:m.isVisible,vertices:m.getTotalVertices()}))};
+  });
+  assert(result.libyaVillage.stuccoDiffuse?.[0]>.85,
+   'Libyan adobe walls must remain light sand, not black PBR facades');
+  assert(result.libyaVillage.stuccoUnlit===true&&
+   result.libyaVillage.stuccoTextureReady===true,
+   'Author-painted adobe facades must remain bright and detailed');
+  assert(result.libyaVillage.stuccoEmission?.[0]>.30,
+   'Adobe wall shadows should receive a warm emissive fill');
+  assert.equal(result.libyaVillage.wallBodies.length,3);
+  assert(result.libyaVillage.wallBodies.every(m=>
+   m.material==='libya-sunlit-stucco'&&m.unlit&&m.visible&&m.vertices>0),
+   'All three Libya houses must render with readable stucco, not old black PBR');
+  assert.equal(result.libyaVillage.style,'libya-adobe-procedural');
+  assert.equal(result.libyaVillage.loaded,3);
+  assert(result.libyaVillage.adobeMeshes>30);
+  assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>1000);
+  assert.equal(result.libyaVillage.palmPickable,false);
   assert.equal(s.art.roadVisualWidth,4.2,'Road must be narrowed');
   assert.equal(await page.evaluate(()=>{
    const m=window.BABYLON.EngineStore.LastCreatedScene.getMeshByName('map-ground-300');
