@@ -39,6 +39,7 @@ for(const w of layout.emplacements)
 for(const trench of layout.trenches)
  assert(D.heightAt(layout,trench.x,trench.z)<-.8);
 assert(nav.clear({x:150,z:70},{x:150,z:90}),'Open central route preserved');
+require('./test-heading-smoothing.cjs');
 console.log('BATTLEFIELD_STAGE9_STAGE10_STATIC_PASS',{parts:parts.length,
  terrain:'feathered, mipmapped, shrub-thin-instances',guns:layout.emplacements.length,
  trenches:layout.trenches.length,quality:'auto/low/high',
