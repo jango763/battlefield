@@ -30,6 +30,10 @@ class Node{
  setEnabled(enabled){this.enabled=enabled}
  getHierarchyBoundingVectors(){return {min:new Vector3(-3,-1,-2),max:new Vector3(3,2,2)}}
 }
+class VertexData {
+ applyToMesh(m){m.hasCustomGeometry=true}
+ static ComputeNormals(positions,indices,normals){normals.push(...positions.map(()=>1))}
+}
 class Color3 extends Vector3{
  static FromHexString(){return new Color3(1,1,1)}
 }
@@ -40,6 +44,7 @@ class Material{
 const drawn=[];
 const B={
  Vector3,Color3,StandardMaterial:Material,TransformNode:Node,
+ VertexData,Mesh:Node,
  MeshBuilder:{
   CreateBox:name=>{drawn.push(name);return new Node(name)},
   CreateCylinder:name=>{drawn.push(name);return new Node(name)},
@@ -73,6 +78,11 @@ const B={
   'Keep two foliage meshes per tree to bound draw calls');
  assert.equal(m.obstacles.filter(o=>o.type==='tree').length,50,
   'Tree-trunk collisions must remain intact');
+ assert(drawn.length>0);
+ assert(m.nodes.some(x=>x.name==='north-africa-palm-fronds'),
+  'One batched palm canopy must replace repetitive spherical forest');
+ assert(m.nodes.find(x=>x.name==='north-africa-palm-fronds').hasCustomGeometry,
+  'Palm geometry must be low-poly indexed triangles');
  const status=await m.loadOriginalBTR();
  assert.equal(status.ok,true);
  assert.equal(status.loaded,3);

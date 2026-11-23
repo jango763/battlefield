@@ -68,6 +68,24 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(s.art.theatre,'north-africa-libya-sunlit-v1');
   assert.equal(s.art.sandTextureSize,1024);
   assert.equal(s.art.lightMood,'warm-dry-high-noon');
+  await page.waitForFunction(()=>
+   window.__BATTLEFIELD_GAME__?.villageModels?.finished===true,
+   null,{timeout:45000});
+  result.libyaVillage=await page.evaluate(()=>{
+   const g=window.__BATTLEFIELD_GAME__.villageModels;
+   const scene=window.BABYLON.EngineStore.LastCreatedScene;
+   const palm=scene.getMeshByName('north-africa-palm-fronds');
+   return {style:g?.style,loaded:g?.loaded,pending:g?.pending,
+    palmPresent:!!palm,palmVertices:palm?.getTotalVertices(),
+    palmPickable:palm?.isPickable,
+    adobeMeshes:scene.meshes.filter(m=>m.name.startsWith('libya-')).length,
+    errors:g?.errors};
+  });
+  assert.equal(result.libyaVillage.style,'libya-adobe-procedural');
+  assert.equal(result.libyaVillage.loaded,3);
+  assert(result.libyaVillage.adobeMeshes>30);
+  assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>1000);
+  assert.equal(result.libyaVillage.palmPickable,false);
   assert.equal(s.art.roadVisualWidth,4.2,'Road must be narrowed');
   assert.equal(await page.evaluate(()=>{
    const m=window.BABYLON.EngineStore.LastCreatedScene.getMeshByName('map-ground-300');
