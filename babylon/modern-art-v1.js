@@ -135,10 +135,12 @@ function apply({scene,B,world,camera,sun,map}){
  // Wind-shaped dune crests are shaded gradients baked into the existing
  // terrain texture. No terrain-mesh displacement, extra draw calls, or
  // collision changes: all skinned soldiers stay grounded.
+ let paintedDuneRidges=0;
  for(let k=0;k<48;k++){
   const x=between(12,288),z=between(12,288),long=between(8,22);
   if(Math.abs(x-150)<13||Math.abs(z-150)<12)continue;
   if(map.farms.some(f=>Math.hypot(x-f.x,z-f.z)<17))continue;
+  paintedDuneRidges++;
   const px=x*1024/300,pz=z*1024/300,rx=long*1024/300;
   brush.save();brush.translate(px,pz);brush.rotate(between(-.65,.65));
   for(const sign of [-1,1]){
@@ -584,7 +586,7 @@ function apply({scene,B,world,camera,sun,map}){
  report.lightMood='warm-dry-high-noon';
  report.sandTextureSize=1024;
  report.terrainLandforms='wind-etched-dune-ridges-v1';
- report.duneRidges=48;
+ report.duneRidges=paintedDuneRidges;
  report.mipmappedScans=true;report.opaqueHedgerows=true;
  report.roadStyle='dual-ruts-with-meadow-shoulders';
  report.terrainReadability='sunlit-sandstone-and-dune-washes';
