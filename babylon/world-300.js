@@ -339,6 +339,10 @@ function create(scene,B,map){
   }
  }
  // Sandbags and intermittent trees — use instances for low draw-call count.
+  // Correct one-sided frond winding for stable upward vertex normals.
+  // Both-face triangles shared the same vertices and cancelled normals.
+  mat.leaves.backFaceCulling=false;
+  mat.leaves.emissiveColor=B.Color3.FromHexString('#383426');
   // 17 date palms / 33 wind-shaped acacias. Palm leaves are compiled into
   // a single faceted world mesh for one draw call; trunk collisions unchanged.
   const palmPositions=[],palmIndices=[],palmNormals=[],palmTriangles=[];
@@ -359,7 +363,7 @@ function create(scene,B,map){
     }
     for(let k=0;k<steps;k++){
      const a0=start+k*2,b0=a0+1,c0=a0+2,d0=a0+3;
-     palmIndices.push(a0,b0,c0,b0,d0,c0,c0,b0,a0,c0,d0,b0);
+     palmIndices.push(a0,b0,c0,b0,d0,c0);
     }
    }
   }
