@@ -125,7 +125,23 @@
   }
   function objective(u,side){
    const candidates=availableFarms(side);
-   if(side==='blue'&&tactical?.snapshot().stance==='attack'&&candidates.length)return candidates.slice().sort((a,b)=>dist(u,a)-dist(u,b))[0];
+   // A direct ATTACK order overrides garrison assignments, but does not
+   // interfere with the hero's six-slot magnetic escort.
+   const forcedAttack=side==='blue'&&tactical?.snapshot().stance==='attack';
+   if(forcedAttack&&candidates.length)
+    return candidates.slice().sort((a,b)=>dist(u,a)-dist(u,b))[0];
+   // Previously the army always returned an uncaptured farm, so the
+   // tactical AI's "defend owned farm" branch was unreachable until the
+   // whole map had been captured. Reserve one autonomous defender for each
+   // held farm when at least three independent soldiers are available.
+   const owned=farms.filter(f=>f.owner===side&&(f.id!=='center'||centralOpen()));
+   if(owned.length&&candidates.length&&!forcedAttack){
+    const independent=toUnit(side).filter(v=>v.alive&&!support?.assignment(v)&&
+     !guardSlots.has(v));
+    const defenderCount=Math.min(owned.length,Math.floor(independent.length/3));
+    const rank=independent.indexOf(u);
+    if(rank>=0&&rank<defenderCount)return owned[rank];
+   }
    if(!candidates.length){
     const defended=farms.filter(f=>f.owner===side);
     return defended.length?defended[Math.abs(hash(u.id))%defended.length]:null;

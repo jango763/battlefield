@@ -22,7 +22,9 @@ function create({layout,navigation,design}){
  }
  function decide(u,{side,enemy,farm,dt}){
   const prev=decisions.get(u);
-  if(prev&&prev.remaining>0&&prev.enemy===enemy?.id&&prev.suppressed===(u.suppressed>0)){
+  if(prev&&prev.remaining>0&&prev.enemy===enemy?.id&&
+   prev.farmId===farm?.id&&prev.farmOwner===farm?.owner&&
+   prev.suppressed===(u.suppressed>0)){
    prev.remaining-=dt;return prev.plan;
   }
   let plan={goal:farm,speed:1,stop:4.1,state:'advance'};
@@ -39,7 +41,8 @@ function create({layout,navigation,design}){
    const p=chooseCover(u,null,farm,14);plan={goal:p||farm,speed:.85,stop:p?.3:7,state:'defend'};
   }else{release(u);if(side==='blue'&&stance==='attack')plan.state='attack';}
   if(u.suppressed>0)plan.speed=Math.min(plan.speed,.5);
-  u.tacticalState=plan.state;decisions.set(u,{plan,remaining:.35,enemy:enemy?.id,suppressed:u.suppressed>0});return plan;
+  u.tacticalState=plan.state;decisions.set(u,{plan,remaining:.35,enemy:enemy?.id,
+   farmId:farm?.id,farmOwner:farm?.owner,suppressed:u.suppressed>0});return plan;
  }
  function snapshot(){const states={};for(const [u,d] of decisions)if(u.alive)states[u.id]=d.plan.state;return {stance,holdPoint,occupied:occupied.size,states};}
  return {decide,setStance,snapshot,release};

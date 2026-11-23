@@ -7,6 +7,14 @@ function install({B,scene,world,layout,design}){
  function mat(name,hex){if(materials.has(name))return materials.get(name);const m=new B.StandardMaterial('field-'+name,scene);m.diffuseColor=B.Color3.FromHexString(hex);m.specularColor=B.Color3.Black();materials.set(name,m);return m;}
  const earth=mat('earth','#69533f'),timber=mat('timber','#544936'),sand=mat('sand','#a39370');
  function box(name,x,y,z,w,h,d,m,rot=0){const o=B.MeshBuilder.CreateBox(name,{width:w,height:h,depth:d},scene);o.position.set(x-150,y,z-150);o.rotation.y=rot;o.material=m;o.isPickable=false;o.receiveShadows=true;meshes.push(o);return o;}
+ // Rounded, staggered low-poly sacks: the former cuboid wall read as a
+ // single flat slab at tactical camera distance. These keep the identical
+ // gameplay collision rectangles; only the rendering geometry changes.
+ function sandbag(name,x,y,z,w,h,d,m,rot=0){
+  const o=B.MeshBuilder.CreateSphere(name,{diameter:1,segments:8},scene);
+  o.position.set(x-150,y,z-150);o.scaling.set(w,h,d);o.rotation.y=rot;
+  o.material=m;o.isPickable=false;o.receiveShadows=true;meshes.push(o);return o;
+ }
  world.heightAt=(x,z)=>design.heightAt(layout,x,z);
  for(const o of layout.obstacles)world.addObstacle(o);
  // Nonuniform terrain grid resolves the actual trench depression and entrance
@@ -33,8 +41,14 @@ function install({B,scene,world,layout,design}){
  for(const f of layout.fortifications){
   const {x,z,id}=f;
   if(f.type==='sandbags'){
-   for(let layer=0;layer<2;layer++)for(let i=0;i<8;i++)
-    box(id+'-'+layer+'-'+i,x-4.7+i*1.34+(layer?.2:0),.25+layer*.4,z,1.37,.43,.95,sand,Math.sin(i*8)*.04);
+   for(let layer=0;layer<2;layer++){
+    // Eight grounded sacks and seven half-offset sacks interlock like a
+    // real low defensive parapet; deterministic offsets prevent shimmer.
+    const count=layer?7:8,stagger=layer?.67:0;
+    for(let i=0;i<count;i++)
+     sandbag(id+'-'+layer+'-'+i,x-4.7+i*1.34+stagger,
+      .23+layer*.40,z,1.48,.46,1.12,sand,Math.sin(i*8+layer)*.045);
+   }
   }else if(f.type==='bunker'){
    for(const side of [-1,1]){
     box(id+'-side-'+side,x+side*3,1.35,z,.8,2.7,6,concrete);
