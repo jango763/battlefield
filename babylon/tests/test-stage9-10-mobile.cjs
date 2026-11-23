@@ -116,17 +116,24 @@ fs.mkdirSync(dir,{recursive:true});
    'Hero ground marker must be noninteractive and follow only the hero');
   result.heroMarker=halo;
   await page.locator('#hud-toggle').click();
-  const radiusBeforeZoom=await page.evaluate(()=>
-   window.BABYLON.EngineStore.LastCreatedScene.activeCamera.radius);
-  await page.locator('#view-focus').click();
-  const zoomIn=await page.evaluate(()=>({
-   radius:window.BABYLON.EngineStore.LastCreatedScene.activeCamera.radius,
-   fov:window.BABYLON.EngineStore.LastCreatedScene.activeCamera.fov,
-   state:window.__BATTLEFIELD_GAME__.cameraView
-  }));
+  const zoomIn=await page.evaluate(()=>{
+   const cam=window.BABYLON.EngineStore.LastCreatedScene.activeCamera;
+   const before={radius:cam.radius,alpha:cam.alpha,beta:cam.beta};
+   // Read before/after during one browser task; the render loop can move
+   // the camera between asynchronous Playwright operations.
+   document.getElementById('view-focus').click();
+   return {radius:cam.radius,radiusBefore:before.radius,
+    alpha:cam.alpha,alphaBefore:before.alpha,
+    beta:cam.beta,betaBefore:before.beta,
+    fov:cam.fov,state:window.__BATTLEFIELD_GAME__.cameraView};
+  });
   assert.equal(zoomIn.fov,.74,'Close soldier view should magnify actors on screen');
-  assert(Math.abs(zoomIn.radius-radiusBeforeZoom)<.12,
-   'Switching FOV must not alter actual camera distance');
+  assert.equal(zoomIn.radius,zoomIn.radiusBefore,
+   'Switching FOV must not directly change camera distance');
+  assert.equal(zoomIn.alpha,zoomIn.alphaBefore,
+   'Switching view must not change north-up bearing');
+  assert.equal(zoomIn.beta,zoomIn.betaBefore,
+   'Switching view must not change camera elevation');
   assert.equal(zoomIn.state.mode,'hero-close');
   // Same portrait viewpoint as the baseline screenshot; capture the larger
   // soldier presentation without the settings panel obscuring the scene.
