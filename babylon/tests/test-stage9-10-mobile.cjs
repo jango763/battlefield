@@ -62,6 +62,9 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(s.graphics.mode,'low');
   assert(s.camera.mode==='elevated-tactical-follow');
   assert(s.camera.radius>=28&&s.camera.radius<=31,'Camera must expose more of battlefield');
+  assert.equal(s.camera.mode,'elevated-tactical-follow');
+  assert.equal(await page.evaluate(()=>window.BABYLON.EngineStore.LastCreatedScene.activeCamera.fov),.92,
+   'Default tactical view must keep the approved wide field');
   await page.locator('#enter-game').click();
   await page.waitForTimeout(750);
   result.heroBefore=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.heroPosition);
@@ -103,7 +106,33 @@ fs.mkdirSync(dir,{recursive:true});
   const right=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.heroPosition);
   assert(right.x<left.x-.15,'Joystick RIGHT is reversed or stuck');
   result.heroMovement={left,right};
+  const halo=await page.evaluate(()=>{
+    const scene=window.BABYLON.EngineStore.LastCreatedScene;
+    const m=scene.getMeshByName('hero-halo-0');
+    return {present:!!m,pickable:m?.isPickable,parent:m?.parent?.name,
+     material:m?.material?.name};
+   });
+  assert(halo.present&&!halo.pickable&&halo.parent==='soldier-anchor-0',
+   'Hero ground marker must be noninteractive and follow only the hero');
+  result.heroMarker=halo;
   await page.locator('#hud-toggle').click();
+  await page.locator('#view-focus').click();
+  const zoomIn=await page.evaluate(()=>({
+   radius:window.BABYLON.EngineStore.LastCreatedScene.activeCamera.radius,
+   fov:window.BABYLON.EngineStore.LastCreatedScene.activeCamera.fov,
+   state:window.__BATTLEFIELD_GAME__.cameraView
+  }));
+  assert.equal(zoomIn.fov,.74,'Close soldier view should magnify actors on screen');
+  assert.equal(zoomIn.radius,s.camera.radius,'Zoom must keep approved camera radius');
+  assert.equal(zoomIn.state.mode,'hero-close');
+  await page.locator('#view-focus').click();
+  const zoomOut=await page.evaluate(()=>({
+   fov:window.BABYLON.EngineStore.LastCreatedScene.activeCamera.fov,
+   state:window.__BATTLEFIELD_GAME__.cameraView
+  }));
+  assert.equal(zoomOut.fov,.92,'Second press must restore tactical view');
+  assert.equal(zoomOut.state.mode,'tactical');
+  result.cameraZoom={zoomIn,zoomOut};
   await page.locator('#quality-cycle').click();
   result.graphicsAfter=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.graphics);
   assert.equal(result.graphicsAfter.mode,'high','Quality toggle did not work');

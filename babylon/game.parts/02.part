@@ -5,6 +5,20 @@ const renderQuality={
  scale:Math.max(1,deviceScale/(graphicsMode==='low'?1.15:
   graphicsMode==='high'?2.1:1.7))
 };
+const CAMERA_FOV_TACTICAL=.92,CAMERA_FOV_HERO=.74;
+let heroCloseView=false;
+function setHeroCameraFocus(enabled){
+ heroCloseView=!!enabled;
+ const fov=heroCloseView?CAMERA_FOV_HERO:CAMERA_FOV_TACTICAL;
+ if(camera)camera.fov=fov;
+ const toggle=$('view-focus');
+ if(toggle){
+  toggle.textContent=heroCloseView?'Обзор: боец':'Обзор: поле';
+  toggle.setAttribute('aria-pressed',String(heroCloseView));
+ }
+ state.cameraView={mode:heroCloseView?'hero-close':'tactical',fov};
+}
+$('view-focus')?.addEventListener('click',()=>setHeroCameraFocus(!heroCloseView));
 const qualityLabels={auto:'Авто',low:'Низкое',high:'Высокое'};
 function changeGraphicsMode(mode){
  if(!qualityLabels[mode])return;
@@ -62,7 +76,7 @@ function createWorld(){
   new B.Vector3(0,1,-107),scene);
  camera.lowerRadiusLimit=27.5;camera.upperRadiusLimit=31;
  camera.lowerBetaLimit=.83;camera.upperBetaLimit=.93;
- camera.fov=.92;
+ setHeroCameraFocus(false);
  state.cameraProfile={mode:'elevated-tactical-follow',radius:camera.radius,
   beta:camera.beta,alpha:camera.alpha};
  camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;

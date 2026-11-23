@@ -136,6 +136,20 @@ const renderQuality={
  scale:Math.max(1,deviceScale/(graphicsMode==='low'?1.15:
   graphicsMode==='high'?2.1:1.7))
 };
+const CAMERA_FOV_TACTICAL=.92,CAMERA_FOV_HERO=.74;
+let heroCloseView=false;
+function setHeroCameraFocus(enabled){
+ heroCloseView=!!enabled;
+ const fov=heroCloseView?CAMERA_FOV_HERO:CAMERA_FOV_TACTICAL;
+ if(camera)camera.fov=fov;
+ const toggle=$('view-focus');
+ if(toggle){
+  toggle.textContent=heroCloseView?'Обзор: боец':'Обзор: поле';
+  toggle.setAttribute('aria-pressed',String(heroCloseView));
+ }
+ state.cameraView={mode:heroCloseView?'hero-close':'tactical',fov};
+}
+$('view-focus')?.addEventListener('click',()=>setHeroCameraFocus(!heroCloseView));
 const qualityLabels={auto:'Авто',low:'Низкое',high:'Высокое'};
 function changeGraphicsMode(mode){
  if(!qualityLabels[mode])return;
@@ -193,7 +207,7 @@ function createWorld(){
   new B.Vector3(0,1,-107),scene);
  camera.lowerRadiusLimit=27.5;camera.upperRadiusLimit=31;
  camera.lowerBetaLimit=.83;camera.upperBetaLimit=.93;
- camera.fov=.92;
+ setHeroCameraFocus(false);
  state.cameraProfile={mode:'elevated-tactical-follow',radius:camera.radius,
   beta:camera.beta,alpha:camera.alpha};
  camera.wheelDeltaPercentage=.013;camera.pinchDeltaPercentage=.012;
@@ -324,6 +338,17 @@ function unitVisual(index,entries,{externalModel=null}={}){
  }
  const marker=B.MeshBuilder.CreateDisc('squad-ring-'+index,{radius:.47,tessellation:24},scene);
  marker.parent=anchor;marker.rotation.x=Math.PI/2;marker.position.y=.025;
+ // Single-hero golden outline above the existing faction marker. Unlike a
+ // billboard sprite it never covers the soldier's uniform or weapon.
+ // Child of anchor: follows hero automatically and disappears on death.
+ if(index===0){
+  const halo=B.MeshBuilder.CreateTorus('hero-halo-0',
+   {diameter:1.42,thickness:.105,tessellation:20},scene);
+  halo.parent=anchor;halo.position.y=.07;
+  halo.material=factionMat('hero-halo','hero','#f1d17b',
+   {alpha:.94,disableLighting:true});
+  halo.isPickable=false;halo.receiveShadows=false;
+ }
  const ringMat=factionMat('ring',index<12?'blue':'red',
   index<12?'#77bcea':'#e98668',{alpha:.75});
  marker.material=ringMat;marker.isPickable=false;
