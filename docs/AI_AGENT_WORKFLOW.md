@@ -40,6 +40,8 @@ Module path ownership is a coordination suggestion, not an invitation to rewrite
 | Legacy Three.js code inadvertently modified | `check-ai-change-scope.cjs` on Babylon-target PR |
 | Bad Safari visuals, dropped FPS, reversed controls | mobile Chromium/WebKit screenshot artifacts; final physical iPhone Safari check |
 
+Actual **real iPhone Safari** acceptance remains a separate manual gate; an emulated browser result cannot replace it.
+
 The CI workflow is an **automatic check**, not GitHub-enforced branch protection. Repository rulesets/required checks need separate admin configuration, and the human acceptance gate is intentionally outside CI.
 
 ## Definition of done
