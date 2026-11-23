@@ -338,6 +338,10 @@ function apply({scene,B,world,camera,sun,map}){
    box(label+'-parapet-end-'+side,x,y+.57,z+side*depth*.5,
     width+.70,.94,.48,'battered-plaster');
   }
+  // Meshes are immediately merged into material batches on mobile; track
+  // authored roof geometry before that removes individual mesh names.
+  report.flatRoofCount=(report.flatRoofCount||0)+1;
+  report.parapetSegments=(report.parapetSegments||0)+4;
  }
  function frameWindow(label,x,y,z,facesBack=false){
   // Deep window reveal, diagonal broken shutter, stone sill.
