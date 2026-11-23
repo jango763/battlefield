@@ -1,3 +1,4 @@
+   }
    const x=(point.x-BASE_X)/UNIT_SCALE,z=(point.z-BASE_Z)/UNIT_SCALE;
    const move=fieldOrders.setDestination(x,z);
    if(move.ok){

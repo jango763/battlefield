@@ -187,6 +187,17 @@ fs.mkdirSync(dir,{recursive:true});
   await page.setViewportSize({width:844,height:390});
   await page.waitForTimeout(550);
   await page.screenshot({path:dir+'/'+name+'-landscape.png'});
+  result.landscapeInput=await page.evaluate(()=>{
+   const zone=document.getElementById('touch-zone');
+   const controls=document.getElementById('mobile-controls');
+   return {display:getComputedStyle(controls).display,
+    zoneWidth:zone.getBoundingClientRect().width,
+    viewport:window.innerWidth};
+  });
+  assert.equal(result.landscapeInput.display,'flex',
+   'Landscape phones must display joystick, reload and fire');
+  assert(result.landscapeInput.zoneWidth<result.landscapeInput.viewport*.50,
+   'Left joystick zone must not block the central battlefield');
   result.final=await page.evaluate(()=>{
    const s=window.__BATTLEFIELD_GAME__,scene=window.BABYLON.EngineStore.LastCreatedScene;
    return {ready:s.ready,error:s.error,fps:scene.getEngine().getFps(),
