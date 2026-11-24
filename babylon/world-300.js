@@ -188,8 +188,8 @@ function create(scene,B,map){
  }
  // 7 pillboxes with gun slit and concrete parapet.
  for(const fort of map.pillboxes){
-  cylinder('pillbox-bunker-'+fort.id,9,2.8,fort.x,1.44,fort.z,mat.stone,8);
-  cylinder('pillbox-roof-'+fort.id,10.5,.55,fort.x,3,fort.z,mat.roof,8);
+  cylinder('pillbox-bunker-'+fort.id,9,2.8,fort.x,1.44,fort.z,mat.stone,20);
+  cylinder('pillbox-roof-'+fort.id,10.5,.55,fort.x,3,fort.z,mat.roof,20);
   box('pillbox-slit-'+fort.id,3,.35,.24,fort.x,1.95,fort.z+4.1,mat.black);
   obstacle(fort.x,fort.z,9,9,'pillbox');
  }
