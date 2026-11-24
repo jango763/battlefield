@@ -5,7 +5,10 @@
 function install({B,scene,world,layout,design}){
  const meshes=[],materials=new Map(),batches=new Map();
  function mat(name,hex){if(materials.has(name))return materials.get(name);const m=new B.StandardMaterial('field-'+name,scene);m.diffuseColor=B.Color3.FromHexString(hex);m.specularColor=B.Color3.Black();materials.set(name,m);return m;}
- const earth=mat('earth','#69533f'),timber=mat('timber','#544936'),sand=mat('sand','#a39370');
+ // Sunlit North African fieldwork palette.
+ const earth=mat('earth','#b79b73'),timber=mat('timber','#917759'),sand=mat('sand','#d8bc8d');
+ const rock=mat('rock','#c9ad82');
+ const optimizationDeferred={bermSegments:0,roofDetails:0};
  function box(name,x,y,z,w,h,d,m,rot=0){const o=B.MeshBuilder.CreateBox(name,{width:w,height:h,depth:d},scene);o.position.set(x-150,y,z-150);o.rotation.y=rot;o.material=m;o.isPickable=false;o.receiveShadows=true;meshes.push(o);return o;}
  // Rounded, staggered low-poly sacks: the former cuboid wall read as a
  // single flat slab at tactical camera distance. These keep the identical
@@ -30,14 +33,25 @@ function install({B,scene,world,layout,design}){
  const vd=new B.VertexData();B.VertexData.ComputeNormals(positions,indices,normals);Object.assign(vd,{positions,indices,normals,uvs});vd.applyToMesh(world.ground,true);
  for(const t of layout.trenches){
   for(const side of [-1,1]){
-   box(t.id+'-earth-'+side,t.x,.38,t.z+side*1.75,t.b-t.a-6,.76,.9,earth);
+   // Scalloped earth berms follow the existing trench line. Their collision
+   // and depression remain governed by the approved tactical design.
+   const length=t.b-t.a-6,count=Math.max(3,Math.ceil(length/7));
+   for(let i=0;i<count;i++){
+    const span=length/count,xx=t.a+3+(i+.5)*span;
+    const irregular=.85+.11*Math.sin(i*2.7+side);
+    sandbag(t.id+'-eroded-berm-'+side+'-'+i,
+     xx,.31,t.z+side*1.77,span+.46,.69*irregular,1.34,earth);
+    if(i%3===0)box(t.id+'-stone-lip-'+side+'-'+i,xx,
+     .12,t.z+side*2.08,span*.40,.23,.48,rock);
+   }
+   optimizationDeferred.bermSegments+=count;
    box(t.id+'-revett-'+side,t.x,-.3,t.z+side*1.19,t.b-t.a-6,1.1,.13,timber);
    for(let x=t.a+4;x<t.b-3;x+=3)box(t.id+'-post-'+side+'-'+x,x,-.1,t.z+side*1.1,.16,1.5,.18,timber);
   }
   // Broad duckboards are stable at RTS distance; no coplanar micro-lines.
   box(t.id+'-duckboard',t.x,-.80,t.z,t.b-t.a-6,.08,1.7,timber);
  }
- const concrete=mat('concrete','#74766b'),metal=mat('steel','#3f4640');
+ const concrete=mat('concrete','#c7b598'),metal=mat('steel','#525754');
  for(const f of layout.fortifications){
   const {x,z,id}=f;
   if(f.type==='sandbags'){
@@ -57,6 +71,13 @@ function install({B,scene,world,layout,design}){
    // Real front aperture and rear entry; overhead lintel never blocks feet.
    box(id+'-slit-lintel',x,2.25,z+f.facing*2.7,2,1,.7,concrete);
    box(id+'-roof',x,2.95,z,7,.55,6.8,concrete);
+   // Low broken sandstone roof parapet. Cosmetic, does not modify cover
+   // detection, firing aperture, navigation, or fortification bounds.
+   for(const side of [-1,1]){
+    box(id+'-roof-rim-x-'+side,x+side*3.25,3.29,z,.48,.24,6.6,rock);
+    box(id+'-roof-rim-z-'+side,x,3.29,z+side*3.06,6.4,.24,.48,rock);
+    optimizationDeferred.roofDetails+=2;
+   }
    box(id+'-threshold',x,.08,z-f.facing*3,1.8,.16,1.5,concrete);
   }else if(f.type==='hedgehog'){
    for(const [i,angle] of [-.8,.8].entries()){const beam=box(id+'-'+i,x,1,z,.25,2.9,.28,metal);beam.rotation.z=angle;}
@@ -101,7 +122,10 @@ function install({B,scene,world,layout,design}){
  // Gameplay collisions are separate data. Batch only unmoving boxes of the
  // SAME material; never merge rotating gun pivots, skinned actors or pickables.
  const optimization={staticMeshes:0,mergedBatches:0,drawCallsSaved:0,
-  dynamicMountMeshes:0,mergeErrors:[]};
+  dynamicMountMeshes:0,mergeErrors:[],
+  coverSurface:'sunlit-libya-earthworks-v1',
+  bermSegments:optimizationDeferred.bermSegments,
+  roofDetails:optimizationDeferred.roofDetails};
  const staticByMaterial=new Map();
  for(const part of meshes){
   if(part.parent){optimization.dynamicMountMeshes++;continue;}
