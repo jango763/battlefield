@@ -67,6 +67,9 @@ assert.match(art,/dual-ruts-with-meadow-shoulders/);
 assert.match(art,/sunlit-sandstone-and-dune-washes/);
 require('./test-heading-smoothing.cjs');
 require('./test-joystick-response.cjs');
+require('./test-adaptive-quality.cjs');
+assert.match(html,/src="\.\/adaptive-quality-core\.js"/);
+assert.match(game,/adaptiveQuality\.nextScale/);
 require('./test-infantry-lighting.cjs');
 console.log('BATTLEFIELD_STAGE9_STAGE10_STATIC_PASS',{parts:parts.length,
  terrain:'feathered, mipmapped, shrub-thin-instances',guns:layout.emplacements.length,

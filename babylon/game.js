@@ -20,6 +20,7 @@ const factions=window.BattlefieldBritishFaction;
 const britishSoldier=window.BattlefieldBritishSoldier;
 const nativeBlend=window.BattlefieldNativeClipBlend;
 const joystickResponse=window.BattlefieldJoystickResponse;
+const adaptiveQuality=window.BattlefieldAdaptiveQuality;
 const infantryLighting=window.BattlefieldInfantryLighting;
 const unitMotion=window.BattlefieldUnitMotionUnifier;
 const alliedModels=window.BattlefieldAlliedModels;
@@ -34,7 +35,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!joystickResponse||!infantryLighting||!replenishment||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!joystickResponse||!adaptiveQuality||!infantryLighting||!replenishment||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -1292,12 +1293,12 @@ function frame(){
  // ballistics, UI hit targets and all native skeleton animations stay fixed.
  if(renderQuality.mode==='auto'&&gameStarted){
   renderQuality.fpsElapsed+=Math.min(1,Math.max(0,engine.getDeltaTime()/1000)); // real frame time
-  if(renderQuality.fpsElapsed>=8){
+  if(renderQuality.fpsElapsed>=adaptiveQuality.CHECK_SECONDS){
    renderQuality.fpsElapsed=0;
    const fps=engine.getFps();
    const old=renderQuality.scale;
-   const next=fps<34?Math.min(renderQuality.high,old+.08):
-    fps>57?Math.max(renderQuality.low,old-.06):old;
+   const next=adaptiveQuality.nextScale(
+    fps,old,renderQuality.low,renderQuality.high);
    if(Math.abs(next-old)>.04){
     renderQuality.scale=next;engine.setHardwareScalingLevel(next);
     state.graphics.hardwareScale=+next.toFixed(2);
