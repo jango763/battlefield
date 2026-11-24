@@ -28,7 +28,8 @@
  function createPool({capacity=CAPACITY,heightAt=()=>0}={}){
   const shape=geometry(),positions=new Float32Array(capacity*VERTICES*3);
   const colors=new Float32Array(capacity*VERTICES*4),normals=[],indices=[];
-  const previous=new Array(capacity).fill(null);
+  const previousX=new Float64Array(capacity),previousZ=new Float64Array(capacity);
+  const visible=new Uint8Array(capacity);
   for(let slot=0;slot<capacity;slot++){
    for(let v=0;v<VERTICES;v++){
     colors.set([1,1,1,shape.alphas[v]],(slot*VERTICES+v)*4);
@@ -43,9 +44,9 @@
     const view=views[slot],p=view?.anchor?.position;
     const live=!!(view?.unit?.alive&&p&&view.anchor.isEnabled());
     if(live)active++;
-    const old=previous[slot];
+    const old=visible[slot];
     if(!live&&!old)continue;
-    if(live&&old&&old.x===p.x&&old.z===p.z)continue;
+    if(live&&old&&previousX[slot]===p.x&&previousZ[slot]===p.z)continue;
     changed=true;
     for(let v=0;v<VERTICES;v++){
      const i=(slot*VERTICES+v)*3;
@@ -53,7 +54,8 @@
      const x=p.x+shape.offsets[v*2],z=p.z+shape.offsets[v*2+1];
      positions[i]=x;positions[i+1]=heightAt(x,z)+LIFT;positions[i+2]=z;
     }
-    previous[slot]=live?{x:p.x,z:p.z}:null;
+    visible[slot]=live?1:0;
+    if(live){previousX[slot]=p.x;previousZ[slot]=p.z;}
    }
    return changed;
   }
@@ -93,9 +95,12 @@
   mesh.alphaIndex=-10;mesh.alwaysSelectAsActiveMesh=true;mesh.setEnabled(false);
   const report={profile:'pooled-soft-contact-v1',capacity:CAPACITY,active:0,
    meshes:1,materials:1,textures:0,vertices:CAPACITY*VERTICES};
+  let enabled=false;
   function update(views){
    if(pool.update(views))mesh.updateVerticesData(B.VertexBuffer.PositionKind,pool.positions,false,false);
-   report.active=pool.active;mesh.setEnabled(pool.active>0);
+   report.active=pool.active;
+   const nextEnabled=pool.active>0;
+   if(nextEnabled!==enabled){enabled=nextEnabled;mesh.setEnabled(enabled);}
   }
   return {update,report,mesh};
  }
