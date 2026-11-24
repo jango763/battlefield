@@ -1,3 +1,4 @@
+ const slots=Array.isArray(scenarioName)?scenarioName:SCENE_SLOTS[scenarioName];
  if(!slots)throw Error('Неизвестный режим отряда: '+scenarioName);
  if(!asset){
   $('loading').textContent='Загружаю анимированного немецкого стрелка…';

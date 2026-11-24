@@ -1,3 +1,4 @@
+    return;
    }
    const x=(point.x-BASE_X)/UNIT_SCALE,z=(point.z-BASE_Z)/UNIT_SCALE;
    const move=fieldOrders.setDestination(x,z);
@@ -132,4 +133,3 @@ async function ensureUnits(scenarioName){
  finally{if(ensureUnitsInFlight===task)ensureUnitsInFlight=null;}
 }
 async function ensureUnitsUnlocked(scenarioName){
- const slots=Array.isArray(scenarioName)?scenarioName:SCENE_SLOTS[scenarioName];

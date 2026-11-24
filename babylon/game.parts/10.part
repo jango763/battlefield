@@ -83,12 +83,12 @@ function frame(){
  // ballistics, UI hit targets and all native skeleton animations stay fixed.
  if(renderQuality.mode==='auto'&&gameStarted){
   renderQuality.fpsElapsed+=Math.min(1,Math.max(0,engine.getDeltaTime()/1000)); // real frame time
-  if(renderQuality.fpsElapsed>=8){
+  if(renderQuality.fpsElapsed>=adaptiveQuality.CHECK_SECONDS){
    renderQuality.fpsElapsed=0;
    const fps=engine.getFps();
    const old=renderQuality.scale;
-   const next=fps<34?Math.min(renderQuality.high,old+.08):
-    fps>57?Math.max(renderQuality.low,old-.06):old;
+   const next=adaptiveQuality.nextScale(
+    fps,old,renderQuality.low,renderQuality.high);
    if(Math.abs(next-old)>.04){
     renderQuality.scale=next;engine.setHardwareScalingLevel(next);
     state.graphics.hardwareScale=+next.toFixed(2);

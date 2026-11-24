@@ -259,6 +259,15 @@ fs.mkdirSync(dir,{recursive:true});
   await page.locator('#quality-cycle').click();
   result.graphicsAuto=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.graphics);
   assert.equal(result.graphicsAuto.mode,'auto');
+  result.adaptiveQualityMath=await page.evaluate(()=>{
+   const q=window.BattlefieldAdaptiveQuality;
+   return {slow:q.nextScale(20,1.5,1,2.5),
+    recovered:q.nextScale(61,1.5,1,2.5),
+    interval:q.CHECK_SECONDS};
+  });
+  assert.equal(result.adaptiveQualityMath.slow,1.9);
+  assert.equal(result.adaptiveQualityMath.recovered,1.42);
+  assert.equal(result.adaptiveQualityMath.interval,3.5);
   assert(result.graphicsAuto.adaptive);
   await page.locator('#hud-toggle').click();
   await page.setViewportSize({width:844,height:390});
