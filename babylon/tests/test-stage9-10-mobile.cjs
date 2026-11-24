@@ -72,6 +72,19 @@ fs.mkdirSync(dir,{recursive:true});
   assert(s.art.duneRidges>18&&s.art.duneRidges<=48,
    'Count only dune bands actually painted away from roads and farms');
   assert.equal(s.art.historicalRoofStyle,'flat-adobe-parapets-v1');
+  assert.equal(s.art.mainFacadeMaterial,'sunlit-painted-libya-plaster-v1');
+  assert(s.art.mainFacadeMeshes>=7,
+   'At least five farms and two HQ wall shells must receive readable plaster');
+  result.facadeMaterial=await page.evaluate(()=>{
+   const m=window.BABYLON.EngineStore.LastCreatedScene.getMaterialByName('hd2026-main-facade-sunlit');
+   return {found:!!m,textureReady:m?.diffuseTexture?.isReady(),
+    unlit:m?.disableLighting,albedo:m?.diffuseColor?.asArray()};
+  });
+  assert(result.facadeMaterial.found&&result.facadeMaterial.textureReady,
+   'Original sunlit adobe paint must be available offline');
+  assert.equal(result.facadeMaterial.unlit,true,
+   'Main settlement facades must remain readable in dark camera angles');
+  assert(result.facadeMaterial.albedo?.[0]>.90);
   assert.equal(s.art.flatRoofCount,7,
    'Every farm and HQ must have an adobe flat roof');
   assert.equal(s.art.parapetSegments,28,
