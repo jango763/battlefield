@@ -256,6 +256,11 @@ fs.mkdirSync(dir,{recursive:true});
   result.graphicsAfter=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.graphics);
   assert.equal(result.graphicsAfter.mode,'high','Quality toggle did not work');
   assert(!result.graphicsAfter.adaptive);
+  // Capture actual High graphics at native mobile viewport: the default
+  // QA landscape screenshot starts at ?quality=low and overstates blur.
+  await page.locator('#hud-toggle').click();
+  await page.screenshot({path:dir+'/'+name+'-high-portrait.png'});
+  await page.locator('#hud-toggle').click();
   await page.locator('#quality-cycle').click();
   result.graphicsAuto=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.graphics);
   assert.equal(result.graphicsAuto.mode,'auto');
@@ -276,12 +281,23 @@ fs.mkdirSync(dir,{recursive:true});
   result.landscapeInput=await page.evaluate(()=>{
    const zone=document.getElementById('touch-zone');
    const controls=document.getElementById('mobile-controls');
+   const heading=document.querySelector('#heading h1');
+   const mini=document.querySelector('#battle-minimap');
    return {display:getComputedStyle(controls).display,
     zoneWidth:zone.getBoundingClientRect().width,
-    viewport:window.innerWidth};
+    viewport:window.innerWidth,
+    titleDisplay:getComputedStyle(heading).display,
+    minimapWidth:mini.getBoundingClientRect().width,
+    hpVisible:getComputedStyle(document.getElementById('quick-status')).display!=='none'};
   });
   assert.equal(result.landscapeInput.display,'flex',
    'Landscape phones must display joystick, reload and fire');
+  assert.equal(result.landscapeInput.titleDisplay,'none',
+   'Redundant battle title must not obscure landscape firing targets');
+  assert(result.landscapeInput.minimapWidth>=85&&result.landscapeInput.minimapWidth<=90,
+   'Tactical minimap must be compact in landscape without disappearing');
+  assert(result.landscapeInput.hpVisible,
+   'Keep hero HP and economy visible during landscape gameplay');
   assert(result.landscapeInput.zoneWidth<result.landscapeInput.viewport*.50,
    'Left joystick zone must not block the central battlefield');
   result.final=await page.evaluate(()=>{
