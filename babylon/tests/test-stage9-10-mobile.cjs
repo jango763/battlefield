@@ -151,7 +151,7 @@ fs.mkdirSync(dir,{recursive:true});
   assert(result.libyaVillage.acacias.every(c=>c.vertices>700&&
    !c.pickable&&c.matte&&c.tint?.[0]<.60&&c.tint?.[1]<.65&&c.glow?.[1]>.40),
    'Two batched, shaded acacia crowns must stay matte and textured');
-  assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>4500,
+  assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>11000,
    'Date palms must use tapered leaflets instead of giant flat fan blades');
   assert.equal(result.libyaVillage.palmPickable,false);
   assert.equal(result.libyaVillage.palmMaterial,'map-palm-leaves');

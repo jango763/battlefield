@@ -386,14 +386,14 @@ function create(scene,B,map){
    palmIndices.push(start,start+1,start+2);
   }
   function palmFronds(x,z,top,phase){
-   const arms=9,steps=4;
+   const arms=11,steps=5;
    for(let a=0;a<arms;a++){
     const angle=phase+a*Math.PI*2/arms,dirX=Math.cos(angle),dirZ=Math.sin(angle);
     const sideX=-dirZ,sideZ=dirX;
     const start=palmPositions.length/3;
     for(let k=0;k<=steps;k++){
      const t=k/steps,reach=4.5*t;
-     const yy=top+.82*Math.sin(t*Math.PI)-1.9*t*t;
+     const yy=top+.88*Math.sin(t*Math.PI)-2.25*t*t;
      // Slender leaf midrib instead of an oversized flat polygon fan.
      const w=.055+.095*Math.sin(t*Math.PI);
      for(const sign of [-1,1]){
@@ -409,14 +409,14 @@ function create(scene,B,map){
     // All 17 palm crowns are still drawn in one existing indexed mesh.
     for(let k=1;k<=steps*2;k++){
      const t=(k-.25)/(steps*2),reach=4.5*t;
-     const y=top+.82*Math.sin(t*Math.PI)-1.9*t*t;
-     const half=.48*Math.sin(t*Math.PI);
-     const radial=reach+.34*(1-t);
+     const y=top+.88*Math.sin(t*Math.PI)-2.25*t*t;
+     const half=.76*Math.sin(t*Math.PI);
+     const radial=reach+.40*(1-t);
      for(const sign of [-1,1]){
       const bx=x-150+dirX*reach,bz=z-150+dirZ*reach;
       addLeaflet(
        bx-dirX*.15,y,bz-dirZ*.15,
-       x-150+dirX*radial+sideX*sign*half,y-.27*(1-t),
+       x-150+dirX*radial+sideX*sign*half,y-.32*(1-t),
        z-150+dirZ*radial+sideZ*sign*half,
        bx+dirX*.21,y+.035,bz+dirZ*.21);
      }

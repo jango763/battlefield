@@ -92,9 +92,9 @@ const B={
  assert(m.nodes.find(x=>x.name==='north-africa-palm-fronds').hasCustomGeometry,
   'Palm geometry must be low-poly indexed triangles');
  const leaves=m.nodes.find(x=>x.name==='north-africa-palm-fronds');
- assert(leaves.generatedVertices>4500,
+ assert(leaves.generatedVertices>11000,
   'Palm silhouettes must include individual tapered leaflets');
- assert(leaves.generatedTriangles>2500,
+ assert(leaves.generatedTriangles>4500,
   'Palm leaflets must remain one batched indexed mesh');
  assert.equal(leaves.material.name,'map-palm-leaves');
  assert.equal(leaves.material.disableLighting,true,
