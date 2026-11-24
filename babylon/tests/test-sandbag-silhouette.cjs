@@ -25,13 +25,18 @@ B.Mesh={MergeMeshes:(group)=>mesh('merged-'+group.length)};
 const layout=Design.create(),added=[],world={ground:mesh('ground'),addObstacle:o=>added.push(o)};
 const field=Field.install({B,scene:{},world,layout,design:Design});
 const count=layout.fortifications.filter(o=>o.type==='sandbags').length;
-assert.equal(spheres.length,15*count,'Sandbag lines must be 8 base + 7 offset sacks');
+const berms=spheres.filter(m=>m.name.includes('-eroded-berm-'));
+const sacks=spheres.filter(m=>!m.name.includes('-eroded-berm-'));
+assert.equal(sacks.length,15*count,'Sandbag lines must be 8 base + 7 offset sacks');
+assert.equal(berms.length,field.optimization.bermSegments,
+ 'Sunlit trench berms must contain the reported number of visible segments');
+assert(berms.length>=36,'Original trenches must receive segmented earthworks');
 assert(spheres.every(m=>m.options.segments===8&&m.options.diameter===1),
- 'Every sandbag must be rounded and low poly');
+ 'Every sandbag and eroded berm must be rounded and low poly');
 assert(spheres.every(m=>m.scaling.x>m.scaling.y&&m.scaling.z>m.scaling.y),
- 'Sandbags must have broad low silhouettes');
-const row0=spheres.find(m=>m.name.endsWith('-0-0'));
-const row1=spheres.find(m=>m.name.endsWith('-1-0'));
+ 'Earthwork profiles must have broad low silhouettes');
+const row0=sacks.find(m=>m.name.endsWith('-0-0'));
+const row1=sacks.find(m=>m.name.endsWith('-1-0'));
 assert(Math.abs(row1.position.x-row0.position.x-.67)<1e-8,
  'Rows should be staggered to avoid rectangular slabs');
 assert.equal(added.length,layout.obstacles.length,
@@ -39,4 +44,5 @@ assert.equal(added.length,layout.obstacles.length,
 assert(field.optimization.drawCallsSaved>60,
  'Rounded geometry must still be batched to protect mobile FPS');
 assert.equal(field.optimization.mergeErrors.length,0);
-console.log('BATTLEFIELD_ROUNDED_SANDBAG_RENDERING_PASS',spheres.length);
+console.log('BATTLEFIELD_ROUNDED_SANDBAG_RENDERING_PASS',
+ {sacks:sacks.length,berms:berms.length});
