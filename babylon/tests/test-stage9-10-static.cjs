@@ -15,6 +15,7 @@ assert.match(art,/id:'hedgerow'/,'Keep the original named shrub layer');
 assert.match(art,/function makeDryScrub\(name\)/);
 assert.match(art,/new B\.Mesh\(name,scene\)/);
 assert.match(art,/shrubSilhouette='faceted-dry-thorn-scrub-v2'/);
+assert.match(art,/foliageLightMode='warm-underside-fill-v1'/);
 assert.match(art,/shrubLobes=lobes\.length/);
 assert.match(art,/hedgerow-leaf-west/);
 assert.match(art,/hedgerow-leaf-east/);
