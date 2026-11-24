@@ -498,6 +498,7 @@ function apply({scene,B,world,camera,sun,map}){
  try{
   const gm=new B.StandardMaterial('hd2026-grass-mat',scene);
   gm.diffuseColor=B.Color3.FromHexString('#ad9a69');
+  gm.emissiveColor=B.Color3.FromHexString('#655c46');
   gm.specularColor=B.Color3.Black();
   const mesh=B.MeshBuilder.CreateCylinder('hd2026-meadow-tuft',
    {diameterTop:.055,diameterBottom:.65,height:.60,tessellation:5},scene);
@@ -576,6 +577,9 @@ function apply({scene,B,world,camera,sun,map}){
   for(const lobe of lobes){
    const shrubMat=new B.StandardMaterial('hd2026-'+lobe.id+'-mat',scene);
    shrubMat.diffuseColor=B.Color3.FromHexString(lobe.shade);
+   // Lift leaf undersides from near-black in mobile WebGL while preserving
+   // faceted normals and the sun direction.
+   shrubMat.emissiveColor=B.Color3.FromHexString('#756c51');
    shrubMat.specularColor=B.Color3.Black();
    shrubMat.backFaceCulling=false;
    const shrub=makeDryScrub('hd2026-'+lobe.id);
@@ -598,6 +602,7 @@ function apply({scene,B,world,camera,sun,map}){
   report.shrubInstances=plots.length;
   report.shrubLobes=lobes.length;
   report.shrubSilhouette='faceted-dry-thorn-scrub-v2';
+  report.foliageLightMode='warm-underside-fill-v1';
  }catch(error){report.errors.push('hedgerows '+String(error));}
  // Restrained warm light — no extreme color filters, high-cost bloom or SSAO
  // at mobile resolution. Original sun casts PCF shadows where already supported.

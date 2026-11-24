@@ -67,6 +67,18 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(s.art.colorGrade,'north-africa-libya-sunlit-v1');
   assert.equal(s.art.theatre,'north-africa-libya-sunlit-v1');
   assert.equal(s.art.shrubSilhouette,'faceted-dry-thorn-scrub-v2');
+  assert.equal(s.art.foliageLightMode,'warm-underside-fill-v1');
+  result.foliageBrightness=await page.evaluate(()=>{
+   const sc=window.BABYLON.EngineStore.LastCreatedScene;
+   const hedge=sc.getMaterialByName('hd2026-hedgerow-mat');
+   const grass=sc.getMaterialByName('hd2026-grass-mat');
+   const palm=sc.getMaterialByName('map-leaves');
+   return {hedge:hedge?.emissiveColor?.asArray(),
+    grass:grass?.emissiveColor?.asArray(),
+    palm:palm?.emissiveColor?.asArray()};
+  });
+  for(const color of Object.values(result.foliageBrightness))
+   assert(color?.[0]>.33,'Decorative foliage should not render black on desert sand');
   assert.equal(s.art.sandTextureSize,1024);
   assert.equal(s.art.terrainLandforms,'wind-etched-dune-ridges-v1');
   assert(s.art.duneRidges>18&&s.art.duneRidges<=48,

@@ -342,7 +342,8 @@ function create(scene,B,map){
   // Correct one-sided frond winding for stable upward vertex normals.
   // Both-face triangles shared the same vertices and cancelled normals.
   mat.leaves.backFaceCulling=false;
-  mat.leaves.emissiveColor=B.Color3.FromHexString('#383426');
+  mat.leaves.emissiveColor=B.Color3.FromHexString('#797352');
+  mat.hedge.emissiveColor=B.Color3.FromHexString('#635c47');
   // 17 date palms / 33 wind-shaped acacias. Palm leaves are compiled into
   // a single faceted world mesh for one draw call; trunk collisions unchanged.
   const palmPositions=[],palmIndices=[],palmNormals=[],palmTriangles=[];
