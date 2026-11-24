@@ -39,6 +39,7 @@ jobs:
       - name: Validate sources, contracts and offline gameplay regressions
         run: |
           node babylon/tests/test-agent-contract.cjs
+          node babylon/tests/test-adobe-arches.cjs
           node babylon/tools/assemble-game-parts.cjs --check
           node --check babylon/game.js
           node --check babylon/modern-art-v1.js
