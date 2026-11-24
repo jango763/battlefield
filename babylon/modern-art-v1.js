@@ -111,7 +111,7 @@ function apply({scene,B,world,camera,sun,map}){
    between(.11,.29));
  }
  // Large fallow-meadow belts break up the uniform 300m green slab from
- // the elevated mobile camera. Painted into 1024px albedo: 0 draw calls.
+ // the elevated mobile camera. Painted into the same 512px albedo: 0 draw calls.
  for(const [x,z,shade,area] of [
   [54,62,'rgba(227,195,141,ALPHA)',30],
   [246,63,'rgba(154,113,75,ALPHA)',34],
@@ -135,10 +135,12 @@ function apply({scene,B,world,camera,sun,map}){
  // Wind-shaped dune crests are shaded gradients baked into the existing
  // terrain texture. No terrain-mesh displacement, extra draw calls, or
  // collision changes: all skinned soldiers stay grounded.
+ let paintedDuneRidges=0;
  for(let k=0;k<48;k++){
   const x=between(12,288),z=between(12,288),long=between(8,22);
   if(Math.abs(x-150)<13||Math.abs(z-150)<12)continue;
   if(map.farms.some(f=>Math.hypot(x-f.x,z-f.z)<17))continue;
+  paintedDuneRidges++;
   const px=x*1024/300,pz=z*1024/300,rx=long*1024/300;
   brush.save();brush.translate(px,pz);brush.rotate(between(-.65,.65));
   for(const sign of [-1,1]){
@@ -374,7 +376,7 @@ function apply({scene,B,world,camera,sun,map}){
     box('farm-'+farm.id+'-edge-column-'+direction+'-'+side,
      x+side*4.38,2.45,face,.47,4.5,.48,'weathered-brick');
   }
-  // Low ventilation shaft instead of the tall Northern European chimney.
+  // Low ventilation shaft instead of tall Northern European chimney.
   box('farm-chimney-'+farm.id,x+2.2,6.25,z-1,1.2,1.0,1.1,'battered-plaster');
   box('farm-chimney-top-'+farm.id,x+2.2,6.85,z-1,1.42,.18,1.42,'pitted-stone');
   for(let i=0;i<8;i++){
@@ -385,9 +387,8 @@ function apply({scene,B,world,camera,sun,map}){
    report.groundDebris++;
   }
  }
- // North African field headquarters: original building and capture
- // collider, redesigned as flat-roof sandstone barracks with parapets.
- // Faction banner stays separate for color recognition.
+ // Country headquarters: rough stone base, timber pilasters, windows,
+ // pitched tiled roof. Faction banner stays separate for color recognition.
  for(const base of map.bases){
   const x=base.x,z=base.z,y=5.72;
   const old=byName.get('base-hq-roof-'+base.id);
@@ -589,7 +590,7 @@ function apply({scene,B,world,camera,sun,map}){
  report.sandTextureSize=1024;
  report.terrainLandforms='wind-etched-dune-ridges-v1';
  report.historicalRoofStyle='flat-adobe-parapets-v1';
- report.duneRidges=48;
+ report.duneRidges=paintedDuneRidges;
  report.mipmappedScans=true;report.opaqueHedgerows=true;
  report.roadStyle='dual-ruts-with-meadow-shoulders';
  report.terrainReadability='sunlit-sandstone-and-dune-washes';
