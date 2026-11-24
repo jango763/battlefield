@@ -47,3 +47,7 @@ The `babylon-agent-gate` GitHub Actions workflow runs applicable static regressi
 ## Reporting status honestly
 
 Use explicit statuses: **studied → planned → implemented → tested in CI → accepted on real device → merged**. Only describe a stage as complete if it really occurred. A draft PR or workflow queued/running does not mean tests passed or gameplay was accepted. Do not claim AI agents run autonomously just because this coordination guide exists.
+
+## Resume and continuous stages
+
+Read [docs/BABYLON_HANDOFF.md](docs/BABYLON_HANDOFF.md) before starting a new session. Check the current branch head and coordination issue first; do not treat a historical handoff as the latest integration head. Do not rerun completed Work stages unless a regression or changed dependency requires it. Proceed to the next unclaimed stage in the same active session without asking for routine confirmation. A user stop request overrides this loop. At each stage update the handoff with observed tests, changed paths, unresolved evidence, and next task. Keep pending CI distinct from passed CI; never merge just because a stage is implemented. No automatic background agent is implied.
