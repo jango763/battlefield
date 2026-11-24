@@ -115,6 +115,7 @@ fs.mkdirSync(dir,{recursive:true});
     palmMaterial:palm?.material?.name,
     palmUnlit:palm?.material?.disableLighting,
     palmTint:palm?.material?.diffuseColor?.asArray(),
+    palmGlow:palm?.material?.emissiveColor?.asArray(),
     adobeMeshes:scene.meshes.filter(m=>m.name.startsWith('libya-')).length,
     errors:g?.errors,
     stuccoDiffuse:scene.getMaterialByName('libya-sunlit-stucco')?.diffuseColor?.asArray(),
@@ -146,6 +147,8 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(result.libyaVillage.palmUnlit,true);
   assert(result.libyaVillage.palmTint?.[1]>result.libyaVillage.palmTint?.[0],
    'Palm leaflet tint should be muted olive, not blown-out white');
+  assert(result.libyaVillage.palmGlow?.[1]>.43,
+   'Matte palm fronds need enough olive fill to avoid near-black leaves');
   assert.equal(s.art.roadVisualWidth,4.2,'Road must be narrowed');
   assert.equal(s.art.roadShoulderBlend,'feathered-libya-sand-v1',
    'Both North African roadways need broad dust-gradient shoulders');
