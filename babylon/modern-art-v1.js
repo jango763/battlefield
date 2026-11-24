@@ -111,7 +111,7 @@ function apply({scene,B,world,camera,sun,map}){
    between(.11,.29));
  }
  // Large fallow-meadow belts break up the uniform 300m green slab from
- // the elevated mobile camera. Painted into 1024px albedo: 0 draw calls.
+ // the elevated mobile camera. Painted into the same 512px albedo: 0 draw calls.
  for(const [x,z,shade,area] of [
   [54,62,'rgba(227,195,141,ALPHA)',30],
   [246,63,'rgba(154,113,75,ALPHA)',34],

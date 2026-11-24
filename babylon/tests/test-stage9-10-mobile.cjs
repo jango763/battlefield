@@ -86,13 +86,23 @@ fs.mkdirSync(dir,{recursive:true});
     errors:g?.errors,
     stuccoDiffuse:scene.getMaterialByName('libya-sunlit-stucco')?.diffuseColor?.asArray(),
     stuccoUnlit:scene.getMaterialByName('libya-sunlit-stucco')?.disableLighting,
-    stuccoTextureReady:scene.getMaterialByName('libya-sunlit-stucco')?.diffuseTexture?.isReady()};
+    stuccoTextureReady:scene.getMaterialByName('libya-sunlit-stucco')?.diffuseTexture?.isReady(),
+    stuccoEmission:scene.getMaterialByName('libya-sunlit-stucco')?.emissiveColor?.asArray(),
+    wallBodies:scene.meshes.filter(m=>m.name.startsWith('libya-adobe-body-')).map(m=>({
+     name:m.name,material:m.material?.name,unlit:m.material?.disableLighting,
+     visible:m.isVisible,vertices:m.getTotalVertices()}))};
   });
   assert(result.libyaVillage.stuccoDiffuse?.[0]>.85,
    'Libyan adobe walls must remain light sand, not black PBR facades');
   assert(result.libyaVillage.stuccoUnlit===true&&
    result.libyaVillage.stuccoTextureReady===true,
    'Author-painted adobe facades must remain bright and detailed');
+  assert(result.libyaVillage.stuccoEmission?.[0]>.30,
+   'Adobe wall shadows should receive a warm emissive fill');
+  assert.equal(result.libyaVillage.wallBodies.length,3);
+  assert(result.libyaVillage.wallBodies.every(m=>
+   m.material==='libya-sunlit-stucco'&&m.unlit&&m.visible&&m.vertices>0),
+   'All three Libya houses must render with readable stucco, not old black PBR');
   assert.equal(result.libyaVillage.style,'libya-adobe-procedural');
   assert.equal(result.libyaVillage.loaded,3);
   assert(result.libyaVillage.adobeMeshes>30);
