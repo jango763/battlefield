@@ -1,3 +1,7 @@
+     // Do not attach a second rifle or overwrite the approved pose.
+     rig.weaponRigReady=true;
+     rig.nativeBakedWeapon=true;
+     view.weaponError=null;
      continue;
     }
     await window.BattlefieldWeaponRig.create({
@@ -129,6 +133,3 @@ function advanceObjectives(hero,econ){
   econ?.owners?.blue?.length||0):SESSION_OBJECTIVES.length;
  state.mission={completed:missionIndex,total:SESSION_OBJECTIVES.length,
   current:task?.title||'Все цели выполнены',progress,
-  target:task?.target||SESSION_OBJECTIVES.length,finished:!task};
- if(advanced&&gameStarted)alertStatus(task?
-  'Задача выполнена! Следующая: '+task.title:

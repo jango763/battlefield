@@ -344,8 +344,12 @@ function unitVisual(index,entries,{externalModel=null}={}){
    clips.set(id,matches[0]);
   }
  }
- const marker=B.MeshBuilder.CreateDisc('squad-ring-'+index,{radius:.47,tessellation:24},scene);
- marker.parent=anchor;marker.rotation.x=Math.PI/2;marker.position.y=.025;
+ // Subtle ground rings keep squad allegiance readable without a solid
+ // bright disc under every soldier. Torus and hero halo follow the same
+ // horizontal XZ plane; the approved skeleton and pose remain untouched.
+ const marker=B.MeshBuilder.CreateTorus('squad-ring-'+index,
+  {diameter:.98,thickness:.055,tessellation:24},scene);
+ marker.parent=anchor;marker.position.y=.034;
  // Single-hero golden outline above the existing faction marker. Unlike a
  // billboard sprite it never covers the soldier's uniform or weapon.
  // Child of anchor: follows hero automatically and disappears on death.
@@ -358,7 +362,7 @@ function unitVisual(index,entries,{externalModel=null}={}){
   halo.isPickable=false;halo.receiveShadows=false;
  }
  const ringMat=factionMat('ring',index<12?'blue':'red',
-  index<12?'#77bcea':'#e98668',{alpha:.75});
+  index<12?'#77bcea':'#e98668',{alpha:.62});
  marker.material=ringMat;marker.isPickable=false;
  const hpBack=B.MeshBuilder.CreatePlane('health-bg-'+index,{width:.8,height:.085},scene);
  hpBack.parent=anchor;hpBack.billboardMode=B.Mesh.BILLBOARDMODE_ALL;
