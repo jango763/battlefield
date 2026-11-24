@@ -8,6 +8,8 @@ function install({B,scene,world,layout,design}){
  // Sunlit North African fieldwork palette.
  const earth=mat('earth','#b79b73'),timber=mat('timber','#917759'),sand=mat('sand','#d8bc8d');
  const rock=mat('rock','#c9ad82');
+ // Muted fabric variation separates overlapping sacks without texture noise.
+ const sandShade=mat('sand-shade','#c8ad83'),sandLight=mat('sand-light','#dfc69b');
  const optimizationDeferred={bermSegments:0,roofDetails:0};
  function box(name,x,y,z,w,h,d,m,rot=0){const o=B.MeshBuilder.CreateBox(name,{width:w,height:h,depth:d},scene);o.position.set(x-150,y,z-150);o.rotation.y=rot;o.material=m;o.isPickable=false;o.receiveShadows=true;meshes.push(o);return o;}
  // Rounded, staggered low-poly sacks: the former cuboid wall read as a
@@ -61,7 +63,7 @@ function install({B,scene,world,layout,design}){
     const count=layer?7:8,stagger=layer?.67:0;
     for(let i=0;i<count;i++)
      sandbag(id+'-'+layer+'-'+i,x-4.7+i*1.34+stagger,
-      .23+layer*.40,z,1.48,.46,1.12,sand,Math.sin(i*8+layer)*.045);
+      .23+layer*.40,z,1.48,.46,1.12,(i+layer)%5===0?sandShade:(i+layer)%5===2?sandLight:sand,Math.sin(i*8+layer)*.045);
    }
   }else if(f.type==='bunker'){
    for(const side of [-1,1]){
