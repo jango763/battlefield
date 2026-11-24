@@ -109,7 +109,12 @@ fs.mkdirSync(dir,{recursive:true});
    const g=window.__BATTLEFIELD_GAME__.villageModels;
    const scene=window.BABYLON.EngineStore.LastCreatedScene;
    const palm=scene.getMeshByName('north-africa-palm-fronds');
+   const acacias=scene.meshes.filter(m=>m.name.startsWith('north-africa-acacia-crown-'));
    return {style:g?.style,loaded:g?.loaded,pending:g?.pending,
+    acacias:acacias.map(m=>({vertices:m.getTotalVertices(),pickable:m.isPickable,
+     matte:m.material?.disableLighting,tint:m.material?.diffuseColor?.asArray(),
+     glow:m.material?.emissiveColor?.asArray()})),
+    oldFlatCrowns:scene.meshes.filter(m=>/^(tree-crown-|tree-top-)/.test(m.name)).length,
     palmPresent:!!palm,palmVertices:palm?.getTotalVertices(),
     palmPickable:palm?.isPickable,
     palmMaterial:palm?.material?.name,
@@ -140,6 +145,12 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(result.libyaVillage.style,'libya-adobe-procedural');
   assert.equal(result.libyaVillage.loaded,3);
   assert(result.libyaVillage.adobeMeshes>30);
+  assert.equal(result.libyaVillage.oldFlatCrowns,0,
+   'Overexposed white disk-shaped tree crowns must be removed');
+  assert.equal(result.libyaVillage.acacias.length,2);
+  assert(result.libyaVillage.acacias.every(c=>c.vertices>700&&
+   !c.pickable&&c.matte&&c.tint?.[0]<.60&&c.tint?.[1]<.65&&c.glow?.[1]>.40),
+   'Two batched, shaded acacia crowns must stay matte and textured');
   assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>4500,
    'Date palms must use tapered leaflets instead of giant flat fan blades');
   assert.equal(result.libyaVillage.palmPickable,false);

@@ -339,6 +339,35 @@ function create(scene,B,map){
   }
  }
  // Sandbags and intermittent trees — use instances for low draw-call count.
+ // Matte arid acacia canopies replace the overexposed mushroom spheres.
+ // Two shared indexed meshes per full map; tree-trunk collisions untouched.
+ const acaciaMats=[
+  material('acacia-olive','#65704e','#5f6f4d'),
+  material('acacia-sage','#858e64','#6e7c53')
+ ];
+ const acaciaGroups=acaciaMats.map(()=>({positions:[],indices:[],normals:[]}));
+ for(const m of acaciaMats){m.disableLighting=true;m.backFaceCulling=false;}
+ function addAcaciaCrown(x,z,id){
+  for(let k=0;k<13;k++){
+   const angle=k*Math.PI*2/13+id*.41;
+   const radius=k===12?.22:1.55+(k%4)*.42;
+   const cx=x-150+Math.cos(angle)*radius;
+   const cz=z-150+Math.sin(angle)*radius;
+   const size=1.38+.22*Math.sin(k*3.7+id*.6);
+   const top=5.93+.28*Math.sin(id*.53+k*2.1);
+   const lower=top-.51-.15*Math.cos(k*1.7);
+   const group=acaciaGroups[(k+id)%2],start=group.positions.length/3;
+   // Asymmetric low-poly leaf cluster: raised apex, tilted four-sided base.
+   // Real relief instead of 2D disks; no alpha cards or additional lights.
+   const corners=[[-size,-size*.60],[size*.67,-size*.94],
+    [size,size*.54],[-size*.74,size*.93]];
+   for(const [dx,dz] of corners)group.positions.push(cx+dx,lower,cz+dz);
+   group.positions.push(cx+.1*Math.cos(id),top+.33,cz+.1*Math.sin(id));
+   group.indices.push(start,start+1,start+4,start+1,start+2,start+4,
+    start+2,start+3,start+4,start+3,start,start+4,
+    start,start+3,start+2,start,start+2,start+1);
+  }
+ }
   // Correct one-sided frond winding for stable upward vertex normals.
   // Both-face triangles shared the same vertices and cancelled normals.
   mat.leaves.backFaceCulling=false;
@@ -402,19 +431,19 @@ function create(scene,B,map){
   if(Math.hypot(x-150,z-150)<24)continue;
   const isPalm=i%3===0,topY=isPalm?7.7:5.7;
   cylinder('tree-trunk-'+i,1.1,isPalm?7.6:5.7,x,topY/2,z,mat.trunk,7);
-  const crown=B.MeshBuilder.CreateSphere('tree-crown-'+i,
-   {diameter:1,segments:5},scene);
-  crown.position.copyFrom(at(x-.44,z+.26,isPalm?topY:5.65,B));
-  crown.scaling.copyFrom(new B.Vector3(isPalm?1.05:6.0,
-   isPalm?.60:1.28,isPalm?1.02:4.45));
-  crown.material=mat.hedge;crown.isPickable=false;nodes.push(crown);
-  const top=B.MeshBuilder.CreateSphere('tree-top-'+i,
-   {diameter:1,segments:5},scene);
-  top.position.copyFrom(at(x+.70,z-.31,isPalm?topY+.20:6.37,B));
-  top.scaling.copyFrom(new B.Vector3(isPalm?.58:4.7,
-   isPalm?.40:1.10,isPalm?.62:3.75));
-  top.material=mat.leaves;top.isPickable=false;nodes.push(top);
   if(isPalm)palmFronds(x,z,topY,i*.43);
+  else addAcaciaCrown(x,z,i);
+ }
+ for(let i=0;i<acaciaGroups.length;i++){
+  const group=acaciaGroups[i];
+  if(!group.positions.length)continue;
+  const mesh=new B.Mesh('north-africa-acacia-crown-'+i,scene);
+  B.VertexData.ComputeNormals(group.positions,group.indices,group.normals);
+  const data=new B.VertexData();
+  data.positions=group.positions;data.indices=group.indices;
+  data.normals=group.normals;data.applyToMesh(mesh);
+  mesh.material=acaciaMats[i];mesh.isPickable=false;
+  mesh.receiveShadows=false;nodes.push(mesh);
  }
  if(palmPositions.length){
   const mesh=new B.Mesh('north-africa-palm-fronds',scene);
