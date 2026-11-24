@@ -146,6 +146,13 @@ fs.mkdirSync(dir,{recursive:true});
   assert(s.art.mipmappedScans&&s.art.opaqueHedgerows);
   assert(s.art.scannedMaterialMaps>=12);
   assert(s.shrubInstances>=30,'Nontransparent low-poly ground foliage absent');
+  assert.equal(s.optimization.coverSurface,'sunlit-libya-earthworks-v1');
+  assert(s.optimization.bermSegments>=36,
+   'Real segmented 3D earthen berms must be installed');
+  assert(s.optimization.roofDetails>=8,
+   'Pillboxes require sunlit limestone roof contours');
+  assert.equal(s.optimization.mergeErrors?.length,0,
+   'Added fieldwork geometry must remain safely batchable');
   assert(s.optimization.drawCallsSaved>=60,
    'Static defensive meshes were not batched: '+JSON.stringify(s.optimization));
   assert(s.optimization.dynamicMountMeshes>=12,'Gun meshes should remain animated');
