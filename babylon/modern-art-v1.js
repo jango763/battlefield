@@ -383,6 +383,14 @@ function apply({scene,B,world,camera,sun,map}){
   mesh.rotation.z=angle;
   return addShape(mesh,matName);
  }
+ // Irregular low-poly masonry fragments, batched with the existing stone.
+ function rubble(name,x,y,z,w,h,d,matName,angle=0){
+  const mesh=B.MeshBuilder.CreateSphere('hd2026-'+name,{diameter:1,segments:5},scene);
+  mesh.position.copyFrom(pos(x,y,z));
+  mesh.scaling.set(w,h,d);
+  mesh.rotation.y=angle;mesh.rotation.z=angle*.3;
+  return addShape(mesh,matName);
+ }
  function roofPair(label,x,z,y,width,depth){
   // North African flat roof with raised adobe parapet. The original
   // pitched shell is hidden below and all approved building collisions
@@ -437,7 +445,7 @@ function apply({scene,B,world,camera,sun,map}){
   box('farm-chimney-top-'+farm.id,x+2.2,6.10,z-1,1.42,.18,1.42,'pitted-stone');
   for(let i=0;i<8;i++){
    const dx=between(-5,5),dz=between(-5,5);
-   box('farm-rubble-'+farm.id+'-'+i,x+dx,.13,z+3.7+Math.abs(dz)*.34,
+   rubble('farm-rubble-'+farm.id+'-'+i,x+dx,.13,z+3.7+Math.abs(dz)*.34,
     between(.35,.9),between(.15,.38),between(.4,1),'pitted-stone',
     between(-.35,.35));
    report.groundDebris++;
@@ -501,7 +509,7 @@ function apply({scene,B,world,camera,sun,map}){
     between(1,3.9),.25,.21,'warped-timber',between(-.5,.5));
   }
   for(let j=0;j<12;j++){
-   box('ruin-'+index+'-stone-'+j,rx+between(-6,6),
+   rubble('ruin-'+index+'-stone-'+j,rx+between(-6,6),
     between(.12,.3),rz+between(-2.7,2.7),
     between(.32,.99),between(.22,.62),between(.3,.82),
     j%3?'pitted-stone':'weathered-brick',between(-.45,.45));
