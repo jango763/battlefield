@@ -54,6 +54,10 @@ control.clearMovement();control.updateAllies(.1);
 assert.equal(hero.x,stopped);
 assert.match(html,/\.battle-active #graphics-tag\{display:none\}/,
  'Hide distracting HD debug tag while the game is active');
+assert.match(html,/\.battle-active #heading h1\{display:none\}/,
+ 'Compact landscape HUD must hide only the redundant title');
+assert.match(html,/\.battle-active #battle-minimap\{width:88px;height:88px;/,
+ 'Compact minimap leaves more room for aim and touch targets');
 assert.match(html,/@media\(max-height:600px\)/,
  'Landscape mobile must have its own small-height HUD layout');
 assert.match(html,/\.battle-active #footer\{display:none\}/,

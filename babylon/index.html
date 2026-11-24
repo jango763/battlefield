@@ -93,6 +93,11 @@ button:disabled{opacity:.5;cursor:default}
  #quick-buttons{grid-template-rows:34px 64px}
  .battle-active #panel:not(.closed){max-height:48dvh;bottom:110px}
  .battle-active #heading small{display:none}
+ .battle-active #heading h1{display:none}
+ .battle-active #heading{max-width:58vw;padding:4px 8px}
+ .battle-active #quick-status{margin-top:0;font-size:12px}
+ .battle-active #battle-minimap{width:88px;height:88px;
+  top:calc(env(safe-area-inset-top) + 53px)}
 }
 #battle-minimap{display:none;position:fixed;top:calc(env(safe-area-inset-top) + 61px);right:11px;width:116px;height:116px;z-index:5;border:2px solid #a79a70;border-radius:5px;background:#334034ed;box-shadow:0 3px 15px #0009;pointer-events:none;image-rendering:auto}
 .battle-active #battle-minimap{display:block}
