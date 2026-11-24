@@ -71,6 +71,11 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(s.art.terrainLandforms,'wind-etched-dune-ridges-v1');
   assert(s.art.duneRidges>18&&s.art.duneRidges<=48,
    'Count only dune bands actually painted away from roads and farms');
+  assert.equal(s.art.historicalRoofStyle,'flat-adobe-parapets-v1');
+  assert.equal(s.art.flatRoofCount,7,
+   'Every farm and HQ must have an adobe flat roof');
+  assert.equal(s.art.parapetSegments,28,
+   'All seven buildings must have four raised parapet segments each');
   assert.equal(s.art.lightMood,'warm-dry-high-noon');
   await page.waitForFunction(()=>
    window.__BATTLEFIELD_GAME__?.villageModels?.finished===true,

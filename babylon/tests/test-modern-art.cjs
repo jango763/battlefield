@@ -54,6 +54,9 @@ for(const obj of Object.values(villages.models)){
 }
 
 assert(art.includes("pbr('warped-timber','wood'"));
+assert(art.includes('flat-adobe-parapets-v1'));
+assert(art.includes('parapet-long-'));
+assert(!art.includes("label+'-ridge'"),'European pitched roof ridge removed');
 assert(art.includes("world.ground.material=smoothEarth"),'Ground must avoid photo-grain shimmer');
 assert(art.includes('north-africa-libya-sunlit-v1'),
  'Map must use the approved dry North African palette');
