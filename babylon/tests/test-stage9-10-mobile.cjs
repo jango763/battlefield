@@ -110,7 +110,11 @@ fs.mkdirSync(dir,{recursive:true});
    const scene=window.BABYLON.EngineStore.LastCreatedScene;
    const palm=scene.getMeshByName('north-africa-palm-fronds');
    const acacias=scene.meshes.filter(m=>m.name.startsWith('north-africa-acacia-crown-'));
+   const trunks=scene.meshes.filter(m=>m.name.startsWith('north-africa-tree-trunks-'));
    return {style:g?.style,loaded:g?.loaded,pending:g?.pending,
+    trunkBatches:trunks.map(m=>({vertices:m.getTotalVertices(),pickable:m.isPickable,
+     tint:m.material?.diffuseColor?.asArray(),glow:m.material?.emissiveColor?.asArray()})),
+    oldTelephonePoles:scene.meshes.filter(m=>m.name.startsWith('tree-trunk-')).length,
     acacias:acacias.map(m=>({vertices:m.getTotalVertices(),pickable:m.isPickable,
      matte:m.material?.disableLighting,tint:m.material?.diffuseColor?.asArray(),
      glow:m.material?.emissiveColor?.asArray()})),
@@ -145,6 +149,12 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(result.libyaVillage.style,'libya-adobe-procedural');
   assert.equal(result.libyaVillage.loaded,3);
   assert(result.libyaVillage.adobeMeshes>30);
+  assert.equal(result.libyaVillage.oldTelephonePoles,0,
+   'Straight dark telephone-pole tree trunks must be replaced');
+  assert.equal(result.libyaVillage.trunkBatches.length,2);
+  assert(result.libyaVillage.trunkBatches.every(t=>t.vertices>500&&
+   !t.pickable&&t.glow?.[0]>.20),
+   'Batched tapered trunk geometry must stay visibly warm and noninteractive');
   assert.equal(result.libyaVillage.oldFlatCrowns,0,
    'Overexposed white disk-shaped tree crowns must be removed');
   assert.equal(result.libyaVillage.acacias.length,2);

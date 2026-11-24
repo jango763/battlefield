@@ -84,6 +84,13 @@ const B={
   'Authored canopy geometry must have a true multi-lobed relief');
  assert(acacias.every(m=>m.material.disableLighting&&!m.isPickable),
   'Muted sage acacia canopies must remain matte and not block pointer taps');
+ assert.equal(drawn.filter(n=>n.startsWith('tree-trunk-')).length,0,
+  'Original dark telephone-pole cylinders must be replaced');
+ const trunks=m.nodes.filter(n=>n.name.startsWith('north-africa-tree-trunks-'));
+ assert.equal(trunks.length,2,'Only two indexed trunk draw batches allowed');
+ assert(trunks.every(m=>m.hasCustomGeometry&&m.generatedVertices>500),
+  'Tree bark should have real taper and curvature, not box proxies');
+ assert(trunks.every(m=>!m.isPickable),'Visual trunks must not intercept taps');
  assert.equal(m.obstacles.filter(o=>o.type==='tree').length,50,
   'Tree-trunk collisions must remain intact');
  assert(drawn.length>0);
