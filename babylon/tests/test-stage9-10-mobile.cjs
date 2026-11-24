@@ -112,6 +112,9 @@ fs.mkdirSync(dir,{recursive:true});
    return {style:g?.style,loaded:g?.loaded,pending:g?.pending,
     palmPresent:!!palm,palmVertices:palm?.getTotalVertices(),
     palmPickable:palm?.isPickable,
+    palmMaterial:palm?.material?.name,
+    palmUnlit:palm?.material?.disableLighting,
+    palmTint:palm?.material?.diffuseColor?.asArray(),
     adobeMeshes:scene.meshes.filter(m=>m.name.startsWith('libya-')).length,
     errors:g?.errors,
     stuccoDiffuse:scene.getMaterialByName('libya-sunlit-stucco')?.diffuseColor?.asArray(),
@@ -136,8 +139,13 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(result.libyaVillage.style,'libya-adobe-procedural');
   assert.equal(result.libyaVillage.loaded,3);
   assert(result.libyaVillage.adobeMeshes>30);
-  assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>1000);
+  assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>4500,
+   'Date palms must use tapered leaflets instead of giant flat fan blades');
   assert.equal(result.libyaVillage.palmPickable,false);
+  assert.equal(result.libyaVillage.palmMaterial,'map-palm-leaves');
+  assert.equal(result.libyaVillage.palmUnlit,true);
+  assert(result.libyaVillage.palmTint?.[1]>result.libyaVillage.palmTint?.[0],
+   'Palm leaflet tint should be muted olive, not blown-out white');
   assert.equal(s.art.roadVisualWidth,4.2,'Road must be narrowed');
   assert.equal(await page.evaluate(()=>{
    const m=window.BABYLON.EngineStore.LastCreatedScene.getMeshByName('map-ground-300');
