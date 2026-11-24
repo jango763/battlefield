@@ -88,6 +88,8 @@ function installNorthAfrica({scene,B,world}){
     p.z+depth/2+.045,.67,.89,.10,recessed);
    cuboid('window-sill-'+i+'-'+side,p.x+side*width*.28,1.96,
     p.z+depth/2+.16,.92,.18,.35,stone);
+   cuboid('window-lintel-'+i+'-'+side,p.x+side*width*.28,2.99,
+    p.z+depth/2+.12,.94,.18,.30,sunStucco);
   }
   // Patchy lower stucco and corner buttresses break the toy-box silhouette.
   for(const side of [-1,1]){
