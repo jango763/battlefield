@@ -1,0 +1,73 @@
+name: Battlefield Windows offline package
+on:
+  push:
+    branches:
+      - experiment/babylon-pc-offline-20261124
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Collect game and local engine
+        run: |
+          set -euo pipefail
+          mkdir -p package/runtime package/babylon/vendor
+          cp -a babylon assets preview integration package/
+          cp babylon/tools/pc-offline/server.cjs package/
+          cp babylon/tools/pc-offline/START_BATTLEFIELD.cmd package/
+          cp babylon/tools/pc-offline/README_RU.txt package/
+          npm install --prefix /tmp/bf-pc-deps --no-audit --no-fund --ignore-scripts babylonjs@9 babylonjs-loaders@9
+          cp /tmp/bf-pc-deps/node_modules/babylonjs/babylon.js package/babylon/vendor/
+          cp /tmp/bf-pc-deps/node_modules/babylonjs-loaders/babylonjs.loaders.min.js package/babylon/vendor/
+          cp /tmp/bf-pc-deps/node_modules/babylonjs/license.md package/babylon/vendor/BABYLON-LICENSE.md 2>/dev/null || cp /tmp/bf-pc-deps/node_modules/babylonjs/LICENSE* package/babylon/vendor/ || true
+          python3 - <<'PY'
+          from pathlib import Path
+          f=Path('package/babylon/index.html')
+          s=f.read_text()
+          for old,new in [('https://cdn.babylonjs.com/babylon.js','./vendor/babylon.js'),('https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js','./vendor/babylonjs.loaders.min.js')]:
+              assert s.count(old)==1, old
+              s=s.replace(old,new)
+          f.write_text(s)
+          PY
+          curl --fail --retry 3 -L https://nodejs.org/dist/v22.16.0/node-v22.16.0-win-x64.zip -o /tmp/node-win.zip
+          curl --fail --retry 3 -L https://nodejs.org/dist/v22.16.0/SHASUMS256.txt -o /tmp/node-checksums.txt
+          EXPECTED=$(awk '$2=="node-v22.16.0-win-x64.zip"{print $1}' /tmp/node-checksums.txt)
+          test -n "$EXPECTED"
+          echo "$EXPECTED  /tmp/node-win.zip" | sha256sum -c -
+          unzip -p /tmp/node-win.zip node-v22.16.0-win-x64/node.exe > package/runtime/node.exe
+          unzip -p /tmp/node-win.zip node-v22.16.0-win-x64/LICENSE > package/runtime/LICENSE.txt
+          node --check package/server.cjs
+          node --check package/babylon/game.js
+          test -s package/runtime/node.exe
+          du -sh package
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Battlefield-PC-offline-x64
+          path: package/
+          compression-level: 3
+          retention-days: 14
+          if-no-files-found: error
+      - name: Verify startup with all external browser requests blocked
+        run: |
+          npm install --prefix /tmp/bf-pc-playwright --no-audit --no-fund playwright@1.58.2
+          /tmp/bf-pc-playwright/node_modules/.bin/playwright install --with-deps chromium
+          node package/server.cjs >/tmp/bf-pc-server.log 2>&1 &
+          sleep 2
+          node babylon/tools/pc-offline/smoke.cjs
+      - name: Upload visual diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Battlefield-PC-diagnostics
+          path: pc-qa.png
+          if-no-files-found: ignore
