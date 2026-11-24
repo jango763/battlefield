@@ -92,6 +92,9 @@ const B={
   'Palm silhouettes must include individual tapered leaflets');
  assert(leaves.generatedTriangles>2500,
   'Palm leaflets must remain one batched indexed mesh');
+ assert.equal(leaves.material.name,'map-palm-leaves');
+ assert.equal(leaves.material.disableLighting,true,
+  'Date palm leaflets must stay matte olive in the harsh sun');
  const status=await m.loadOriginalBTR();
  assert.equal(status.ok,true);
  assert.equal(status.loaded,3);

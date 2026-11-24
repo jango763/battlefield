@@ -346,6 +346,10 @@ function create(scene,B,map){
   mat.hedge.emissiveColor=B.Color3.FromHexString('#635c47');
   // 17 date palms / 33 wind-shaped acacias. Palm leaves are compiled into
   // a single faceted world mesh for one draw call; trunk collisions unchanged.
+  // Matte olive ensures fine leaflets stay legible, not overexposed white.
+  const palmLeafMat=material('palm-leaves','#748052','#222b1e');
+  palmLeafMat.disableLighting=true;
+  palmLeafMat.backFaceCulling=false;
   const palmPositions=[],palmIndices=[],palmNormals=[];
   function addLeaflet(x0,y0,z0,x1,y1,z1,x2,y2,z2){
    const start=palmPositions.length/3;
@@ -418,7 +422,7 @@ function create(scene,B,map){
   const data=new B.VertexData();
   data.positions=palmPositions;data.indices=palmIndices;data.normals=palmNormals;
   data.applyToMesh(mesh);
-  mesh.material=mat.leaves;mesh.isPickable=false;mesh.receiveShadows=false;
+  mesh.material=palmLeafMat;mesh.isPickable=false;mesh.receiveShadows=false;
   nodes.push(mesh);
  }
  for(const p of [[86,123],[210,120],[120,175],[190,181],[150,83],[152,220]]){
