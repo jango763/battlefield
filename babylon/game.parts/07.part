@@ -1,3 +1,4 @@
+     {heroKill:unit.isHero,armoured:false});
    }
   }
  }
@@ -132,4 +133,3 @@ function drawHud(){
  state.firstGameArmy=fieldOrders?.snapshot()||null;
  state.emplacements=support?.snapshot()||[];
  state.tactical=tacticalAI?.snapshot();
- state.heroCover=window.BattlefieldDefenseLayout.coverAt(world.defenses,hero,controller.getTarget(hero));

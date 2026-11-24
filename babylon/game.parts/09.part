@@ -1,3 +1,4 @@
+  $('order-move').setAttribute('aria-pressed','true');
   $('order-attack').setAttribute('aria-pressed','false');
   alertStatus('Движение: коснитесь земли для приказа.');
  });

@@ -1,4 +1,3 @@
-const deviceScale=Math.max(1,window.devicePixelRatio||1);
 const renderQuality={
  // Hardware scaling = device pixel ratio / rendered pixels per CSS pixel.
  // Auto starts sharper and adapts toward ~1.2x for constrained GPUs.
@@ -104,6 +103,8 @@ function createWorld(){
  world.field=window.BattlefieldTacticalField.install({B,scene,world,layout:world.defenses,design:window.BattlefieldDefenseLayout});
  state.defenses={trenches:world.defenses.trenches.length,lines:2};
  state.optimization=world.field.optimization;
+ contactShadows=window.BattlefieldInfantryContactShadows.create({B,scene,world});
+ state.contactShadows=contactShadows.report;
  world.navigation=window.BattlefieldNavigation.create({obstacles:world.obstacles});
  state.navigation=world.navigation.stats;
  state.vehicleBounds=world.vehicleBounds;
@@ -132,4 +133,3 @@ function createWorld(){
    const point=info.pickInfo.pickedPoint;
    if(!point)return;
    if(inputMode==='attack'){
-    alertStatus('Выберите врага. Для движения нажмите «Движение».');

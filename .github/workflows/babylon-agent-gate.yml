@@ -54,6 +54,7 @@ jobs:
           node babylon/tests/test-gold-economy.cjs
           node babylon/tests/test-first-game-behavior.cjs
           node babylon/tests/test-camera-joystick-checkpoint.cjs
+          node babylon/tests/test-infantry-contact-shadows.cjs
           node babylon/tests/test-weapon-balance.cjs
           node babylon/tests/test-world-300.cjs
   mobile-webgl:

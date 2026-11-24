@@ -35,7 +35,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!joystickResponse||!adaptiveQuality||!infantryLighting||!replenishment||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!joystickResponse||!adaptiveQuality||!infantryLighting||!window.BattlefieldInfantryContactShadows||!replenishment||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -76,7 +76,7 @@ state.engineering={version:'10-stage-20261122',parts:10,privacy:'local-only',
  glbFallbacks:0,assetRetries:0,frameStats:{},source:'original-ww2-babylon'};
 window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
-let infantryFill=null;
+let infantryFill=null,contactShadows=null;
 let modelDepot=null,modelDepotRetryAfter=0;
 const motionDonors={germanRun:null,britishReady:null};
 // Cross-rig locomotion failed visual acceptance in the isolated soldier range.
@@ -239,6 +239,8 @@ function createWorld(){
  world.field=window.BattlefieldTacticalField.install({B,scene,world,layout:world.defenses,design:window.BattlefieldDefenseLayout});
  state.defenses={trenches:world.defenses.trenches.length,lines:2};
  state.optimization=world.field.optimization;
+ contactShadows=window.BattlefieldInfantryContactShadows.create({B,scene,world});
+ state.contactShadows=contactShadows.report;
  world.navigation=window.BattlefieldNavigation.create({obstacles:world.obstacles});
  state.navigation=world.navigation.stats;
  state.vehicleBounds=world.vehicleBounds;
@@ -1270,6 +1272,7 @@ function frame(){
    syncVisual(view);
    nativeBlend.update(view,dt);
   }
+  contactShadows.update(views);
   // Fixed original Three.js follow profile, without rotating on the joystick.
   if(allies[0]?.alive&&camera){
    // Leave room ahead to see enemies and cover, as in the original.
