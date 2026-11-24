@@ -1,3 +1,7 @@
+ try{return await task;}
+ finally{if(ensureUnitsInFlight===task)ensureUnitsInFlight=null;}
+}
+async function ensureUnitsUnlocked(scenarioName){
  const slots=Array.isArray(scenarioName)?scenarioName:SCENE_SLOTS[scenarioName];
  if(!slots)throw Error('Неизвестный режим отряда: '+scenarioName);
  if(!asset){
@@ -129,7 +133,3 @@ async function processWeaponQueue(){
     if(view.nativeAlliedClips&&view.importedAlliedName==='britishJakeli'){
      // The exact pre-baked Lee-Enfield rig has physically checked hand
      // contact. Legacy German IK would deform this licensed British mesh.
-     // Do not attach a second rifle or overwrite the approved pose.
-     rig.weaponRigReady=true;
-     rig.nativeBakedWeapon=true;
-     view.weaponError=null;

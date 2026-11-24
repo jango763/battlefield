@@ -38,6 +38,8 @@ assert.match(field,/joined\.freezeWorldMatrix\(\)/);
 assert.match(field,/optimization\.drawCallsSaved/);
 assert.match(field,/indices\.push\(a,b,c,b,d,c\)/, 'Terrain winding must be upward');
 assert.match(game,/changeGraphicsMode\(mode\)/);
+assert.match(game,/CreateTorus\('squad-ring-'\+index/);
+assert.doesNotMatch(game,/CreateDisc\('squad-ring-'\+index/);
 assert.match(game,/state\.optimization=world\.field\.optimization/);
 assert.match(game,/renderQuality\.mode==='auto'/);
 assert.match(html,/id="quality-cycle"/);

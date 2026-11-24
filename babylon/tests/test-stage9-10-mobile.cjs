@@ -229,6 +229,15 @@ fs.mkdirSync(dir,{recursive:true});
   assert(halo.present&&!halo.pickable&&halo.parent==='soldier-anchor-0',
    'Hero ground marker must be noninteractive and follow only the hero');
   result.heroMarker=halo;
+  result.teamMarker=await page.evaluate(()=>{
+   const ring=window.BABYLON.EngineStore.LastCreatedScene.getMeshByName('squad-ring-0');
+   return {present:!!ring,vertices:ring?.getTotalVertices(),
+    name:ring?.name,pickable:ring?.isPickable};
+  });
+  assert(result.teamMarker.present&&!result.teamMarker.pickable,
+   'Original team identity marker must follow the soldier');
+  assert(result.teamMarker.vertices>100,
+   'Team marker should be thin torus geometry, not a solid filled disc');
   await page.locator('#hud-toggle').click();
   const zoomIn=await page.evaluate(()=>{
    const cam=window.BABYLON.EngineStore.LastCreatedScene.activeCamera;
