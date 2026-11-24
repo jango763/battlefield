@@ -54,6 +54,10 @@ control.clearMovement();control.updateAllies(.1);
 assert.equal(hero.x,stopped);
 assert.match(html,/\.battle-active #graphics-tag\{display:none\}/,
  'Hide distracting HD debug tag while the game is active');
+assert.match(html,/max-width:700px\) and \(min-height:601px\)/,
+ 'Portrait phones must get their own unobtrusive battle HUD');
+assert.match(html,/\.battle-active #quick-status\{margin-top:0;font-size:11px/,
+ 'Hero health and gold must stay visible in portrait mode');
 assert.match(html,/\.battle-active #heading h1\{display:none\}/,
  'Compact landscape HUD must hide only the redundant title');
 assert.match(html,/\.battle-active #battle-minimap\{width:88px;height:88px;/,
