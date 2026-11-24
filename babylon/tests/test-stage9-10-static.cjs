@@ -24,6 +24,8 @@ assert.match(art,/north-africa-libya-sunlit-v1/);
 assert.match(art,/sandTextureSize=1024/);
 assert.match(art,/terrainLandforms='wind-etched-dune-ridges-v1'/);
 assert.match(art,/historicalRoofStyle='flat-adobe-parapets-v1'/);
+assert.match(art,/mainFacadeMaterial='sunlit-painted-libya-plaster-v1'/);
+assert.match(art,/report.mainFacadeMeshes\+\+/);
 assert.match(art,/duneRidges=paintedDuneRidges/);
 assert.match(art,/scene\.fogDensity=\.0009/);
 assert.match(field,/B\.Mesh\.MergeMeshes\(group,true,true\)/);

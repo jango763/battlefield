@@ -72,6 +72,34 @@ function apply({scene,B,world,camera,sun,map}){
  const roof=pbr('old-roof-tiles','brick',{scale:4,tint:'#aa8066',rough:1});
  const timber=pbr('warped-timber','wood',{scale:2,tint:'#9c7956',rough:1});
  const dirt=pbr('soil-patches','mud',{scale:2,tint:'#b79a74',rough:1});
+ // Paint the MAIN farm/HQ facades into a deterministic sunlit plaster atlas.
+ // PBR scans without an environment light left vertical walls nearly black
+ // even after the standalone desert village was corrected in stage 3.
+ // The game world, input, shadows and character rigs do not depend on this
+ // visual-only material substitution.
+ const plasterAtlas=new B.DynamicTexture('hd2026-main-facade-plaster',
+  {width:256,height:256},scene,true);
+ const pc=plasterAtlas.getContext();
+ pc.fillStyle='#d6bb93';pc.fillRect(0,0,256,256);
+ let stuccoSeed=1944;
+ const randStucco=()=>((stuccoSeed=(Math.imul(stuccoSeed,1664525)+1013904223)>>>0)/4294967296);
+ for(let i=0;i<1150;i++){
+  const px=randStucco()*256,pz=randStucco()*256;
+  const w=1.2+randStucco()*12,h=.6+randStucco()*4;
+  pc.globalAlpha=.04+randStucco()*.13;
+  pc.fillStyle=i%5===0?'#8d7658':i%3===0?'#f7e5c2':'#c4a57d';
+  pc.fillRect(px,pz,w,h);
+ }
+ pc.globalAlpha=1;plasterAtlas.update(false);
+ plasterAtlas.anisotropicFilteringLevel=4;
+ plasterAtlas.updateSamplingMode(B.Texture.TRILINEAR_SAMPLINGMODE);
+ const brightPlaster=new B.StandardMaterial('hd2026-main-facade-sunlit',scene);
+ brightPlaster.diffuseTexture=plasterAtlas;
+ brightPlaster.diffuseColor=B.Color3.FromHexString('#f6e6cb');
+ brightPlaster.specularColor=B.Color3.Black();
+ brightPlaster.disableLighting=true;
+ report.mainFacadeMaterial='sunlit-painted-libya-plaster-v1';
+ report.mainFacadeMeshes=0;
  // Quiet tactical terrain: the 32x tiled high-frequency photo mud produced
  // severe moire on iPhone while the elevated camera moved. Generate ONLY
  // broad, low-contrast brush patches and build real mipmaps for minification.
@@ -282,8 +310,8 @@ function apply({scene,B,world,camera,sun,map}){
  if(eastRoad)eastRoad.isVisible=false;
  report.roadVisualWidth=4.2;
  const classify={
-  'base-square-':stone,'base-hq-':plaster,'barrack-':plaster,
-  'farm-yard-':dirt,'farm-house-':plaster,'farm-barn-':timber,
+  'base-square-':stone,'base-hq-':brightPlaster,'barrack-':brightPlaster,
+  'farm-yard-':dirt,'farm-house-':brightPlaster,'farm-barn-':timber,
   'pillbox-bunker-':stone,'pillbox-roof-':stone,
   'legacy-ruin-':brick,'broken-fence-':timber,'fence-rail-':timber,
   'farm-door-':timber,'farm-window-sill-':stone,'farm-roof-ridge-':timber,
@@ -305,6 +333,7 @@ function apply({scene,B,world,camera,sun,map}){
   if(!match)continue;
   // Clan/faction indicators remain unmodified by the texture pass.
   mesh.material=match[1];
+  if(match[1]===brightPlaster)report.mainFacadeMeshes++;
   mesh.receiveShadows=true;report.meshSurfaces++;
  }
  // Strong white 28-metre circles across the hero's screen were base rings,
