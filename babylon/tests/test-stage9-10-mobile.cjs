@@ -159,6 +159,18 @@ fs.mkdirSync(dir,{recursive:true});
    'Palm leaflet tint should be muted olive, not blown-out white');
   assert(result.libyaVillage.palmGlow?.[1]>.43,
    'Matte palm fronds need enough olive fill to avoid near-black leaves');
+  assert.equal(s.art.screeSurface,'baked-matte-limestone-chips-v1');
+  assert(s.art.screeRocks>=50&&s.art.screeRocks<=160,
+   'Low limestone scatter must not add excessive geometry');
+  assert.equal(s.art.screeBatches,2);
+  result.desertScree=await page.evaluate(()=>{
+   const scene=window.BABYLON.EngineStore.LastCreatedScene;
+   return scene.meshes.filter(m=>m.name.startsWith('hd2026-desert-scree-'))
+    .map(m=>({name:m.name,vertices:m.getTotalVertices(),
+     pickable:m.isPickable,material:m.material?.name}));
+  });
+  assert.equal(result.desertScree.length,2);
+  assert(result.desertScree.every(m=>m.vertices>100&&!m.pickable));
   assert.equal(s.art.roadVisualWidth,4.2,'Road must be narrowed');
   assert.equal(s.art.roadShoulderBlend,'feathered-libya-sand-v1',
    'Both North African roadways need broad dust-gradient shoulders');
