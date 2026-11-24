@@ -31,7 +31,11 @@ class Node{
  getHierarchyBoundingVectors(){return {min:new Vector3(-3,-1,-2),max:new Vector3(3,2,2)}}
 }
 class VertexData {
- applyToMesh(m){m.hasCustomGeometry=true}
+ applyToMesh(m){
+  m.hasCustomGeometry=true;
+  m.generatedVertices=(this.positions||[]).length/3;
+  m.generatedTriangles=(this.indices||[]).length/3;
+ }
  static ComputeNormals(positions,indices,normals){normals.push(...positions.map(()=>1))}
 }
 class Color3 extends Vector3{
@@ -83,6 +87,11 @@ const B={
   'One batched palm canopy must replace repetitive spherical forest');
  assert(m.nodes.find(x=>x.name==='north-africa-palm-fronds').hasCustomGeometry,
   'Palm geometry must be low-poly indexed triangles');
+ const leaves=m.nodes.find(x=>x.name==='north-africa-palm-fronds');
+ assert(leaves.generatedVertices>4500,
+  'Palm silhouettes must include individual tapered leaflets');
+ assert(leaves.generatedTriangles>2500,
+  'Palm leaflets must remain one batched indexed mesh');
  const status=await m.loadOriginalBTR();
  assert.equal(status.ok,true);
  assert.equal(status.loaded,3);

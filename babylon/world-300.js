@@ -346,7 +346,12 @@ function create(scene,B,map){
   mat.hedge.emissiveColor=B.Color3.FromHexString('#635c47');
   // 17 date palms / 33 wind-shaped acacias. Palm leaves are compiled into
   // a single faceted world mesh for one draw call; trunk collisions unchanged.
-  const palmPositions=[],palmIndices=[],palmNormals=[],palmTriangles=[];
+  const palmPositions=[],palmIndices=[],palmNormals=[];
+  function addLeaflet(x0,y0,z0,x1,y1,z1,x2,y2,z2){
+   const start=palmPositions.length/3;
+   palmPositions.push(x0,y0,z0,x1,y1,z1,x2,y2,z2);
+   palmIndices.push(start,start+1,start+2);
+  }
   function palmFronds(x,z,top,phase){
    const arms=9,steps=4;
    for(let a=0;a<arms;a++){
@@ -356,7 +361,8 @@ function create(scene,B,map){
     for(let k=0;k<=steps;k++){
      const t=k/steps,reach=4.5*t;
      const yy=top+.82*Math.sin(t*Math.PI)-1.9*t*t;
-     const w=.03+.66*Math.sin(t*Math.PI);
+     // Slender leaf midrib instead of an oversized flat polygon fan.
+     const w=.055+.095*Math.sin(t*Math.PI);
      for(const sign of [-1,1]){
       palmPositions.push(x-150+dirX*reach+sideX*w*sign,yy,
        z-150+dirZ*reach+sideZ*w*sign);
@@ -365,6 +371,22 @@ function create(scene,B,map){
     for(let k=0;k<steps;k++){
      const a0=start+k*2,b0=a0+1,c0=a0+2,d0=a0+3;
      palmIndices.push(a0,b0,c0,b0,d0,c0);
+    }
+    // Thin staggered leaflets form a serrated date-palm silhouette.
+    // All 17 palm crowns are still drawn in one existing indexed mesh.
+    for(let k=1;k<=steps*2;k++){
+     const t=(k-.25)/(steps*2),reach=4.5*t;
+     const y=top+.82*Math.sin(t*Math.PI)-1.9*t*t;
+     const half=.48*Math.sin(t*Math.PI);
+     const radial=reach+.34*(1-t);
+     for(const sign of [-1,1]){
+      const bx=x-150+dirX*reach,bz=z-150+dirZ*reach;
+      addLeaflet(
+       bx-dirX*.15,y,bz-dirZ*.15,
+       x-150+dirX*radial+sideX*sign*half,y-.27*(1-t),
+       z-150+dirZ*radial+sideZ*sign*half,
+       bx+dirX*.21,y+.035,bz+dirZ*.21);
+     }
     }
    }
   }

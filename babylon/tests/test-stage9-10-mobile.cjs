@@ -136,7 +136,8 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(result.libyaVillage.style,'libya-adobe-procedural');
   assert.equal(result.libyaVillage.loaded,3);
   assert(result.libyaVillage.adobeMeshes>30);
-  assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>1000);
+  assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>4500,
+   'Date palms must use tapered leaflets instead of giant flat fan blades');
   assert.equal(result.libyaVillage.palmPickable,false);
   assert.equal(s.art.roadVisualWidth,4.2,'Road must be narrowed');
   assert.equal(await page.evaluate(()=>{
