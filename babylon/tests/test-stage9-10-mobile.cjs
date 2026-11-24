@@ -109,7 +109,12 @@ fs.mkdirSync(dir,{recursive:true});
    const g=window.__BATTLEFIELD_GAME__.villageModels;
    const scene=window.BABYLON.EngineStore.LastCreatedScene;
    const palm=scene.getMeshByName('north-africa-palm-fronds');
+   const acacias=scene.meshes.filter(m=>m.name.startsWith('north-africa-acacia-crown-'));
    return {style:g?.style,loaded:g?.loaded,pending:g?.pending,
+    acacias:acacias.map(m=>({vertices:m.getTotalVertices(),pickable:m.isPickable,
+     matte:m.material?.disableLighting,tint:m.material?.diffuseColor?.asArray(),
+     glow:m.material?.emissiveColor?.asArray()})),
+    oldFlatCrowns:scene.meshes.filter(m=>/^(tree-crown-|tree-top-)/.test(m.name)).length,
     palmPresent:!!palm,palmVertices:palm?.getTotalVertices(),
     palmPickable:palm?.isPickable,
     palmMaterial:palm?.material?.name,
@@ -140,7 +145,13 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(result.libyaVillage.style,'libya-adobe-procedural');
   assert.equal(result.libyaVillage.loaded,3);
   assert(result.libyaVillage.adobeMeshes>30);
-  assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>4500,
+  assert.equal(result.libyaVillage.oldFlatCrowns,0,
+   'Overexposed white disk-shaped tree crowns must be removed');
+  assert.equal(result.libyaVillage.acacias.length,2);
+  assert(result.libyaVillage.acacias.every(c=>c.vertices>700&&
+   !c.pickable&&c.matte&&c.tint?.[0]<.60&&c.tint?.[1]<.65&&c.glow?.[1]>.40),
+   'Two batched, shaded acacia crowns must stay matte and textured');
+  assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>11000,
    'Date palms must use tapered leaflets instead of giant flat fan blades');
   assert.equal(result.libyaVillage.palmPickable,false);
   assert.equal(result.libyaVillage.palmMaterial,'map-palm-leaves');
@@ -149,6 +160,18 @@ fs.mkdirSync(dir,{recursive:true});
    'Palm leaflet tint should be muted olive, not blown-out white');
   assert(result.libyaVillage.palmGlow?.[1]>.43,
    'Matte palm fronds need enough olive fill to avoid near-black leaves');
+  assert.equal(s.art.screeSurface,'baked-matte-limestone-chips-v1');
+  assert(s.art.screeRocks>=50&&s.art.screeRocks<=160,
+   'Low limestone scatter must not add excessive geometry');
+  assert.equal(s.art.screeBatches,2);
+  result.desertScree=await page.evaluate(()=>{
+   const scene=window.BABYLON.EngineStore.LastCreatedScene;
+   return scene.meshes.filter(m=>m.name.startsWith('hd2026-desert-scree-'))
+    .map(m=>({name:m.name,vertices:m.getTotalVertices(),
+     pickable:m.isPickable,material:m.material?.name}));
+  });
+  assert.equal(result.desertScree.length,2);
+  assert(result.desertScree.every(m=>m.vertices>100&&!m.pickable));
   assert.equal(s.art.roadVisualWidth,4.2,'Road must be narrowed');
   assert.equal(s.art.roadShoulderBlend,'feathered-libya-sand-v1',
    'Both North African roadways need broad dust-gradient shoulders');

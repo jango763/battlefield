@@ -513,6 +513,49 @@ function apply({scene,B,world,camera,sun,map}){
     joined.freezeWorldMatrix();report.drawCallBatches++;}
   }catch(error){report.errors.push('mesh merge '+name+' '+String(error));}
  }
+ // Original low limestone scree: 2 indexed draw batches, never
+ // additional obstacle data. Rock height stays under 27 cm, below steps.
+ try{
+  const rockMaterials=['#b69b76','#d0b591'].map((hex,i)=>{
+   const m=new B.StandardMaterial('hd2026-scree-tone-'+i,scene);
+   m.diffuseColor=B.Color3.FromHexString(hex);
+   m.specularColor=B.Color3.Black();m.backFaceCulling=false;return m;
+  });
+  const groups=rockMaterials.map(()=>({positions:[],indices:[],normals:[]}));
+  const lowPowerScree=new URLSearchParams(
+   typeof location!=='undefined'?location.search:'').get('quality')==='low';
+  let count=0;
+  for(let i=0;i<(lowPowerScree?100:160);i++){
+   const x=between(15,285),z=between(15,285);
+   if(Math.abs(x-150)<8||Math.abs(z-150)<8)continue;
+   if(map.farms.some(f=>Math.hypot(x-f.x,z-f.z)<14))continue;
+   if(map.bases.some(b=>Math.hypot(x-b.x,z-b.z)<25))continue;
+   if(map.wrecks.some(w=>Math.hypot(x-w.x,z-w.z)<9))continue;
+   const g=groups[i%2],first=g.positions.length/3;
+   const size=between(.22,.68),height=between(.11,.27);
+   const rot=between(-Math.PI,Math.PI),cos=Math.cos(rot),sin=Math.sin(rot);
+   for(const [u,v] of [[-1,-.72],[1.04,-.61],[.84,1.01],[-.83,.92]]){
+    const rx=(u*cos-v*sin)*size,rz=(u*sin+v*cos)*size;
+    g.positions.push(x-150+rx,.017,z-150+rz);
+   }
+   g.positions.push(x-150+between(-.12,.12),height,z-150+between(-.12,.12));
+   g.indices.push(first,first+1,first+4,first+1,first+2,first+4,
+    first+2,first+3,first+4,first+3,first,first+4,
+    first,first+3,first+2,first,first+2,first+1);
+   count++;
+  }
+  for(let i=0;i<groups.length;i++){
+   const g=groups[i];if(!g.positions.length)continue;
+   B.VertexData.ComputeNormals(g.positions,g.indices,g.normals);
+   const data=new B.VertexData();
+   data.positions=g.positions;data.indices=g.indices;data.normals=g.normals;
+   const mesh=new B.Mesh('hd2026-desert-scree-'+i,scene);
+   data.applyToMesh(mesh);mesh.material=rockMaterials[i];
+   mesh.isPickable=false;mesh.receiveShadows=false;
+  }
+  report.screeSurface='baked-matte-limestone-chips-v1';
+  report.screeRocks=count;report.screeBatches=groups.filter(g=>g.positions.length).length;
+ }catch(error){report.errors.push('desert scree '+String(error));}
  // Opaque low-poly grass clumps avoid alpha-tested edge crawl and flicker.
  // They are decorative thin instances and do not change terrain collisions.
  try{

@@ -65,6 +65,9 @@ assert(art.includes("world.ground.material=smoothEarth"),'Ground must avoid phot
 assert(art.includes('north-africa-libya-sunlit-v1'),
  'Map must use the approved dry North African palette');
 assert(art.includes('sunlit-sandstone-and-dune-washes'));
+assert(art.includes("hd2026-desert-scree-"));
+assert(art.includes("baked-matte-limestone-chips-v1"));
+assert(art.includes("B.VertexData.ComputeNormals(g.positions,g.indices,g.normals)"));
 assert(art.includes("road.albedoTexture=roadTexture"),'Roads must use coarse painted material');
 assert(art.includes("makeOrganicRoad('north-south',true"),'Road edge should be organic');
 assert(art.includes("mesh.name.startsWith('rut-')"),'Remove toy-like raised tracks');

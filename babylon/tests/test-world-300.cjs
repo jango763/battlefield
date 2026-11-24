@@ -76,10 +76,14 @@ const B={
  assert.equal(drawn.filter(n=>n.startsWith('farm-house-')).length,5);
  assert.equal(drawn.filter(n=>n.startsWith('pillbox-bunker-')).length,7);
  assert.equal(drawn.filter(n=>n.startsWith('legacy-btr-position-')).length,3);
- assert.equal(drawn.filter(n=>n.startsWith('tree-crown-')).length,50,
-  'Every tree should have a broad lobed silhouette');
- assert.equal(drawn.filter(n=>n.startsWith('tree-top-')).length,50,
-  'Keep two foliage meshes per tree to bound draw calls');
+ assert.equal(drawn.filter(n=>n.startsWith('tree-crown-')).length,0);
+ assert.equal(drawn.filter(n=>n.startsWith('tree-top-')).length,0);
+ const acacias=m.nodes.filter(n=>n.name.startsWith('north-africa-acacia-crown-'));
+ assert.equal(acacias.length,2,'Two shared acacia canopy meshes limit draw calls');
+ assert(acacias.every(m=>m.hasCustomGeometry&&m.generatedVertices>700),
+  'Authored canopy geometry must have a true multi-lobed relief');
+ assert(acacias.every(m=>m.material.disableLighting&&!m.isPickable),
+  'Muted sage acacia canopies must remain matte and not block pointer taps');
  assert.equal(m.obstacles.filter(o=>o.type==='tree').length,50,
   'Tree-trunk collisions must remain intact');
  assert(drawn.length>0);
@@ -88,9 +92,9 @@ const B={
  assert(m.nodes.find(x=>x.name==='north-africa-palm-fronds').hasCustomGeometry,
   'Palm geometry must be low-poly indexed triangles');
  const leaves=m.nodes.find(x=>x.name==='north-africa-palm-fronds');
- assert(leaves.generatedVertices>4500,
+ assert(leaves.generatedVertices>11000,
   'Palm silhouettes must include individual tapered leaflets');
- assert(leaves.generatedTriangles>2500,
+ assert(leaves.generatedTriangles>4500,
   'Palm leaflets must remain one batched indexed mesh');
  assert.equal(leaves.material.name,'map-palm-leaves');
  assert.equal(leaves.material.disableLighting,true,
