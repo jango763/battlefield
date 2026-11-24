@@ -56,6 +56,7 @@ function frame(){
    syncVisual(view);
    nativeBlend.update(view,dt);
   }
+  contactShadows.update(views);
   // Fixed original Three.js follow profile, without rotating on the joystick.
   if(allies[0]?.alive&&camera){
    // Leave room ahead to see enemies and cover, as in the original.

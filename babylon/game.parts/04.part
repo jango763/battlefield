@@ -1,3 +1,4 @@
+ ensureUnitsInFlight=task;
  try{return await task;}
  finally{if(ensureUnitsInFlight===task)ensureUnitsInFlight=null;}
 }
@@ -132,4 +133,3 @@ async function processWeaponQueue(){
     }
     if(view.nativeAlliedClips&&view.importedAlliedName==='britishJakeli'){
      // The exact pre-baked Lee-Enfield rig has physically checked hand
-     // contact. Legacy German IK would deform this licensed British mesh.

@@ -1,3 +1,4 @@
+ state.heroCover=window.BattlefieldDefenseLayout.coverAt(world.defenses,hero,controller.getTarget(hero));
  state.heroPosition={x:hero.x,z:hero.z};
  state.cameraPosition=camera?{radius:camera.radius,alpha:camera.alpha,
   beta:camera.beta,targetX:camera.target.x,targetZ:camera.target.z}:null;
@@ -132,4 +133,3 @@ function registerUI(){
  $('supply').addEventListener('click',resupplyHero);
  $('order-move').addEventListener('click',()=>{
   inputMode='move';
-  $('order-move').setAttribute('aria-pressed','true');
