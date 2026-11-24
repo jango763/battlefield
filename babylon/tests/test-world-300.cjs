@@ -93,6 +93,9 @@ const B={
  assert(trunks.every(m=>!m.isPickable),'Visual trunks must not intercept taps');
  assert.equal(m.obstacles.filter(o=>o.type==='tree').length,50,
   'Tree-trunk collisions must remain intact');
+ assert(m.obstacles.filter(o=>o.type==='tree').every(o=>
+  Math.abs(o.hw-.55)<1e-9&&Math.abs(o.hd-.55)<1e-9),
+  'Batched tree trunks must preserve original 1.1m obstacle footprints');
  assert(drawn.length>0);
  assert(m.nodes.some(x=>x.name==='north-africa-palm-fronds'),
   'One batched palm canopy must replace repetitive spherical forest');
