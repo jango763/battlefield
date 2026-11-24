@@ -132,6 +132,27 @@ function apply({scene,B,world,camera,sun,map}){
    i%3===0?'rgba(229,198,151,ALPHA)':'rgba(169,126,83,ALPHA)',
    between(.11,.24));
  }
+ // Wind-shaped dune crests are shaded gradients baked into the existing
+ // terrain texture. No terrain-mesh displacement, extra draw calls, or
+ // collision changes: all skinned soldiers stay grounded.
+ let paintedDuneRidges=0;
+ for(let k=0;k<48;k++){
+  const x=between(12,288),z=between(12,288),long=between(8,22);
+  if(Math.abs(x-150)<13||Math.abs(z-150)<12)continue;
+  if(map.farms.some(f=>Math.hypot(x-f.x,z-f.z)<17))continue;
+  paintedDuneRidges++;
+  const px=x*1024/300,pz=z*1024/300,rx=long*1024/300;
+  brush.save();brush.translate(px,pz);brush.rotate(between(-.65,.65));
+  for(const sign of [-1,1]){
+   const g=brush.createLinearGradient(0,-rx*.14,0,rx*.14);
+   g.addColorStop(0,sign===1?'rgba(243,218,168,.11)':'rgba(144,101,65,.08)');
+   g.addColorStop(.5,sign===1?'rgba(236,203,151,.22)':'rgba(139,91,52,.13)');
+   g.addColorStop(1,'rgba(194,157,106,0)');
+   brush.fillStyle=g;brush.beginPath();
+   brush.ellipse(0,sign*rx*.16,rx,rx*.17,0,0,Math.PI*2);brush.fill();
+  }
+  brush.restore();
+ }
  // Continuous dusty road margins avoid a blank straight brown runway.
  for(let z=20;z<281;z+=7)for(const side of [-1,1]){
   earthWash(150+side*between(4,7),z+between(-3,3),between(3.4,7.5),
@@ -564,6 +585,8 @@ function apply({scene,B,world,camera,sun,map}){
  report.theatre=THEATRE;
  report.lightMood='warm-dry-high-noon';
  report.sandTextureSize=1024;
+ report.terrainLandforms='wind-etched-dune-ridges-v1';
+ report.duneRidges=paintedDuneRidges;
  report.mipmappedScans=true;report.opaqueHedgerows=true;
  report.roadStyle='dual-ruts-with-meadow-shoulders';
  report.terrainReadability='sunlit-sandstone-and-dune-washes';
