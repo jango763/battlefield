@@ -184,6 +184,26 @@ fs.mkdirSync(dir,{recursive:true});
    'Default tactical view must keep the approved wide field');
   await page.locator('#enter-game').click();
   await page.waitForTimeout(750);
+  result.portraitInputHud=await page.evaluate(()=>{
+   const h=document.querySelector('#heading h1');
+   const status=document.getElementById('quick-status');
+   const minimap=document.getElementById('battle-minimap');
+   const fire=document.getElementById('quick-fire');
+   return {titleDisplay:getComputedStyle(h).display,
+    statusDisplay:getComputedStyle(status).display,
+    statusText:status.textContent,
+    minimapWidth:minimap.getBoundingClientRect().width,
+    fireVisible:getComputedStyle(fire).display!=='none'};
+  });
+  assert.equal(result.portraitInputHud.titleDisplay,'none',
+   'The redundant title must not cover portrait combat');
+  assert.equal(result.portraitInputHud.statusDisplay,'block',
+   'Keep HP/gold displayed');
+  assert.match(result.portraitInputHud.statusText,/HP \d+.*Золото/);
+  assert(result.portraitInputHud.minimapWidth>=88&&
+   result.portraitInputHud.minimapWidth<=91,
+   'Compact portrait minimap must free battlefield space');
+  assert(result.portraitInputHud.fireVisible,'Fire must remain available');
   result.heroBefore=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.heroPosition);
   await page.screenshot({path:dir+'/'+name+'-portrait.png'});
   result.terrainDiagnostics=await page.evaluate(()=>{
