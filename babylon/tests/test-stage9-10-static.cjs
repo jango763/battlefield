@@ -24,6 +24,8 @@ assert.match(art,/terrainStyle='low-frequency-mipmapped-matte'/);
 assert.match(art,/north-africa-libya-sunlit-v1/);
 assert.match(art,/sandTextureSize=1024/);
 assert.match(art,/terrainLandforms='wind-etched-dune-ridges-v1'/);
+assert.match(art,/screeSurface='baked-matte-limestone-chips-v1'/);
+assert.match(art,/screeBatches=groups\.filter/);
 assert.match(art,/historicalRoofStyle='flat-adobe-parapets-v1'/);
 assert.match(art,/mainFacadeMaterial='sunlit-painted-libya-plaster-v1'/);
 assert.match(art,/report.mainFacadeMeshes\+\+/);
