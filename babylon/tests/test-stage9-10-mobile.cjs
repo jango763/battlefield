@@ -66,6 +66,7 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(result.infantryFill.report.modifiedImportedMaterials,0);
   assert.equal(s.art.colorGrade,'north-africa-libya-sunlit-v1');
   assert.equal(s.art.theatre,'north-africa-libya-sunlit-v1');
+  assert.equal(s.art.shrubSilhouette,'faceted-dry-thorn-scrub-v2');
   assert.equal(s.art.sandTextureSize,1024);
   assert.equal(s.art.lightMood,'warm-dry-high-noon');
   await page.waitForFunction(()=>
