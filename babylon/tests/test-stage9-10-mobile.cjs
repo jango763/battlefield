@@ -112,7 +112,8 @@ fs.mkdirSync(dir,{recursive:true});
    const acacias=scene.meshes.filter(m=>m.name.startsWith('north-africa-acacia-crown-'));
    return {style:g?.style,loaded:g?.loaded,pending:g?.pending,
     acacias:acacias.map(m=>({vertices:m.getTotalVertices(),pickable:m.isPickable,
-     matte:m.material?.disableLighting,tint:m.material?.diffuseColor?.asArray()})),
+     matte:m.material?.disableLighting,tint:m.material?.diffuseColor?.asArray(),
+     glow:m.material?.emissiveColor?.asArray()})),
     oldFlatCrowns:scene.meshes.filter(m=>/^(tree-crown-|tree-top-)/.test(m.name)).length,
     palmPresent:!!palm,palmVertices:palm?.getTotalVertices(),
     palmPickable:palm?.isPickable,
@@ -148,7 +149,7 @@ fs.mkdirSync(dir,{recursive:true});
    'Overexposed white disk-shaped tree crowns must be removed');
   assert.equal(result.libyaVillage.acacias.length,2);
   assert(result.libyaVillage.acacias.every(c=>c.vertices>700&&
-   !c.pickable&&c.matte&&c.tint?.[0]<.60&&c.tint?.[1]<.65),
+   !c.pickable&&c.matte&&c.tint?.[0]<.60&&c.tint?.[1]<.65&&c.glow?.[1]>.40),
    'Two batched, shaded acacia crowns must stay matte and textured');
   assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>4500,
    'Date palms must use tapered leaflets instead of giant flat fan blades');
