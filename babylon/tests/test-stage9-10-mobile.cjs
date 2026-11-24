@@ -140,6 +140,8 @@ fs.mkdirSync(dir,{recursive:true});
    'Date palms must use tapered leaflets instead of giant flat fan blades');
   assert.equal(result.libyaVillage.palmPickable,false);
   assert.equal(s.art.roadVisualWidth,4.2,'Road must be narrowed');
+  assert.equal(s.art.roadShoulderBlend,'feathered-libya-sand-v1',
+   'Both North African roadways need broad dust-gradient shoulders');
   assert.equal(await page.evaluate(()=>{
    const m=window.BABYLON.EngineStore.LastCreatedScene.getMeshByName('map-ground-300');
    return m?.material?.name==='hd2026-matte-terrain'&&!!m.material.diffuseTexture;

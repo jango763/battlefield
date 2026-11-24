@@ -181,6 +181,26 @@ function apply({scene,B,world,camera,sun,map}){
   }
   brush.restore();
  }
+ // Broad soft shoulders visually blend the road ribbons into the sand.
+ // These are two cheap gradient passes in the already mipmapped terrain
+ // atlas. The physical road/camera/AI collision geometry does not change.
+ const roadPx=150*1024/300,shoulderPx=11*1024/300;
+ for(const vertical of [true,false]){
+  const left=roadPx-shoulderPx,right=roadPx+shoulderPx;
+  const shade=vertical?
+   brush.createLinearGradient(left,0,right,0):
+   brush.createLinearGradient(0,left,0,right);
+  shade.addColorStop(0,'rgba(193,153,103,0)');
+  shade.addColorStop(.27,'rgba(193,153,103,.13)');
+  shade.addColorStop(.37,'rgba(218,184,136,.29)');
+  shade.addColorStop(.5,'rgba(233,202,153,.36)');
+  shade.addColorStop(.63,'rgba(218,184,136,.29)');
+  shade.addColorStop(.73,'rgba(193,153,103,.13)');
+  shade.addColorStop(1,'rgba(193,153,103,0)');
+  brush.fillStyle=shade;
+  if(vertical)brush.fillRect(left,0,2*shoulderPx,1024);
+  else brush.fillRect(0,left,1024,2*shoulderPx);
+ }
  // Continuous dusty road margins avoid a blank straight brown runway.
  for(let z=20;z<281;z+=7)for(const side of [-1,1]){
   earthWash(150+side*between(4,7),z+between(-3,3),between(3.4,7.5),
@@ -627,6 +647,7 @@ function apply({scene,B,world,camera,sun,map}){
  report.duneRidges=paintedDuneRidges;
  report.mipmappedScans=true;report.opaqueHedgerows=true;
  report.roadStyle='dual-ruts-with-meadow-shoulders';
+ report.roadShoulderBlend='feathered-libya-sand-v1';
  report.terrainReadability='sunlit-sandstone-and-dune-washes';
  report.ready=true;
  scene.metadata=scene.metadata||{};
