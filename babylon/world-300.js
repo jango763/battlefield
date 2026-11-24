@@ -342,8 +342,8 @@ function create(scene,B,map){
  // Matte arid acacia canopies replace the overexposed mushroom spheres.
  // Two shared indexed meshes per full map; tree-trunk collisions untouched.
  const acaciaMats=[
-  material('acacia-olive','#65704e','#11150d'),
-  material('acacia-sage','#858e64','#151a10')
+  material('acacia-olive','#65704e','#5f6f4d'),
+  material('acacia-sage','#858e64','#6e7c53')
  ];
  const acaciaGroups=acaciaMats.map(()=>({positions:[],indices:[],normals:[]}));
  for(const m of acaciaMats){m.disableLighting=true;m.backFaceCulling=false;}
