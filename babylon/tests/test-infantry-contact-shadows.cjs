@@ -32,4 +32,16 @@ for(let frame=0;frame<1000;frame++){
 assert.equal(vertices.length,S.CAPACITY*S.VERTICES*3);
 assert(pool.indices.every(i=>i>=0&&i<S.CAPACITY*S.VERTICES));
 assert(pool.indices.length/3<=2000,'One pooled mesh stays within mobile geometry budget');
+const surface=(name,x,z,w,d,y)=>({name,isVisible:true,isEnabled:()=>true,
+ computeWorldMatrix(){},getBoundingInfo:()=>({boundingBox:{
+  minimumWorld:{x:x-w/2,z:z-d/2},maximumWorld:{x:x+w/2,z:z+d/2,y}}})});
+const sample=S.createSurfaceSampler({scene:{meshes:[
+ surface('north-south-road',0,0,4.2,265,.045),
+ surface('base-square-blue',0,-125,26,19,.17),
+ surface('base-hq-blue',0,-125,13,9,5.2)]},
+ world:{heightAt:()=>-.85,defenses:{trenches:[{a:160,b:180,z:170}]}}});
+assert.equal(sample(0,0),.045,'Road top is a receiving surface');
+assert.equal(sample(0,-125),.17,'Base paving receives shadows, never the HQ roof');
+assert.equal(sample(20,20),-.76,'Trench duckboards must not hide contact shadows');
+assert.equal(sample(35,35),-.85,'Away from walkable meshes use actual terrain');
 console.log('BATTLEFIELD_CONTACT_SHADOWS_PASS');

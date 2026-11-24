@@ -59,11 +59,11 @@
   }
   return {positions,colors,normals,indices,update,get active(){return active;}};
  }
- function create({B,scene,world}){
+ function createSurfaceSampler({scene,world}){
   // Cache only shallow walkable map surfaces, after art has narrowed roads.
   // Querying their bounds once also covers base paving above the sand.
   const surfaces=scene.meshes.filter(m=>
-   /^map-(north-south-road|west-east-road|lane-farm-|base-square-)/.test(m.name)
+   /^(north-south-road|west-east-road|lane-farm-|base-square-)/.test(m.name)
    &&m.isEnabled()&&m.isVisible).map(m=>{
     m.computeWorldMatrix(true);const b=m.getBoundingInfo().boundingBox;
     return {minX:b.minimumWorld.x,maxX:b.maximumWorld.x,
@@ -71,12 +71,15 @@
    });
   for(const t of world.defenses?.trenches||[])surfaces.push({
    minX:t.a+3-150,maxX:t.b-3-150,minZ:t.z-.85-150,maxZ:t.z+.85-150,y:-.76});
-  const pool=createPool({heightAt:(x,z)=>{
+  return (x,z)=>{
    let y=world.heightAt?.(x+150,z+150)||0;
    for(const s of surfaces)if(x>=s.minX&&x<=s.maxX&&z>=s.minZ&&z<=s.maxZ)
     y=Math.max(y,s.y);
    return y;
-  }});
+  };
+ }
+ function create({B,scene,world}){
+  const pool=createPool({heightAt:createSurfaceSampler({scene,world})});
   const mesh=new B.Mesh('infantry-contact-shadows',scene),data=new B.VertexData();
   Object.assign(data,{positions:pool.positions,colors:pool.colors,
    normals:pool.normals,indices:pool.indices});data.applyToMesh(mesh,true);
@@ -96,5 +99,5 @@
   }
   return {update,report,mesh};
  }
- return Object.freeze({CAPACITY,VERTICES,LIFT,createPool,create});
+ return Object.freeze({CAPACITY,VERTICES,LIFT,createPool,createSurfaceSampler,create});
 });
