@@ -347,7 +347,7 @@ function create(scene,B,map){
   // 17 date palms / 33 wind-shaped acacias. Palm leaves are compiled into
   // a single faceted world mesh for one draw call; trunk collisions unchanged.
   // Matte olive ensures fine leaflets stay legible, not overexposed white.
-  const palmLeafMat=material('palm-leaves','#748052','#222b1e');
+  const palmLeafMat=material('palm-leaves','#4a5738','#64734e');
   palmLeafMat.disableLighting=true;
   palmLeafMat.backFaceCulling=false;
   const palmPositions=[],palmIndices=[],palmNormals=[];
