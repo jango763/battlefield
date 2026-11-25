@@ -74,7 +74,15 @@ const B={
  assert(m.inBase(150,25,'blue')&&!m.inBase(150,25,'red'));
  assert(m.inBase(150,275,'red')&&!m.inBase(150,275,'blue'));
  assert.equal(drawn.filter(n=>n.startsWith('farm-house-')).length,5);
- assert.equal(drawn.filter(n=>n.startsWith('pillbox-bunker-')).length,7);
+ const forts=m.nodes.filter(n=>n.name.startsWith('pillbox-bunker-'));
+ assert.equal(forts.length,7);
+ assert(forts.every(n=>n.hasCustomGeometry));
+ for(const fort of m.obstacles.filter(o=>o.type==='pillbox')){
+  for(const wreck of m.obstacles.filter(o=>o.type==='btr-wreck')){
+   assert(Math.abs(fort.x-wreck.x)>fort.hw+wreck.hw+2 ||
+    Math.abs(fort.z-wreck.z)>fort.hd+wreck.hd+2,'Keep the convoy clear of pillboxes');
+  }
+ }
  assert.equal(drawn.filter(n=>n.startsWith('legacy-btr-position-')).length,3);
  assert.equal(drawn.filter(n=>n.startsWith('tree-crown-')).length,0);
  assert.equal(drawn.filter(n=>n.startsWith('tree-top-')).length,0);

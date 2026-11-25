@@ -186,13 +186,47 @@ function create(scene,B,map){
    goldMarker.metadata={mapTag:'locked-center',farmId:farm.id};
   }
  }
- // 7 pillboxes with gun slit and concrete parapet.
- for(const fort of map.pillboxes){
-  cylinder('pillbox-bunker-'+fort.id,9,2.8,fort.x,1.44,fort.z,mat.stone,20);
-  cylinder('pillbox-roof-'+fort.id,10.5,.55,fort.x,3,fort.z,mat.roof,20);
-  box('pillbox-slit-'+fort.id,3,.35,.24,fort.x,1.95,fort.z+4.1,mat.black);
-  obstacle(fort.x,fort.z,9,9,'pillbox');
+ // Chamfered concrete casemates. The recessed firing gallery opens on all
+ // sides; its continuous corner piers carry the shallow battered roof.
+ function buildCasemate(fort){
+  const positions=[],indices=[],uvs=[],normals=[];
+  function face(points){
+   const start=positions.length/3;
+   const horizontal=points.every(point=>point[1]===points[0][1]);
+   for(const [x,y,z] of points){
+    positions.push(x,y,z);
+    uvs.push((horizontal?x:x+z)*.22,(horizontal?z:y)*.22);
+   }
+   for(let k=1;k<points.length-1;k++)indices.push(start,start+k,start+k+1);
+  }
+  const outline=[[-3,-3],[3,-3],[4,-2],[4,2],[3,3],[-3,3],[-4,2],[-4,-2]];
+  function ring(scale,y){return outline.map(([x,z])=>[x*scale,y,z*scale]);}
+  function sides(bottom,top){
+   for(let i=0;i<8;i++){const j=(i+1)%8;face([bottom[i],top[i],top[j],bottom[j]]);}
+  }
+  const foot=ring(1,.01),sill=ring(.92,1.12),soffit=ring(.98,1.78);
+  sides(foot,sill);face([...sill].reverse());
+  const gallery=ring(.92,1.78);
+  for(let i=1;i<8;i+=2){
+   const j=(i+1)%8;
+   face([sill[i],gallery[i],gallery[j],sill[j]]);
+  }
+  sides(ring(.57,1.12),ring(.57,1.78));
+  face(soffit);
+  const lip=ring(.98,1.98),cap=ring(.84,2.26);
+  sides(soffit,lip);sides(lip,cap);face([...cap].reverse());
+  // Babylon uses clockwise front faces. The top outline above is outward
+  // in a right-handed cross product, so reverse the triangles for Babylon.
+  indices.reverse();
+  const mesh=new B.Mesh('pillbox-bunker-'+fort.id,scene);
+  const data=new B.VertexData();
+  B.VertexData.ComputeNormals(positions,indices,normals);
+  data.positions=positions;data.indices=indices;data.normals=normals;data.uvs=uvs;
+  data.applyToMesh(mesh);mesh.position.copyFrom(at(fort.x,fort.z,0,B));
+  mesh.material=mat.stone;mesh.isPickable=false;nodes.push(mesh);
+  obstacle(fort.x,fort.z,8,6,'pillbox');
  }
+ for(const fort of map.pillboxes)buildCasemate(fort);
  // Three burned-out APCs in the exact approved broken-column positions.
  // This geometry deliberately represents *positions/roadblocks only*.
  // The original GLB is embedded in a huge legacy HTML file and must be
