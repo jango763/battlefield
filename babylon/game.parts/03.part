@@ -1,3 +1,4 @@
+    alertStatus('Выберите врага. Для движения нажмите «Движение».');
     return;
    }
    const x=(point.x-BASE_X)/UNIT_SCALE,z=(point.z-BASE_Z)/UNIT_SCALE;
@@ -132,4 +133,3 @@ let ensureUnitsInFlight=null;
 async function ensureUnits(scenarioName){
  while(ensureUnitsInFlight){try{await ensureUnitsInFlight;}catch(_){/* retry next slot */}}
  const task=ensureUnitsUnlocked(scenarioName);
- ensureUnitsInFlight=task;

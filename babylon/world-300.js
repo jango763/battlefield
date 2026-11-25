@@ -188,8 +188,8 @@ function create(scene,B,map){
  }
  // 7 pillboxes with gun slit and concrete parapet.
  for(const fort of map.pillboxes){
-  cylinder('pillbox-bunker-'+fort.id,9,2.8,fort.x,1.44,fort.z,mat.stone,8);
-  cylinder('pillbox-roof-'+fort.id,10.5,.55,fort.x,3,fort.z,mat.roof,8);
+  cylinder('pillbox-bunker-'+fort.id,9,2.8,fort.x,1.44,fort.z,mat.stone,20);
+  cylinder('pillbox-roof-'+fort.id,10.5,.55,fort.x,3,fort.z,mat.roof,20);
   box('pillbox-slit-'+fort.id,3,.35,.24,fort.x,1.95,fort.z+4.1,mat.black);
   obstacle(fort.x,fort.z,9,9,'pillbox');
  }
@@ -386,14 +386,14 @@ function create(scene,B,map){
    palmIndices.push(start,start+1,start+2);
   }
   function palmFronds(x,z,top,phase){
-   const arms=9,steps=4;
+   const arms=11,steps=5;
    for(let a=0;a<arms;a++){
     const angle=phase+a*Math.PI*2/arms,dirX=Math.cos(angle),dirZ=Math.sin(angle);
     const sideX=-dirZ,sideZ=dirX;
     const start=palmPositions.length/3;
     for(let k=0;k<=steps;k++){
      const t=k/steps,reach=4.5*t;
-     const yy=top+.82*Math.sin(t*Math.PI)-1.9*t*t;
+     const yy=top+.88*Math.sin(t*Math.PI)-2.25*t*t;
      // Slender leaf midrib instead of an oversized flat polygon fan.
      const w=.055+.095*Math.sin(t*Math.PI);
      for(const sign of [-1,1]){
@@ -409,20 +409,54 @@ function create(scene,B,map){
     // All 17 palm crowns are still drawn in one existing indexed mesh.
     for(let k=1;k<=steps*2;k++){
      const t=(k-.25)/(steps*2),reach=4.5*t;
-     const y=top+.82*Math.sin(t*Math.PI)-1.9*t*t;
-     const half=.48*Math.sin(t*Math.PI);
-     const radial=reach+.34*(1-t);
+     const y=top+.88*Math.sin(t*Math.PI)-2.25*t*t;
+     const half=.76*Math.sin(t*Math.PI);
+     const radial=reach+.40*(1-t);
      for(const sign of [-1,1]){
       const bx=x-150+dirX*reach,bz=z-150+dirZ*reach;
       addLeaflet(
        bx-dirX*.15,y,bz-dirZ*.15,
-       x-150+dirX*radial+sideX*sign*half,y-.27*(1-t),
+       x-150+dirX*radial+sideX*sign*half,y-.32*(1-t),
        z-150+dirZ*radial+sideZ*sign*half,
        bx+dirX*.21,y+.035,bz+dirZ*.21);
      }
     }
    }
   }
+ // Tree trunks are gently tapered, curved bark rather than telephone poles.
+ // Keep every original tree obstacle dimension and location but render
+ // all 50 visual trunks in only two indexed static meshes.
+ const trunkMats=[material('trunk-warm-bark','#8e7152','#403122'),
+  material('trunk-sunlit-bark','#9e8060','#493a28')];
+ const trunkGroups=trunkMats.map(()=>({positions:[],indices:[],normals:[]}));
+ for(const m of trunkMats)m.backFaceCulling=false;
+ function addTaperedTrunk(x,z,height,id){
+  const group=trunkGroups[id%2],first=group.positions.length/3;
+  const rings=5,segments=7;
+  for(let j=0;j<rings;j++){
+   const t=j/(rings-1),r=.53*(1-.42*t);
+   const swayX=.27*Math.sin(id*1.37)*t*t;
+   const swayZ=.23*Math.cos(id*.91)*t*t;
+   for(let k=0;k<segments;k++){
+    const a=k*Math.PI*2/segments+id*.41;
+    const groove=1+.055*Math.sin(k*3.6+j*1.4+id);
+    group.positions.push(x-150+swayX+Math.cos(a)*r*groove,
+     height*t,z-150+swayZ+Math.sin(a)*r*groove);
+   }
+  }
+  for(let j=0;j<rings-1;j++)for(let k=0;k<segments;k++){
+   const a=first+j*segments+k,b=first+j*segments+(k+1)%segments;
+   const c=a+segments,d=b+segments;
+   group.indices.push(a,b,c,b,d,c);
+  }
+  const top=group.positions.length/3;
+  group.positions.push(x-150+.27*Math.sin(id*1.37),
+   height,z-150+.23*Math.cos(id*.91));
+  for(let k=0;k<segments;k++){
+   const a=first+(rings-1)*segments+k,b=first+(rings-1)*segments+(k+1)%segments;
+   group.indices.push(a,b,top);
+  }
+ }
  for(let i=0;i<50;i++){
   const side=i%2?-1:1;
   const x=20+(i*47)%261;
@@ -430,9 +464,20 @@ function create(scene,B,map){
   if(x<18||x>282||z<15||z>285)continue;
   if(Math.hypot(x-150,z-150)<24)continue;
   const isPalm=i%3===0,topY=isPalm?7.7:5.7;
-  cylinder('tree-trunk-'+i,1.1,isPalm?7.6:5.7,x,topY/2,z,mat.trunk,7);
+  addTaperedTrunk(x,z,isPalm?7.6:5.7,i);
+  obstacle(x,z,1.1,1.1,'tree');
   if(isPalm)palmFronds(x,z,topY,i*.43);
   else addAcaciaCrown(x,z,i);
+ }
+ for(let i=0;i<trunkGroups.length;i++){
+  const g=trunkGroups[i];if(!g.positions.length)continue;
+  B.VertexData.ComputeNormals(g.positions,g.indices,g.normals);
+  const data=new B.VertexData();
+  data.positions=g.positions;data.indices=g.indices;
+  data.normals=g.normals;
+  const mesh=new B.Mesh('north-africa-tree-trunks-'+i,scene);
+  data.applyToMesh(mesh);mesh.material=trunkMats[i];
+  mesh.isPickable=false;mesh.receiveShadows=false;nodes.push(mesh);
  }
  for(let i=0;i<acaciaGroups.length;i++){
   const group=acaciaGroups[i];

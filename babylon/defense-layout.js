@@ -61,7 +61,11 @@ function heightAt(layout,x,z){
   if(x<t.a||x>t.b||Math.abs(z-t.z)>1.3)continue;
   const ramp=Math.min(1,(x-t.a)/3,(t.b-x)/3),edge=Math.min(1,(1.3-Math.abs(z-t.z))/.15);
   return -t.depth*Math.max(0,ramp)*Math.max(0,edge)||0;
- }return 0;
+ }
+ // Border dunes taper to zero before the road network and settlement.
+ // Linear slopes interpolate exactly on the existing ten-metre terrain grid.
+ const edgeX=Math.min(x,300-x),edgeZ=Math.min(z,300-z);
+ return .17*Math.max(0,10-edgeX)+.12*Math.max(0,10-edgeZ);
 }
 function coverAt(layout,unit,attacker){
  let best=0;

@@ -19,7 +19,7 @@ B.VertexData.ComputeNormals=()=>{};
 B.MeshBuilder={
  CreateBox:(name)=>{const v=mesh(name);boxes.push(v);return v;},
  CreateSphere:(name,opts)=>{const v=mesh(name);v.options=opts;spheres.push(v);return v;},
- CreateTorus:name=>mesh(name),CreateLines:name=>mesh(name)
+ CreateCylinder:name=>mesh(name),CreateTorus:name=>mesh(name),CreateLines:name=>mesh(name)
 };
 B.Mesh={MergeMeshes:(group)=>mesh('merged-'+group.length)};
 const layout=Design.create(),added=[],world={ground:mesh('ground'),addObstacle:o=>added.push(o)};

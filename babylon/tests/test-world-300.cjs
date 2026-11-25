@@ -84,17 +84,27 @@ const B={
   'Authored canopy geometry must have a true multi-lobed relief');
  assert(acacias.every(m=>m.material.disableLighting&&!m.isPickable),
   'Muted sage acacia canopies must remain matte and not block pointer taps');
+ assert.equal(drawn.filter(n=>n.startsWith('tree-trunk-')).length,0,
+  'Original dark telephone-pole cylinders must be replaced');
+ const trunks=m.nodes.filter(n=>n.name.startsWith('north-africa-tree-trunks-'));
+ assert.equal(trunks.length,2,'Only two indexed trunk draw batches allowed');
+ assert(trunks.every(m=>m.hasCustomGeometry&&m.generatedVertices>500),
+  'Tree bark should have real taper and curvature, not box proxies');
+ assert(trunks.every(m=>!m.isPickable),'Visual trunks must not intercept taps');
  assert.equal(m.obstacles.filter(o=>o.type==='tree').length,50,
   'Tree-trunk collisions must remain intact');
+ assert(m.obstacles.filter(o=>o.type==='tree').every(o=>
+  Math.abs(o.hw-.55)<1e-9&&Math.abs(o.hd-.55)<1e-9),
+  'Batched tree trunks must preserve original 1.1m obstacle footprints');
  assert(drawn.length>0);
  assert(m.nodes.some(x=>x.name==='north-africa-palm-fronds'),
   'One batched palm canopy must replace repetitive spherical forest');
  assert(m.nodes.find(x=>x.name==='north-africa-palm-fronds').hasCustomGeometry,
   'Palm geometry must be low-poly indexed triangles');
  const leaves=m.nodes.find(x=>x.name==='north-africa-palm-fronds');
- assert(leaves.generatedVertices>4500,
+ assert(leaves.generatedVertices>11000,
   'Palm silhouettes must include individual tapered leaflets');
- assert(leaves.generatedTriangles>2500,
+ assert(leaves.generatedTriangles>4500,
   'Palm leaflets must remain one batched indexed mesh');
  assert.equal(leaves.material.name,'map-palm-leaves');
  assert.equal(leaves.material.disableLighting,true,
