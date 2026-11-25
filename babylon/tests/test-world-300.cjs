@@ -86,6 +86,10 @@ const B={
  assert.equal(drawn.filter(n=>n.startsWith('legacy-btr-position-')).length,3);
  assert.equal(drawn.filter(n=>n.startsWith('tree-crown-')).length,0);
  assert.equal(drawn.filter(n=>n.startsWith('tree-top-')).length,0);
+ for(const tree of m.obstacles.filter(o=>o.type==='tree')){
+  assert(map.wrecks.every(w=>Math.hypot(w.x-tree.x,w.z-tree.z)>=7),
+   'Keep tree crowns clear of the convoy');
+ }
  const acacias=m.nodes.filter(n=>n.name.startsWith('north-africa-acacia-crown-'));
  assert.equal(acacias.length,2,'Two shared acacia canopy meshes limit draw calls');
  assert(acacias.every(m=>m.hasCustomGeometry&&m.generatedVertices>700),

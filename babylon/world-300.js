@@ -493,8 +493,10 @@ function create(scene,B,map){
  }
  for(let i=0;i<50;i++){
   const side=i%2?-1:1;
-  const x=20+(i*47)%261;
-  const z=side*(19+(i*23)%114)+150;
+  let x=20+(i*47)%261;
+  let z=side*(19+(i*23)%114)+150;
+  // Leave clearance for the hull and the overhanging crown.
+  if(map.wrecks.some(w=>Math.hypot(x-w.x,z-w.z)<7)){x-=23;z+=9;}
   if(x<18||x>282||z<15||z>285)continue;
   if(Math.hypot(x-150,z-150)<24)continue;
   const isPalm=i%3===0,topY=isPalm?7.7:5.7;
