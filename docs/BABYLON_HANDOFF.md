@@ -28,3 +28,10 @@
 ## Рабочие правила
 
 Подтверждённый результат Work не перепроверять без причины. В активной сессии переходить к следующему этапу без напоминания. При ошибке исправлять текущий этап или фиксировать блокировку, не скрывать её. Не менять утверждённые механики, модели бойцов и управление ради художественных изменений. Не выдавать код без визуальной проверки за графику уровня CoH3. Команда «Стоп» прекращает дальнейшие действия. CI проверяет код, но не создаёт новый игровой код и не запускает фонового агента.
+
+
+## Libya art integration · 2026-11-25
+
+Draft PR #76 combines the compatible work of #71–75. Playable checkpoint 7bfad103b5a197162c4e84d376dec5b5a53551c9. GitHub Actions run 45697042562 passed regression, Chromium mobile WebGL and WebKit mobile WebGL. The mobile scene test finds all nine shared depot instances. The comparison below uses Chromium with a matched camera, viewport and quality setting. It shows the depot before (53274a1) and after (7bfad10). Remaining acceptance requires physical iPhone Safari performance, touch and visual review. A single depot view does not cover the full map.
+
+![Depot before and after](../babylon/modernization/qa/depot-comparison.jpg)
