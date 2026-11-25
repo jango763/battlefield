@@ -211,8 +211,14 @@ function apply({scene,B,world,camera,sun,map}){
    earthWash(x,t.z+between(-2,2),between(4.5,8.5),
     'rgba(127,92,60,ALPHA)',between(.16,.29));
  }
- for(const w of map.wrecks||[])
-  earthWash(w.x,w.z,between(5,8),'rgba(113,78,53,ALPHA)',.32);
+ for(const w of map.wrecks||[]){
+  // Overlapping soot and rust stains follow each wreck's local long axis.
+  for(let n=-3;n<=3;n++){
+   const x=w.x+Math.sin(w.heading)*n,z=w.z+Math.cos(w.heading)*n;
+   earthWash(x,z,4.4-Math.abs(n)*.5,'rgba(79,65,52,ALPHA)',.46);
+   earthWash(x+1,z+.6,2.1,'rgba(132,85,54,ALPHA)',.32);
+  }
+ }
  brush.globalAlpha=1;
  const terrainTexture=new B.DynamicTexture('hd2026-soft-painted-earth',
   {width:1024,height:1024},scene,true);
@@ -363,6 +369,11 @@ function apply({scene,B,world,camera,sun,map}){
   if(circle)circle.isVisible=false;
  }
  const batches=new Map();
+ const recess=new B.StandardMaterial('hd2026-window-recess',scene);
+ recess.diffuseColor=B.Color3.FromHexString('#51483b');
+ recess.emissiveColor=B.Color3.FromHexString('#252017');
+ recess.specularColor=B.Color3.Black();
+ material['window-recess']=recess;
  function addShape(mesh,matName){
   mesh.material=material[matName];
   mesh.isPickable=false;
@@ -376,6 +387,14 @@ function apply({scene,B,world,camera,sun,map}){
   const mesh=B.MeshBuilder.CreateBox('hd2026-'+name,{width:w,height:h,depth:d},scene);
   mesh.position.copyFrom(pos(x,y,z));
   mesh.rotation.z=angle;
+  return addShape(mesh,matName);
+ }
+ // Irregular low-poly masonry fragments, batched with the existing stone.
+ function rubble(name,x,y,z,w,h,d,matName,angle=0){
+  const mesh=B.MeshBuilder.CreateSphere('hd2026-'+name,{diameter:1,segments:5},scene);
+  mesh.position.copyFrom(pos(x,y,z));
+  mesh.scaling.set(w,h,d);
+  mesh.rotation.y=angle;mesh.rotation.z=angle*.3;
   return addShape(mesh,matName);
  }
  function roofPair(label,x,z,y,width,depth){
@@ -395,6 +414,8 @@ function apply({scene,B,world,camera,sun,map}){
   report.parapetSegments=(report.parapetSegments||0)+4;
  }
  function frameWindow(label,x,y,z,facesBack=false){
+  // Dark inset silhouette inside the existing frame, no collision change.
+  box(label+'-recess',x,y,z,1.48,1.26,.16,'window-recess');
   // Deep window reveal, diagonal broken shutter, stone sill.
   box(label+'-top',x,y+.72,z,1.65,.16,.24,'pitted-stone');
   box(label+'-bottom',x,y-.69,z,1.75,.16,.37,'pitted-stone');
@@ -411,7 +432,7 @@ function apply({scene,B,world,camera,sun,map}){
   const x=farm.x-2,z=farm.z;
   const old=byName.get('farm-roof-'+farm.id);
   if(old)old.isVisible=false;
-  roofPair('farm-'+farm.id,x,z,5.6,9.8,7.7);
+  roofPair('farm-'+farm.id,x,z,4.85,9.8,7.7);
   // Same art on both facades, with timber frames and actual shutter details.
   for(const direction of [-1,1]){
    const face=z+direction*3.59;
@@ -426,11 +447,11 @@ function apply({scene,B,world,camera,sun,map}){
      x+side*4.38,2.45,face,.47,4.5,.48,'weathered-brick');
   }
   // Low ventilation shaft instead of tall Northern European chimney.
-  box('farm-chimney-'+farm.id,x+2.2,6.25,z-1,1.2,1.0,1.1,'battered-plaster');
-  box('farm-chimney-top-'+farm.id,x+2.2,6.85,z-1,1.42,.18,1.42,'pitted-stone');
+  box('farm-chimney-'+farm.id,x+2.2,5.50,z-1,1.2,1.0,1.1,'battered-plaster');
+  box('farm-chimney-top-'+farm.id,x+2.2,6.10,z-1,1.42,.18,1.42,'pitted-stone');
   for(let i=0;i<8;i++){
    const dx=between(-5,5),dz=between(-5,5);
-   box('farm-rubble-'+farm.id+'-'+i,x+dx,.13,z+3.7+Math.abs(dz)*.34,
+   rubble('farm-rubble-'+farm.id+'-'+i,x+dx,.13,z+3.7+Math.abs(dz)*.34,
     between(.35,.9),between(.15,.38),between(.4,1),'pitted-stone',
     between(-.35,.35));
    report.groundDebris++;
@@ -439,7 +460,7 @@ function apply({scene,B,world,camera,sun,map}){
  // Country headquarters: rough stone base, timber pilasters, windows,
  // pitched tiled roof. Faction banner stays separate for color recognition.
  for(const base of map.bases){
-  const x=base.x,z=base.z,y=5.72;
+  const x=base.x,z=base.z,y=5.20;
   const old=byName.get('base-hq-roof-'+base.id);
   if(old)old.isVisible=false;
   roofPair('hq-'+base.id,x,z,y,13.4,9.25);
@@ -456,7 +477,7 @@ function apply({scene,B,world,camera,sun,map}){
    box('hq-'+base.id+'-corner-'+side,left,2.9,z-3,.66,5.2,.73,'weathered-brick');
    box('hq-'+base.id+'-second-corner-'+side,left,2.9,z+3,.66,5.2,.73,'weathered-brick');
   }
-  box('hq-chimney-'+base.id,x+3.4,6.45,z-1.5,1.4,1.1,1.4,'battered-plaster');
+  box('hq-chimney-'+base.id,x+3.4,5.93,z-1.5,1.4,1.1,1.4,'battered-plaster');
   // Blue/red equipment banner is cloth, not a whole neon-blue building.
   const banner=new B.StandardMaterial('hd2026-banner-'+base.team,scene);
   banner.diffuseColor=B.Color3.FromHexString(base.team==='blue'?'#6b9aaa':'#aa6755');
@@ -494,7 +515,7 @@ function apply({scene,B,world,camera,sun,map}){
     between(1,3.9),.25,.21,'warped-timber',between(-.5,.5));
   }
   for(let j=0;j<12;j++){
-   box('ruin-'+index+'-stone-'+j,rx+between(-6,6),
+   rubble('ruin-'+index+'-stone-'+j,rx+between(-6,6),
     between(.12,.3),rz+between(-2.7,2.7),
     between(.32,.99),between(.22,.62),between(.3,.82),
     j%3?'pitted-stone':'weathered-brick',between(-.45,.45));

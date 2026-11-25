@@ -107,10 +107,15 @@ fs.mkdirSync(dir,{recursive:true});
    null,{timeout:45000});
   result.libyaVillage=await page.evaluate(()=>{
    const g=window.__BATTLEFIELD_GAME__.villageModels;
+   if(g.arcades!==9)throw Error('Expected nine instanced GLB arcades, got '+g.arcades+' '+JSON.stringify(g.errors));
    const scene=window.BABYLON.EngineStore.LastCreatedScene;
    const palm=scene.getMeshByName('north-africa-palm-fronds');
    const acacias=scene.meshes.filter(m=>m.name.startsWith('north-africa-acacia-crown-'));
+   const trunks=scene.meshes.filter(m=>m.name.startsWith('north-africa-tree-trunks-'));
    return {style:g?.style,loaded:g?.loaded,pending:g?.pending,
+    trunkBatches:trunks.map(m=>({vertices:m.getTotalVertices(),pickable:m.isPickable,
+     tint:m.material?.diffuseColor?.asArray(),glow:m.material?.emissiveColor?.asArray()})),
+    oldTelephonePoles:scene.meshes.filter(m=>m.name.startsWith('tree-trunk-')).length,
     acacias:acacias.map(m=>({vertices:m.getTotalVertices(),pickable:m.isPickable,
      matte:m.material?.disableLighting,tint:m.material?.diffuseColor?.asArray(),
      glow:m.material?.emissiveColor?.asArray()})),
@@ -145,13 +150,19 @@ fs.mkdirSync(dir,{recursive:true});
   assert.equal(result.libyaVillage.style,'libya-adobe-procedural');
   assert.equal(result.libyaVillage.loaded,3);
   assert(result.libyaVillage.adobeMeshes>30);
+  assert.equal(result.libyaVillage.oldTelephonePoles,0,
+   'Straight dark telephone-pole tree trunks must be replaced');
+  assert.equal(result.libyaVillage.trunkBatches.length,2);
+  assert(result.libyaVillage.trunkBatches.every(t=>t.vertices>500&&
+   !t.pickable&&t.glow?.[0]>.20),
+   'Batched tapered trunk geometry must stay visibly warm and noninteractive');
   assert.equal(result.libyaVillage.oldFlatCrowns,0,
    'Overexposed white disk-shaped tree crowns must be removed');
   assert.equal(result.libyaVillage.acacias.length,2);
   assert(result.libyaVillage.acacias.every(c=>c.vertices>700&&
    !c.pickable&&c.matte&&c.tint?.[0]<.60&&c.tint?.[1]<.65&&c.glow?.[1]>.40),
    'Two batched, shaded acacia crowns must stay matte and textured');
-  assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>4500,
+  assert(result.libyaVillage.palmPresent&&result.libyaVillage.palmVertices>11000,
    'Date palms must use tapered leaflets instead of giant flat fan blades');
   assert.equal(result.libyaVillage.palmPickable,false);
   assert.equal(result.libyaVillage.palmMaterial,'map-palm-leaves');
@@ -227,6 +238,27 @@ fs.mkdirSync(dir,{recursive:true});
    result.portraitInputHud.minimapWidth<=91,
    'Compact portrait minimap must free battlefield space');
   assert(result.portraitInputHud.fireVisible,'Fire must remain available');
+  result.contactShadows=await page.evaluate(()=>{
+   const scene=window.BABYLON.EngineStore.LastCreatedScene;
+   const mesh=scene.getMeshByName('infantry-contact-shadows');
+   const positions=mesh.getVerticesData('position');
+   return {report:window.__BATTLEFIELD_GAME__.contactShadows,
+    meshCount:scene.meshes.filter(m=>m.name==='infantry-contact-shadows').length,
+    vertices:mesh.getTotalVertices(),enabled:mesh.isEnabled(),
+    pickable:mesh.isPickable,collisions:mesh.checkCollisions,
+    vertexAlpha:mesh.hasVertexAlpha,depthWrite:!mesh.material.disableDepthWrite,
+    textures:mesh.material.getActiveTextures().length,
+    heroCenter:Array.from(positions.slice(0,3)),
+    hero:scene.getTransformNodeByName('soldier-anchor-0').position.asArray()};
+  });
+  const shadows=result.contactShadows;
+  assert.equal(shadows.meshCount,1);
+  assert(shadows.enabled&&shadows.report.active>=1);
+  assert(shadows.report.active<=24&&shadows.vertices<=1200);
+  assert(!shadows.pickable&&!shadows.collisions&&!shadows.depthWrite);
+  assert(shadows.vertexAlpha&&shadows.textures===0);
+  assert(Math.abs(shadows.heroCenter[0]-shadows.hero[0])<.001);
+  assert(Math.abs(shadows.heroCenter[2]-shadows.hero[2])<.001);
   result.heroBefore=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.heroPosition);
   await page.screenshot({path:dir+'/'+name+'-portrait.png'});
   result.terrainDiagnostics=await page.evaluate(()=>{
@@ -325,6 +357,22 @@ fs.mkdirSync(dir,{recursive:true});
   // QA landscape screenshot starts at ?quality=low and overstates blur.
   await page.locator('#hud-toggle').click();
   await page.screenshot({path:dir+'/'+name+'-high-portrait.png'});
+  // Paused, identical camera/quality: isolate the actual contact-shadow gain.
+  await page.locator('#quick-pause').click();
+  await page.waitForTimeout(400);
+  await page.evaluate(()=>{
+   const m=window.BABYLON.EngineStore.LastCreatedScene.getMeshByName('infantry-contact-shadows');
+   m.isVisible=false;
+  });
+  await page.waitForTimeout(100);
+  await page.screenshot({path:dir+'/'+name+'-contact-before.png'});
+  await page.evaluate(()=>{
+   window.BABYLON.EngineStore.LastCreatedScene.getMeshByName('infantry-contact-shadows').isVisible=true;
+  });
+  await page.waitForTimeout(100);
+  await page.screenshot({path:dir+'/'+name+'-contact-after.png'});
+  await page.locator('#quick-pause').click();
+
   await page.locator('#hud-toggle').click();
   await page.locator('#quality-cycle').click();
   result.graphicsAuto=await page.evaluate(()=>window.__BATTLEFIELD_GAME__.graphics);

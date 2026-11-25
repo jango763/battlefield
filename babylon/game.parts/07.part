@@ -1,3 +1,4 @@
+     {heroKill:unit.isHero,armoured:false});
    }
   }
  }
@@ -26,7 +27,7 @@
   const mat=new B.StandardMaterial('blast glow',scene);
   mat.emissiveColor=color('#fd7a2d');mat.alpha=.45;
   sphere.material=mat;sphere.isPickable=false;
-  addEffect(sphere,.30,mat);
+  addEffect(sphere,.42,mat);fx[fx.length-1].dust=true;
  }
  if(unit===findActor()){
   const hit=result.hits.length?result.hits.map(h=>h.id+' −'+h.damage+' HP').join(', '):
@@ -132,4 +133,3 @@ function drawHud(){
  state.firstGameArmy=fieldOrders?.snapshot()||null;
  state.emplacements=support?.snapshot()||[];
  state.tactical=tacticalAI?.snapshot();
- state.heroCover=window.BattlefieldDefenseLayout.coverAt(world.defenses,hero,controller.getTarget(hero));

@@ -35,7 +35,7 @@ $('hud-toggle').addEventListener('click',()=>{
  $('hud-toggle').setAttribute('aria-pressed',String(!closed));
  $('hud-toggle').textContent=closed?'Меню':'Скрыть';
 });
-if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!joystickResponse||!adaptiveQuality||!infantryLighting||!replenishment||!window.BattlefieldWeaponRig){
+if(!B||!combat||!tactics||!presentation||!orders||!goldRules||!worldBuilder||!modernArt||!factions||!britishSoldier||!alliedModels||!alliedLoader||!characters||!nativeBlend||!joystickResponse||!adaptiveQuality||!infantryLighting||!window.BattlefieldInfantryContactShadows||!replenishment||!window.BattlefieldWeaponRig){
  const message='Не загружены Babylon.js или боевые модули. Проверьте подключение к сети.';
  $('loading').textContent=message;
  $('failure-text').textContent=message;
@@ -76,7 +76,7 @@ state.engineering={version:'10-stage-20261122',parts:10,privacy:'local-only',
  glbFallbacks:0,assetRetries:0,frameStats:{},source:'original-ww2-babylon'};
 window.__BATTLEFIELD_GAME__=state;
 let engine,scene,camera,asset,views=[],battle,controller,allies=[],enemies=[];
-let infantryFill=null;
+let infantryFill=null,contactShadows=null;
 let modelDepot=null,modelDepotRetryAfter=0;
 const motionDonors={germanRun:null,britishReady:null};
 // Cross-rig locomotion failed visual acceptance in the isolated soldier range.
@@ -239,6 +239,8 @@ function createWorld(){
  world.field=window.BattlefieldTacticalField.install({B,scene,world,layout:world.defenses,design:window.BattlefieldDefenseLayout});
  state.defenses={trenches:world.defenses.trenches.length,lines:2};
  state.optimization=world.field.optimization;
+ contactShadows=window.BattlefieldInfantryContactShadows.create({B,scene,world});
+ state.contactShadows=contactShadows.report;
  world.navigation=window.BattlefieldNavigation.create({obstacles:world.obstacles});
  state.navigation=world.navigation.stats;
  state.vehicleBounds=world.vehicleBounds;
@@ -836,7 +838,7 @@ function drawShot({unit,target,result,mount}){
   const mat=new B.StandardMaterial('blast glow',scene);
   mat.emissiveColor=color('#fd7a2d');mat.alpha=.45;
   sphere.material=mat;sphere.isPickable=false;
-  addEffect(sphere,.30,mat);
+  addEffect(sphere,.42,mat);fx[fx.length-1].dust=true;
  }
  if(unit===findActor()){
   const hit=result.hits.length?result.hits.map(h=>h.id+' −'+h.damage+' HP').join(', '):
@@ -1270,11 +1272,12 @@ function frame(){
    syncVisual(view);
    nativeBlend.update(view,dt);
   }
+  contactShadows.update(views);
   // Fixed original Three.js follow profile, without rotating on the joystick.
   if(allies[0]?.alive&&camera){
    // Leave room ahead to see enemies and cover, as in the original.
    const dest=position(allies[0],1.55).add(new B.Vector3(0,0,3.0));
-   camera.target=B.Vector3.Lerp(camera.target,dest,Math.min(1,dt*2.8));
+   camera.target=B.Vector3.Lerp(camera.target,dest,1-Math.exp(-dt*2.8));
   }
   const now=performance.now();
   // The five capture-ring meshes change slowly. Rebuilding the complete
@@ -1286,6 +1289,7 @@ function frame(){
  }
  for(let i=fx.length-1;i>=0;i--){
   const f=fx[i];f.ttl-=dt;
+  if(f.dust){const age=1-Math.max(0,f.ttl/.42);f.mesh.scaling.setAll(.22+.78*age);f.mesh.position.y+=dt*.75;f.material.alpha=.45*(1-age);f.material.emissiveColor.set(.95-age*.48,.45-age*.09,.13+age*.09);}
   if(f.flight){const t=Math.max(0,Math.min(1,1-f.ttl/f.flight.duration));f.mesh.position.copyFrom(B.Vector3.Lerp(f.flight.start,f.flight.end,t));f.mesh.position.y+=Math.sin(Math.PI*t)*2;}
   if(f.ttl<=0){
    if(f.pooled){f.pooled.active=false;f.mesh.setEnabled(false);}

@@ -18,6 +18,19 @@ const PLACES=Object.freeze([
  * Three original stucco buildings retain real navigation collisions at the
  * same approved scenery positions. No proprietary game art is required.
  */
+// Convex arched silhouette in local XY plane. Original low-poly geometry.
+function archGeometry(width,height,segments=12){
+ const radius=width/2,spring=height-radius;
+ const outline=[[-radius,0],[radius,0]];
+ for(let i=0;i<=segments;i++){
+  const angle=i*Math.PI/segments;
+  outline.push([radius*Math.cos(angle),spring+radius*Math.sin(angle)]);
+ }
+ const positions=[],uvs=[],indices=[];
+ for(const [x,y] of outline){positions.push(x,y,0);uvs.push(x/width+.5,y/height);}
+ for(let i=1;i<outline.length-1;i++)indices.push(0,i,i+1,0,i+1,i);
+ return {positions,uvs,indices};
+}
 function installNorthAfrica({scene,B,world}){
  const output={started:true,loaded:0,pending:0,finished:false,
   style:'libya-adobe-procedural',errors:[],assets:[],drawMeshes:0};
@@ -58,6 +71,16 @@ function installNorthAfrica({scene,B,world}){
  const dust=new B.StandardMaterial('libya-weathered-ochre',scene);
  dust.diffuseColor=B.Color3.FromHexString('#c5a47a');
  dust.specularColor=B.Color3.Black();
+ function arch(id,x,z,width,height,mat,baseY=0){
+  const mesh=new B.Mesh('libya-'+id,scene),data=new B.VertexData();
+  const shape=archGeometry(width,height),normals=[];
+  // Two-sided triangles with explicit normals avoid handedness-dependent culling.
+  for(let i=0;i<shape.positions.length/3;i++)normals.push(0,0,1);
+  Object.assign(data,shape,{normals});data.applyToMesh(mesh);
+  mesh.position.set(x-150,baseY,z-150);mesh.material=mat;
+  mesh.isPickable=false;mesh.receiveShadows=true;
+  output.drawMeshes++;return mesh;
+ }
  function cuboid(id,x,y,z,w,h,d,mat,rot=0){
   const m=B.MeshBuilder.CreateBox('libya-'+id,
    {width:w,height:h,depth:d},scene);
@@ -80,14 +103,19 @@ function installNorthAfrica({scene,B,world}){
    p.x+sx*(width/2),height+.57,p.z,wall,rise,depth+.66,sunStucco);
   for(const sz of [-1,1])cuboid('roof-rail-z-'+i+'-'+sz,
    p.x,height+.57,p.z+sz*depth/2,width+.66,rise,wall,sunStucco);
-  // Recessed door + sandstone lintel and two narrow shielded windows.
-  cuboid('deep-door-'+i,p.x,1.27,p.z+depth/2+.035,1.45,2.5,.10,recessed);
-  cuboid('door-lintel-'+i,p.x,2.55,p.z+depth/2+.14,1.9,.30,.40,stone);
-  for(const side of [-1,1]){
-   cuboid('window-'+i+'-'+side,p.x+side*width*.28,2.48,
-    p.z+depth/2+.045,.67,.89,.10,recessed);
-   cuboid('window-sill-'+i+'-'+side,p.x+side*width*.28,1.96,
-    p.z+depth/2+.16,.92,.18,.35,stone);
+  // Arched stone surrounds and dark inserts, on both camera-facing sides.
+  // All pieces remain visual details inside the existing collision footprint.
+  for(const face of [-1,1]){
+   const z=p.z+face*depth/2;
+   arch('door-surround-'+i+'-'+face,p.x,z+face*.025,1.84,2.78,stone);
+   arch('deep-door-'+i+'-'+face,p.x,z+face*.065,1.40,2.48,recessed);
+   for(const side of [-1,1]){
+    const x=p.x+side*width*.28;
+    arch('window-frame-'+i+'-'+face+'-'+side,x,z+face*.026,.91,1.11,sunStucco,1.94);
+    arch('window-'+i+'-'+face+'-'+side,x,z+face*.065,.67,.89,recessed,2.04);
+    cuboid('window-lintel-'+i+'-'+face+'-'+side,x,3.15,z+face*.12,.94,.18,.30,sunStucco);
+    cuboid('window-sill-'+i+'-'+face+'-'+side,x,1.94,z+face*.12,.92,.18,.30,stone);
+   }
   }
   // Patchy lower stucco and corner buttresses break the toy-box silhouette.
   for(const side of [-1,1]){
@@ -120,7 +148,30 @@ function installNorthAfrica({scene,B,world}){
 }
 async function install({scene,B,art,world}){
  if(art?.theatre==='north-africa-libya-sunlit-v1')
-  return installNorthAfrica({scene,B,world});
+  {
+   const report=installNorthAfrica({scene,B,world});
+   try{
+    const imported=await B.SceneLoader.ImportMeshAsync('', './art/models/', 'libya-arcade.glb', scene);
+    const source=imported.meshes.find(m=>m.getTotalVertices()>0);
+    if(!source)throw Error('Empty arcade model');
+    source.parent=null;source.rotationQuaternion=null;source.rotation.setAll(0);
+    source.isVisible=false;source.isPickable=false;
+    const candidates=world.nodes.filter(m=>/^(barrack-|farm-barn-)/.test(m.name)&&!m.name.includes('-roof-'));
+    report.arcades=0;
+    for(const shell of candidates){
+     const barn=shell.name.startsWith('farm-barn');
+     const roof=scene.getMeshByName(shell.name.replace(barn?'farm-barn-':'barrack-',barn?'farm-barn-roof-':'barrack-roof-'));
+     if(!roof)continue;
+     const instance=source.createInstance('libya-arcade-'+shell.name);
+     instance.position.set(shell.position.x,.09,shell.position.z);
+     instance.rotation.y=barn?Math.PI/2:0;
+     instance.scaling.set(barn?7/9:1,1,barn?5/5.4:1);
+     instance.isVisible=true;instance.isPickable=false;
+     shell.isVisible=false;roof.isVisible=false;report.arcades++;
+    }
+   }catch(error){report.errors.push(String(error));}
+   return report;
+  }
  if(!scene||!B||!art)throw Error('Missing historical village scene');
  const output={started:true,loaded:0,pending:PLACES.length,errors:[],assets:[]};
  window.__BF_CC0_VILLAGE__=output;
@@ -182,5 +233,5 @@ async function install({scene,B,art,world}){
  output.finished=true;
  return output;
 }
-return Object.freeze({install,PLACES});
+return Object.freeze({install,PLACES,archGeometry});
 });

@@ -40,7 +40,7 @@ const MAP=Object.freeze({
   {id:'north-base',team:TEAM_RED,x:150,z:275}]),
  farms:FARMS,
  pillboxes:Object.freeze([
-  {id:'center-left',x:104,z:148},{id:'center-south',x:150,z:128},
+  {id:'center-left',x:104,z:148},{id:'center-south',x:165,z:130},
   {id:'center-right',x:196,z:148},{id:'south-left',x:95,z:65},
   {id:'south-right',x:205,z:65},{id:'north-left',x:95,z:235},
   {id:'north-right',x:205,z:235}

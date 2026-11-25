@@ -12,7 +12,7 @@ assert.equal(typeof modernModule.apply,'function');
 assert.equal(modernModule.PROFILE,'modern-battlefield-pbr-v1');
 assert(html.includes('<script src="./modern-art-v1.js"></script>'));
 assert(html.includes('<script src="./modern-village-models.js"></script>'));
-assert(game.includes('villageModels.install({scene,B,art:state.modernArt})'));
+assert(game.includes('villageModels.install({scene,B,world,art:state.modernArt})'));
 assert(village.includes('B.SceneLoader.LoadAssetContainerAsync'));
 assert(village.includes('m.isPickable=false'));
 assert(village.includes('normandy-timber-house'));

@@ -1,3 +1,4 @@
+  current:task?.title||'Все цели выполнены',progress,
   target:task?.target||SESSION_OBJECTIVES.length,finished:!task};
  if(advanced&&gameStarted)alertStatus(task?
   'Задача выполнена! Следующая: '+task.title:
@@ -132,4 +133,3 @@ function drawShot({unit,target,result,mount}){
     // dead BOT starts exactly one five-minute game-time timer.
     economy.reportBotDeath(victim);
     economy.kill(unit.economyTeam,{team:victim.economyTeam},
-     {heroKill:unit.isHero,armoured:false});

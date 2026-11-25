@@ -74,27 +74,49 @@ const B={
  assert(m.inBase(150,25,'blue')&&!m.inBase(150,25,'red'));
  assert(m.inBase(150,275,'red')&&!m.inBase(150,275,'blue'));
  assert.equal(drawn.filter(n=>n.startsWith('farm-house-')).length,5);
- assert.equal(drawn.filter(n=>n.startsWith('pillbox-bunker-')).length,7);
+ const forts=m.nodes.filter(n=>n.name.startsWith('pillbox-bunker-'));
+ assert.equal(forts.length,7);
+ assert(forts.every(n=>n.hasCustomGeometry));
+ for(const fort of m.obstacles.filter(o=>o.type==='pillbox')){
+  for(const wreck of m.obstacles.filter(o=>o.type==='btr-wreck')){
+   assert(Math.abs(fort.x-wreck.x)>fort.hw+wreck.hw+2 ||
+    Math.abs(fort.z-wreck.z)>fort.hd+wreck.hd+2,'Keep the convoy clear of pillboxes');
+  }
+ }
  assert.equal(drawn.filter(n=>n.startsWith('legacy-btr-position-')).length,3);
  assert.equal(drawn.filter(n=>n.startsWith('tree-crown-')).length,0);
  assert.equal(drawn.filter(n=>n.startsWith('tree-top-')).length,0);
+ for(const tree of m.obstacles.filter(o=>o.type==='tree')){
+  assert(map.wrecks.every(w=>Math.hypot(w.x-tree.x,w.z-tree.z)>=7),
+   'Keep tree crowns clear of the convoy');
+ }
  const acacias=m.nodes.filter(n=>n.name.startsWith('north-africa-acacia-crown-'));
  assert.equal(acacias.length,2,'Two shared acacia canopy meshes limit draw calls');
  assert(acacias.every(m=>m.hasCustomGeometry&&m.generatedVertices>700),
   'Authored canopy geometry must have a true multi-lobed relief');
  assert(acacias.every(m=>m.material.disableLighting&&!m.isPickable),
   'Muted sage acacia canopies must remain matte and not block pointer taps');
+ assert.equal(drawn.filter(n=>n.startsWith('tree-trunk-')).length,0,
+  'Original dark telephone-pole cylinders must be replaced');
+ const trunks=m.nodes.filter(n=>n.name.startsWith('north-africa-tree-trunks-'));
+ assert.equal(trunks.length,2,'Only two indexed trunk draw batches allowed');
+ assert(trunks.every(m=>m.hasCustomGeometry&&m.generatedVertices>500),
+  'Tree bark should have real taper and curvature, not box proxies');
+ assert(trunks.every(m=>!m.isPickable),'Visual trunks must not intercept taps');
  assert.equal(m.obstacles.filter(o=>o.type==='tree').length,50,
   'Tree-trunk collisions must remain intact');
+ assert(m.obstacles.filter(o=>o.type==='tree').every(o=>
+  Math.abs(o.hw-.55)<1e-9&&Math.abs(o.hd-.55)<1e-9),
+  'Batched tree trunks must preserve original 1.1m obstacle footprints');
  assert(drawn.length>0);
  assert(m.nodes.some(x=>x.name==='north-africa-palm-fronds'),
   'One batched palm canopy must replace repetitive spherical forest');
  assert(m.nodes.find(x=>x.name==='north-africa-palm-fronds').hasCustomGeometry,
   'Palm geometry must be low-poly indexed triangles');
  const leaves=m.nodes.find(x=>x.name==='north-africa-palm-fronds');
- assert(leaves.generatedVertices>4500,
+ assert(leaves.generatedVertices>11000,
   'Palm silhouettes must include individual tapered leaflets');
- assert(leaves.generatedTriangles>2500,
+ assert(leaves.generatedTriangles>4500,
   'Palm leaflets must remain one batched indexed mesh');
  assert.equal(leaves.material.name,'map-palm-leaves');
  assert.equal(leaves.material.disableLighting,true,

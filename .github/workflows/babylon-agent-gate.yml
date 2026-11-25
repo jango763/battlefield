@@ -12,6 +12,13 @@ on:
   push:
     branches:
       - experiment/ai-agent-coordination-20261123
+      - experiment/babylon-agent-handoff-20261124
+      - experiment/babylon-cover-readability-20261124
+    paths:
+      - 'babylon/**'
+      - 'docs/**'
+      - 'AGENTS.md'
+      - '.github/workflows/babylon-agent-gate.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -35,10 +42,11 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" | node babylon/tools/check-ai-change-scope.cjs
+          git diff --name-only --no-renames "$BASE_SHA" "$HEAD_SHA" | node babylon/tools/check-ai-change-scope.cjs
       - name: Validate sources, contracts and offline gameplay regressions
         run: |
           node babylon/tests/test-agent-contract.cjs
+          node babylon/tests/test-adobe-arches.cjs
           node babylon/tools/assemble-game-parts.cjs --check
           node --check babylon/game.js
           node --check babylon/modern-art-v1.js
@@ -54,6 +62,10 @@ jobs:
           node babylon/tests/test-gold-economy.cjs
           node babylon/tests/test-first-game-behavior.cjs
           node babylon/tests/test-camera-joystick-checkpoint.cjs
+          node babylon/tests/test-infantry-contact-shadows.cjs
+          node babylon/tests/test-adaptive-quality.cjs
+          node babylon/tests/test-infantry-lighting.cjs
+          node babylon/tests/test-modern-art.cjs
           node babylon/tests/test-weapon-balance.cjs
           node babylon/tests/test-world-300.cjs
   mobile-webgl:

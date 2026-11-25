@@ -8,6 +8,8 @@ function install({B,scene,world,layout,design}){
  // Sunlit North African fieldwork palette.
  const earth=mat('earth','#b79b73'),timber=mat('timber','#917759'),sand=mat('sand','#d8bc8d');
  const rock=mat('rock','#c9ad82');
+ // Muted fabric variation separates overlapping sacks without texture noise.
+ const sandShade=mat('sand-shade','#c8ad83'),sandLight=mat('sand-light','#dfc69b');
  const optimizationDeferred={bermSegments:0,roofDetails:0};
  function box(name,x,y,z,w,h,d,m,rot=0){const o=B.MeshBuilder.CreateBox(name,{width:w,height:h,depth:d},scene);o.position.set(x-150,y,z-150);o.rotation.y=rot;o.material=m;o.isPickable=false;o.receiveShadows=true;meshes.push(o);return o;}
  // Rounded, staggered low-poly sacks: the former cuboid wall read as a
@@ -61,7 +63,7 @@ function install({B,scene,world,layout,design}){
     const count=layer?7:8,stagger=layer?.67:0;
     for(let i=0;i<count;i++)
      sandbag(id+'-'+layer+'-'+i,x-4.7+i*1.34+stagger,
-      .23+layer*.40,z,1.48,.46,1.12,sand,Math.sin(i*8+layer)*.045);
+      .23+layer*.40,z,1.48,.46,1.12,(i+layer)%5===0?sandShade:(i+layer)%5===2?sandLight:sand,Math.sin(i*8+layer)*.045);
    }
   }else if(f.type==='bunker'){
    for(const side of [-1,1]){
@@ -92,10 +94,16 @@ function install({B,scene,world,layout,design}){
  for(const def of layout.emplacements){
   const {x,z,id}=def,pivot=new B.TransformNode(id+'-turret',scene);pivot.position.set(x-150,0,z-150);
   function part(label,dx,y,dz,w,h,d,m){const p=box(id+'-'+label,x+dx,y,z+dz,w,h,d,m);p.setParent(pivot);return p;}
+  function roundPart(label,y,z,length,diameter){
+   const barrel=B.MeshBuilder.CreateCylinder(id+'-'+label,{
+    height:length,diameterTop:diameter*.84,diameterBottom:diameter,tessellation:12},scene);
+   barrel.parent=pivot;barrel.position.set(0,y,z);barrel.rotation.x=Math.PI/2;
+   barrel.material=metal;barrel.isPickable=false;meshes.push(barrel);
+  }
   if(def.kind==='cannon'){
    part('breech',0,1.15,-.25,.55,.48,.9,metal);
-   part('barrel',0,1.25,1.1,.19,.19,2.5,metal);
-   part('muzzle',0,1.25,2.42,.26,.26,.24,metal);
+   roundPart('barrel',1.25,1.1,2.5,.20);
+   roundPart('muzzle',1.25,2.42,.24,.26);
    part('shield',0,1.15,.15,2.35,1.7,.15,metal);
    part('axle',0,.62,-.25,2.7,.17,.2,metal);
    for(const side of [-1,1]){
@@ -105,7 +113,7 @@ function install({B,scene,world,layout,design}){
    }
   }else{
    part('receiver',0,1.25,0,.23,.25,.75,metal);
-   part('barrel',0,1.3,.95,.095,.095,1.35,metal);
+   roundPart('barrel',1.3,.95,1.35,.095);
    part('muzzle',0,1.3,1.65,.16,.16,.18,metal);
    part('stock',0,1.2,-.6,.18,.22,.5,timber);
    part('ammo-box',-.38,1.05,-.05,.38,.37,.45,metal);

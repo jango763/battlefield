@@ -1,3 +1,4 @@
+     // contact. Legacy German IK would deform this licensed British mesh.
      // Do not attach a second rifle or overwrite the approved pose.
      rig.weaponRigReady=true;
      rig.nativeBakedWeapon=true;
@@ -132,4 +133,3 @@ function advanceObjectives(hero,econ){
  const progress=task?(task.kind==='kills'?hero.kills:
   econ?.owners?.blue?.length||0):SESSION_OBJECTIVES.length;
  state.mission={completed:missionIndex,total:SESSION_OBJECTIVES.length,
-  current:task?.title||'Все цели выполнены',progress,
